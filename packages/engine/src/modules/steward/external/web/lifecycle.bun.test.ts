@@ -73,35 +73,37 @@ test("code-only updates preserve contracts, callback changes fail until re-regis
   expect(page?.keyed).toEqual(["read"]); expect(page?.needs).toEqual({ content: ["path", "request-key"] });
   f.state.tools.delete("read"); await expect(f.pages.get("alpha", "main")).rejects.toThrow("重新登记");
 });
-const app = (builtin: boolean) => {
-  const row = { id: builtin ? "fixture-agent" : "fixture-alpha", name: builtin ? "agent" : "alpha", builtin, status: "active", activeHash: (builtin ? "a" : "b").repeat(64) };
+const app = (name = "alpha") => {
+  const row = { id: `fixture-${name}`, name, builtin: false, status: "active", activeHash: "a".repeat(64) };
   return { ...row, ...moduleIdentity(row), health: {}, runs: [], versions: [{ hash: "f".repeat(64), status: "approved", createdAt: "2026-11-05" }] };
 };
-const overview = (builtin: boolean) => ({ app: app(builtin) });
+const overview = (name = "alpha") => ({ app: app(name) });
 const route = { id: "id", tab: "overview", session: "" };
 const contract = (target: string) => ({ target, description: "合同", inputSchema: { type: "object", properties: { files: { type: "array", items: { type: "object" } } } }, outputSchema: { type: "object" }, idempotent: false });
 test("contracts come from exact target prefixes and only user-discovered tools get forms", () => {
-  const view = overview(true), tools = [contract("agent.start"), contract("agent.status"), contract("other.agent"), contract("agent-extra.read")];
-  const result = detailSpec({ overview: view, tools, userTools: [contract("agent.status"), contract("other.agent")] }, { ...route, tab: "tools" });
+  const view = overview("pi"), tools = [contract("pi.configure"), contract("pi.models"), contract("other.pi"), contract("pi-extra.read")];
+  const result = detailSpec({ overview: view, tools, userTools: [contract("pi.models"), contract("other.pi")] }, { ...route, tab: "tools" });
   const nodes = Object.values(result.elements);
-  expect(nodes.filter(node => node.type === "ToolContract").map(node => (node.props.tool as { target: string }).target)).toEqual(["agent.start", "agent.status"]);
-  expect(nodes.filter(node => node.type === "ToolForm").map(node => (node.props.tool as { target: string }).target)).toEqual(["agent.status"]);
+  expect(nodes.filter(node => node.type === "ToolContract").map(node => (node.props.tool as { target: string }).target)).toEqual(["pi.configure", "pi.models"]);
+  expect(nodes.filter(node => node.type === "ToolForm").map(node => (node.props.tool as { target: string }).target)).toEqual(["pi.models"]);
   const noUser = detailSpec({ overview: view, tools }, { ...route, tab: "tools" });
   expect(Object.values(noUser.elements).some(node => node.type === "ToolForm")).toBe(false);
 });
-test.each([true, false])("capabilities gate removal and immutable version actions: builtin=%s", builtin => {
-  const view = overview(builtin);
+test.each(["pi", "alpha"])("ordinary %s capabilities gate removal and version actions", name => {
+  const view = overview(name);
+  expect(view.app).toMatchObject({ builtin: false, origin: "external" });
   const managed = Object.values(appsSpec({ apps: [view.app], systemApps: [] }).elements);
-  expect(managed.some(node => node.type === "AppRemoval")).toBe(!builtin);
+  expect(managed.some(node => node.type === "AppRemoval")).toBe(true);
   expect(Object.values(detailSpec({ overview: view }, route).elements).some(node => node.type === "AppRemoval" || node.type === "SystemAction")).toBe(false);
   const versions = JSON.stringify(detailSpec({ overview: view }, { ...route, tab: "versions" }));
-  expect(versions.includes("回滚到此版本")).toBe(!builtin);
-  view.app.capabilities = { ...view.app.capabilities, remove: false, disable: false, enable: false };
+  expect(versions.includes("回滚到此版本")).toBe(true);
+  view.app.capabilities = { ...view.app.capabilities, remove: false, disable: false, enable: false, rollback: false };
   const disabled = Object.values(appsSpec({ apps: [view.app], systemApps: [] }).elements);
   expect(disabled.some(node => node.type === "AppRemoval" || node.type === "SystemAction")).toBe(false);
+  expect(JSON.stringify(detailSpec({ overview: view }, { ...route, tab: "versions" }))).not.toContain("回滚到此版本");
 });
 test.each(["active", "paused", "migrating"])("application list owns lifecycle actions for %s apps", status => {
-  const current = { ...app(false), status };
+  const current = { ...app(), status };
   const result = appsSpec({ apps: [current], systemApps: [] });
   const nodes = Object.values(result.elements), control = nodes.find(node => node.type === "SystemAction");
   expect(nodes.some(node => node.type === "AppRemoval")).toBe(status !== "migrating");
@@ -111,29 +113,31 @@ test.each(["active", "paused", "migrating"])("application list owns lifecycle ac
   expect(missingActive.some(node => node.type === "AppRemoval" || node.type === "SystemAction")).toBe(false);
 });
 test("directory retains exactly kernel and module groups without distribution controls", () => {
-  const external = app(false), builtin = app(true);
-  const result = appsSpec({ apps: [builtin, external], systemApps: [{ name: "approvals", description: "审批" }] });
+  const external = app(), pi = app("pi");
+  expect([external, pi].filter(app => app.builtin)).toEqual([]);
+  const result = appsSpec({ apps: [pi, external], systemApps: [{ name: "approvals", description: "审批" }] });
   expect(Object.values(result.elements).filter(node => node.type === "Card").map(node => node.props.title)).toEqual(["内核", "模块"]);
   const text = JSON.stringify(result);
-  for (const value of [`/apps/${external.id}`, `/apps/${builtin.id}`, "/apps/system/approvals", "内置", "外置"]) expect(text).toContain(value);
+  for (const value of [`/apps/${external.id}`, `/apps/${pi.id}`, "/apps/system/approvals", "外置"]) expect(text).toContain(value);
+  expect(text).not.toContain("内置");
   expect(text).not.toContain("PackageInstall"); expect(text).not.toContain("安装目录");
 });
 test.each(["configured", "unconfigured", "registered"] as const)("kernel runtime %s remains factual and read-only", status => {
-  const runtime = { status, backend: status === "configured" ? "pi" : null, responsibility: "包装 Pi Agent", configuration: "修改启动配置后重启" };
+  const runtime = { status, backend: status === "configured" ? "pi" : null, responsibility: "治理 Agent 和已注册 Provider", configuration: "修改启动配置后重启" };
   const directory = appsSpec({ apps: [], systemApps: [{ name: "agent", description: "执行能力", runtime }] });
   expect(JSON.stringify(directory)).toContain(status === "configured" ? "后端已配置：pi" : status === "unconfigured" ? "后端未配置" : "已注册 · 按需使用");
   for (const tab of ["overview", "tools"]) {
-    const result = detailSpec({ overview: { description: "执行能力", runtime }, tools: [contract("agent.start")], userTools: [contract("agent.start")] }, { id: "agent", tab, session: "" }, true);
+    const result = detailSpec({ overview: { description: "执行能力", runtime }, tools: [contract("agent.run")], userTools: [contract("agent.run")] }, { id: "agent", tab, session: "" }, true);
     const nodes = Object.values(result.elements), text = JSON.stringify(result);
     expect(result.elements[result.root]!.props.title).toBe("agent · 内核");
     expect(text).toContain("内核接口");
     expect(nodes.some(node => ["SystemAction", "AppRemoval", "ToolForm", "SettingsForm"].includes(node.type))).toBe(false);
     if (tab === "overview") expect(text).toContain("修改启动配置后重启");
-    else expect(text).toContain("agent.start");
+    else expect(text).toContain("agent.run");
   }
 });
-test.each(["web", "notify"])("preinstalled %s retains ordinary lifecycle and version history", name => {
-  const current = { ...app(false), name };
+test.each(["pi", "web", "notify"])("preinstalled %s retains ordinary lifecycle and version history", name => {
+  const current = app(name);
   const nodes = Object.values(appsSpec({ apps: [current], systemApps: [] }).elements);
   expect(nodes.find(node => node.type === "AppRemoval")?.props.name).toBe(name);
   expect(nodes.find(node => node.type === "SystemAction")?.props.tool).toBe("module-disable");
@@ -142,7 +146,7 @@ test.each(["web", "notify"])("preinstalled %s retains ordinary lifecycle and ver
   expect(unavailable.some(node => node.type === "AppRemoval")).toBe(false);
 });
 test("old configuration tabs and health reports do not invent supported actions", () => {
-  const view = overview(false);
+  const view = overview();
   Object.assign(view.app.health, { runtime: { state: "running" }, healthCheck: true, readiness: { summary: "stale report" } });
   for (const tab of ["overview", "settings", "permissions"]) {
     const result = JSON.stringify(detailSpec({ overview: view }, { ...route, tab }));

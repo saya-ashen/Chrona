@@ -253,6 +253,7 @@ async function commandWork(context: CodingContext, registry: WorkRegistry, comma
   return forwardExecution(context, view, command);
 }
 export function handleWorkCommand(context: CodingContext, command: WorkCommand): Promise<unknown> {
+  if (command.op === "start") return Promise.reject(codingError("unsupported", "Workspace placement and trusted source receipts are unavailable through the generic Agent API"));
   if (command.op === "events") {
     // A history read must not hold the business journal lock while waiting for events.
     return serializeWork(async () => findWork(await readRegistry(context), command.workId).view)

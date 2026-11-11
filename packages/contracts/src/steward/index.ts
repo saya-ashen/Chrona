@@ -17,6 +17,7 @@ export { moduleToolParameterSchema, type ModuleToolParameter } from "./module-in
 export { moduleOutputSchema, compileModuleOutput } from "./module-output";
 import type { ProviderEvents } from "./provider";
 export * from "./provider";
+export * from "./agent-provider";
 export * from "./execution";
 export * from "./kernel-execution";
 export * from "./execution-events";
@@ -162,8 +163,8 @@ export const moduleManifestSchema = z.object({
    * A name alone, or (v2-16 §2.1) the fields the page should ask for: fixed `fields`, `extraFields` for user-named keys (one per account), `oauth` for a kernel-run authorization (v2-30 §4).
    */
   secrets: z.array(z.union([SECRET_NAME_SCHEMA, secretSpecSchema])).max(50).default([]),
-  /** Required with `uses: agent.complete`: a declared tier plus hard per-event limits. Agent owns model selection. */
-  model: z.object({ tier: modelTier, maxCalls: z.number().int().min(1).max(20), maxOutputTokens: z.number().int().min(1).max(32_000) }).strict().optional(),
+  /** Hard per-event limits for completion runs; Provider owns model selection. */
+  model: z.object({ tier: modelTier.optional(), maxCalls: z.number().int().min(1).max(20), maxOutputTokens: z.number().int().min(1).max(32_000) }).strict().optional(),
   effects: z.array(z.enum(MODULE_EFFECTS)).max(MODULE_EFFECTS.length),
   params: z.record(slug, z.object({ type: z.enum(["number", "string", "boolean"]), value: z.union([z.number(), z.string().max(2000), z.boolean()]) }).strict()).default({}),
   data: z.object({ schema: z.number().int().min(1), migrate: z.string().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/).optional() }).strict().default({ schema: 1 }),
@@ -182,7 +183,7 @@ export const moduleManifestSchema = z.object({
   if (manifest.listen && !manifest.keepAlive) ctx.addIssue({ code: "custom", path: ["listen"], message: "listen requires keepAlive" });
   if (listenPaths(manifest).some(own => RESERVED_LISTEN_PATHS.some(path => own === path || own.startsWith(`${path}-`)))) ctx.addIssue({ code: "custom", path: ["listen"], message: "Path is reserved by Chrona" });
   if (new Set(listenPaths(manifest)).size !== listenPaths(manifest).length) ctx.addIssue({ code: "custom", path: ["listen"], message: "Listen paths must be unique" });
-  if (grantedUses(manifest).some(target => target === "agent.complete") !== !!manifest.model) ctx.addIssue({ code: "custom", path: ["model"], message: "Declare model limits exactly when the module uses agent.complete" });
+  if (manifest.model && !grantedUses(manifest).some(target => target === "agent.run" || target === "*")) ctx.addIssue({ code: "custom", path: ["model"], message: "Model limits require agent.run" });
   const names = new Set<string>();
   manifest.tools.forEach((tool, index) => {
     if (names.has(tool.name)) ctx.addIssue({ code: "custom", path: ["tools", index, "name"], message: "Tool names must be unique" });
@@ -256,7 +257,7 @@ export function grantedUses(manifest: { uses?: readonly string[]; secrets?: read
 /** Default notification application target; no kernel routing privilege. */
 export const NOTIFY_INTERFACE = "notify.send";
 /** Chrona's in-process system modules: reached by routed calls like modules, but part of Chrona (not proposable, not sandboxed). */
-export const SYSTEM_MODULES = ["approvals", "modules", "settings", "secrets", "activity", "timers"] as const;
+export const SYSTEM_MODULES = ["approvals", "modules", "settings", "secrets", "activity", "timers", "agent"] as const;
 /** Longest call path; synchronous calls are refused when the target is already on their path (it is waiting). */
 export const MAX_CALL_DEPTH = 6;
 /** A saved registration may only call this exact app identity and tool contract; this grants no access. */
@@ -420,8 +421,10 @@ export type ProviderRunInput = {
   prompt: string; images?: { mime: string; base64: string }[]; deadline: Date | null;
   /** Trusted platform instructions; module/user task text belongs in prompt, never here. */
   systemPrompt: string;
-  /** Kernel-selected resource scope; minimal excludes Chrona tools and configured skills/extensions. */
+  /** Legacy resource hint; user-selected Provider resources remain available. */
   resources: "configured" | "minimal";
+  /** Backend-specific options; cannot change kernel-bound Run identity or authority. */
+  providerOptions?: Record<string, unknown>;
   /** Exact provider/model for an owner-authorized build; must be verified before any prompt. */
   model?: string;
   /** Module tool names (m_*) declared up front; Providers with tool allowlists must admit them. */
@@ -448,12 +451,12 @@ export type ProviderAdapter = {
   name: string;
   supportsRunModel?: boolean;
   health(): Promise<{ available: boolean; sandboxed: boolean; error: string | null }>;
-  /** One completion with `model`: no tools, session or fallback model (`agent.complete`). Absent: unconfigured. */
+  /** Internal adapter completion: no tools, session or fallback model. Public callers use agent.run with kind: completion. */
   complete?(input: { model: string; thinking?: (typeof THINKING_LEVELS)[number]; system?: string; prompt: string; maxOutputTokens: number; timeoutMs: number }): Promise<{ text: string; inputTokens: number | null; outputTokens: number | null }>;
   /** Read normalized session history without exposing backend file formats to the kernel. */
   transcript?(input: { sessionDir: string; limit: number }): Promise<ProviderTranscriptItem[]>;
   /** Starts a run; returns a handle that can receive messages while running. */
-  start(input: ProviderRunInput): { inject(message: string, images?: { mime: string; base64: string }[]): Promise<void>; abort(): Promise<void>; done: Promise<{ outcome: "finished" | "failed" | "timed_out" | "unavailable"; sessionId: string | null; error: string | null }> };
+  start(input: ProviderRunInput): { native?(request: Record<string, unknown>): Promise<Record<string, unknown>>; inject(message: string, images?: { mime: string; base64: string }[]): Promise<void>; abort(): Promise<void>; done: Promise<{ outcome: "finished" | "failed" | "timed_out" | "unavailable"; sessionId: string | null; error: string | null }> };
 };
 
 // ---------------------------------------------------------------- types ----

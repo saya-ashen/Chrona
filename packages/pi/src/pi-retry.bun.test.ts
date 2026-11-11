@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -11,24 +11,27 @@ afterEach(async () => {
   await Promise.all(directories.splice(0).map(path => rm(path, { recursive: true, force: true })));
 });
 
-// Synthetic Pi 1.5 RPC only. It reads caps at startup and implements only the enabled
-// RPC setter, as Pi does. Backoff is shortened; the actual configured delays are asserted.
-async function fixture(mode = "recover", withSettings = true) {
+// Synthetic Pi 1.5 RPC only. Recovery uses finite retries explicitly chosen in the
+// user's settings. Timers are shortened; the configured delays remain observable.
+async function fixture(mode = "recover", settingsSource?: string | null) {
   const cwd = await mkdtemp(join(tmpdir(), "chrona-pi-retry-"));
   const agentDir = await mkdtemp(join(tmpdir(), "chrona-pi-retry-profile-"));
   directories.push(cwd, agentDir);
   const command = join(cwd, "fake-pi"), extension = join(cwd, "bridge.ts");
-  const original = JSON.stringify({ defaultModel: "retained", compaction: { enabled: true, reserveTokens: 1234 },
-    retry: { enabled: false, maxRetries: 1000000, baseDelayMs: 1000000000, maxAgentDelayMs: 1000000000,
-      provider: { maxRetries: 1000000, timeoutMs: 12345 } } });
-  if (withSettings) await writeFile(join(agentDir, "settings.json"), original);
+  const original = settingsSource === undefined ? JSON.stringify({ defaultModel: "retained", compaction: { enabled: true, reserveTokens: 1234 },
+    retry: { enabled: true, maxRetries: 3, baseDelayMs: 17, maxAgentDelayMs: 43,
+      provider: { maxRetries: 9, timeoutMs: 12345 } } }) : settingsSource;
+  if (original !== null) await writeFile(join(agentDir, "settings.json"), original);
   await writeFile(extension, "");
   await writeFile(command, `#!${process.execPath}
-import {appendFileSync,readFileSync,writeFileSync} from 'node:fs';
+import {appendFileSync,existsSync,readFileSync,writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 if(process.argv.includes('--version')){console.log('1.5.0');process.exit(0)}
 const mode=${JSON.stringify(mode)}, profile=process.env.PI_CODING_AGENT_DIR;
-const settings=JSON.parse(readFileSync(join(profile,'settings.json'),'utf8'));
+const settingsPath=join(profile,'settings.json');
+const raw=existsSync(settingsPath)?readFileSync(settingsPath,'utf8').replace(/^\\uFEFF/,'').trim():'';
+const settings=raw?JSON.parse(raw):{};
+const retry={...settings.retry};
 writeFileSync('launch.json',JSON.stringify({profile,settings,args:process.argv.slice(2)}));
 let streaming=false, retrying=false, attempt=0, aborted=false, timer;
 const emit=x=>process.stdout.write(JSON.stringify(x)+'\\n');
@@ -49,17 +52,19 @@ function run(){
   emit({type:'auto_retry_end',success:false,attempt,finalError:mode==='terminal-empty'?'':mode==='terminal-missing'?undefined:'terminal '+process.env.CHRONA_AGENT_TOKEN});
   timer=setTimeout(settle,100);return;
  }
- const recovered=mode==='recover'&&attempt===settings.retry.maxRetries;
+ const recovered=mode==='success'||mode==='recover'&&attempt===retry.maxRetries;
  const message=recovered?{role:'assistant',stopReason:'stop',content:[{type:'text',text:'Recovered'}]}:
   failure(mode==='permanent'?'401 unauthorized':mode==='overflow'?'context length exceeded':'upstream_stream_read_error '+process.env.CHRONA_AGENT_TOKEN);
  emit({type:'message_end',message});streaming=false;
- const willRetry=!recovered&&!['permanent','overflow'].includes(mode)&&settings.retry.enabled&&attempt<settings.retry.maxRetries;
+ const willRetry=!recovered&&!['permanent','overflow'].includes(mode)&&retry.enabled&&attempt<retry.maxRetries;
  emit({type:'agent_end',messages:[message],willRetry});
  if(willRetry){
   // No settled event in the gap between a model failure and recovery scheduling.
   timer=setTimeout(()=>{
    retrying=true;attempt++;
-   emit({type:'auto_retry_start',attempt,maxAttempts:settings.retry.maxRetries,delayMs:Math.min(settings.retry.baseDelayMs*2**(attempt-1),settings.retry.maxAgentDelayMs),errorMessage:message.errorMessage});
+   const recovery={attempt,maxAttempts:retry.maxRetries,delayMs:Math.min(retry.baseDelayMs*2**(attempt-1),retry.maxAgentDelayMs)};
+   appendFileSync('retries.jsonl',JSON.stringify(recovery)+'\\n');
+   emit({type:'auto_retry_start',...recovery,errorMessage:message.errorMessage});
    mark('retry-wait');
    if(mode!=='retry-wait')timer=setTimeout(run,25);
   },25);
@@ -73,7 +78,7 @@ process.stdin.on('data',chunk=>{buffer+=chunk;let n;while((n=buffer.indexOf('\\n
  const c=JSON.parse(buffer.slice(0,n));buffer=buffer.slice(n+1);appendFileSync('commands.jsonl',JSON.stringify(c)+'\\n');
  if(c.type==='get_state')reply(c,{sessionId:'retry-session',model:{provider:'openai',id:'pinned'},isStreaming:streaming,isCompacting:false,pendingMessageCount:0});
  if(c.type==='get_commands')reply(c,{commands:[]});
- if(c.type==='set_auto_retry'){settings.retry.enabled=c.enabled;reply(c)}
+ if(c.type==='set_auto_retry'){retry.enabled=c.enabled;settings.retry={...settings.retry,enabled:c.enabled};reply(c)}
  if(c.type==='set_auto_compaction'){settings.compaction={...settings.compaction,enabled:c.enabled};reply(c)}
  if(c.type==='prompt'){writeFileSync('prompt-settings.json',JSON.stringify(settings));reply(c);run()}
  if(c.type==='clear_queue')reply(c,{steering:[],followUp:[]});
@@ -102,35 +107,60 @@ test.each([
   const result = await f.provider.start({ ...f.input, ...selection, executionBudget: { maxToolCalls: 1 } }).done;
   expect(result).toEqual({ outcome: "finished", sessionId: "retry-session", error: null });
   const launch = await f.json("launch.json"), settings = await f.json("prompt-settings.json");
-  expect(launch.profile.startsWith(join(f.agentDir, "build-"))).toBe(true);
-  expect(existsSync(launch.profile)).toBe(false);
-  expect(launch.settings.retry).toEqual({ enabled: true, maxRetries: 2, baseDelayMs: 2000, maxAgentDelayMs: 8000, provider: { maxRetries: 0, timeoutMs: 12345 } });
-  expect(settings.retry).toEqual(launch.settings.retry);
-  expect(settings.compaction).toEqual({ enabled: false, reserveTokens: 1234 });
-  expect(settings.defaultModel).toBe("retained");
-  expect(launch.args).toContain("--no-approve");
+  expect(launch.profile).toBe(f.agentDir);
+  expect(await readdir(f.agentDir)).toEqual(["settings.json"]);
+  expect(launch.settings).toEqual(JSON.parse(f.original!));
+  expect(settings).toEqual(launch.settings);
+  expect(launch.args).not.toContain("--no-approve");
   if (selection.model) expect(launch.args[launch.args.indexOf("--model") + 1]).toBe(selection.model);
-  expect(await readFile(join(f.agentDir, "settings.json"), "utf8")).toBe(f.original);
-  expect(await f.lines("attempts.jsonl")).toEqual([{ attempt: 0 }, { attempt: 1 }, { attempt: 2 }]);
+  expect(await readFile(join(f.agentDir, "settings.json"), "utf8")).toBe(f.original!);
+  expect(await f.lines("attempts.jsonl")).toEqual([{ attempt: 0 }, { attempt: 1 }, { attempt: 2 }, { attempt: 3 }]);
+  expect(await f.lines("retries.jsonl")).toEqual([
+    { attempt: 1, maxAttempts: 3, delayMs: 17 },
+    { attempt: 2, maxAttempts: 3, delayMs: 34 },
+    { attempt: 3, maxAttempts: 3, delayMs: 43 },
+  ]);
   expect(await f.lines("effects.jsonl")).toEqual([{ id: "effect-before-error" }]);
   const commands = await f.lines("commands.jsonl");
   expect(commands.filter(c => c.type === "prompt")).toHaveLength(1);
-  expect(commands.filter(c => c.type === "set_auto_retry")).toEqual([expect.objectContaining({ enabled: true })]);
-  expect(commands.findIndex(c => c.type === "set_auto_compaction")).toBeLessThan(commands.findIndex(c => c.type === "prompt"));
+  expect(commands.filter(c => ["set_auto_retry", "set_auto_compaction"].includes(String(c.type)))).toEqual([]);
   expect(existsSync(join(f.cwd, "settled"))).toBe(true);
   expect(existsSync(join(f.cwd, "closed"))).toBe(true);
 });
 
-test.each(["missing", "empty", "bom", "bom-only"])("%s settings still get finite caps", async format => {
-  const f = await fixture("recover", false);
+test.each(["missing", "empty", "bom", "bom-only"])("%s user settings are left unchanged", async format => {
+  const original = format === "missing" ? null : format === "bom" ? '\uFEFF{ "retry": { "enabled": false }, "theme": "retained" }\n' : format === "bom-only" ? "\uFEFF" : "";
+  const f = await fixture("success", original);
   const settingsPath = join(f.agentDir, "settings.json");
-  const original = format === "bom" ? "\uFEFF" + f.original : format === "bom-only" ? "\uFEFF" : "";
-  if (format !== "missing") await writeFile(settingsPath, original);
-  const result = await f.provider.start(f.input).done;
+  const result = await f.provider.start({ ...f.input, model: "openai/pinned" }).done;
   expect(result.outcome).toBe("finished");
-  expect((await f.json("launch.json")).settings.retry).toMatchObject({ maxRetries: 2, provider: { maxRetries: 0 } });
-  if (format === "missing") expect(existsSync(settingsPath)).toBe(false);
+  const launch = await f.json("launch.json");
+  expect(launch.profile).toBe(f.agentDir);
+  expect(launch.settings).toEqual(format === "bom" ? { retry: { enabled: false }, theme: "retained" } : {});
+  expect(await f.json("prompt-settings.json")).toEqual(launch.settings);
+  expect((await f.lines("commands.jsonl")).filter(c => ["set_auto_retry", "set_auto_compaction"].includes(String(c.type)))).toEqual([]);
+  expect(await readdir(f.agentDir)).toEqual(original === null ? [] : ["settings.json"]);
+  if (original === null) expect(existsSync(settingsPath)).toBe(false);
   else expect(await readFile(settingsPath, "utf8")).toBe(original);
+});
+
+test.each(["minimal", "configured"] as const)("disabled user retries stay disabled with %s resources", async resources => {
+  const original = '{ "retry": { "enabled": false, "maxRetries": 73, "baseDelayMs": 999999, "provider": { "maxRetries": 11 } }, "compaction": { "enabled": true } }\n';
+  const f = await fixture("exhaust", original);
+  const result = await f.provider.start({ ...f.input, resources, model: "openai/pinned" }).done;
+  expect(result.outcome).toBe("failed");
+  expect(result.error).toContain("[redacted]");
+  expect(result.error).not.toContain(f.input.token);
+  expect(await f.lines("attempts.jsonl")).toEqual([{ attempt: 0 }]);
+  expect(await f.lines("effects.jsonl")).toEqual([{ id: "effect-before-error" }]);
+  expect(existsSync(join(f.cwd, "retries.jsonl"))).toBe(false);
+  const commands = await f.lines("commands.jsonl");
+  expect(commands.filter(c => c.type === "prompt")).toHaveLength(1);
+  expect(commands.filter(c => ["set_auto_retry", "set_auto_compaction"].includes(String(c.type)))).toEqual([]);
+  expect(await f.json("prompt-settings.json")).toEqual(JSON.parse(original));
+  expect(await readFile(join(f.agentDir, "settings.json"), "utf8")).toBe(original);
+  expect(existsSync(join(f.cwd, "settled"))).toBe(true);
+  expect(existsSync(join(f.cwd, "closed"))).toBe(true);
 });
 
 test.each(["exhaust", "permanent", "overflow", "terminal-event", "terminal-empty", "terminal-missing"])("%s fails at the settled boundary without replay", async mode => {
@@ -138,7 +168,7 @@ test.each(["exhaust", "permanent", "overflow", "terminal-event", "terminal-empty
   expect(result.outcome).toBe("failed");
   expect(result.error).not.toContain(f.input.token);
   expect(result.error).toContain(mode === "permanent" ? "401 unauthorized" : mode === "overflow" ? "context length exceeded" : ["terminal-empty", "terminal-missing"].includes(mode) ? "Pi model retry failed" : "[redacted]");
-  expect(await f.lines("attempts.jsonl")).toHaveLength(mode === "exhaust" ? 3 : mode.startsWith("terminal-") ? 2 : 1);
+  expect(await f.lines("attempts.jsonl")).toHaveLength(mode === "exhaust" ? 4 : mode.startsWith("terminal-") ? 2 : 1);
   expect((await f.lines("commands.jsonl")).filter(c => c.type === "prompt")).toHaveLength(1);
   expect(await f.lines("effects.jsonl")).toEqual([{ id: "effect-before-error" }]);
   expect(existsSync(join(f.cwd, "settled"))).toBe(true);

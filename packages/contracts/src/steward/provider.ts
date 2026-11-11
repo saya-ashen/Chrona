@@ -41,6 +41,8 @@ export type ProviderAnswer = z.infer<typeof providerAnswerSchema>;
 export type ProviderInteraction = z.infer<typeof providerInteractionSchema>;
 export type ProviderRunView = z.infer<typeof providerRunViewSchema>;
 export type ProviderEvents = {
+  /** Bounded redacted native protocol event, retained under the owning Run. */
+  raw?(value: Record<string, unknown>): Promise<void>;
   progress(value: ProviderProgress): Promise<void>;
   usage(value: ProviderUsage): Promise<void>;
   resources(value: ProviderResources): Promise<void>;

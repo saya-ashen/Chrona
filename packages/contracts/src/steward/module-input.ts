@@ -2,18 +2,18 @@ import { z } from "zod";
 
 export type ModuleToolParameter =
   | { anyOf: ModuleToolParameter[]; type?: never; description?: string }
-  | { type: ("string" | "number" | "boolean")[]; description?: string }
+  | { type: ("string" | "number" | "boolean" | "null")[]; description?: string }
   | { type: "string"; description?: string; enum?: string[] }
-  | { type: "number" | "boolean"; description?: string }
+  | { type: "number" | "boolean" | "null"; description?: string }
   | { type: "array"; description?: string; items: ModuleToolParameter }
   | { type: "object"; description?: string; properties: Record<string, ModuleToolParameter>; required?: string[]; additionalProperties?: boolean };
 
 const description = z.string().max(300).optional();
 const parameter: z.ZodType<ModuleToolParameter> = z.lazy(() => z.union([
   z.object({ anyOf: z.array(parameter).min(1).max(10), description }).strict(),
-  z.object({ type: z.array(z.enum(["string", "number", "boolean"])).min(2).max(3), description }).strict(),
+  z.object({ type: z.array(z.enum(["string", "number", "boolean", "null"])).min(2).max(4), description }).strict(),
   z.object({ type: z.literal("string"), description, enum: z.array(z.string().max(100)).min(1).max(20).optional() }).strict(),
-  z.object({ type: z.enum(["number", "boolean"]), description }).strict(),
+  z.object({ type: z.enum(["number", "boolean", "null"]), description }).strict(),
   z.object({ type: z.literal("array"), description, items: parameter }).strict(),
   z.object({ type: z.literal("object"), description, properties: z.record(z.string().min(1).max(100), parameter), required: z.array(z.string().min(1).max(100)).default([]), additionalProperties: z.boolean().default(false) }).strict()
     .refine(value => value.required.every(key => Object.hasOwn(value.properties, key)), "Required fields must be declared in properties"),

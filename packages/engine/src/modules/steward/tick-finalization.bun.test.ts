@@ -1,11 +1,12 @@
+import { testProviderPorts } from "./test-provider";
 import { expect, test } from "bun:test";
 import "./module-effects";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { ExecutionPrincipal, ProviderAdapter, ProviderRunInput } from "@chrona/contracts/steward";
-import { admitContextPrimitive } from "./agent-context";
+import type { ProviderAdapter, ProviderRunInput } from "@chrona/contracts/steward";
+import { callSync, kernelOrigin } from "./module-calls";
 import { moduleSupervisor } from "./module-supervisor";
 import { testModuleSandbox } from "./module-test-process";
 import { liveRuns } from "./runs";
@@ -33,15 +34,15 @@ test.each([
       starts.push(input);
       return { done: completion.promise, async inject() {}, async abort() {} };
     } } };
+  await testProviderPorts(ports);
   const tick = createTick(ports);
   let runId: string | undefined;
   try {
     const workspaceId = (await db.workspace.create({ data: { name: "finalization" } })).id;
     const module = await db.module.create({ data: { workspaceId, name: "fixture-app", activeHash: "hash", status: "active" } });
-    await db.moduleVersion.create({ data: { moduleId: module.id, hash: "hash", manifest: { name: "fixture-app", entry: "index.ts", keepAlive: true, effects: [], uses: [], tests: ["test.ts"] }, status: "approved", source: "user", intent: {}, report: {} } });
-    const principal: ExecutionPrincipal = { workspaceId, ownerId: "owner", caller: { kind: "module", moduleId: module.id, hash: "hash" } };
-    const context = await admitContextPrimitive(ports, principal, "context", { requestKey: "context" }) as { contextId: string };
-    const run = await admitContextPrimitive(ports, principal, "run", { ...context, requestKey: "run", lane: "foreground", prompt: "Work once", tools: [], content: [] }) as { runId: string };
+    await db.moduleVersion.create({ data: { moduleId: module.id, hash: "hash", manifest: { name: "fixture-app", entry: "index.ts", keepAlive: true, effects: [], uses: ["agent.run", "agent.read"], tests: ["test.ts"] }, status: "approved", source: "user", intent: {}, report: {} } });
+    const origin = { ...kernelOrigin(workspaceId), caller: { kind: "module" as const, module: module.name, moduleId: module.id, hash: "hash" } };
+    const run = (await callSync(ports, origin, "agent.run", { prompt: "Work once" }, { key: "run" })).output as { runId: string; contextId: string };
     runId = run.runId;
     expect((await tick()).failures).toEqual([]);
     await tick.settled();
@@ -58,7 +59,7 @@ test.each([
     expect(await db.audit.count({ where: { kind: "run_finalize_failed", subjectId: runId } })).toBe(1);
     expect(await db.audit.count({ where: { kind: "run_finished", subjectId: runId } })).toBe(0);
     expect(await db.run.findUniqueOrThrow({ where: { id: runId } })).toMatchObject({ status: "running", endedAt: null });
-    expect((await db.session.findUniqueOrThrow({ where: { id: context.contextId } })).providerSessionId).toBeNull();
+    expect((await db.session.findUniqueOrThrow({ where: { id: run.contextId } })).providerSessionId).toBeNull();
     expect(finished).toEqual([]);
     await db.$executeRawUnsafe("DROP TRIGGER fail_run_finish");
 
@@ -68,9 +69,9 @@ test.each([
     expect((await tick()).failures).toEqual([]);
     await tick.settled({ includeRuns: true });
     const status = item.cancel ? "cancelled" : item.outcome;
-    expect(await db.run.findUniqueOrThrow({ where: { id: runId } })).toMatchObject({ status, error: item.reject ? "Execution stop is unconfirmed" : item.cancel ? "Cancelled by owner" : item.error, endedAt: time });
-    expect((await db.session.findUniqueOrThrow({ where: { id: context.contextId } })).providerSessionId).toBe(item.reject ? null : "original-provider-session");
-    expect(await admitContextPrimitive(ports, principal, "get", { runId })).toMatchObject({ status: item.reject ? "unknown" : status, active: item.reject });
+    expect(await db.run.findUniqueOrThrow({ where: { id: runId } })).toMatchObject({ status, stopStatus: item.reject ? "unknown" : "confirmed", error: item.reject ? "Execution stop is unconfirmed" : item.cancel ? "Cancelled by owner" : item.error, endedAt: time });
+    expect((await db.session.findUniqueOrThrow({ where: { id: run.contextId } })).providerSessionId).toBe(item.reject ? null : "original-provider-session");
+    expect((await callSync(ports, origin, "agent.read", { runId })).output).toMatchObject({ run: { status: item.reject ? "unknown" : status, active: item.reject } });
     expect(finished).toEqual([runId]);
     expect(await db.audit.count({ where: { kind: "run_finished", subjectId: runId } })).toBe(1);
     expect((await tick()).failures).toEqual([]);

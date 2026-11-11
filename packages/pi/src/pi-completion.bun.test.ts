@@ -185,3 +185,50 @@ test("unknown completion closure rejects and retains private files instead of pu
   expect((await stat(launch.cwd)).isDirectory()).toBe(true);
   expect(await readFile(join(launch.cwd, "token-limit.applied"), "utf8")).toBe(String(f.input.maxOutputTokens));
 });
+
+async function waitForLaunch(f: Awaited<ReturnType<typeof fixture>>) {
+  for (let count = 0; count < 200; count++) {
+    if (await readFile(f.launch, "utf8").catch(() => null)) return;
+    await Bun.sleep(5);
+  }
+  throw new Error("Fake Pi did not launch");
+}
+test("abort waits for actual process closure before reporting cancelled and removing private files", async () => {
+  const f = await fixture("hang"), controller = new AbortController();
+  let confirm!: () => void, actualClosed!: Promise<unknown>, settled = false;
+  const closure = new Promise<void>(resolve => { confirm = resolve; });
+  const complete = createPiCompletion({ ...f.providerOptions, launch(input) {
+    const child = launchPiProcess(input);
+    if (input.args.includes("--version")) return child;
+    actualClosed = child.closed;
+    return { ...child, closed: child.closed.then(async value => { await closure; return value; }) };
+  } });
+  const done = complete({ ...f.input, signal: controller.signal }).then(() => { settled = true; return null; }, error => { settled = true; return error; });
+  try {
+    await waitForLaunch(f); controller.abort(); await actualClosed;
+    await Bun.sleep(10); expect(settled).toBe(false);
+    const launch = JSON.parse(await readFile(f.launch, "utf8"));
+    expect((await stat(launch.cwd)).isDirectory()).toBe(true);
+    confirm();
+    expect(await done).toMatchObject({ code: "cancelled", stopped: true });
+    await expectStoppedAndCleaned(f);
+  } finally { confirm(); controller.abort(); await done; }
+});
+
+test("abort cannot claim cancellation when descendant closure is unknown", async () => {
+  const f = await fixture("hang"), controller = new AbortController(), uncertainty = new Error("Descendant closure is unknown");
+  const complete = createPiCompletion({ ...f.providerOptions, launch(input) {
+    const child = launchPiProcess(input);
+    return input.args.includes("--version") ? child : { ...child, closed: child.closed.then(() => { throw uncertainty; }) };
+  } });
+  const done = complete({ ...f.input, signal: controller.signal });
+  void done.catch(() => {});
+  await waitForLaunch(f); controller.abort();
+  await expect(done).rejects.toBe(uncertainty);
+  expect(uncertainty).not.toHaveProperty("stopped");
+  const launch = JSON.parse(await readFile(f.launch, "utf8"));
+  cleanups.push(() => rm(launch.cwd, { recursive: true, force: true }));
+  expect((await stat(launch.cwd)).isDirectory()).toBe(true);
+  const pid = Number(await readFile(f.pid, "utf8"));
+  expect(() => process.kill(pid, 0)).toThrow();
+});

@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import puppeteer from "puppeteer-core";
-import { createModelPolicy } from "../../packages/engine/src/modules/steward/builtin/agent/model-policy";
-import { SETTINGS_PAGE as agentPage } from "../../packages/engine/src/modules/steward/builtin/agent/settings-page";
+import { createConfiguration } from "../../packages/engine/src/modules/steward/external/pi/configuration";
+import { SETTINGS_PAGE as piPage } from "../../packages/engine/src/modules/steward/external/pi/settings-page";
 import { SETTINGS_PAGE as notifyPage } from "../../packages/engine/src/modules/steward/external/notify/settings-page";
 import { openStore } from "../../packages/engine/src/modules/steward/external/notify/store";
 import { createNotify } from "../../packages/engine/src/modules/steward/external/notify/notify";
@@ -15,7 +15,7 @@ const bundle = await Bun.build({ entrypoints: [join(web, "src/pages.tsx")], targ
 assert(bundle.success, bundle.logs.map(String).join("\n"));
 const javascript = await bundle.outputs[0]!.text();
 const css = await readFile(join(web, "src/pages.css"), "utf8");
-const policy = createModelPolicy(join(root, "agent"), async () => ({ authorized: true }), async () => false);
+const policy = createConfiguration(join(root, "pi"), { agentDir: root, chronaExtension: join(root, "unused-extension.ts"), agentUrl: "http://127.0.0.1:1/api/steward-agent" });
 await mkdir(join(root, "notify"));
 const store = openStore(join(root, "notify"));
 const notify = createNotify({ store, publicUrl: null, directory: async () => ({ modules: [], tools: [] }), call: async () => { throw new Error("Unexpected delivery"); }, status: async () => { throw new Error("Unexpected delivery"); } });
@@ -25,7 +25,7 @@ const browser = await puppeteer.launch({ executablePath: chrome, headless: true,
 const errors: string[] = [], checks: string[] = [];
 try {
   for (const [width, height] of [[1440, 900], [1024, 768], [390, 844]]) {
-    for (const [module, settings] of [["agent", agentPage], ["notify", notifyPage]] as const) {
+    for (const [module, settings] of [["pi", piPage], ["notify", notifyPage]] as const) {
       const page = await browser.newPage();
       page.on("pageerror", error => errors.push(String(error)));
       await page.setViewport({ width: width!, height: height! });
@@ -34,7 +34,8 @@ try {
       let writes = 0;
       await page.exposeFunction("settingsCall", async (target: string, args: Record<string, unknown>) => {
         if (args.form) writes++;
-        if (target === "agent.configure") return policy.configure(args, "browser-owner");
+        if (target === "pi.configure") return policy.configure(args);
+        if (target === "pi.models") return policy.models();
         if (target === "notify.ui-settings") return notify.handle("ui-settings", args, { kind: "owner", via: null }, new Date());
         throw new Error(`Unexpected tool ${target}`);
       });
@@ -45,7 +46,7 @@ try {
         const host = window as unknown as { settingsCall(target: string, args: Record<string, unknown>): Promise<unknown> };
         renderer.mount(document.querySelector("main"), { ...settings, module }, { call: host.settingsCall, navigate() {}, content: async () => new Blob() });
       }, { javascript, settings, module });
-      const input = module === "agent" ? "fast-model" : "daily-cap";
+      const input = module === "pi" ? "model" : "daily-cap";
       await page.waitForSelector(`input[name="${input}"]`);
       assert.equal(writes, 0, `${module}: opening page never saves`);
       assert.equal(await page.$("textarea"), null, `${module}: concrete controls`);
@@ -54,20 +55,19 @@ try {
         Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, value);
         input.dispatchEvent(new Event("input", { bubbles: true }));
       }, value);
-      await setInput(input, module === "agent" ? "fixture/fast" : "7");
-      if (module === "agent") {
-        await page.select('select[name="fast-thinking"]', "high");
-        await setInput("preferred-timeout-ms", "2500");
+      await setInput(input, module === "pi" ? "fixture/fast" : "7");
+      if (module === "pi") {
+        await page.select('select[name="thinking"]', "high");
       }
-      await page.click("button");
-      await page.waitForFunction(expected => document.body.textContent!.includes(expected), {}, module === "agent" ? "Agent 设置已保存" : "通知设置已保存");
+      await page.evaluate(() => { const button = [...document.querySelectorAll("button")].find(button => button.textContent!.includes("保存")); if (!button) throw new Error("Save button missing"); button.click(); });
+      await page.waitForFunction(expected => document.body.textContent!.includes(expected), {}, module === "pi" ? "Pi 设置已保存" : "通知设置已保存");
       assert.equal(writes, 1);
-      if (module === "agent") assert.deepEqual((await policy.configure({}, "browser-owner")).config?.tiers.fast, { model: "fixture/fast", thinking: "high" });
+      if (module === "pi") assert.deepEqual((await policy.configure({})).config, { model: "fixture/fast", thinking: "high" });
       else assert.equal(store.settings().dailyCap, 7);
-      await setInput(module === "agent" ? "preferred-timeout-ms" : "daily-cap", module === "agent" ? "0" : "51");
-      await page.click("button");
+      await setInput(module === "pi" ? "profile" : "daily-cap", module === "pi" ? "relative" : "51");
+      await page.evaluate(() => { const button = [...document.querySelectorAll("button")].find(button => button.textContent!.includes("保存")); if (!button) throw new Error("Save button missing"); button.click(); });
       await page.waitForFunction(() => !!document.querySelector('[role="alert"]')?.textContent.includes("保存失败"));
-      assert.equal(await page.$eval(`input[name="${module === "agent" ? "preferred-timeout-ms" : "daily-cap"}"]`, element => (element as HTMLInputElement).value), module === "agent" ? "0" : "51");
+      assert.equal(await page.$eval(`input[name="${module === "pi" ? "profile" : "daily-cap"}"]`, element => (element as HTMLInputElement).value), module === "pi" ? "relative" : "51");
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${module} ${width}: no horizontal scrolling`);
       checks.push(`${module} ${width}×${height}: read, explicit save, Chinese success/error, retained draft, no overflow`);
       await page.close();

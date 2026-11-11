@@ -13,7 +13,6 @@ export function moduleIdentity(row: { name: string; builtin: boolean }, options:
   const origin: ModuleOrigin = row.builtin ? "builtin" : "external";
   const capabilities = moduleCapabilities(origin, options);
   if (isModulePaused(row.name)) for (const operation of pausedOperations) capabilities[operation] = false;
-  if (row.builtin && row.name === "agent") for (const operation of ["build", "propose", "group", "activate", "update", "rollback", "remove", "install"] as const) capabilities[operation] = false;
   return { origin, capabilities };
 }
 export function moduleCapabilities(origin: ModuleOrigin, options: { configurable?: boolean; removable?: boolean } = {}): ModuleCapabilities {
@@ -32,7 +31,7 @@ const dynamic = new Set<ModuleOperation>(["build", "propose", "group", "activate
 export function assertModuleOperation(row: { name: string; builtin: boolean }, operation: ModuleOperation) {
   if (isKernelReservedName(row.name) || (!row.builtin && builtinNames.has(row.name))) throw new ModuleIdentityError("conflict", "module_identity_conflict", `Module ${row.name} conflicts with a reserved identity`);
   if ((pausedOperations as readonly ModuleOperation[]).includes(operation)) assertModuleAvailable(row.name);
-  if (dynamic.has(operation) && row.builtin && (row.name === "agent" || !builtinNames.has(row.name) || operation === "remove" || operation === "install")) throw new ModuleIdentityError("forbidden", "immutable_module", `Built-in ${row.name} cannot ${operation}`);
+  if (dynamic.has(operation) && row.builtin && (!builtinNames.has(row.name) || operation === "remove" || operation === "install")) throw new ModuleIdentityError("forbidden", "immutable_module", `Built-in ${row.name} cannot ${operation}`);
 }
 export async function assertExternalModule(tx: Prisma.TransactionClient, workspaceId: string, moduleId: string, operation: ModuleOperation) {
   const row = await tx.module.findFirst({ where: { workspaceId, id: moduleId } });

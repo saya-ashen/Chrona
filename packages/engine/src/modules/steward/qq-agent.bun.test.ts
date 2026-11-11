@@ -23,7 +23,8 @@ test("QQ owns attachment references, scoped contexts, quotes and delivery uncert
     f.ports.onQueued = () => new Promise(() => {});
     const qq = await f.ports.db.module.findUniqueOrThrow({ where: { workspaceId_name: { workspaceId: f.workspaceId, name: "qq" } } });
     const caller = { kind: "module" as const, module: "qq", moduleId: qq.id, hash: qq.activeHash! };
-    const call = async (target: string, args: Record<string, unknown> = {}) => { const { ["request-key"]: key, ["command-key"]: commandKey, ...input } = args; return (await callSync(f.ports, { ...kernelOrigin(f.workspaceId), caller }, target, target.startsWith("agent.") ? input : args, { key: target.startsWith("agent.") ? (key ?? commandKey) as string | undefined : undefined })).output; };
+    const call = async (target: string, args: Record<string, unknown> = {}, options: { key?: string } = {}) =>
+      (await callSync(f.ports, { ...kernelOrigin(f.workspaceId), caller }, target, args, options)).output;
     let owner = "original-owner", uncertain = false;
     const sent: QqReplyItem[] = [];
     const options = { dataDir: join(f.root, "qq-private"), contentDir: join(f.ports.dataDir, "platform/content", qq.id), call,
@@ -43,7 +44,8 @@ test("QQ owns attachment references, scoped contexts, quotes and delivery uncert
     await relay().send(message);
     expect(await f.ports.db.run.count()).toBe(1);
     await expect(conversations.newSession()).rejects.toMatchObject({ code: "conflict" });
-    await conversations.app.interrupt(run.id); await conversations.poll();
+    await expect(conversations.app.interrupt(run.id)).resolves.toMatchObject({ runId: run.id, status: "cancelled", active: false, stopConfirmed: true });
+    await conversations.poll();
     expect(sent).toHaveLength(1); expect(sent[0]!.owner).toBe("original-owner"); expect(sent[0]!.inReplyTo).toBe("message-1");
     await conversations.externalId(sent[0]!.messageId, "qq:out:receipt-1");
     await relay().send({ ...message, text: "引用刚才的回复", externalId: "message-2", quotedExternalId: "receipt-1", attachments: [] });

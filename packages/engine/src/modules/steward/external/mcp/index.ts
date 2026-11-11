@@ -14,7 +14,7 @@ const schema = (properties: Args = {}, required: string[] = []) => ({ type: "obj
 type McpTool = { name: string; description: string; inputSchema: Args; run(args: Args): Promise<unknown>; destructive?: boolean };
 type Contract = { target: string; inputSchema: Args; moduleId?: string; hash?: string; contractHash?: string };
 const preferences = createPreferences(chrona.paths.data);
-const call = (target: string, args: Args = {}) => target === "mcp.settings" ? preferences.tool(args) : applicationCall(target, Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined)));
+const call = (target: string, args: Args = {}, options: { key?: string } = {}) => target === "mcp.settings" ? preferences.tool(args) : applicationCall(target, Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined)), options);
 on("tool", async event => {
   if (event.id !== "settings" && event.id !== "ui-settings") throw new Error(`Unknown tool ${event.id}`);
   if (!event.caller) throw new Error("forbidden: missing actual caller");
@@ -55,10 +55,14 @@ async function ask(args: Args) {
   }
   return { ...sent, status: "pending" };
 }
+function requiresDecisionTool(name: string, input: unknown) {
+  const kind = (input as { input?: { kind?: string } } | undefined)?.input?.kind;
+  return name === "approvals.resolve" || name === "agent.write" && kind === "answer";
+}
 async function discoveredCall(args: Args) {
   const name = args.name as string;
   // Decisions use dedicated destructive tools; there is no alternate generic route.
-  if (["approvals.resolve", "agent.respond"].includes(name)) throw Object.assign(new Error("Use the dedicated decision tool after the user decides"), { code: "forbidden" });
+  if (requiresDecisionTool(name, args.arguments)) throw Object.assign(new Error("Use the dedicated decision tool after the user decides"), { code: "forbidden" });
   const contracts = await call("modules.describe", { query: name, audience: "user" }).then(page => (page as { items: unknown }).items) as Contract[];
   const exact = contracts.filter(tool => tool.target === name);
   if (exact.length !== 1) throw Object.assign(new Error(`Current user tool ${name} not found`), { code: "not_found" });
@@ -86,7 +90,7 @@ const tools: McpTool[] = [
   { name: "chrona_run_cancel", description: "Interrupt one MCP-owned run, preserving completed work.", inputSchema: schema({ runId: str() }, ["runId"]), run: ({ runId }) => conversations.interrupt(runId as string) },
   { name: "chrona_modules", description: "Read installed application identities and lifecycle facts.", inputSchema: schema(), run: () => call("modules.list").then(page => (page as { items: unknown }).items) },
   { name: "chrona_activity", description: "Read bounded kernel audit facts. Application activity is available through discovered app tools.", inputSchema: schema({ before: str() }), run: args => call("activity.records", args) },
-  { name: "chrona_system_apps", description: "Read current user-facing contracts in the five public kernel namespaces.", inputSchema: schema({ module: str() }), run: ({ module }) => systemApps(call, module as string | undefined) },
+  { name: "chrona_system_apps", description: "Read current user-facing contracts in the seven public kernel namespaces.", inputSchema: schema({ module: str() }), run: ({ module }) => systemApps(call, module as string | undefined) },
   { name: "chrona_app", description: "Read one installed identity, up to 50 current user tool contracts, and observed diagnostics; kernel namespaces show contracts only.", inputSchema: schema({ module: str() }, ["module"]), run: ({ module }) => appOverview(call, module as string) },
   { name: "chrona_memory", description: "Read MCP's selected memory provider status, or search it by keywords.", inputSchema: schema({ query: str() }), run: ({ query }) => memoryView(call, "mcp", query as string | undefined) },
   { name: "chrona_memory_preferences", description: "Read or update MCP's own memory preferences. Omitted fields are preserved; provider null disables memory.", inputSchema: schema({ settings: schema({ provider: { anyOf: [{ type: "string", pattern: "^[a-z][a-z0-9-]{1,40}$" }, { type: "null" }] }, autoRecall: { type: "boolean" }, autoRetain: { type: "boolean" } }) }), run: ({ settings }) => settings === undefined ? preferences.read() : preferences.update(settings) },

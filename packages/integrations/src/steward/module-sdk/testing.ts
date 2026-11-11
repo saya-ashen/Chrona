@@ -59,7 +59,7 @@ async function callReply(call: Call, { stubs, manifest, seen, completions, bindi
 }
 /**
  * Fake kernel for author tests. No call ever executes a real external effect. Routed calls answer from
- * `stubs["<module>.<tool>"]` (sync: its value is the output), built-in Agent fixtures, or a queued call.
+ * `stubs["<module>.<tool>"]` (sync: its value is the output), kernel Agent fixtures, or a queued call.
  * `stubs.secret` also supplies secrets.get.
  */
 export async function startModule(entry: string | ExplicitModuleEntry, { stubs = {} }: { stubs?: Record<string, Stub> } = {}) {
@@ -152,15 +152,15 @@ export async function startModule(entry: string | ExplicitModuleEntry, { stubs =
 }
 
 async function agentReply(target: string, args: Record<string, unknown>, completions: Map<string, unknown>, key: unknown) {
-  if ((target === "agent.context" || target === "agent.run")) {
-    const receiptId = `${target}:${String(key)}`;
-    return { result: { output: target === "agent.context" ? { contextId: receiptId } : { contextId: args["context-id"], runId: receiptId, status: "queued", active: true } } };
+  if (target === "agent.run") {
+    const runId = `agent.run:${String(key)}`, contextId = String(args.contextId ?? `agent.context:${String(key)}`);
+    const run = { runId, contextId, status: "finished", active: false };
+    if (!completions.has(runId)) completions.set(runId, { run, items: [{ sequence: 0, at: new Date(0).toISOString(), kind: args.kind === "completion" ? "completion" : "text", payload: args.kind === "completion" ? { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 } : { text: "Chrona test model response" } }], nextCursor: null, ended: true, interactions: [] });
+    return { result: { output: run } };
   }
-  if (target === "agent.complete") {
-    const operationId = String(key);
-    if (!completions.has(operationId)) completions.set(operationId, { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 });
-    return { result: { output: { operationId } } };
+  if (target === "agent.read") {
+    const result = completions.get(String(args.runId));
+    return result ? { result: { output: result } } : { error: { code: "not_found", message: "Run not found in test fixture" } };
   }
-  if (target === "agent.completion") return { result: { output: { result: completions.get(String(args["operation-id"])) ?? null, failure: !completions.has(String(args["operation-id"])) } } };
   return null;
 }

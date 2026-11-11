@@ -5,6 +5,7 @@ type App = Row & { id: string; name: string };
 type Diagnostic = Row & { moduleId: string };
 
 const kernelDescriptions = {
+  agent: "Agent Providers 与受治理的执行。",
   approvals: "授权请求与审批记录。",
   modules: "已安装模块、可发现的工具合同、诊断与受治理的生命周期。",
   settings: "内核运行设置与授权规则。",

@@ -40,7 +40,7 @@ test("secret permissions project configured and saved metadata without exposing 
 
 test("model permissions report declared limits and kernel budgets without a central model mapping", async () => {
   const f = await fixture(), version = await f.db.moduleVersion.findFirstOrThrow({ where: { moduleId: f.module.id } });
-  const manifest = moduleManifestSchema.parse({ ...version.manifest as object, uses: ["agent.complete"], model: { tier: "fast", maxCalls: 2, maxOutputTokens: 100 } });
+  const manifest = moduleManifestSchema.parse({ ...version.manifest as object, uses: ["agent.run"], model: { tier: "fast", maxCalls: 2, maxOutputTokens: 100 } });
   await f.db.moduleVersion.update({ where: { id: version.id }, data: { manifest } });
   await f.db.workspace.update({ where: { id: f.workspaceId }, data: { settings: { moduleModel: { maxCallsPerEvent: 4, maxOutputTokens: 500, dailyCalls: 20, eventTimeoutMs: 5000, moduleDailyCalls: { example: 7 } } } } });
   const view = await modulePermissions(f.ports, f.workspaceId, f.module.name) as { model: unknown };

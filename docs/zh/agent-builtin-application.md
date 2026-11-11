@@ -1,66 +1,45 @@
-# Agent 内置应用
+# Kernel Agent 与已登记 Provider
 
-当前业务调用方优先使用 context/run/get/stream/write/interrupt/respond 原语，应用自己管理会话和业务流程。下文 start/status/inject/abort 等接口保留底层和既有调用说明；完整当前边界见[Agent 原语与应用编排](agent-module-orchestration.md)。
+2026-11-11 的工作树实现改为通用 kernel Agent API 与普通 Provider 应用。本页取代旧的不可变 builtin Agent 设计；文件名保留供既有文档引用。接口目标见[规范第 9 节](kernel-api-design.md#9-agent)，源码、测试、实际部署分别判断。此前 builtin Agent 的验收不能证明新版通过，也不会更新既有实例。
 
-2026-11-07 开发变更。本文区分实现、验证和试用状态；生产部署不在范围。
+## 所有权
 
-## 职责
+kernel 保存 Provider 登记、真实 caller、上下文归属、Run 准入、唯一队列、硬预算、租约、取消、事件和实际停止证据。kernel 不创建 Pi 适配器，不拥有模型、thinking、profile、Skill、扩展或原生协议的策略。
 
-`builtin/agent` 使用现有 `module.json`、SDK socket 和 module supervisor 独立运行。它随 Chrona 发行，内部创建 Pi Provider，持有进程控制对象、运行操作状态和自己的启动／结束回执。正式服务不再在内核进程创建 Pi Provider；`ports.provider` 是 routed-call 代理及能力元信息。显式注入 Provider 的单元测试／嵌入接线仍可使用进程内适配器，按数据库隔离注册，不是正式服务的第二执行路径。
+Pi 位于 `external/pi`，是默认预装的普通应用，可按受控生命周期暂停、更新和移除。Pi 拥有适配器、配置、现有 RPC 进程、操作回执和原生协议。初始化记录安装或跳过，删除后不自动补装；升级 Chrona 不自动替换 Pi。Web、Coding、Mind 等业务应用拥有会话和业务编排。
 
-内核保留调用者身份、Run/token 授权、队列、预算、持久状态与停止证据规则。Agent 在执行前由路由核验 Run、cwd、lane、deadline、operationId；启动审计只记录摘要。原进程内版本已有的启动记录不能成为新版重复启动许可。
+## 七个公开工具
 
-## 调用
+| 工具 | 用途 |
+| --- | --- |
+| `agent.register` | 当前已批准、活跃应用登记自己的执行端点、协议版本、能力和配置入口；不能传入另一应用身份 |
+| `agent.providers` | 分页查看登记、能力、配置入口和观测可用性 |
+| `agent.run` | 创建或继续上下文，按 `kind: conversation | completion` 入唯一 Run 队列，接受 Provider 自有 `providerOptions` |
+| `agent.read` | 根据绑定 Run、视图及游标读取事件、状态和交互；支持有界等待 |
+| `agent.write` | 向已有 Run 发送消息，或按 questionId 回答已有交互 |
+| `agent.stop` | 请求停止并返回实际确认状态；收到请求不等于停止 |
+| `agent.native` | 在该 Run 已有的 Provider 操作上发送原生请求并返回结构化响应 |
 
-- `start` 立即返回 operationId；`status` 返回未结束、已结束或无法确认。本次迁移中，实际 Provider Run 优先通过绑定操作的结果事件唤醒，丢失通知时每五秒核对原持久回执；无调用方的旧内核 completion 网关已删除，应用补全走唯一的私有操作与预算结算链路。SDK handler 不等待整个任务。迁移进度与未完成门禁见[内核与 Agent 重构](kernel-agent-migration.md)。
-- `inject` 补充输入；`abort` 确认收到请求，不能据此确认任务已停止。
-- `release` 只接受已有完成回执的操作；磁盘回执保留，防止同一 Run 再次启动。
-- `complete/completion` 是 modules 可见的结构化应用工具，不再接受内核 encoded input。补全使用既有应用私有持久操作和 `agent-admit/agent-settle`，绑定真实 caller/version/commandKey，重启不重放未知模型执行；没有实际终态证据时预算预留继续占用。
-- `transcript` 与 `health` 提供现有只读能力；诊断 `health` 事件通过现有 `modules.report-health` 报告就绪。
-- 工具参数使用 JSON 字符串包裹，应用使用原有 zod 输入校验，保留 nullable、嵌套参数和限制；输出复用运行时 schema 的结构化 manifest 契约。
+输入、输出以 `packages/contracts/src/steward/agent-provider.ts` 与生成的 `schemas/system-tools.json` 为准。写入的请求 key 在 `chrona.call` 的 `options.key` 中。没有旧 `context/get/stream/respond/interrupt/complete/configure` 别名；模型及 profile 配置由 Provider 的普通工具或页面处理。
 
-接口 audience 为 `kernel` 与 `modules`。内核继续使用原始 Run 协议；模块使用下述结构化公开参数，不能传 `input` 编码内核请求。Agent 从 SDK `trigger.caller` 读取直接调用模块的 moduleId/hash，按操作归属校验；业务参数不能冒充身份。owner/Provider 不直接调用 Agent。
+上下文归实际入口应用所有。首次 Run 固定 Provider 登记版本，后续控制和恢复继续使用该绑定；选择新的默认 Provider 不切换已运行任务。没有可用 Provider 时报告不可用，多个可选项时须明确选择。登记提供实际执行端点，不只是展示信息。
 
-## 回调
+## 登记与回调
 
-`runtime-callback` 暂保留进程内订阅，接收进度、用量、资源、执行事件、问答和问答中断。它还提供仅受信任 Agent 能用的 `agent-admit/agent-settle`：准入从当前尚未结束的路由调用中查原调用模块身份、参数和事件预算上下文；Agent 只提交 callId，不能通过业务参数选择调用者。模型结束后按预留记录结算。SDK Agent 使用普通 routed call，内核核验其当前工作空间、builtin 身份、moduleId、activeHash 以及 approved/builtin 版本来源。其他应用即使声明相同 uses，仍无权发送运行回调。引用绑定工作空间，随运行结束释放。
+登记记录绑定当前 moduleId、批准活动 hash、协议版本及每个执行端点的 contractHash。health/start/status/inject/abort/release 和可选 transcript/native/complete 都是登记应用自己的 kernel-only 工具。配置入口面向 owner，不接收内核 token 或 callback 身份。
 
-## 宿主接线与停止
+kernel 在调用执行端点前验证固定身份及合同，签发绑定 Run 的 token、路径、操作 ID 和 callbackId。`runtime-callback.event` 只接收绑定 Provider 版本的事件；普通应用不能借请求参数自授回调身份。用户工具仍以原入口应用的准入执行，不借 Provider 身份扩权。
 
-宿主仅向已核验发行身份的 Agent 注入 Pi 配置和已有模型环境白名单；不把数据库、QQ 或服务访问凭据传入应用。模型凭据仅经宿主环境进入 Agent/Pi，不进入模块调用、页面或回执。Agent、Pi 与普通应用均只支持 `trusted-local`，使用服务用户的 OS 权限，不提供恶意代码隔离或硬虚拟内存上限。旧 `required-isolation` 或非空 `CHRONA_STEWARD_SANDBOX_BWRAP` 配置明确报错，须移除；浏览器仅使用显式配置或宿主已安装的程序，不自动下载。运行包声明与宿主依赖规则见[运维说明](operations.md#脚本限制)。S4 跨平台进程通信、监管及三端验收仍待完成，这些 S1 调整不建立 Windows/macOS 完整支持结论。
+Provider 在外部启动前保存启动摘要，终态先持久化再通知。只有启动摘要而没有终态的操作保持未知；查询、重启或丢失响应均不授权重复执行。停止及 host 后代回执保留实际证据，不能从错误文案或进程自报推导树已停止。
 
-应用使用现有 SDK 和 supervisor。断开 socket 时，SDK 生命周期回调触发 Agent 清理；supervisor 仍拥有应用进程组。正常服务退出先取消并等待活动运行，再停止模块。失联、崩溃、回执写入失败均不能推断实际停止，内核仍保留未知状态。应用重启发现只有启动摘要而无完成回执时报告未知，不自动重启工作。2026-11-11 增加 Linux 有证据恢复：launcher 生成宿主代际，启动摘要绑定代际；原生外层 guardian 在全部后代退出后留下持久停止回执。新 Agent 核验原代际后可把原 operation 收为失败，普通 Run 沿既有恢复路径释放容量。没有回执、guardian 本身被杀或其他平台仍保持未知。此路径不证明外部效果未发生，不接管活动 Pi 会话，也不重放工作；实现和真实 SIGKILL 验收见[持续关注与恢复](continuous-steward-journey.md)。
+## Pi 配置与原生协议
 
-新 Agent 不允许普通提案／构建／动态替换／回滚／删除，否则会把可信宿主入口交给普通代码。supervisor 启动时只从当前 Chrona 发行的已核验资源升级 Agent：旧版必须是批准的 builtin 来源，数据 schema 相同、无迁移、无正在运行的 Run；保留暂停状态和已有数据，记录版本与激活历史。有运行时阻塞则保留旧版并报告注册失败，停止／协调完成后重启再升级。该路径不接受模块输入，也不开放动态替换。现有其他应用的生命周期保持原状。
+Pi 使用显式选定 profile，未选定时遵循宿主 Pi 环境及该服务用户的默认配置。服务用户与交互用户可能不同，配置页应显示实际来源。模型和 thinking 归 Pi；不再以 fast/balanced/deep 为内核固定政策。用户的 Skill、扩展、模板、上下文和原生审批配置由 Pi 正常加载，Chrona 的桥接资源按需追加。
 
-## 数据与交付
+`providerOptions` 是启动参数，`agent.native` 使用已经存在的同一进程。Provider 负责校验自身协议、关联响应及同步执行状态；不能通过原生命令另起隐藏任务、切换上下文身份或重放不确定操作。原生输出保留结构和明确的保留缺口，凭据继续脱敏；缺少原始数据不应伪装成完整原生输出。
 
-应用回执在自己的 data/operations 中，内核执行回执仅存请求摘要与结束结果；文件名为 operationId 摘要，不保存 token、提示词或 profile。公开模块模型回执会保存私有完成文本，受 moduleId/hash 归属校验。结束回执先写临时文件再原子替换。坏数据拒绝恢复。
+宿主通过通用 `providerModules` 接线，并只向核验过的发行应用版本交付相应环境。配置不包含数据库或其他应用凭据。trusted-local 使用同一服务用户的 OS 权限，路由及 Manifest 不构成恶意代码隔离。required-isolation 仍明确拒绝。
 
-Agent 自身 bundle 通过 `build.ts` 生成；发行资源生成步骤在比对 Git 种子前重建 bundle。新增 Agent 种子保留其他模块的 Git 历史。未修改数据库 schema 或迁移。
+## 验证范围
 
-## 普通模块调用
-
-模块使用现有 `chrona.call()`，无需额外 SDK 或 HTTP。manifest 在 `uses` 声明调用契约；遵循现有路由语义，`visibility` 决定受众，`uses` 不是新增的运行时权限白名单。模型功能必须声明 `model` 限制。
-
-```ts
-const { operationId } = await chrona.call("agent.start", {
-  "work-id": "report-fix", "project-ref": "authorized-project", "command-key": "start-1",
-  goal: "完成已授权的项目修改",
-  budget: { "timeout-ms": 60_000, "max-tool-calls": 10 },
-});
-const execution = await chrona.call("agent.status", { "operation-id": operationId });
-await chrona.call("agent.inject", { "operation-id": operationId, "command-key": "input-1", message: "补充要求" });
-await chrona.call("agent.abort", { "operation-id": operationId, "command-key": "cancel-1" });
-```
-
-公开参数采用现有 manifest 的 kebab-case 字段；返回字段沿用结构化契约的 camelCase。操作 ID 是不含路径的摘要。调用均使用默认同步模式：`start/complete` 很快返回操作 ID，随后短查询；不支持把敏感参数持久化进通用异步调用队列。
-
-- `start` 复用已有 ExecutionStart：授权项目引用、目标、幂等 command-key、期限与工具次数上限。内核按原模块身份调用既有执行准入，创建唯一 Run 队列中的执行。模块不能指定 cwd、session 路径、token、模型或内核回调引用。
-- `status` 返回 `{ operationId, execution }`；`inject/abort` 要求独立 command-key，复用持久控制回执与撤销规则。准入后由 Agent 直接操作其句柄，避免 SDK handler 经过内核回调自己形成死锁。
-- `transcript` 接受 operation-id、可选 cursor/limit，返回已归一化的执行事件页，不接受宿主 session 路径。
-- `release` 需结束确认，保留摘要回执防止重复启动；完成的模型结果也可 release。更换模块实例或版本不能读取或控制旧操作；不会自动继承旧版本正在执行的工作。
-- `complete` 接受 command-key、prompt、可选 system、max-output-tokens。模型和期限由原模块 manifest 与用户 moduleModel 设置决定；先原子预留额度，再由 Agent 发起请求。`completion` 查询结果，不触发新付费请求。
-- Agent 自有 module-operations 回执保存操作归属、请求摘要与执行引用／完成结果。只有 digest 的未知操作重启后拒绝重放；不自动重试付费请求。模型结果属于模块私有数据，受相同归属检查；不写入公共调用审计。
-
-验证证据与当前本机试用版本在 `/tmp/chrona-agent-extraction-check/verification.md` 和独立试用实例 README 中记录。不存在生产部署结论。
+开发和测试使用全新临时数据库与假 Provider/假 Pi，不调用真实模型或账号。应验证无 Provider 启动、登记归属及冲突、端点合同固定、跨 Run 控制拒绝、原生同进程关联、未知效果不重放、原始事件保留、预算以及实际停止。当前改动引入新的初始 schema；不能直接将新程序覆盖到旧数据实例，不提供旧库兼容或校验绕过。

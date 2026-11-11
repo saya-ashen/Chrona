@@ -1,15 +1,15 @@
 import { z } from "zod";
 
 /** Public kernel namespaces, reserved independently of database initialization. */
-export const KERNEL_MODULE_NAMES = ["modules", "approvals", "settings", "secrets", "activity", "timers"] as const;
+export const KERNEL_MODULE_NAMES = ["modules", "approvals", "settings", "secrets", "activity", "timers", "agent"] as const;
 export const RESERVED_ENTRY_NAMES = ["rescue"] as const;
 /** Private kernel host identities routed internally; never installable applications. */
 export const LOCAL_CAPABILITY_NAMES = ["runtime-callback", "workspace-local"] as const;
-export const BUILTIN_MODULE_NAMES = ["agent"] as const;
-export const PREINSTALLED_MODULE_NAMES = ["web", "notify", "qq", "author"] as const;
+export const BUILTIN_MODULE_NAMES = [] as const;
+export const PREINSTALLED_MODULE_NAMES = ["pi", "web", "notify", "qq", "author"] as const;
 export const OPTIONAL_EXTERNAL_MODULE_NAMES = ["memory-local", "coding", "coding-web", "mcp", "files", "events", "remind", "mind", "remote-execution"] as const;
 /** Persisted initialization receipts retain explicit skipped entries for paused packages. */
-const INITIALIZATION_MODULE_NAMES = ["web", "notify", "qq", "author", "remind", "mind"] as const;
+const INITIALIZATION_MODULE_NAMES = ["pi", "web", "notify", "qq", "author", "remind", "mind"] as const;
 export const OFFICIAL_EXTERNAL_MODULE_NAMES = [...PREINSTALLED_MODULE_NAMES, ...OPTIONAL_EXTERNAL_MODULE_NAMES] as const;
 export const moduleVersionHashSchema = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/);
 export const moduleOriginSchema = z.enum(["kernel", "builtin", "external"]);

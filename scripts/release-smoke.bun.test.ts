@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test";
-import { chmod, cp, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { buildArtifacts } from "../build/manifest";
-import { approveSmokeWeb, assertModuleTypecheck, releaseSmokeEnvironment } from "../build/release-smoke";
+import { approveSmokeWeb, assertModuleTypecheck, assertPiReleaseResources, releaseSmokeEnvironment } from "../build/release-smoke";
 
 test("release smoke uses isolated credentials and disables real providers", () => {
   const env = releaseSmokeEnvironment("/tmp/smoke/data", "/tmp/smoke/config", {
@@ -74,4 +74,24 @@ test("release smoke approves only Web when configured active has no activated ve
     expect(requests.filter(request => request.startsWith("POST"))).toEqual(["POST /api/approvals/web-approval/resolve"]);
     expect(requests.at(-1)).toBe("GET /api/modules");
   } finally { server.stop(true); }
+});
+
+test("release smoke requires the external Pi application and its bundle without builtin resources", async () => {
+  const root = await mkdtemp(join(tmpdir(), "chrona-smoke-pi-"));
+  const moduleDir = join(root, "external/pi");
+  try {
+    await mkdir(join(moduleDir, "vendor"), { recursive: true });
+    await mkdir(join(root, "module-git"));
+    await writeFile(join(moduleDir, "module.json"), JSON.stringify({ name: "pi" }));
+    for (const file of ["package.json", "bun.lock", "runtime.js", "test.js"]) await writeFile(join(moduleDir, file), "fixture\n");
+    await expect(assertPiReleaseResources(root)).rejects.toThrow("Pi module Git bundle missing");
+    await writeFile(join(root, "module-git/pi.bundle"), "fixture bundle\n");
+    await assertPiReleaseResources(root);
+    expect(await Bun.file(join(root, "builtin/agent/module.json")).exists()).toBe(false);
+    await writeFile(join(moduleDir, "module.json"), JSON.stringify({ name: "agent" }));
+    await expect(assertPiReleaseResources(root)).rejects.toThrow("manifest mismatch");
+    await writeFile(join(moduleDir, "module.json"), JSON.stringify({ name: "pi" }));
+    await rm(join(moduleDir, "runtime.js"));
+    await expect(assertPiReleaseResources(root)).rejects.toThrow("Pi external module resource missing");
+  } finally { await rm(root, { recursive: true, force: true }); }
 });

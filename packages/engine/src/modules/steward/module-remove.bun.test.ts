@@ -11,7 +11,7 @@ import type { StewardPorts } from "./ports";
 
 const closes: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const close of closes.splice(0).reverse()) await close(); });
-async function fixture(name = "example", entry = false) {
+async function fixture(name = "pi", entry = false) {
   const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-remove-");
   const workspace = await db.workspace.create({ data: { name: "remove" } });
   const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => new Date("2026-11-05T12:00:00Z") };
@@ -45,7 +45,7 @@ test.each(["owned-session", "entry-session", "queued-run", "build-target", "depe
   }
   if (kind === "dependency") {
     const other = await f.db.module.create({ data: { workspaceId: f.workspace.id, name: "consumer", activeHash: "consumer" } });
-    await f.db.moduleVersion.create({ data: { moduleId: other.id, hash: "consumer", manifest: { ...f.manifest, name: "consumer", uses: ["example.read"] }, source: "user", status: "approved", intent: {}, report: {} } });
+    await f.db.moduleVersion.create({ data: { moduleId: other.id, hash: "consumer", manifest: { ...f.manifest, name: "consumer", uses: [`${f.module.name}.read`] }, source: "user", status: "approved", intent: {}, report: {} } });
   }
   if (kind === "unknown-call" || kind === "unhandled-reply") await f.db.moduleInvocation.create({ data: { workspaceId: f.workspace.id, caller: `module:${f.module.id}`, callerModuleId: f.module.id, target: "other", tool: "read", args: {}, key: "once", mode: "async", status: kind === "unknown-call" ? "unknown" : "succeeded", reply: kind === "unhandled-reply" } });
   if (kind === "unknown-effect") await f.db.moduleCall.create({ data: { moduleId: f.module.id, hash: "version", method: "exec", key: "once", status: "failed", error: "unknown" } });
@@ -55,9 +55,14 @@ test.each(["owned-session", "entry-session", "queued-run", "build-target", "depe
   expect(await f.db.module.findUnique({ where: { id: f.module.id } })).not.toBeNull();
 });
 
-test.each(["web", "notify", "other-entry", "files", "events"])("ordinary entry %s can be removed after approval with a data backup", async name => {
+test.each(["pi", "web", "notify", "other-entry", "files", "events"])("ordinary entry %s can be removed after approval with a data backup", async name => {
   const f = await fixture(name, true);
-  await removeApproved(f.context, await f.approved());
+  expect(f.module.builtin).toBe(false);
+  const timer = await f.db.schedule.create({ data: { workspaceId: f.workspace.id, moduleId: f.module.id, mode: "module", triggerId: "daily", text: "retained timer", createdBy: "chrona", rule: { kind: "every", minutes: 60 }, status: "active", nextAt: f.ports.now() } });
+  const action = await f.approved();
+  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: timer.id } })).toMatchObject({ status: "active" });
+  await removeApproved(f.context, action);
+  expect(await f.db.schedule.findUnique({ where: { id: timer.id } })).toBeNull();
   expect(await f.db.module.findUnique({ where: { id: f.module.id } })).toBeNull();
   expect(await f.db.moduleRemoval.findUniqueOrThrow({ where: { moduleId: f.module.id } })).toMatchObject({ workspaceId: f.workspace.id, name: f.module.name, hash: f.module.activeHash });
   const removal = await f.db.audit.findFirstOrThrow({ where: { kind: "module_removed", subjectId: f.module.id } });
@@ -128,7 +133,7 @@ test("ended history and completed calls do not block removal; backup preserves d
   expect(await readFile(join((removal.details as { backup: string }).backup, "data/keep.txt"), "utf8")).toBe("valuable");
 });
 
-test.each(["web", "notify", "other-entry"])("idle audited Agent context permits removal of %s", async name => {
+test.each(["pi", "web", "notify", "other-entry"])("idle audited Agent context permits removal of %s", async name => {
   const f = await fixture(name, true);
   const session = await f.db.session.create({ data: { workspaceId: f.workspace.id, key: "context", source: "module", moduleId: f.module.id, entryModuleId: f.module.id } });
   await f.db.agentContext.create({ data: { workspaceId: f.workspace.id, moduleId: f.module.id, sessionId: session.id, hash: "" } });

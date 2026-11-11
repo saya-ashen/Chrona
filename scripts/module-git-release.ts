@@ -13,6 +13,9 @@ type PublishPlan = { version: 1; modules: { name: string; proposedRepository: st
 const oid = /^[a-f0-9]{40}$/;
 const nullDevice = process.platform === "win32" ? "NUL" : "/dev/null";
 const ignored = new Set([".git", "node_modules", ".venv", ".chrona"]);
+// Historical seeds remain in the maintained lock and bundle store, but are never packaged or published.
+const retiredModuleNames = new Set(["agent"]);
+const activeModuleNames = new Set<string>(buildArtifacts.moduleGit.modules.map(module => module.name));
 
 function git(dir: string, args: string[], input?: Uint8Array, dates?: string): string {
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
@@ -92,7 +95,7 @@ async function writeJson(path: string, value: unknown) {
   await rename(`${path}.tmp`, path);
 }
 function validateReleaseIdentity(entry: ModuleGitReleaseEntry, names: Set<string>) {
-  if (!buildArtifacts.moduleGit.modules.some(module => module.name === entry.name) || names.has(entry.name) || entry.branch !== "main" || !oid.test(entry.commit) || entry.bundle !== `${entry.name}.bundle` || !/^[a-f0-9]{64}$/.test(entry.bundleSha256) || (entry.repository !== null && entry.repository !== `https://github.com/chrona-core/chrona-module-${entry.name}`)) throw new Error("Invalid module Git release identity");
+  if ((!activeModuleNames.has(entry.name) && !retiredModuleNames.has(entry.name)) || names.has(entry.name) || entry.branch !== "main" || !oid.test(entry.commit) || entry.bundle !== `${entry.name}.bundle` || !/^[a-f0-9]{64}$/.test(entry.bundleSha256) || (entry.repository !== null && entry.repository !== `https://github.com/chrona-core/chrona-module-${entry.name}`)) throw new Error("Invalid module Git release identity");
 }
 async function readLock(seedDir: string, preparing = false): Promise<ReleaseLock> {
   const raw: unknown = JSON.parse(await readFile(join(seedDir, "lock.json"), "utf8"));
@@ -102,7 +105,8 @@ async function readLock(seedDir: string, preparing = false): Promise<ReleaseLock
     validateReleaseIdentity(entry, names);
     names.add(entry.name);
   }
-  if (!preparing && names.size !== buildArtifacts.moduleGit.modules.length) throw new Error("Module Git release lock is incomplete");
+  const missing = [...activeModuleNames].filter(name => !names.has(name));
+  if (!preparing && missing.length) throw new Error(`Module Git release lock is incomplete: ${missing.join(", ")}; coordinate seed preparation for the staged release before packaging`);
   return lock;
 }
 
@@ -177,6 +181,8 @@ export async function prepareModuleGitRelease(input: { root: string; resourcesRo
     modules.push(entry);
     plan.modules.push({ name: module.name, proposedRepository: `chrona-core/chrona-module-${module.name}`, localRepository: resolve(input.seedDir, "repos", `${module.name}.git`), branch: "main", commit: entry.commit });
   }
+  // Preserve retired identities byte-for-byte; their bundles and repository histories stay untouched.
+  modules.push(...previous?.modules.filter(entry => retiredModuleNames.has(entry.name)) ?? []);
   const lock: ReleaseLock = { version: 1, modules };
   await writeJson(join(input.seedDir, "lock.json"), lock);
   await writeJson(join(input.seedDir, "publish-plan.json"), plan);
@@ -189,7 +195,8 @@ async function gitDirectory(path: string) {
 
 /** Consume fixed seeds, including published histories, without generating a new initial commit. */
 export async function copyModuleGitRelease(seedDir: string, resourcesRoot: string) {
-  const lock = await readLock(seedDir), target = join(resourcesRoot, buildArtifacts.moduleGit.resourcesDir);
+  const maintained = await readLock(seedDir), target = join(resourcesRoot, buildArtifacts.moduleGit.resourcesDir);
+  const lock: ReleaseLock = { version: 1, modules: maintained.modules.filter(entry => activeModuleNames.has(entry.name)) };
   await mkdir(target, { recursive: true });
   for (const file of ["LICENSE", "THIRD-PARTY-NOTICES.txt"]) {
     const bytes = await readFile(join(seedDir, file));
@@ -217,7 +224,7 @@ export async function copyModuleGitRelease(seedDir: string, resourcesRoot: strin
 /** Read-only remote checks; it never creates a GitHub repository or pushes. */
 export async function verifyPublishedModuleGitRelease(seedDir: string) {
   const lock = await readLock(seedDir);
-  for (const entry of lock.modules) {
+  for (const entry of lock.modules.filter(entry => activeModuleNames.has(entry.name))) {
     const name = `chrona-core/chrona-module-${entry.name}`;
     const repo = JSON.parse(execFileSync("gh", ["repo", "view", name, "--json", "visibility,url,nameWithOwner,owner"], { encoding: "utf8", timeout: 30_000, stdio: ["ignore", "pipe", "pipe"] }));
     const url = `https://github.com/${name}`;
@@ -231,8 +238,8 @@ export async function verifyPublishedModuleGitRelease(seedDir: string) {
 if (import.meta.main) {
   const [command, directory, resources] = process.argv.slice(2);
   if (command === "prepare" && directory && resources) {
-    const { assembleAgentDependencies } = await import("../build/agent-dependencies");
-    await assembleAgentDependencies(resolve(resources, "builtin/agent"));
+    const { preparePiApplication } = await import("../build/agent-dependencies");
+    await preparePiApplication(resolve(resources));
     await prepareModuleGitRelease({ root: resolve(import.meta.dirname, ".."), seedDir: resolve(directory), resourcesRoot: resolve(resources), hostCommit: process.env.CHRONA_MODULE_GIT_COMMIT, hostTimestamp: process.env.CHRONA_MODULE_GIT_TIMESTAMP });
   } else if (command === "verify-published" && directory && !resources) await verifyPublishedModuleGitRelease(resolve(directory));
   else throw new Error("Usage: bun scripts/module-git-release.ts prepare <seed-directory> <staged-resources-root> | verify-published <seed-directory>");

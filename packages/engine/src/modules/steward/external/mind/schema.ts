@@ -57,8 +57,8 @@ export const decisionSchema = z.object({
   id, at: time, kind: z.enum(["manual", "daily", "signal", "deadline", "review"]), concernIds: z.array(id).max(20), signalIds: z.array(id).max(40),
   revisions: z.record(id, z.number().int().positive()), sourceKinds: z.array(z.object({ source: id, kind: id }).strict()).max(40),
   phase: z.enum(["prepared", "running", "waiting", "unknown", "completed", "unreported", "failed"]),
-  contextKey: key, runKey: key, contextId: id.nullable(), runId: id.nullable(), prompt: z.string().min(1).max(100_000), tools: z.array(z.enum(["mind.agenda", "mind.propose", "mind.report"])).length(3),
-  after: z.number().int().nonnegative().optional(), report: reportCandidateSchema.nullable(), reportCandidates: z.array(reportCandidateSchema).max(8).default([]).optional(), retryAt: time.optional(), finishedAt: time.nullable(), error: z.string().max(500).nullable(),
+  runKey: key, contextId: id.nullable(), runId: id.nullable(), prompt: z.string().min(1).max(100_000), tools: z.array(z.enum(["mind.agenda", "mind.propose", "mind.report"])).length(3),
+  cursor: z.string().min(1).nullable().optional(), report: reportCandidateSchema.nullable(), reportCandidates: z.array(reportCandidateSchema).max(8).default([]).optional(), retryAt: time.optional(), finishedAt: time.nullable(), error: z.string().max(500).nullable(),
   interactions: z.array(z.object({ id, title: short, message: z.string().max(2000), expiresAt: time }).strict()).max(12),
   notification: notificationSchema.nullable(),
 }).strict();
@@ -92,7 +92,7 @@ export const stateSchema = z.object({
   for (const decision of state.decisions) {
     const candidates = decision.reportCandidates ?? [];
     if (new Set(candidates.map(c => c.reportId)).size !== candidates.length || candidates.some(c => c.verified)) ctx.addIssue({ code: "custom", message: "Invalid report candidates" });
-    if (decision.contextKey !== `${decision.id}:context` || decision.runKey !== `${decision.id}:run` || new Set(decision.tools).size !== 3
+    if (decision.runKey !== `${decision.id}:run` || new Set(decision.tools).size !== 3
       || new Set(decision.concernIds).size !== decision.concernIds.length || new Set(decision.signalIds).size !== decision.signalIds.length
       || Object.keys(decision.revisions).length !== decision.concernIds.length || decision.concernIds.some(cid => !decision.revisions[cid])
       || (decision.runId !== null && decision.contextId === null)

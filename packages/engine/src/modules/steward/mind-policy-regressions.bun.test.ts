@@ -37,23 +37,18 @@ function agent(f: Fixture) {
   let active = true;
   let receipt: unknown;
   const calls: string[] = [];
-  const call: Call = async (target, args) => {
+  const call: Call = async (target, args, options) => {
     calls.push(target);
     const state = await f.store.read();
     const current = state.decisions.find(d => d.id === state.runtime.currentDecisionId);
     if (!current) throw new Error(`Agent called without a durable decision: ${target}`);
     const contextId = `context-${current.id}`, runId = `run-${current.id}`;
-    if (target === "agent.context") {
-      expect(args["request-key"]).toBe(current.contextKey);
-      return { contextId };
-    }
     if (target === "agent.run") {
-      expect(args["request-key"]).toBe(current.runKey);
+      expect(options?.key).toBe(current.runKey);
       expect(args.prompt).toBe(current.prompt);
       return { contextId, runId, active, status: active ? "running" : "finished" };
     }
-    if (target === "agent.get") return { contextId, runId, active, status: active ? "running" : "finished" };
-    if (target === "agent.stream") return { items: receipt && Number(args.after ?? 0) < 1 ? [{ sequence: 1, kind: "tool-result", payload: { type: "tool-result", value: { runId, callId: "call-report", target: "mind.report", moduleId: mind.moduleId, hash: mind.hash, contractHash: "a".repeat(64), status: "succeeded", outputState: "complete", output: receipt } } }] : [], after: receipt ? 1 : 0, interactions: [] };
+    if (target === "agent.read") return { run: { contextId, runId, active, status: active ? "running" : "finished" }, items: receipt && !args.cursor ? [{ sequence: 1, kind: "tool-result", payload: { type: "tool-result", value: { runId, callId: "call-report", target: "mind.report", moduleId: mind.moduleId, hash: mind.hash, contractHash: "a".repeat(64), status: "succeeded", outputState: "complete", output: receipt } } }] : [], nextCursor: receipt ? "opaque:1" : null, ended: !active, interactions: [] };
     throw new Error(`Unexpected external call: ${target}`);
   };
   return { call, calls, finish(value: unknown) {
@@ -230,7 +225,7 @@ test("64 owner-reviewed proposals release suggestion capacity and retain exact a
 function terminalDecision(n: number, patch: Partial<Decision> = {}): Decision {
   const id = `history-${n}`;
   const result: ReportResult = { summary: "Historical assessment", concerns: [], feedback: dimensions };
-  return { id, at: at(-40 * DAY), kind: "manual", concernIds: [], signalIds: [], revisions: {}, sourceKinds: [], phase: "completed", contextKey: `${id}:context`, runKey: `${id}:run`, contextId: `${id}:context`, runId: `${id}:run`, prompt: "Historical terminal snapshot", tools: ["mind.agenda", "mind.propose", "mind.report"], report: { reportId: digest({ id, result }), result, verified: true }, finishedAt: at(-40 * DAY + 1000), error: null, interactions: [], notification: null, ...patch };
+  return { id, at: at(-40 * DAY), kind: "manual", concernIds: [], signalIds: [], revisions: {}, sourceKinds: [], phase: "completed", runKey: `${id}:run`, contextId: `${id}:context`, runId: `${id}:run`, prompt: "Historical terminal snapshot", tools: ["mind.agenda", "mind.propose", "mind.report"], report: { reportId: digest({ id, result }), result, verified: true }, finishedAt: at(-40 * DAY + 1000), error: null, interactions: [], notification: null, ...patch };
 }
 const wireBytes = (value: unknown) => Buffer.byteLength(JSON.stringify({ result: value }), "utf8");
 const SAFE_RESPONSE_BYTES = 230 * 1024;
@@ -299,7 +294,7 @@ test("terminal history compaction leaves room to settle the outstanding run with
   await new MindRuntime(new MindStore(f.directory), a.call).tick(at(1000));
   const state = await f.store.read(), settled = state.decisions.find(d => d.id === outstanding.id)!;
   expect(state.runtime.currentDecisionId).toBeNull();
-  expect(settled).toMatchObject({ id: outstanding.id, contextKey: outstanding.contextKey, runKey: outstanding.runKey, contextId: outstanding.contextId, runId: outstanding.runId, phase: "completed" });
+  expect(settled).toMatchObject({ id: outstanding.id, runKey: outstanding.runKey, contextId: outstanding.contextId, runId: outstanding.runId, phase: "completed" });
   expect(state.concerns[0]!.lastAssessment?.conclusion).toBe(result.concerns[0]!.conclusion);
   expect(await stage(f, outstanding, result)).toEqual(receipt);
   expect(a.calls.filter(target => target === "agent.run")).toHaveLength(1);

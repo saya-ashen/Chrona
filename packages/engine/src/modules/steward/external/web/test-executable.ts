@@ -40,6 +40,9 @@ export async function checkExecutableComponents(
   assert.equal(loaded.javascript, definition.javascript); assert.equal(loaded.moduleId, owner.moduleId);
   const call = { target: `${owner.module}.list`, args: { path: "" }, page: { module: owner.module, id: page.id, revision: page.revision } };
   assert.equal((await post("/api/web/call", call)).status, 200, "declared component tools use the real page-pinned route");
+  assert.equal((await post("/api/web/call", { ...call, page: { ...call.page, revision: "stale" } })).status, 409);
+  assert.equal((await post("/api/web/call", { ...call, target: `${owner.module}.undeclared` })).status, 409);
+  assert.equal((await post("/api/web/call", { ...call, target: "planning.get" })).status, 409);
   assert.equal((await get(componentPath.replace(extension.revision, "stale"))).status, 409);
   state.status = "paused";
   assert.equal((await get(componentPath)).status, 409); assert.equal((await post("/api/web/call", call)).status, 409);

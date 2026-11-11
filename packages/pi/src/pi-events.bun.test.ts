@@ -10,7 +10,7 @@ async function fixture(method = "confirm", unavailableStats = false, sensitive =
   await writeFile(command, `#!${process.execPath}
 import {appendFileSync,writeFileSync} from 'node:fs';
 if(process.argv.includes('--version')){console.log('0.85.0');process.exit(0)}
-const emit=x=>process.stdout.write(JSON.stringify(x)+'\\n'),reply=(c,data={})=>emit({type:'response',id:c.id,success:true,data});
+const emit=x=>process.stdout.write(JSON.stringify(x)+'\\n'),reply=(c,data={})=>emit({type:'response',id:c.id,command:c.type,success:true,data});
 let started=false,completed=false,buffer='';process.stdin.setEncoding('utf8');
 process.stdin.on('data',chunk=>{buffer+=chunk;let n;while((n=buffer.indexOf('\\n'))!==-1){const c=JSON.parse(buffer.slice(0,n));buffer=buffer.slice(n+1);appendFileSync('commands.jsonl',JSON.stringify(c)+'\\n');
  if(c.type==='get_state')reply(c,{sessionId:'fixture',isStreaming:started,isCompacting:false,pendingMessageCount:0});

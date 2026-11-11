@@ -105,7 +105,7 @@ export function createPreferences(dataDir: string) {
   return { read, update, tool };
 }
 const preferences = createPreferences(chrona.paths.data);
-const appCall = (target: string, args: Record<string, unknown> = {}) => target === "qq.settings" ? preferences.tool(args) : applicationCall(target, args);
+const appCall = (target: string, args: Record<string, unknown> = {}, options: { key?: string } = {}) => target === "qq.settings" ? preferences.tool(args) : applicationCall(target, args, options);
 
 const log: QqLog = (event, fields = {}) => console.error(JSON.stringify({ component: "qq-bot", event, ...fields }));
 type Args = Record<string, string | boolean | undefined>;

@@ -22,7 +22,7 @@ import type { StewardPorts } from "./ports";
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await close(); });
 async function fixture() {
-  const dataDir = await mkdtemp("/tmp/chrona-install-test-"), db = testDb();
+  const dataDir = await mkdtemp("/tmp/chrona-install-test-"), db = testDb({ injectedAgent: false });
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const w = await db.workspace.create({ data: { name: "Install" } });
   let executions = 0;
@@ -44,7 +44,7 @@ test("catalog reports missing releases and paused products unavailable and keeps
   const f = await fixture();
   const catalog = await externalPackageCatalog(f.ports, f.workspaceId);
   for (const name of ["coding", "mind", "remind"]) expect(catalog.find(item => item.name === name)).toMatchObject({ available: false, releaseHash: null, moduleId: null });
-  expect(new Set(PREINSTALLED_MODULE_NAMES.filter(name => !isModulePaused(name)))).toEqual(new Set(["web", "notify", "qq", "author"]));
+  expect(new Set(PREINSTALLED_MODULE_NAMES.filter(name => !isModulePaused(name)))).toEqual(new Set(["pi", "web", "notify", "qq", "author"]));
   expect(await f.db.module.count()).toBe(0);
 });
 
@@ -231,7 +231,7 @@ test("initialization converges from the existing build queue and never reinstall
   expect((await externalPackageCatalog(f.ports, f.workspaceId)).find(p => p.name === "qq")?.installation).toMatchObject({ requestKey: first.packages.qq.requestKey });
 });
 
-test.each(["web", "notify", "author"] as const)("failed %s preinstall checks need explicit retry without reinstalling completed apps", async name => {
+test.each(["pi", "web", "notify", "author"] as const)("failed %s preinstall checks need explicit retry without reinstalling completed apps", async name => {
   const f = await fixture();
   for (const name of PREINSTALLED_MODULE_NAMES) await f.resource(name);
   await f.resource(name, { packages: ["fixture-missing-program"] });
@@ -312,9 +312,9 @@ test("an explicit checked external update preserves paused selection", async () 
   expect(await f.db.module.findUniqueOrThrow({ where: { id: first.moduleId! } })).toMatchObject({ status: "paused", activeHash: candidate.hash });
 });
 
-test("real checks and credential approval refresh the same installation receipt to installed", async () => {
-  const f = await fixture(); await f.resource("qq", { secrets: ["fixture_key"] });
-  const request = { package: "qq" as const, mode: "install" as const, requestKey: "credential-flow" };
+test.each(["pi", "qq"] as const)("%s checks and credential approval refresh the same installation receipt to installed", async name => {
+  const f = await fixture(); await f.resource(name, { secrets: ["fixture_key"] });
+  const request = { package: name, mode: "install" as const, requestKey: "credential-flow" };
   expect(await installExternal(f.ports, f.workspaceId, request)).toMatchObject({ status: "building" });
   const context = moduleContext(f.ports, f.workspaceId);
   await buildPending(context); await refreshInstallationReceipts(f.ports, f.workspaceId);
@@ -356,7 +356,7 @@ test("offline official update preserves a local fork and queues the merged commi
   expect(await installExternal(f.ports, f.workspaceId, request)).toEqual(result);
 });
 
-test.each(["web", "notify", "author"] as const)("preinstalled %s uses checks, stays removed after restart and explicitly reinstalls with a new identity", async name => {
+test.each(["pi", "web", "notify", "author"] as const)("preinstalled %s uses checks, stays removed after restart and explicitly reinstalls with a new identity", async name => {
   const f = await fixture();
   await f.resource(name, { uses: ["*"] });
   await f.db.module.createMany({ data: PREINSTALLED_MODULE_NAMES.filter(other => other !== name).map(other => ({ workspaceId: f.workspaceId, name: other })) });

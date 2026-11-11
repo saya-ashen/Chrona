@@ -4,12 +4,12 @@ import { tmpdir } from "node:os";
 import { inspectPiLaunch, piEnvironment, piLaunchConfig, type PiProviderOptions } from "./pi-launch";
 import { launchPiProcess, type PiProcess } from "./pi-process";
 
-export type PiCompletionInput = { model: string; thinking?: string; system?: string; prompt: string; maxOutputTokens: number; timeoutMs: number };
+export type PiCompletionInput = { model: string; thinking?: string; system?: string; prompt: string; maxOutputTokens: number; timeoutMs: number; signal?: AbortSignal };
 export type PiCompletionResult = { text: string; inputTokens: number | null; outputTokens: number | null };
 type PiMessage = { provider?: string; model: string; stopReason?: string; content?: { type: string; text?: string }[]; usage?: { input?: unknown; output?: unknown } };
 type CompletionState = { child?: PiProcess; closed?: Promise<void>; dir?: string; expired: boolean };
 type OutputState = { result?: PiCompletionResult };
-const failure = (code: "provider_error" | "timeout") => Object.assign(new Error(`Module model call: ${code}`), { code });
+const failure = (code: "provider_error" | "timeout" | "cancelled") => Object.assign(new Error(`Module model call: ${code}`), { code });
 const tokens = (value: unknown) => typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
 const timedOut = (state: CompletionState) => state.expired;
 const childOf = (state: CompletionState) => state.child;
@@ -147,15 +147,24 @@ export function createPiCompletion(options: PiProviderOptions) {
     if (!Number.isSafeInteger(input.maxOutputTokens) || input.maxOutputTokens <= 0 || !Number.isSafeInteger(input.timeoutMs) || input.timeoutMs <= 0 || input.timeoutMs > 2_147_483_647) throw failure("provider_error");
     const state: CompletionState = { expired: false };
     let timer: ReturnType<typeof setTimeout> | undefined, workPromise: Promise<PiCompletionResult> | undefined;
-    const isExpired = () => timedOut(state);
+    const isExpired = () => timedOut(state) || !!input.signal?.aborted;
+    let cancel: (() => void) | undefined;
     try {
       return await Promise.race([
-        new Promise<never>((_, reject) => { timer = setTimeout(() => { state.expired = true; childOf(state)?.kill("SIGKILL"); reject(failure("timeout")); }, input.timeoutMs); }),
+        new Promise<never>((_, reject) => {
+          cancel = () => { childOf(state)?.kill("SIGKILL"); reject(failure("cancelled")); };
+          input.signal?.addEventListener("abort", cancel, { once: true });
+          if (input.signal?.aborted) cancel();
+          timer = setTimeout(() => { state.expired = true; childOf(state)?.kill("SIGKILL"); reject(failure("timeout")); }, input.timeoutMs);
+        }),
         workPromise = work(config, input, state, isExpired),
       ]);
     } catch (error) {
-      throw timeoutError(error, isExpired) ? failure("timeout") : failure("provider_error");
+      // This evidence reaches the caller only if finally confirms tree closure.
+      // A rejected closed promise overrides it and leaves the operation unknown.
+      throw Object.assign(failure(input.signal?.aborted ? "cancelled" : timeoutError(error, isExpired) ? "timeout" : "provider_error"), { stopped: true });
     } finally {
+      if (cancel) input.signal?.removeEventListener("abort", cancel);
       await cleanup(state, timer, workPromise);
     }
   };

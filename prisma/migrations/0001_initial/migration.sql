@@ -447,6 +447,8 @@ CREATE TABLE "AgentContext" (
     "workspaceId" TEXT NOT NULL,
     "moduleId" TEXT NOT NULL,
     "hash" TEXT NOT NULL,
+    "providerId" TEXT,
+    "providerRevision" TEXT,
     CONSTRAINT "AgentContext_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "Session" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -912,3 +914,31 @@ CREATE INDEX "ModuleRemoval_workspaceId_name_hash_createdAt_idx" ON "ModuleRemov
 
 -- CreateIndex
 CREATE INDEX "BuildRequest_workspaceId_sessionId_idx" ON "BuildRequest"("workspaceId", "sessionId");
+
+-- Workspace-owned Provider registrations and immutable per-Run selections.
+CREATE TABLE "AgentProvider" (
+    "workspaceId" TEXT NOT NULL,
+    "id" TEXT NOT NULL,
+    "moduleId" TEXT NOT NULL,
+    "hash" TEXT NOT NULL,
+    "revision" TEXT NOT NULL,
+    "declaration" JSONB NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    PRIMARY KEY ("workspaceId", "id"),
+    CONSTRAINT "AgentProvider_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE INDEX "AgentProvider_workspaceId_moduleId_idx" ON "AgentProvider"("workspaceId", "moduleId");
+CREATE TABLE "AgentRunProvider" (
+    "runId" TEXT NOT NULL PRIMARY KEY,
+    "providerId" TEXT NOT NULL,
+    "moduleId" TEXT NOT NULL,
+    "hash" TEXT NOT NULL,
+    "revision" TEXT NOT NULL,
+    "declaration" JSONB NOT NULL,
+    "providerOptions" JSONB NOT NULL,
+    "completion" JSONB,
+    "kind" TEXT NOT NULL DEFAULT 'conversation',
+    CONSTRAINT "AgentRunProvider_runId_fkey" FOREIGN KEY ("runId") REFERENCES "Run" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE INDEX "AgentRunProvider_moduleId_hash_idx" ON "AgentRunProvider"("moduleId", "hash");

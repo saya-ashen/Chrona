@@ -20,9 +20,14 @@ export function providerWrite<T>(db: PrismaClient, guard: ProviderWriteGuard | u
   });
 }
 export function providerJournal(db: PrismaClient, runId: string, now: () => Date, guard?: ProviderWriteGuard) {
-  let progress = 0;
-  return async (type: "progress" | "usage" | "resources", value: Prisma.InputJsonValue) => {
+  let progress = 0, raw = 0, gap = false;
+  return async (type: "progress" | "usage" | "resources" | "raw", value: Prisma.InputJsonValue) => {
     if (type === "progress" && ++progress > 300) return;
+    if (type === "raw" && ++raw > 300) {
+      if (gap) return;
+      gap = true;
+      value = { type: "chrona_raw_gap", reason: "retention_limit", retainedEvents: 300, detail: "Subsequent raw events are not retained for this Run" };
+    }
     const at = now();
     await providerWrite(db, guard, tx => appendRunEventIn(tx, runId, type, { type, value, at: at.toISOString() }, at));
   };

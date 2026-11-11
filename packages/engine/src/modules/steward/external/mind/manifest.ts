@@ -44,7 +44,7 @@ const descriptions: Record<Tool, string> = {
 export function buildManifest() {
   return {
     name: "mind", description: "Evidence-driven personal follow-up: private concerns and projects, exact source associations, bounded daily suggestions and restart-safe Agent reasoning.",
-    entry: "index.ts", keepAlive: true, activated: true, effects: [], uses: ["modules.describe", "files.read", "timers.list", "timers.set", "timers.cancel", "agent.context", "agent.run", "agent.get", "agent.stream", "web.page-set", "notify.send", "mind.agenda", "mind.propose", "mind.report"],
+    entry: "index.ts", keepAlive: true, activated: true, effects: [], uses: ["modules.describe", "files.read", "timers.list", "timers.set", "timers.cancel", "agent.run", "agent.read", "web.page-set", "notify.send", "mind.agenda", "mind.propose", "mind.report"],
     data: { schema: 1 }, tests: ["test.ts"],
     tools: (Object.keys(inputs) as Tool[]).map(name => ({
       name, description: descriptions[name], visibility: ["signal", "agenda", "propose", "report"].includes(name) ? ["modules"] : ["owner"],

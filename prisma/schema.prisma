@@ -28,6 +28,7 @@ model Workspace {
   audits Audit[]
   stewardState StewardState?
   agentCommands AgentCommand[]
+  agentProviders AgentProvider[]
   kernelFacts KernelFact[]
   factConsumer KernelFactConsumer?
   candidateAdmissions CandidateAdmission[]
@@ -256,6 +257,7 @@ model Run {
   provider String
   execution ExecutionAttempt?
   agentAdmission AgentRunAdmission?
+  agentProvider AgentRunProvider?
   providerLaunch ProviderLaunch?
   buildAdmission BuildExecutionAdmission?
   invocations ModuleInvocation[]
@@ -561,8 +563,40 @@ model AgentContext {
   workspaceId String
   moduleId String
   hash String
+  providerId String?
+  providerRevision String?
   session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   @@index([workspaceId, moduleId])
+}
+
+/// Workspace-local registration owned permanently by its actual registering module.
+model AgentProvider {
+  workspaceId String
+  id String
+  moduleId String
+  hash String
+  revision String
+  declaration Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@id([workspaceId, id])
+  @@index([workspaceId, moduleId])
+}
+
+/// Immutable provider and configuration selection made in the Run enqueue transaction.
+model AgentRunProvider {
+  runId String @id
+  providerId String
+  moduleId String
+  hash String
+  revision String
+  declaration Json
+  providerOptions Json
+  completion      Json?
+  kind String @default("conversation")
+  run Run @relation(fields: [runId], references: [id], onDelete: Cascade)
+  @@index([moduleId, hash])
 }
 
 /// Exact tool/content selection admitted for one Run and its original application.

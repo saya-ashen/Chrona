@@ -18,20 +18,21 @@ async function fixture() {
   const root = await mkdtemp(join(tmpdir(), "chrona-upstream-route-test-")), db = testDb();
   cleanups.push(async () => { await db.$disconnect(); await rm(root, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "Upstream fixture" } });
-  const resources = join(root, "external"), dir = join(resources, "upstream-fixture"); await mkdir(dir, { recursive: true });
-  await writeFile(join(dir, "module.json"), JSON.stringify(moduleManifestSchema.parse({ name: "upstream-fixture", entry: "index.ts", keepAlive: true, effects: [], tests: ["test.ts"] })));
+  const resources = join(root, "external"), dir = join(resources, "pi"); await mkdir(dir, { recursive: true });
+  await writeFile(join(dir, "module.json"), JSON.stringify(moduleManifestSchema.parse({ name: "pi", entry: "index.ts", keepAlive: true, effects: [], tests: ["test.ts"] })));
   await writeFile(join(dir, "index.ts"), "// original\n"); await writeFile(join(dir, "test.ts"), "// test\n");
-  const git = await seedTestModuleRelease(resources, "upstream-fixture");
+  const git = await seedTestModuleRelease(resources, "pi");
   const ports: StewardPorts = { db, dataDir: root, now: () => new Date(), publicUrl: null }, context = moduleContext(ports, workspace.id);
-  const proposal = await propose(context, { root: resources, dir: "upstream-fixture", intent: { changes: ["Initial checked candidate"] }, sourceCommit: git.commit, gitBundle: git }, "user");
+  const proposal = await propose(context, { root: resources, dir: "pi", intent: { changes: ["Initial checked candidate"] }, sourceCommit: git.commit, gitBundle: git }, "user");
   const moduleId = proposal.moduleId!;
   await db.moduleVersion.update({ where: { moduleId_hash: { moduleId, hash: proposal.hash } }, data: { status: "approved" } });
   await db.module.update({ where: { id: moduleId }, data: { activeHash: proposal.hash } });
+  expect(await db.module.findUniqueOrThrow({ where: { id: moduleId } })).toMatchObject({ name: "pi", builtin: false, activeHash: proposal.hash });
   await recordModuleUpstream(ports, workspace.id, moduleId, git);
   const location = { platform: context.platform, moduleId };
   async function update() {
     await writeFile(join(dir, "upstream.txt"), "official update\n");
-    return seedTestModuleRelease(resources, "upstream-fixture");
+    return seedTestModuleRelease(resources, "pi");
   }
   return { root, resources, dir, ports, context, workspaceId: workspace.id, moduleId, git, location, update };
 }
@@ -45,7 +46,7 @@ test("offline module status is honest and fetch cannot invent a remote", async (
 test("offline bundle merge queues preserved local changes without activating", async () => {
   const f = await fixture();
   await writeFile(join(f.dir, "local.txt"), "local customization\n");
-  const local = await propose(f.context, { root: f.resources, dir: "upstream-fixture", intent: { changes: ["Local customization"] } }, "user");
+  const local = await propose(f.context, { root: f.resources, dir: "pi", intent: { changes: ["Local customization"] } }, "user");
   await rm(join(f.dir, "local.txt"));
   const update = await f.update(); let prepared = "";
   const proposal = await submitMergedCommit(f.context, { moduleId: f.moduleId, commit: update.commit, bundle: update, intent: { changes: ["Offline update"], preserves: ["Local customization"] }, onPrepared: async commit => { prepared = commit; } });
@@ -75,9 +76,9 @@ test("explicit fetched merge uses a request key once and rejects stale selection
 test("merge conflict keeps local source and active version; retry does not rerun merge", async () => {
   const f = await fixture();
   await writeFile(join(f.dir, "index.ts"), "// local conflicting edit\n");
-  const local = await propose(f.context, { root: f.resources, dir: "upstream-fixture", intent: { changes: ["Local edit"] } }, "user");
+  const local = await propose(f.context, { root: f.resources, dir: "pi", intent: { changes: ["Local edit"] } }, "user");
   await writeFile(join(f.dir, "index.ts"), "// upstream conflicting edit\n");
-  const update = await seedTestModuleRelease(f.resources, "upstream-fixture"), repository = "https://github.com/chrona/fixture.git";
+  const update = await seedTestModuleRelease(f.resources, "pi"), repository = "https://github.com/chrona/fixture.git";
   await importModuleGitBundle({ ...f.location, ...update, repository });
   await moduleGitCommand(moduleGitPath(f.context.platform, f.moduleId), ["update-ref", "refs/remotes/upstream/main", update.commit]);
   await recordModuleUpstream(f.ports, f.workspaceId, f.moduleId, { ...update, repository });

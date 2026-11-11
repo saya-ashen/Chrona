@@ -1,71 +1,33 @@
 import { expect, test } from "bun:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { moduleManifestSchema, primitiveInput } from "@chrona/contracts/steward";
-import { buildAgentApplication, parameters } from "../../packages/engine/src/modules/steward/builtin/agent/build";
+import { moduleManifestSchema, runtimeStartSchema } from "@chrona/contracts/steward";
+import { buildPiApplication, parameters } from "../../packages/engine/src/modules/steward/external/pi/build";
 import { validateToolArgs } from "../../packages/engine/src/modules/steward/module-tool-contract";
 
-const local = {
-  kind: "execution", "execution-id": "local-build-contract", "request-key": "local-build-contract", prompt: "bounded work",
-  placement: { kind: "local", "project-ref": "project", "mapping-revision": 1 },
-  workspace: { mode: "existing", baseline: { kind: "commit", digest: "a".repeat(40) } },
-  "queue-expires-at": "2030-01-01T00:00:00.000Z", budget: { "timeout-ms": 5000, "max-tool-calls": 5 },
-};
-const application = {
-  ...local, "execution-id": "application-build-contract", "request-key": "application-build-contract",
-  placement: { kind: "application", "application-id": "runner", "target-ref": "target", "target-revision": 1, "project-ref": "project" },
-  budget: { ...local.budget, "max-model-calls": 2, "max-output-tokens": 100 },
-};
-
-const publicInput = ({ ["request-key"]: _key, ...args }: Record<string, unknown>) => args;
-
-test("generated Agent manifest admits local and application runs while SDK validation stays strict", async () => {
-  const root = await mkdtemp(join(tmpdir(), "chrona-agent-build-contract-"));
+test("built external Pi exposes structured kernel endpoints and owner configuration", async () => {
+  const root = await mkdtemp("/tmp/chrona-pi-build-contract-");
   try {
-    await buildAgentApplication(root);
-    const generated = JSON.parse(await readFile(join(root, "module.json"), "utf8"));
-    expect(generated).toEqual(JSON.parse(await readFile(join(import.meta.dir, "../../packages/engine/src/modules/steward/builtin/agent/module.json"), "utf8")));
-    const run = moduleManifestSchema.parse(generated).tools.find(tool => tool.name === "work-run")!;
-    for (const input of [local, application]) {
-      expect(validateToolArgs(run, publicInput(input))).toEqual(publicInput(input));
-      expect(() => primitiveInput("run", { ...validateToolArgs(run, publicInput(input)), "request-key": input["request-key"] })).not.toThrow();
+    await buildPiApplication(root);
+    const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(root, "module.json"), "utf8")));
+    expect(manifest.name).toBe("pi");
+    expect(manifest.activated).toBe(true);
+    expect(manifest.uses).toContain("agent.register");
+    const start = manifest.tools.find(tool => tool.name === "start")!;
+    const input = { operationId: "run", runId: "run", token: "private-token", callbacks: crypto.randomUUID(), lane: "foreground", cwd: root, sessionDir: root, sessionId: null, deadline: null, prompt: "private-prompt", systemPrompt: "", resources: "minimal", providerOptions: { model: "fixture/model", thinking: "high" } };
+    expect(start.visibility).toEqual(["kernel"]);
+    expect(() => validateToolArgs(start, input)).not.toThrow();
+    expect(() => runtimeStartSchema.parse(input)).not.toThrow();
+    for (const invalid of [{ ...input, input: "{}" }, { ...input, sessionId: 1 }, { ...input, operationId: undefined }]) {
+      expect(() => validateToolArgs(start, invalid)).toThrow();
     }
-    // Branch-only requirements cannot be expressed by manifest parameters; the SDK still enforces them.
-    const { "max-output-tokens": _tokens, ...incompleteBudget } = application.budget;
-    const { "target-ref": _target, ...incompletePlacement } = application.placement;
-    const { "mapping-revision": _revision, ...incompleteLocalPlacement } = local.placement;
-    for (const input of [
-      { ...application, budget: incompleteBudget },
-      { ...application, placement: incompletePlacement },
-      { ...local, placement: incompleteLocalPlacement },
-      { ...local, placement: { ...local.placement, "application-id": "runner" } },
-      { ...local, budget: { ...local.budget, "max-model-calls": 2 } },
-    ]) {
-      expect(() => validateToolArgs(run, publicInput(input))).not.toThrow();
-      expect(() => primitiveInput("run", input)).toThrow();
-    }
-    const { "timeout-ms": _timeout, ...missingSharedLimit } = local.budget;
-    for (const input of [
-      { ...local, cwd: "/host" },
-      { ...local, placement: { ...local.placement, unknown: true } },
-      { ...local, budget: missingSharedLimit },
-      { ...local, budget: { ...local.budget, "timeout-ms": "5000" } },
-    ]) {
-      expect(() => validateToolArgs(run, publicInput(input))).toThrow();
-      expect(() => primitiveInput("run", input)).toThrow();
-    }
+    expect(manifest.tools.find(tool => tool.name === "native")!.parameters.properties).toHaveProperty("request");
+    for (const name of ["configure", "models"]) expect(manifest.tools.find(tool => tool.name === name)!.visibility).toEqual(["owner"]);
+    expect(manifest.tools.some(tool => ["run", "placement", "cleanup", "work-run"].includes(tool.name))).toBe(false);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
-test("Agent input object unions merge recursively inside arrays and preserve mixed leaf unions", () => {
-  const object = (properties: Record<string, ReturnType<typeof parameters>>, required = Object.keys(properties)) => ({ type: "object", properties, required });
-  const string = { type: "string" }, number = { type: "number" };
-  const union = (left: unknown, right: unknown) => ({ anyOf: [left, right] });
-  expect(parameters(union(
-    object({ entries: { type: "array", items: object({ shared: string, local: number }) } }),
-    object({ entries: { type: "array", items: object({ shared: string, application: number }) } }),
-  ))).toEqual(object({ entries: { type: "array", items: object({ shared: string, local: number, application: number }, ["shared"]) } }));
-  expect(parameters(union(object({ field: string }), object({ field: number })))).toEqual(object({ field: { type: ["string", "number"] } }));
-  expect(parameters(union(object({ field: string }), object({ field: object({}) })))).toEqual(object({ field: { anyOf: [string, object({})] } }));
+test("Pi manifest schemas retain null and nested structured JSON unions", () => {
+  expect(parameters({ anyOf: [{ type: "string" }, { type: "null" }] })).toEqual({ anyOf: [{ type: "string" }, { type: "null" }] });
+  expect(parameters({ type: "object", properties: { sessionId: { anyOf: [{ type: "string" }, { type: "null" }] }, entries: { type: "array", items: { type: "object", properties: {}, additionalProperties: true } } }, required: ["sessionId"] })).toEqual({ type: "object", properties: { sessionId: { anyOf: [{ type: "string" }, { type: "null" }] }, entries: { type: "array", items: { type: "object", properties: {}, required: [], additionalProperties: true } } }, required: ["sessionId"], additionalProperties: false });
 });

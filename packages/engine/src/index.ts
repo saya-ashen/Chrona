@@ -5,7 +5,7 @@ export { createSecrets } from "./modules/steward/secrets";
 export { exportLegacyConversations, verifyLegacyConversationExport, deleteExportedLegacyConversations } from "./modules/steward/legacy-conversation-export";
 export { readBoundedFile } from "./modules/steward/workspace-files";
 export { completeOAuth, OAUTH_CALLBACK_PATH } from "./modules/steward/oauth";
-export { createAgentClient, stopAgentRuns, createStewardService, createTools, StewardError, CallError } from "./modules/steward";
+export { createRegisteredProviderClient, stopAgentRuns, createStewardService, createTools, StewardError, CallError } from "./modules/steward";
 export { startOwnerBuild, ownerBuildSchema } from "./modules/steward/owner-build";
 export { runOwnerBuild } from "./modules/steward/owner-build-run";
 export { moduleSupervisor } from "./modules/steward/module-supervisor";

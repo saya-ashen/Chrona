@@ -1,6 +1,6 @@
 {
   "name": "coding",
-  "description": "Headless project coding conversations, durable command receipts and immutable results.",
+  "description": "Headless project coding conversations and durable command receipts over the kernel Agent API.",
   "entry": "index.ts",
   "listen": "/api/coding",
   "keepAlive": true,
@@ -8,16 +8,10 @@
   "effects": [],
   "authority": "owner",
   "uses": [
-    "*",
-    "agent.work-projects",
-    "agent.work-run",
-    "agent.work-get",
-    "agent.work-lookup",
-    "agent.work-write",
-    "agent.work-respond",
-    "agent.work-interrupt",
-    "agent.work-stream",
-    "agent.work-inspect"
+    "agent.run",
+    "agent.read",
+    "agent.write",
+    "agent.stop"
   ],
   "tools": [
     {

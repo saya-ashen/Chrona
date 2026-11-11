@@ -1,5 +1,5 @@
 export { createStewardService } from "./service";
-export { createAgentClient } from "./agent-client";
+export { createRegisteredProviderClient } from "./agent-client";
 export { stopAgentRuns } from "./local-runtime";
 export { createModules } from "./modules";
 export { createRuns, liveRuns, authenticateRun } from "./runs";

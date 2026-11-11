@@ -8,7 +8,6 @@ import { acceptCodingResult, listCodingResults } from "./results";
 import { loadSessions, publicSession, saveSessions, serializeConversation, type CodingSession, type CodingSessions, type CommandRecord } from "./sessions";
 import { codingError, readCodingWork, remember, type CodingContext } from "./storage";
 import { listProjects as projects, mutateProject } from "./projects";
-import { AgentAnswerRejected } from "./work";
 import { boundedCodingOutput, encodedBytes } from "./output";
 export type { CodingContext } from "./types";
 export type { CodingCommand } from "./commands";
@@ -190,7 +189,7 @@ async function settle(context: CodingContext, journal: CodingSessions, entry: Co
     const code = (error as { code?: string } | null)?.code ?? "unavailable";
     entry.receipt.error = { code, message: (error instanceof Error ? error.message : "Unknown command outcome").slice(0, 1000) };
     // Transport loss, changed evidence and unknown admission retain the exact pending identity.
-    if (error instanceof AgentAnswerRejected || definitive.has(code)) {
+    if (definitive.has(code)) {
       entry.receipt.status = "rejected";
       const session = journal.sessions.find(item => item.id === entry.receipt.sessionId), turn = session?.turns.find(item => item.key === entry.command.requestKey);
       if (turn) {

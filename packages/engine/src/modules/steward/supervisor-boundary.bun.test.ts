@@ -112,7 +112,7 @@ test("ordinary manual tool delivery, declared activation, owned timers and runti
 for (const model of [false, true]) test(`literal params ignore caller/workspace preferences; timeout caps survive (model=${model})`, async () => {
   const seen: ModuleEvent[] = [];
   const f = await fixture(async input => { seen.push(input); return {}; });
-  const app = await f.app("ordinary", { params: { limit: { type: "number", value: 7 }, enabled: { type: "boolean", value: false }, label: { type: "string", value: "literal" } }, ...(model ? { uses: ["agent.complete"], model: { tier: "normal", maxCalls: 2, maxOutputTokens: 20 } } : {}) });
+  const app = await f.app("ordinary", { params: { limit: { type: "number", value: 7 }, enabled: { type: "boolean", value: false }, label: { type: "string", value: "literal" } }, ...(model ? { uses: ["agent.run"], model: { tier: "normal", maxCalls: 2, maxOutputTokens: 20 } } : {}) });
   // Warm the fake process so recorded timers below cover event delivery only.
   await app.deliver();
   const ceiling = model ? modelCaps.eventTimeoutMs : RUN_LIMITS.jobTimeoutMs;

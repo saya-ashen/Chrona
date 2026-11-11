@@ -4,7 +4,8 @@ import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { isDeepStrictEqual } from "node:util";
 import { moduleManifestSchema, type ExecutionPorts, type ExecutionPrincipal, type ExecutionRef, type ExecutionStart, type ExecutionView } from "@chrona/contracts/steward";
-import { agentFixture, kernelOrigin } from "@chrona/engine/test-support";
+import { kernelOrigin } from "@chrona/engine/test-support";
+import { agentFixture } from "../../../../scripts/agent-integration/agent-application.fixtures";
 import { CallError, callSync, moduleSupervisor } from "@chrona/engine";
 import { createScriptSandbox } from "../../../../packages/integrations/src/steward/script-sandbox";
 import { createServerApp } from "../app";
@@ -24,7 +25,7 @@ function deferred() {
 
 /** Real SDK applications, auth, registry and SQLite event store; only execution is simulated.
  * agentFixture uses testDb({injectedAgent:false}), which creates a fresh OS-temp SQLite
- * database independently of DATABASE_URL. No provider, runtime ticking or TCP server runs.
+ * database independently of DATABASE_URL. The external Pi SDK registers against loopback; no model or application runtime tick runs.
  */
 export async function codingPeerFixture() {
   const f = await agentFixture(), db = f.ports.db;
@@ -40,7 +41,7 @@ export async function codingPeerFixture() {
   resetEnvCacheForTests();
   const sandbox = createScriptSandbox({ executionMode: "trusted-local", dataDir: f.ports.dataDir, moduleSdk: f.ports.moduleSdk });
   const runtime = createStewardRuntime(db, { provider: null, dataDir: f.ports.dataDir, sandbox: { ...sandbox.health, startModule: sandbox.startModule } });
-  Object.assign(runtime.ports, { agentApplication: f.ports.agentApplication, moduleBuiltinResources: f.ports.moduleBuiltinResources, moduleSdk: f.ports.moduleSdk });
+  Object.assign(runtime.ports, { providerModules: f.ports.providerModules, moduleExternalResources: f.ports.moduleExternalResources, moduleSdk: f.ports.moduleSdk });
   const ports = runtime.ports;
   try {
     async function install(name: "coding" | "coding-web") {

@@ -62,7 +62,7 @@ export async function executionRunInput(ports: StewardPorts, run: ClaimedRun): P
   }
 
   return { runId: run.id, token: run.token, lane: "background", cwd: row.resolvedCwd, sessionDir: row.logDir, sessionId: run.session?.providerSessionId ?? null,
-    systemPrompt: EXECUTION_SYSTEM_PROMPT, resources: "minimal",
+    systemPrompt: EXECUTION_SYSTEM_PROMPT, resources: "configured",
     prompt: `Project baseline: ${row.baseline}\nBudget: ${JSON.stringify(budget)}\nDeadline: ${run.deadlineAt.toISOString()}\n\nGoal:\n${run.prompt}`,
     deadline: run.deadlineAt, execution: ref, executionBudget: { maxToolCalls: budget.maxToolCalls }, hostPaths: [], content: [], extraTools: [], searchTools: false,
     detail: { append },

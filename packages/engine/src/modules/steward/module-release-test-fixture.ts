@@ -3,7 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { commitModuleSource, moduleGitPath } from "./module-git";
-import { readModuleFiles } from "./module-preview";
+import { snapshotModuleMaterial } from "./module-artifacts";
 import { existsSync } from "node:fs";
 import type { StewardPorts } from "./ports";
 import runtimeDeclarations from "../../../../integrations/src/steward/runtimes.json";
@@ -17,7 +17,9 @@ export function testReleaseRuntimeChecks(): Pick<StewardPorts, "moduleSdk" | "mo
 /** Synthetic fixtures retain ancestry across release edits, without any network or user database. */
 export async function seedTestModuleRelease(resourcesRoot: string, name: string, repository: string | null = null) {
   const platform = join(resourcesRoot, ".test-release-git"), moduleId = name;
-  const files = await readModuleFiles(join(resourcesRoot, name), "Unsafe test release");
+  // Validate complete material first. commitModuleSource stores its verified
+  // artifact bytes separately and selects only source + record for Git.
+  const files = await snapshotModuleMaterial(resourcesRoot, name, { verifyTree: true });
   const revision = await commitModuleSource({ platform, moduleId, versionId: randomUUID(), files, message: "Synthetic module release" });
   const seedDir = join(dirname(resourcesRoot), "module-git"); await mkdir(seedDir, { recursive: true });
   const bundlePath = join(seedDir, `${name}.bundle`), repo = moduleGitPath(platform, moduleId);

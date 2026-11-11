@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { createAgentConversations } from "./agent-conversations";
 import type { QqBinding, QqChatPort, QqReplyItem } from "./bot";
-type Call = (target: string, args: Record<string, unknown>) => Promise<unknown>;
+type Call = (target: string, args: Record<string, unknown>, options?: { key?: string }) => Promise<unknown>;
 
 type Route = { owner: string; workspace: string };
 type State = { version: 1; routes: Record<string, Route>; deliveries: Partial<Record<string, "pending" | "accepted" | "withheld">> };
@@ -35,7 +35,7 @@ async function readAttachment(contentDir: string, ref: string) {
   } finally { await handle.close(); }
 }
 export function createQqConversations(options: { dataDir: string; contentDir: string; call: Call; binding: () => Promise<QqBinding | null>; deliver: (item: QqReplyItem) => Promise<unknown> }) {
-  const app = createAgentConversations({ source: "qq", dataDir: options.dataDir, call: (target, args = {}) => options.call(target, args), reply: () => {} });
+  const app = createAgentConversations({ source: "qq", dataDir: options.dataDir, call: (target, args = {}, callOptions) => options.call(target, args, callOptions), reply: () => {} });
   const directory = join(options.dataDir, "conversation-delivery"), path = join(directory, "state.json");
   let queue = Promise.resolve<unknown>(undefined);
   function serial<T>(work: () => Promise<T>) { const next = queue.then(work); queue = next.catch(() => {}); return next; }

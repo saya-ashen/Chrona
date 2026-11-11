@@ -32,10 +32,11 @@ async function fixture(handler?: Parameters<typeof testModuleProcess>[0]) {
   return { db, ports, workspace, app, received, advance: (ms: number) => { time += ms; }, owner: { ...kernelOrigin(workspace.id), caller: { kind: "owner" as const, via: null } } };
 }
 
-test("six public namespaces expose exactly the target 35 tools; old names are rejected", async () => {
+test("seven public namespaces expose exactly the target 42 tools; old names are rejected", async () => {
   const f = await fixture();
-  expect(listSystemModules().map(row => row.name).sort()).toEqual(["activity", "approvals", "modules", "secrets", "settings", "timers"]);
-  expect(listSystemModules().flatMap(row => row.tools)).toHaveLength(35);
+  expect(listSystemModules().map(row => row.name).sort()).toEqual(["activity", "agent", "approvals", "modules", "secrets", "settings", "timers"]);
+  expect(listSystemModules().flatMap(row => row.tools)).toHaveLength(42);
+  expect(listSystemModules().find(row => row.name === "agent")?.tools.map(tool => tool.name).sort()).toEqual(["native", "providers", "read", "register", "run", "stop", "write"]);
   for (const target of ["modules.tools", "modules.reference", "modules.diagnostics", "modules.admit-candidates", "modules.candidate-check"]) await expect(callSync(f.ports, f.owner, target, {})).rejects.toMatchObject({ code: "not_found" });
   const page = await callSync(f.ports, f.owner, "modules.list", { limit: 1 });
   expect(page.output).toMatchObject({ items: [], nextCursor: null });

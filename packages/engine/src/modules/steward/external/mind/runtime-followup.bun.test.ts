@@ -26,7 +26,7 @@ async function fixture() {
   return { root, store, service };
 }
 function decision(id = "decision-1"): Decision {
-  return { id, at: NOW, kind: "review", concernIds: [], signalIds: [], revisions: {}, sourceKinds: [], phase: "unknown", contextKey: `${id}:context`, runKey: `${id}:run`, contextId: "context-1", runId: "run-1", prompt: "Uncompacted active evidence", tools: [...REASONING_TOOLS], report: null, finishedAt: null, error: null, interactions: [], notification: null };
+  return { id, at: NOW, kind: "review", concernIds: [], signalIds: [], revisions: {}, sourceKinds: [], phase: "unknown", runKey: `${id}:run`, contextId: "context-1", runId: "run-1", prompt: "Uncompacted active evidence", tools: [...REASONING_TOOLS], report: null, finishedAt: null, error: null, interactions: [], notification: null };
 }
 function result(row: Decision): ReportResult {
   return { summary: "Evidence unavailable", concerns: row.concernIds.map(id => ({ id, revision: row.revisions[id]!, conclusion: "Try the source again later", signalIds: row.signalIds })), feedback: { ...feedback } };
@@ -45,11 +45,10 @@ function agent(f: Awaited<ReturnType<typeof fixture>>) {
     const state = await f.store.read(), row = state.decisions.find(d => d.id === state.runtime.currentDecisionId)!;
     if (!row) throw new Error("No durable current decision");
     const identity = { contextId: `context-${row.id}`, runId: `run-${row.id}`, active, status: active ? "running" : "finished" };
-    if (target === "agent.context") return { contextId: identity.contextId };
-    if (target === "agent.run" || target === "agent.get") return identity;
-    if (target === "agent.stream") {
-      expect(args["run-id"]).toBe(row.runId);
-      return { items: output.map(item => ({ ...item, payload: { ...item.payload, value: { ...item.payload.value, runId: row.runId } } })), after: output.length, interactions: [] };
+    if (target === "agent.run") return identity;
+    if (target === "agent.read") {
+      expect(args.runId).toBe(row.runId);
+      return { items: (args.cursor ? [] : output).map(item => ({ ...item, payload: { ...item.payload, value: { ...item.payload.value, runId: row.runId } } })), run: identity, nextCursor: output.length ? "receipt-cursor" : null, ended: !active, interactions: [] };
     }
     throw new Error(`Unexpected effect ${target}`);
   };
@@ -124,14 +123,30 @@ test.each(["run", "context"] as const)("a mismatched Agent %s identity cannot au
   const effects: string[] = [];
   await new MindRuntime(f.store, async target => {
     effects.push(target);
-    if (target === "agent.get") return { runId: mismatch === "run" ? "wrong-run" : row.runId, contextId: mismatch === "context" ? "wrong-context" : row.contextId, active: false, status: "finished" };
-    if (target === "agent.stream") return { items: [transcript(receipt(row, reportId))], interactions: [] };
+    if (target === "agent.read") return { run: { runId: mismatch === "run" ? "wrong-run" : row.runId, contextId: mismatch === "context" ? "wrong-context" : row.contextId, active: false, status: "finished" }, items: [transcript(receipt(row, reportId))], nextCursor: null, ended: true, interactions: [] };
     throw new Error(`Unexpected Agent call ${target}`);
   }).tick(NOW);
   const state = await new MindStore(f.root).read();
-  expect(effects).toEqual(["agent.get"]);
+  expect(effects).toEqual(["agent.read"]);
   expect(state.runtime.currentDecisionId).toBe(row.id);
-  expect(state.decisions[0]).toMatchObject({ phase: "unknown", finishedAt: null, contextKey: row.contextKey, runKey: row.runKey, report: null });
+  expect(state.decisions[0]).toMatchObject({ phase: "unknown", finishedAt: null, runKey: row.runKey, report: null });
+  expect(state.decisions[0]!.reportCandidates).toEqual(row.reportCandidates);
+});
+
+test.each(["retained-cursor", 12, ""])("invalid Agent cursor %p retains the durable checkpoint and unverified report", async nextCursor => {
+  const f = await fixture(), row = decision(), reportId = digest("stalled-receipt");
+  row.cursor = "retained-cursor";
+  addReportCandidate(row, { reportId, result: result(row), verified: false });
+  await f.store.update(state => { state.decisions.push(row); state.runtime.currentDecisionId = row.id; });
+  let reads = 0;
+  await new MindRuntime(f.store, async (target, args) => {
+    expect(target).toBe("agent.read"); expect(args.cursor).toBe(row.cursor); reads++;
+    return { run: { runId: row.runId, contextId: row.contextId, active: false, status: "finished" }, items: [transcript(receipt(row, reportId))], nextCursor, ended: true, interactions: [] };
+  }).tick(NOW);
+  const state = await new MindStore(f.root).read();
+  expect(reads).toBe(1);
+  expect(state.runtime.currentDecisionId).toBe(row.id);
+  expect(state.decisions[0]).toMatchObject({ phase: "unknown", finishedAt: null, cursor: "retained-cursor", report: null });
   expect(state.decisions[0]!.reportCandidates).toEqual(row.reportCandidates);
 });
 
@@ -245,18 +260,18 @@ test("Mind resumes its persisted result cursor after a later page fails; transcr
   let unavailable = true;
   const cursors: unknown[] = [];
   const call: Call = async (target, args) => {
-    if (target === "agent.get") return { runId: row.runId, contextId: row.contextId, active: false, status: "finished" };
-    if (target !== "agent.stream") throw new Error(`Unexpected effect ${target}`);
-    cursors.push(args.after);
-    if (args.after === 0) return { items: Array.from({ length: 100 }, (_, index) => ({ sequence: index + 1, kind: "progress", payload: {} })), after: 100, interactions: [], transcript: [transcript(receipt(row, reportId))] };
+    const run = { runId: row.runId, contextId: row.contextId, active: false, status: "finished" };
+    if (target !== "agent.read") throw new Error(`Unexpected effect ${target}`);
+    cursors.push(args.cursor ?? null);
+    if (!args.cursor) return { items: Array.from({ length: 2 }, (_, index) => ({ sequence: index + 1, kind: "progress", payload: {} })), run, nextCursor: "opaque-page-two", ended: true, interactions: [], transcript: [transcript(receipt(row, reportId))] };
     if (unavailable) throw new Error("lost second page");
-    return { items: [{ ...transcript(receipt(row, reportId)), sequence: 101 }], after: 101, interactions: [] };
+    return { items: [{ ...transcript(receipt(row, reportId)), sequence: 101 }], run, nextCursor: null, ended: true, interactions: [] };
   };
   await new MindRuntime(f.store, call).tick(NOW);
   const pending = (await f.store.read()).decisions[0]!;
-  expect(pending.after).toBe(100); expect(pending.report?.verified).not.toBe(true);
+  expect(pending.cursor).toBe("opaque-page-two"); expect(pending.report?.verified).not.toBe(true);
   unavailable = false;
   await new MindRuntime(new MindStore(f.root), call).tick(NOW);
-  expect(cursors).toEqual([0, 100, 100]);
-  expect((await f.store.read()).decisions[0]).toMatchObject({ phase: "completed", after: 101, report: { verified: true, reportId } });
+  expect(cursors).toEqual([null, "opaque-page-two", "opaque-page-two"]);
+  expect((await f.store.read()).decisions[0]).toMatchObject({ phase: "completed", cursor: null, report: { verified: true, reportId } });
 });

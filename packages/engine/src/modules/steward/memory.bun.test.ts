@@ -5,7 +5,7 @@ import { selectedMemory, conversationMemory, memoryView, memoryForget, type Memo
 import { createAgentConversations } from "./entry-app/conversations";
 import { parseSnapshot } from "./external/memory-local/conversation";
 import { preferences } from "./external/memory-local/preferences";
-import { moduleManifestSchema } from "@chrona/contracts/steward";
+import { kernelAgentInputs, kernelAgentOutputs, moduleManifestSchema } from "@chrona/contracts/steward";
 
 type Args = Record<string, unknown>;
 const dirs: string[] = [];
@@ -109,20 +109,29 @@ test("preferences are private application files, persistent, deduplicated and in
 });
 test.each(["web", "mcp", "qq"] as const)("%s retains its own journal/context and persists memory receipts across restart", async source => {
   const dataDir = await directory(), f = fixture(), replies: Args[] = [], prompts: string[] = [];
+  const admissions: { args: Args; key?: string }[] = [];
   let failRun = true, active = true, clock = 0;
-  const call = async (target: string, args: Args = {}): Promise<unknown> => {
-    if (target === "agent.context") return { contextId: "private-context" };
-    if (target === "agent.run") { prompts.push(String(args.prompt)); if (failRun) { failRun = false; throw new Error("lost run receipt"); } return { runId: "run-1", status: "running", active: true }; }
-    if (target === "agent.get") return { status: "finished", active };
-    if (target === "agent.stream") return { items: [], after: 0, transcript: [{ at, kind: "text", text: "done" }], interactions: [] };
+  const call = async (target: string, args: Args = {}, options: { key?: string } = {}): Promise<unknown> => {
+    if (target === "agent.run") {
+      const input = kernelAgentInputs.run.parse(args);
+      expect(options.key).toStartWith(`${source}-run:`);
+      admissions.push({ args, key: options.key }); prompts.push(input.prompt);
+      if (failRun) { failRun = false; throw new Error("lost run receipt"); }
+      return kernelAgentOutputs.run.parse({ runId: "run-1", contextId: "private-context", status: "running", active: true });
+    }
+    if (target === "agent.read") {
+      expect(kernelAgentInputs.read.parse(args)).toMatchObject({ runId: "run-1", limit: 100 });
+      return kernelAgentOutputs.read.parse({ run: { runId: "run-1", contextId: "private-context", status: active ? "running" : "finished", active }, items: [], nextCursor: null, ended: !active, transcript: [{ at, kind: "text", text: "done" }], interactions: [] });
+    }
     return f.call(target, args);
   };
-  const options = { source, dataDir, call, tools: ["memory-local.recall"], reply: (reply: Args) => { replies.push(reply); }, now: () => new Date(Date.parse(at) + clock++ * 1000) };
+  const options = { source, dataDir, call, tools: [{ moduleId: "memory-local-id", tool: "recall" }], reply: (reply: Args) => { replies.push(reply); }, now: () => new Date(Date.parse(at) + clock++ * 1000) };
   let app = createAgentConversations(options);
   await expect(app.send({ text: "remember this", requestKey: "one" })).rejects.toThrow("lost run receipt");
   app = createAgentConversations(options);
   const sent = await app.send({ text: "remember this", requestKey: "one" });
   expect(prompts).toHaveLength(2); expect(prompts[0]).toBe(prompts[1]);
+  expect(admissions[1]).toEqual(admissions[0]);
   expect(prompts[0]).toContain("Earlier choice");
   expect(f.calls.filter(call => call.target.endsWith(".conversation-context"))).toHaveLength(1);
   active = false; await app.poll();

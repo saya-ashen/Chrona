@@ -6,12 +6,11 @@ import { testDb } from "./test-db";
 import { moduleContext } from "./module-context";
 import { propose } from "./module-proposal";
 import { queueBuild } from "./module-build-session";
-import { activateIn, activateBuiltinReleaseIn } from "./module-generation";
+import { activateIn } from "./module-generation";
 import { rollback } from "./module-activation";
 import { buildPending } from "./module-build";
 import { requestGroup } from "./module-group";
 import { resolveBuiltinRelease } from "./module-release";
-import { seedTestModuleRelease } from "./module-release-test-fixture";
 import { currentModuleEvolution, updateModuleEvolution } from "./module-evolution";
 import { requestStatus, setStatusIn } from "./module-status";
 import { rollbackFailedStart } from "./module-generation";
@@ -24,7 +23,7 @@ import type { StewardPorts } from "./ports";
 const closes: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const close of closes.splice(0).reverse()) await close(); });
 async function fixture() {
-  const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-identity-");
+  const db = testDb({ injectedAgent: false }), dataDir = await mkdtemp("/tmp/chrona-identity-");
   closes.push(async () => { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "identity" } });
   const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => new Date("2026-11-05T12:00:00Z") };
@@ -56,7 +55,7 @@ test.each([...BUILTIN_MODULE_NAMES, ...KERNEL_MODULE_NAMES, "rescue"])("empty-wo
   expect(await f.db.approval.count()).toBe(0);
 });
 
-test.each(["web", "notify"])("ordinary preinstalled %s accepts checked updates, rollback and deletion", async name => {
+test.each(["pi", "web", "notify"])("ordinary preinstalled %s accepts checked updates, rollback and deletion", async name => {
   const f = await fixture(), app = await f.app(name, false);
   expect(moduleIdentity(app)).toMatchObject({ origin: "external", capabilities: { build: true, propose: true, group: true, activate: true, update: true, rollback: true, remove: true, install: false } });
   for (const operation of ["build", "propose", "group", "activate", "update", "rollback"] as const) {
@@ -83,12 +82,6 @@ test.each(["mcp", "files", "events"])("optional official %s has external lifecyc
   else await expect(assertExternalName(f.db, f.workspace.id, name, "propose")).rejects.toMatchObject({ code: "unavailable", reason: "module_paused" });
   expect(moduleIdentity({ name, builtin: true }, { removable: false }).capabilities.remove).toBe(false);
   expect(moduleIdentity({ name: "other-entry", builtin: false }, { removable: false }).capabilities.remove).toBe(false);
-});
-
-test("builtin Agent cannot be replaced through dynamic application lifecycle", async () => {
-  const f = await fixture(), app = await f.app("agent", true);
-  expect(moduleIdentity(app)).toMatchObject({ origin: "builtin", capabilities: { build: false, update: false, remove: false } });
-  for (const operation of ["build", "propose", "group", "activate", "update", "rollback", "remove", "install"] as const) expect(() => assertModuleOperation(app, operation)).toThrow();
 });
 
 test.each([...KERNEL_MODULE_NAMES, "rescue"])("persisted builtin flag cannot grant dynamic authority to %s", async name => {
@@ -127,34 +120,11 @@ test("version source does not grant builtin identity and external activation pre
   expect(await f.db.schedule.findUniqueOrThrow({ where: { id: independentlyPaused.id } })).toMatchObject({ status: "cancelled", nextAt: null });
 });
 
-test("trusted Git seed is idempotent and rejects untrusted metadata or replacing active code", async () => {
+test("Agent has no builtin release even when old resources are supplied", async () => {
   const f = await fixture();
   f.ports.moduleBuiltinResources = join(f.dataDir, "release");
-  await mkdir(join(f.ports.moduleBuiltinResources, "agent"), { recursive: true });
-  const app = await f.app("agent", true);
-  await writeFile(join(f.ports.moduleBuiltinResources, "agent/module.json"), JSON.stringify(app.manifest));
-  await writeFile(join(f.ports.moduleBuiltinResources, "agent/index.ts"), "export {};");
-  const git = await seedTestModuleRelease(f.ports.moduleBuiltinResources!, "agent");
-  const release = await resolveBuiltinRelease(f.ports, "agent");
-  await f.db.moduleVersion.create({ data: { moduleId: app.id, hash: release.hash, manifest: release.manifest, source: "builtin", status: "approved", intent: {}, report: { git: { commit: git.commit, tree: git.tree } } } });
-  await requestStatus(f.context, app.id, "paused", "maintenance");
-  await f.db.module.update({ where: { id: app.id }, data: { activeHash: null } });
-  await f.db.$transaction(tx => activateBuiltinReleaseIn(f.context, tx, release));
-  const evolution = await currentModuleEvolution(f.db, f.workspace.id, app.id, release.hash);
-  await f.db.$transaction(tx => activateBuiltinReleaseIn(f.context, tx, release));
-  expect(await f.db.generation.count()).toBe(1);
-  expect(await currentModuleEvolution(f.db, f.workspace.id, app.id, release.hash)).toEqual(evolution);
-  expect(await f.db.module.findUniqueOrThrow({ where: { id: app.id } })).toMatchObject({ activeHash: release.hash, status: "paused" });
-  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: app.id, hash: release.hash } }, data: { source: "user" } });
-  await expect(f.db.$transaction(tx => activateBuiltinReleaseIn(f.context, tx, release))).rejects.toMatchObject({ code: "conflict" });
-  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: app.id, hash: release.hash } }, data: { source: "builtin" } });
-  await f.db.module.update({ where: { id: app.id }, data: { activeHash: "next" } });
-  await expect(f.db.$transaction(tx => activateBuiltinReleaseIn(f.context, tx, release))).rejects.toMatchObject({ code: "conflict" });
-  await f.db.module.update({ where: { id: app.id }, data: { activeHash: null } });
-  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: app.id, hash: release.hash } }, data: { report: { git: { commit: "b".repeat(40), tree: git.tree } } } });
-  await expect(f.db.$transaction(tx => activateBuiltinReleaseIn(f.context, tx, release))).rejects.toMatchObject({ code: "conflict" });
-  await f.db.module.update({ where: { id: app.id }, data: { builtin: false } });
-  await expect(f.db.$transaction(tx => activateBuiltinReleaseIn(f.context, tx, release))).rejects.toMatchObject({ code: "conflict" });
+  await expect(resolveBuiltinRelease(f.ports, "agent")).rejects.toMatchObject({ reason: "release_not_found" });
+  expect(await f.db.module.count()).toBe(0);
 });
 
 test("a real automatically activated group cannot partially roll back after start failure", async () => {

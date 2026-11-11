@@ -579,7 +579,9 @@ test("receiver rotation requires reconciled poll, settled capacity and every ret
 test("source flood commits a bounded gap and final plus signed stop drain through the actual app", async () => {
   const f = await fixture(); f.kernel.packet = f.packet;
   const device = f.open(processDriver("yes source-flood | head -c 700000; sleep 60"));
-  await device.tick(); await device.idle(); await device.tick(); await device.tick();
+  await device.tick(); await device.idle();
+  // Each app forwarding pass has a wall-clock budget; keep polling until verified stop.
+  do { await device.tick(); } while (!f.kernel.settled);
   const source = reports(device.journal).filter(report => report.kind === "source");
   expect(source.length).toBeLessThanOrEqual(513);
   const last = source.at(-1)!.payload.records as { payload: { type: string; reason?: string; from?: number; through?: number } }[];

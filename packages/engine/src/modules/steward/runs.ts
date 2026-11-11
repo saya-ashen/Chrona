@@ -13,12 +13,13 @@ import { buildSettings, budgetTimezone, runTimeoutMinutes } from "./settings";
 import { audit } from "./audit";
 import { StewardError } from "./errors";
 import { authenticateRun } from "./run-auth";
-import { assertBuildProvider, buildExecution } from "./build-execution";
+import { assertBuildProviderIn, buildExecution } from "./build-execution";
 import { assertExternalName } from "./module-identity";
 import { declaredModules } from "./module-build-targets";
 import { executionPrincipal, executionNeverOfferedIn } from "./execution-state";
 import { claimExecutionIn, prepareServerClaim } from "./execution-claim";
 import { assertExecutionPrincipal } from "./execution-principal";
+import { bindQueuedProviderIn, providerCompletionBudgetSchema } from "./agent-provider";
 
 export { liveRuns } from "./run-live";
 
@@ -30,9 +31,18 @@ export function nextLocalMidnight(now: Date, timezone: string) {
   return new Date(hi);
 }
 export { authenticateRun } from "./run-auth";
-export type EnqueueRun = { sessionId?: string; lane: RunLane; trigger: RunTrigger; prompt: string; label?: string | null };
+export type EnqueueRun = { sessionId?: string; lane: RunLane; trigger: RunTrigger; prompt: string; label?: string | null; providerId?: string; providerOptions?: Prisma.InputJsonObject };
 type RunRow = Prisma.RunGetPayload<{ include: { session: true } }>;
 type RunOutcome = Awaited<ReturnType<ProviderAdapter["start"]>["done"]>;
+
+async function completionTimeout(tx: Prisma.TransactionClient, runId: string, timeoutMs: number | null) {
+  const binding = await tx.agentRunProvider.findUnique({ where: { runId } });
+  if (binding?.kind === "completion") {
+    const budget = providerCompletionBudgetSchema.parse(binding.completion);
+    timeoutMs = Math.min(timeoutMs ?? Infinity, budget.limits.eventTimeoutMs);
+  }
+  return timeoutMs;
+}
 
 function claimSelection(selection?: ExecutionClaimSelection): Prisma.RunWhereInput {
   if (selection?.kind === "ordinary") return { execution: null };
@@ -44,8 +54,10 @@ export function createRunSession(tx: Prisma.TransactionClient, workspaceId: stri
   return tx.session.create({ data: { workspaceId, key: `${source}:${randomUUID()}`, source, ...origin, createdAt: now, lastActivityAt: now } });
 }
 /** Coding admission already owns its writer transaction; logs are created by the launch/capture path. */
-export function enqueueExecutionRunIn(ports: StewardPorts, tx: Prisma.TransactionClient, input: { workspaceId: string; sessionId: string; prompt: string; cwd: string; now: Date }) {
-  return tx.run.create({ data: { workspaceId: input.workspaceId, sessionId: input.sessionId, prompt: input.prompt, cwd: input.cwd, lane: "background", trigger: "source", provider: ports.provider?.name ?? "unconfigured", tokenHash: hash(randomBytes(32).toString("hex")), createdAt: input.now } });
+export async function enqueueExecutionRunIn(ports: StewardPorts, tx: Prisma.TransactionClient, input: { workspaceId: string; sessionId: string; prompt: string; cwd: string; now: Date }) {
+  const run = await tx.run.create({ data: { workspaceId: input.workspaceId, sessionId: input.sessionId, prompt: input.prompt, cwd: input.cwd, lane: "background", trigger: "source", provider: "unconfigured", tokenHash: hash(randomBytes(32).toString("hex")), createdAt: input.now } });
+  await bindQueuedProviderIn(tx, input.workspaceId, run.id);
+  return run;
 }
 export function createRuns(ports: StewardPorts, workspaceId: string) {
   const runs = new RunService(ports, workspaceId);
@@ -63,7 +75,12 @@ class RunService {
     // The clock may tie or move backwards; builds still enter FIFO in admission order.
     const tail = input.lane === "build" ? await tx.run.findFirst({ where: { workspaceId, lane: "build" }, orderBy: { createdAt: "desc" }, select: { createdAt: true } }) : null;
     const createdAt = new Date(Math.max(ports.now().getTime(), tail ? tail.createdAt.getTime() + 1 : 0));
-    return tx.run.create({ data: { ...input, workspaceId, provider: ports.provider?.name ?? "unconfigured", tokenHash: hash(randomBytes(32).toString("hex")), cwd, createdAt } });
+    const { providerId, providerOptions, ...record } = input;
+    const run = await tx.run.create({ data: { ...record, workspaceId, provider: "unconfigured", tokenHash: hash(randomBytes(32).toString("hex")), cwd, createdAt } });
+    const context = await tx.agentContext.findUnique({ where: { sessionId: session.id } });
+    // Public Agent admission writes its explicitly selected binding in this same transaction.
+    if (!context?.providerId) await bindQueuedProviderIn(tx, workspaceId, run.id, providerId, providerOptions);
+    return run;
   }
   private async admitQueued(tx: Prisma.TransactionClient, run: RunRow, now: Date, { lane, today, timezone }: { lane: RunLane; today: { sessionId: string | null }[]; timezone: string }) {
     if ((run.session && run.session.status !== "active") || run.cancelRequestedAt) {
@@ -98,15 +115,16 @@ class RunService {
       execution = await buildExecution(tx, run.id);
     }
     if (execution) {
-      try { assertBuildProvider(this.ports, execution); }
+      try { await assertBuildProviderIn(tx, this.workspaceId, execution, run.id); }
       catch {
         await tx.run.update({ where: { id: run.id }, data: { status: "failed", endedAt: now, error: "Authorized build Provider/model pin is unavailable" } });
         return null;
       }
       builds = { ...builds!, timeoutMinutes: execution.timeoutMinutes, maxSubmissions: execution.maxSubmissions };
     }
-    const timeoutMs = await this.claimTimeout(tx, run, builds, ordinaryTimeoutMinutes);
-    if (timeoutMs === undefined) return null;
+    const requestedTimeout = await this.claimTimeout(tx, run, builds, ordinaryTimeoutMinutes);
+    if (requestedTimeout === undefined) return null;
+    const timeoutMs = await completionTimeout(tx, run.id, requestedTimeout);
     const token = randomBytes(32).toString("hex"), deadlineAt = timeoutMs === null ? null : new Date(now.getTime() + timeoutMs);
     const prompt = builds ? `${run.prompt}\n\nCurrent kernel limits for this run (override earlier numeric build limits): at most ${builds.maxSubmissions} candidate submissions; deadline ${deadlineAt!.toISOString()} (${builds.timeoutMinutes} minutes). Report before the deadline; do not start an automatic continuation.` : run.prompt;
     if (!(await tx.run.updateMany({ where: { id: run.id, status: "queued" }, data: { status: "running", tokenHash: hash(token), startedAt: now, deadlineAt, leaseUntil: deadlineAt, prompt } })).count) return null;

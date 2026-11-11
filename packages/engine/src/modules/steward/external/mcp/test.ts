@@ -19,7 +19,7 @@ const contracts = [
   contract("author.list", objectSchema({ path: { type: "string" } }, ["path"]), "author"),
   contract("modules.admit", admissionInput),
   contract("planning.search", objectSchema({ filters: { type: "array", items: objectSchema({ state: { type: "string", enum: ["open", "done"] } }, ["state"]) } }, ["filters"]), "planning"),
-  contract("agent.respond", objectSchema(), "agent"),
+  contract("agent.write", objectSchema({ runId: { type: "string" }, input: { type: "object", additionalProperties: true } }, ["runId", "input"])),
   contract("memory-local.recall", objectSchema({ query: { type: "string" }, limit: { type: "number" } }, ["query"]), "memory-local"),
   ...["conversation-context", "conversation-retain"].map(name => ({ ...contract(`memory-local.${name}`, objectSchema({ snapshot: { type: "string" } }, ["snapshot"]), "memory-local"), user: false })),
 ];
@@ -34,9 +34,9 @@ const module = await startModule("index.ts", { stubs: Object.fromEntries([
     return { items: contracts.filter(tool => !(args.audience === "user" && "user" in tool && tool.user === false) && (!args.query || tool.target.includes(String(args.query)))), nextCursor: null };
   }),
   routed("modules.list", () => ({ items: [{ id: "files-id", name: "files", status: "active" }], nextCursor: null })), routed("modules.health", () => ({ items: [diagnostic], nextCursor: null })),
-  routed("agent.context", () => ({ contextId: "context-mcp" })), routed("agent.run", () => ({ runId: "run-mcp", status: "queued", active: true })),
-  routed("agent.get", () => ({ status: "finished", active: false })), routed("agent.stream", () => ({ items: [], after: 0, ended: true, transcript: [{ at: "2026-11-08T00:00:00Z", kind: "text", text: "done" }], interactions: [{ id: "i1", status: "pending" }] })),
-  routed("agent.respond"), routed("agent.interrupt"), routed("approvals.resolve"), routed("approvals.list", () => ({ items: [], nextCursor: null })), routed("activity.records", () => ({ items: [], before: null })),
+  routed("agent.run", () => ({ contextId: "context-mcp", runId: "run-mcp", status: "queued", active: true })),
+  routed("agent.read", () => ({ run: { runId: "run-mcp", contextId: "context-mcp", status: "finished", active: false }, items: [], nextCursor: null, ended: true, transcript: [{ at: "2026-11-08T00:00:00Z", kind: "text", text: "done" }], interactions: [{ id: "i1", status: "pending" }] })),
+  routed("agent.write", () => ({ accepted: true })), routed("agent.stop", () => ({ runId: "run-mcp", contextId: "context-mcp", status: "finished", active: false, stopConfirmed: true })), routed("approvals.resolve"), routed("approvals.list", () => ({ items: [], nextCursor: null })), routed("activity.records", () => ({ items: [], before: null })),
   routed("planning.search", args => args), routed("files.list", () => ["file"]), routed("web.today", () => ({ approvals: [] })), routed("notify.list", () => ({ items: [] })),
   routed("author.prepare", args => ({ kind: "material-only", execution: { supported: false }, admission: { requestKey: JSON.parse(String(args.input)).requestKey, submitter: { moduleId: "author-id", hash: "a".repeat(64) }, targets: [{ name: "example", moduleId: null, expectedActiveHash: null }] } })),
   routed("modules.admit", args => ({ ...args, admissionId: "fixed-admission" })),
@@ -120,7 +120,7 @@ try {
   assert.deepEqual(calls.at(-1), ["approvals.resolve", { approval: "a1", decision: "approve" }]);
   const decisions = calls.filter(([target]) => target === "approvals.resolve").length;
   assert.equal((await tool("chrona_module_call", { name: "approvals.resolve", arguments: { approval: "a1", decision: "approve" } })).isError, true);
-  assert.equal((await tool("chrona_module_call", { name: "agent.respond" })).isError, true);
+  assert.equal((await tool("chrona_module_call", { name: "agent.write", arguments: { runId: "run-mcp", input: { kind: "answer", questionId: "i1", answer: { decision: "cancel" } } } })).isError, true);
   assert.equal(calls.filter(([target]) => target === "approvals.resolve").length, decisions);
 
   assert.equal((await json("chrona_module_tools", { query: "author" })).length, 8);
@@ -209,9 +209,9 @@ try {
     assert.equal((await tool("chrona_session_update", { sessionId, title: "new" })).isError, true);
   }
   await json("chrona_run_answer", { interactionId: "i1", decision: "submit", value: "answer" });
-  assert.deepEqual(calls.at(-1), ["agent.respond", { "run-id": "run-mcp", "question-id": "i1", answer: { decision: "submit", value: "answer" } }]);
+  assert.deepEqual(calls.at(-1), ["agent.write", { runId: "run-mcp", input: { kind: "answer", questionId: "i1", answer: { decision: "submit", value: "answer" } } }]);
   await json("chrona_run_cancel", { runId: "run-mcp" });
-  assert.deepEqual(calls.at(-1), ["agent.interrupt", { "run-id": "run-mcp",  }]);
+  assert.deepEqual(calls.at(-1), ["agent.stop", { runId: "run-mcp" }]);
   assert.equal((await tool("chrona_run_cancel", { runId: "foreign-run" })).isError, true);
   assert.equal((await tool("chrona_run_answer", { interactionId: "foreign-question", decision: "cancel" })).isError, true);
   await json("chrona_session_update", { sessionId: reply.sessionId, title: "Renamed" });

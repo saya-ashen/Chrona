@@ -4,11 +4,11 @@ import { moduleIdentity, moduleCapabilities } from "./module-identity";
 /** Synthetic only: no credentials, accounts, network clients or real execution resources. */
 const manifest = (name: string) => moduleManifestSchema.parse({ name, description: `Fixture ${name}`, entry: "index.ts", keepAlive: true, effects: [], tests: ["test.ts"], tools: [] });
 export const moduleLifecycleFixtures = {
-  builtin: { row: { id: "fixture-agent", name: "agent", builtin: true, status: "active", activeHash: "a".repeat(64) }, manifest: manifest("agent"), ...moduleIdentity({ name: "agent", builtin: true }) },
+  pi: { row: { id: "fixture-pi", name: "pi", builtin: false, status: "active", activeHash: "a".repeat(64) }, manifest: manifest("pi"), ...moduleIdentity({ name: "pi", builtin: false }) },
   external: { row: { id: "fixture-alpha", name: "alpha", builtin: false, status: "active", activeHash: "b".repeat(64) }, manifest: manifest("alpha"), ...moduleIdentity({ name: "alpha", builtin: false }) },
   secondExternal: { row: { id: "fixture-beta", name: "beta", builtin: false, status: "paused", activeHash: "c".repeat(64) }, manifest: manifest("beta") },
   reinstalled: { row: { id: "fixture-alpha-new", name: "alpha", builtin: false, status: "active", activeHash: "d".repeat(64) }, manifest: manifest("alpha") },
-  kernel: { name: "modules", origin: "kernel" as const, capabilities: moduleCapabilities("kernel") },
+  kernel: { name: "agent", origin: "kernel" as const, capabilities: moduleCapabilities("kernel") },
   preinstalled: manifest("qq"), optional: manifest("memory-local"),
   forgedManifest: { ...manifest("alpha"), builtin: true, origin: "builtin" },
   forgedRow: { id: "fixture-forged", name: "agent", builtin: false, status: "active", activeHash: "e".repeat(64) },

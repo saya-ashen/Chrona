@@ -23,9 +23,15 @@ test.each(applications)("%s author tests preserve application-owned policies", a
     const source = join(import.meta.dirname, "external", name);
     await cp(source, code, { recursive: true, filter: path => !path.split(/[\\/]/).includes("node_modules") });
     if (await Bun.file(join(code, "package.json")).exists()) {
-      const install = Bun.spawn([process.execPath, "install", "--offline", "--frozen-lockfile", "--ignore-scripts", "--no-progress"], { cwd: code, stdout: "pipe", stderr: "pipe" });
-      const output = await Promise.all([new Response(install.stdout).text(), new Response(install.stderr).text(), install.exited]);
-      expect(output[2], output.slice(0, 2).join("\n")).toBe(0);
+      // Use the application's installed dependency tree, including declarations and
+      // nested versions. Dereference links so the disposable fixture is self-contained.
+      await cp(join(source, "node_modules"), join(code, "node_modules"), { recursive: true, dereference: true });
+      const pkg = await Bun.file(join(code, "package.json")).json() as { dependencies?: Record<string, string> };
+      for (const [dependency, version] of Object.entries(pkg.dependencies ?? {})) {
+        const installed = await Bun.file(join(code, "node_modules", dependency, "package.json")).json();
+        expect(installed.name).toBe(dependency);
+        expect(Bun.semver.satisfies(installed.version, version), `${dependency}@${installed.version} must satisfy ${version}`).toBe(true);
+      }
     }
     const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(code, "module.json"), "utf8")));
     const sandbox = createScriptSandbox({ dataDir, executionMode: "trusted-local" });
@@ -37,10 +43,11 @@ test.each(applications)("%s author tests preserve application-owned policies", a
     }
     const context = moduleContext({ db, dataDir, ...testReleaseRuntimeChecks(), publicUrl: null, now: () => new Date(), sandbox: { ...sandbox.health, runModule: sandbox.runModule } }, workspace.id);
     const checked = await typecheckBuild(context, code, manifest);
-    expect(typecheckErrors(checked)).toEqual([]);
+    const testsPassed = await runTests(context, code, manifest, reports);
+    expect(typecheckErrors(checked), JSON.stringify({ testsPassed, reports })).toEqual([]);
     expect(checked.status).toBe("passed");
     expect(manifest.tests.length).toBeGreaterThan(0);
-    expect(await runTests(context, code, manifest, reports), JSON.stringify(reports)).toBe(true);
+    expect(testsPassed, JSON.stringify(reports)).toBe(true);
     expect(reports).toHaveLength(manifest.tests.length);
     expect(reports.every(report => report.exitCode === 0)).toBe(true);
   } finally { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); }

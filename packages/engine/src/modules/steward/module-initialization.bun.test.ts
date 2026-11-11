@@ -9,7 +9,7 @@ import type { StewardPorts } from "./ports";
 const closes: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const close of closes.splice(0).reverse()) await close(); });
 async function fixture() {
-  const db = testDb();
+  const db = testDb({ injectedAgent: false });
   closes.push(() => db.$disconnect());
   const workspace = await db.workspace.create({ data: { name: "initialization" } });
   const notify = await db.module.create({ data: { workspaceId: workspace.id, name: "notify", activeHash: "installed-hash", builtin: false } });
@@ -142,4 +142,21 @@ test("an installed optional Mind is retained without being adopted as a preinsta
   const persisted = (await f.db.workspace.findUniqueOrThrow({ where: { id: f.workspaceId } })).settings as Record<string, unknown>;
   expect(persisted.moduleInitialization).toEqual(await f.initialize());
   expect(await f.db.module.findUniqueOrThrow({ where: { id: mind.id } })).toEqual(mind);
+});
+
+
+test.each(["installed", "pending"] as const)("Pi removed after %s initialization is never reinstalled even on explicit retry", async status => {
+  const f = await fixture();
+  const pi = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "pi", activeHash: "a".repeat(40), builtin: false } });
+  f.state.packages.pi = { ...f.state.packages.pi, status, moduleId: pi.id, hash: pi.activeHash };
+  if (status === "pending") f.state.status = "pending";
+  await f.save();
+  await f.db.module.delete({ where: { id: pi.id } });
+  let submissions = 0;
+  f.ports.moduleExternalInstaller = async () => { submissions++; throw new Error("Removed Pi reached installer"); };
+  const result = await ensureWorkspaceInitialized(f.ports, f.workspaceId, { retryFailed: true });
+  expect(result.packages.pi).toMatchObject({ status: status === "installed" ? "installed" : "skipped", moduleId: pi.id });
+  expect(await f.db.module.count({ where: { name: "pi" } })).toBe(0);
+  expect(submissions).toBe(0);
+  expect((await f.initialize()).packages.pi).toEqual(result.packages.pi);
 });

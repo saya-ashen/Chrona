@@ -37,9 +37,10 @@ function parameterValidator(parameter: import("@chrona/contracts/steward").Modul
     case "string": schema = parameter.enum ? z.enum(parameter.enum as [string, ...string[]]) : z.string(); break;
     case "number": schema = z.number(); break;
     case "boolean": schema = z.boolean(); break;
+    case "null": schema = z.null(); break;
     case "array": schema = z.array(parameterValidator(parameter.items)); break;
     case "object": schema = objectValidator(parameter); break;
-    default: schema = z.union(parameter.type.map(type => type === "string" ? z.string() : type === "number" ? z.number() : z.boolean()));
+    default: schema = z.union(parameter.type.map(type => type === "string" ? z.string() : type === "number" ? z.number() : type === "boolean" ? z.boolean() : z.null()));
   }
   return parameter.description ? schema.describe(parameter.description) : schema;
 }

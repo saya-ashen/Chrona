@@ -1,35 +1,18 @@
-import { join, resolve } from "node:path";
-import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import { providerText } from "@chrona/domain/steward/provider";
 import { PiEvents } from "./pi-events";
+import { PiDetail } from "./pi-detail";
+import { PiRawRecords, nativeError, nativeRequest, nativeResponse, piRunInput, promptCommands } from "./pi-native";
 import { validatePiSessionResume } from "./pi-session-resume";
 import { piTranscript } from "./pi-transcript";
-import { EXECUTION_EVENT_LIMITS, executionEventSchema, executionJsonBytes, type ExecutionEvent, type ExecutionPayload, type ProviderAdapter, type ProviderRunInput } from "@chrona/contracts/steward";
+import type { ProviderAdapter, ProviderRunInput } from "@chrona/contracts/steward";
 import { createPiCompletion } from "./pi-completion";
 import { launchPiProcess, type PiProcess } from "./pi-process";
-import { expectedPiCommands, inspectPiLaunch, piArguments, piEnvironment, piLaunchConfig, prepareContent, profileOverlaps, type PiLaunchConfig, type PiProviderOptions } from "./pi-launch";
+import { inspectPiLaunch, piArguments, piEnvironment, piLaunchConfig, prepareContent, profileOverlaps, type PiLaunchConfig, type PiProviderOptions } from "./pi-launch";
 export type { PiProviderOptions } from "./pi-launch";
 
 type Result = Awaited<ReturnType<ProviderAdapter["start"]>["done"]>;
-function buildProfile(config: PiLaunchConfig, input: ProviderRunInput) {
-  if (!input.model && input.resources !== "minimal") return null;
-  const settingsPath = join(config.agentDir, "settings.json");
-  const raw = existsSync(settingsPath) ? readFileSync(settingsPath, "utf8").replace(/^\uFEFF/, "") : "";
-  const settings = raw ? object(JSON.parse(raw)) : {};
-  const retry = object(settings.retry);
-  const profile = mkdtempSync(join(config.agentDir, "build-"));
-  for (const name of ["auth.json", "models.json"]) if (existsSync(join(config.agentDir, name))) symlinkSync(join(config.agentDir, name), join(profile, name));
-  // Pi's RPC setter only changes enabled. Install finite session recovery before spawn;
-  // it continues the failed model stream, retaining prior tool results. Never replay a Run.
-  writeFileSync(join(profile, "settings.json"), JSON.stringify({ ...settings, retry: {
-    ...retry, enabled: true, maxRetries: 2, baseDelayMs: 2000, maxAgentDelayMs: 8000,
-    provider: { ...object(retry.provider), maxRetries: 0 },
-  } }), { mode: 0o600 });
-  return profile;
-}
-
 type RecordValue = Record<string, unknown>;
 const object = (value: unknown): RecordValue => value !== null && typeof value === "object" && !Array.isArray(value) ? value as RecordValue : {};
 const imagesFor = (images: ProviderRunInput["images"]) => images?.map(image => ({ type: "image", data: image.base64, mimeType: image.mime }));
@@ -62,112 +45,12 @@ function messageError(message: RecordValue): string | null {
   return null;
 }
 
-/** A single drain promise and bounded normalized queue; raw RPC never enters storage. */
-class PiDetail {
-  private seq = 0;
-  private queue: ExecutionEvent[] = [];
-  private bytes = 0;
-  private draining: Promise<void> | null = null;
-  private timer: ReturnType<typeof setTimeout> | undefined;
-  private lost: { from: number; through: number } | null = null;
-  private failure = false;
-  private final: ExecutionPayload | null = null;
-  private messageId = 0;
-  constructor(private input: ProviderRunInput, private secrets: string[]) {}
-  private text(value: unknown, limit = 20_000) {
-    const text = providerText(value, this.secrets, limit, true);
-    return Buffer.byteLength(text) > limit ? Buffer.from(text).subarray(0, limit).toString("utf8") : text;
-  }
-  private event(payload: ExecutionPayload): ExecutionEvent {
-    return { ...this.input.execution!, seq: ++this.seq, at: new Date().toISOString(), payload };
-  }
-  private gap(seq: number) {
-    this.lost = { from: Math.min(this.lost?.from ?? seq, seq), through: Math.max(this.lost?.through ?? seq, seq) };
-    this.failure = true;
-  }
-  emit(payload: ExecutionPayload) {
-    if (!this.input.detail || !this.input.execution) return;
-    const event = this.event(payload), bytes = executionJsonBytes(event);
-    if (!executionEventSchema.safeParse(event).success || this.queue.length >= EXECUTION_EVENT_LIMITS.bufferEvents || this.bytes + bytes > EXECUTION_EVENT_LIMITS.bufferBytes) { this.gap(event.seq); return; }
-    this.queue.push(event); this.bytes += bytes;
-    if (!this.timer) this.timer = setTimeout(() => { this.timer = undefined; void this.flush(); }, EXECUTION_EVENT_LIMITS.flushMs);
-  }
-  receive(event: RecordValue) {
-    this.receiveMessage(event);
-    this.receiveTool(event);
-  }
-  private receiveMessage(event: RecordValue) {
-    const message = object(event.message), delta = object(event.assistantMessageEvent);
-    if (event.type === "message_start" && ["user", "assistant"].includes(String(message.role))) {
-      this.messageId++;
-      this.emit({ type: "message", messageId: `message:${this.messageId}`, role: message.role as "user" | "assistant", text: "", complete: false });
-    }
-    if (event.type === "message_update" && delta.type === "text_delta") {
-      if (typeof delta.delta === "string" && Buffer.byteLength(delta.delta) > 20_000) this.gap(++this.seq);
-      this.emit({ type: "text_delta", messageId: `message:${this.messageId}`, delta: this.text(delta.delta) });
-    }
-    if (event.type === "message_end" && ["user", "assistant"].includes(String(message.role))) {
-      const raw = this.messageText(message.content);
-      const text = this.text(raw);
-      if (Buffer.byteLength(raw) > 20_000) this.gap(++this.seq);
-      const payload: ExecutionPayload = { type: "message", messageId: `message:${this.messageId}`, role: message.role as "user" | "assistant", text, complete: true };
-      if (message.role === "assistant") this.final = payload;
-      this.emit(payload);
-    }
-  }
-  private messageText(content: unknown): string {
-    return Array.isArray(content) ? content.map(object).filter(part => part.type === "text").map(part => typeof part.text === "string" ? part.text : "").join("\n") : typeof content === "string" ? content : "";
-  }
-  private toolId(value: unknown) {
-    if (typeof value !== "string" || !value) return "";
-    // Provider IDs are opaque; composite IDs must still correlate start and end.
-    return this.text(value, 128) === value && /^[\w:.-]+$/.test(value) ? value : `tool:${createHash("sha256").update(value).digest("hex")}`;
-  }
-  private receiveTool(event: RecordValue) {
-    if (event.type === "tool_execution_start") {
-      const tool = this.text(event.toolName, 100), toolCallId = this.toolId(event.toolCallId);
-      if (tool && /^[\w:.-]+$/.test(toolCallId)) this.emit({ type: "tool_started", toolCallId, tool, display: {} });
-    }
-    if (event.type === "tool_execution_end") {
-      const tool = this.text(event.toolName, 100), toolCallId = this.toolId(event.toolCallId);
-      if (tool && /^[\w:.-]+$/.test(toolCallId)) {
-        const originalBytes = event.result === undefined ? 0 : Buffer.byteLength(JSON.stringify(event.result));
-        this.emit({ type: "tool_finished", toolCallId, tool, isError: event.isError === true, summary: event.isError ? "Tool failed" : "Tool completed", truncated: originalBytes > 0, originalBytes });
-      }
-    }
-  }
-  private flush(): Promise<void> {
-    if (this.draining) return this.draining;
-    this.draining = (async () => {
-      while (this.queue.length) {
-        const event = this.queue[0]!;
-        try { await this.input.detail!.append(event); }
-        catch { this.gap(event.seq); }
-        this.queue.shift(); this.bytes -= executionJsonBytes(event);
-      }
-    })().finally(() => { this.draining = null; });
-    return this.draining;
-  }
-  async close(status: "completed" | "failed") {
-    clearTimeout(this.timer);
-    await this.flush();
-    // Reserved snapshot/control recovery must still run after detail loss or saturation.
-    const append = async (payload: ExecutionPayload) => {
-      try { await this.input.detail!.append(this.event(payload)); }
-      catch { this.failure = true; }
-    };
-    if (this.lost) await append({ type: "gap", ...this.lost, reason: "backpressure" });
-    if (this.final) await append(this.final);
-    await append({ type: "state", status, cancelRequested: false, stopConfirmed: true });
-    if (this.failure) throw new Error("Execution detail is incomplete; recover the final snapshot");
-  }
-}
-
 /** Owns one subprocess and its mutable RPC/completion state. */
 class PiRun {
   private child: PiProcess | undefined;
   private events: PiEvents | undefined;
   private detail: PiDetail | undefined;
+  private raw: PiRawRecords | undefined;
   private secrets: string[] = [];
   private sessionId: ProviderRunInput["sessionId"];
   private readonly resumeSessionId: ProviderRunInput["sessionId"];
@@ -177,6 +60,7 @@ class PiRun {
   private sessionSettled = false;
   private retrying = false;
   private checking = false;
+  private nativeInFlight = 0;
   private startup: Promise<void> = Promise.resolve();
   private resourcesReady: Promise<void> = Promise.resolve();
   private cancellation: Result | null = null;
@@ -193,9 +77,9 @@ class PiRun {
   private complete!: (result: Result) => void;
   private rejectDone!: (error: unknown) => void;
   readonly done = new Promise<Result>((resolveDone, rejectDone) => { this.complete = resolveDone; this.rejectDone = rejectDone; });
-  private pending = new Map<string, { resolve(value: RecordValue): void; reject(error: Error): void }>();
+  private pending = new Map<string, { type: string; envelope: boolean; resolve(value: RecordValue): void; reject(error: Error): void }>();
 
-  constructor(private input: ProviderRunInput, private idleMs?: number) {
+  constructor(private input: ProviderRunInput, private idleMs?: number, private nativeTimeoutMs = 30_000) {
     this.sessionId = input.sessionId;
     this.resumeSessionId = input.execution ? input.sessionId : null;
   }
@@ -221,23 +105,24 @@ class PiRun {
     return providerText(stripVTControlCharacters(text), this.secrets, 1000);
   }
   private inactive() { return this.closing !== null || this.settled || this.cancellation !== null; }
-  private runProfile: string | null = null;
   private finalize() {
     if (this.settled) return;
     this.settled = true;
     clearTimeout(this.timer); clearTimeout(this.poll); clearTimeout(this.killTimer); clearTimeout(this.idle);
     for (const request of this.pending.values()) request.reject(new Error("Pi run ended"));
     this.pending.clear();
-    if (this.runProfile) { rmSync(this.runProfile, { recursive: true, force: true }); this.runProfile = null; }
     const result = this.closing ?? this.cancellation ?? { outcome: "failed" as const, sessionId: this.sessionId, error: this.redact(`Pi exited before completion. ${this.stderr}`) };
     void (async () => {
       await bounded(this.events?.close() ?? Promise.resolve(), 1000).catch(() => {});
+      let error: string | undefined;
       try { await this.detail?.close(result.outcome === "finished" ? "completed" : "failed"); }
-      catch { this.complete({ ...result, outcome: "failed", error: "Execution detail is incomplete; recover the final snapshot" }); return; }
-      this.complete(result);
+      catch { error = "Execution detail is incomplete; recover the final snapshot"; }
+      try { await this.raw?.close(); }
+      catch { error = "Pi raw event stream is incomplete"; }
+      this.complete(error ? { ...result, outcome: "failed", error } : result);
     })();
   }
-  /** Closure uncertainty must never become fulfilled completion or delete the retained run profile. */
+  /** Closure uncertainty must never become fulfilled completion. */
   private unconfirmedClosure(error: unknown) {
     if (this.settled) return;
     this.settled = true;
@@ -259,20 +144,20 @@ class PiRun {
     // done resolves only after process exit: the engine may commit the cwd immediately.
     this.killTimer = setTimeout(() => this.child?.kill("SIGKILL"), 500);
   }
-  private send(type: string, fields: RecordValue = {}, cancelling = false): Promise<RecordValue> {
+  private send(type: string, fields: RecordValue = {}, cancelling = false, envelope = false): Promise<RecordValue> {
     if (this.closing || this.settled || this.cancellation && !cancelling || !this.child) return Promise.reject(new Error("Pi run is not active"));
     const id = String(++this.sequence);
     return new Promise((resolveRequest, reject) => {
-      this.pending.set(id, { resolve: resolveRequest, reject });
+      this.pending.set(id, { type, envelope, resolve: resolveRequest, reject });
       // Stream writes are ordered; the callback waits for the write to be flushed.
-      this.child!.stdin.write(`${JSON.stringify({ id, type, ...fields })}\n`, error => {
+      this.child!.stdin.write(`${JSON.stringify({ ...fields, id, type })}\n`, error => {
         if (error) { this.pending.delete(id); reject(error); this.stop("failed", "Pi stdin failed"); }
       });
     });
   }
   private readyToCheck() { return this.sessionSettled && !this.retrying; }
   private isComplete(version: number, state: RecordValue) {
-    return version === this.epoch && this.readyToCheck() && !this.streaming && !this.events?.waiting && state.isStreaming === false && state.isCompacting !== true && state.pendingMessageCount === 0 && this.pending.size === 0;
+    return version === this.epoch && this.readyToCheck() && !this.streaming && !this.events?.waiting && state.isStreaming === false && state.isCompacting !== true && state.pendingMessageCount === 0 && this.pending.size === 0 && this.nativeInFlight === 0;
   }
   private async checkEnd() {
     if (this.inactive() || !this.readyToCheck() || this.checking) return;
@@ -280,7 +165,7 @@ class PiRun {
     const version = this.epoch;
     try {
       const state = await this.send("get_state");
-      if (typeof state.sessionId === "string") this.sessionId = state.sessionId;
+      if (typeof state.sessionId === "string" && this.sessionId !== null && state.sessionId !== this.sessionId) throw new Error("Pi session changed");
       await this.finishIfComplete(version, state);
     } catch { if (!this.inactive()) this.stop("failed", "Could not inspect Pi completion state"); }
     finally {
@@ -302,6 +187,7 @@ class PiRun {
     this.poll = setTimeout(() => { void this.checkEnd(); }, delay);
   }
   private async abortWith(outcome: "failed" | "timed_out", error = outcome === "timed_out" ? "Pi deadline exceeded" : "Pi run aborted") {
+    let response: RecordValue | undefined;
     if (!this.inactive()) {
       this.cancellation = { outcome, error, sessionId: this.sessionId };
       this.sessionSettled = false; this.epoch++; this.events?.interrupt();
@@ -310,19 +196,25 @@ class PiRun {
         try {
           // abort can resume queued work. Never send it unless clearing succeeded.
           await bounded(this.send("clear_queue", {}, true));
-          await bounded(this.send("abort", {}, true));
+          response = await bounded(this.send("abort", {}, true, true));
           await this.collectUsage(true);
         } catch { /* Close/kill instead. Chrona retains the persisted user input. */ }
       }
       this.stop(outcome, error);
     }
     await this.done;
+    return response;
   }
   private response(event: RecordValue) {
     const request = this.pending.get(String(event.id));
     if (!request) return;
     this.pending.delete(String(event.id));
-    if (event.success === true) request.resolve(object(event.data));
+    if (event.command !== request.type || typeof event.success !== "boolean") {
+      request.reject(nativeError("unknown", "Pi RPC response correlation failed"));
+      this.stop("failed", "Pi RPC response correlation failed"); return;
+    }
+    if (request.envelope) request.resolve(event);
+    else if (event.success === true) request.resolve(object(event.data));
     else request.reject(new Error(this.redact(typeof event.error === "string" ? event.error : "Pi RPC command failed")));
   }
   private agentEnd(event: RecordValue) {
@@ -354,11 +246,15 @@ class PiRun {
     if (this.inactive() || !this.child) return Promise.reject(new Error("Pi run is not active"));
     return new Promise((resolveWrite, reject) => this.child!.stdin.write(`${JSON.stringify(record)}\n`, error => error ? reject(error) : resolveWrite()));
   }
-  private receive(value: unknown) {
-    const event = object(value);
+  private observe(event: RecordValue) {
+    this.raw?.receive(event);
     this.touch(event);
     this.events?.receive(event);
     this.detail?.receive(event);
+  }
+  private receive(value: unknown) {
+    const event = object(value);
+    this.observe(event);
     switch (event.type) {
       case "response": this.response(event); break;
       case "agent_start": this.streaming = true; this.sessionSettled = false; this.modelError = null; this.epoch++; break;
@@ -383,16 +279,10 @@ class PiRun {
     if (this.input.model) {
       const model = object(state.model);
       if (`${model.provider}/${model.id}` !== this.input.model) throw new Error("Pi selected a different model than the authorized build");
-      }
-    if (this.input.model || this.input.resources === "minimal") {
-      await this.send("set_auto_retry", { enabled: true });
-      await this.send("set_auto_compaction", { enabled: false });
     }
     if (typeof state.sessionId === "string") this.sessionId = state.sessionId;
     const resources = await this.send("get_commands");
-    const selected = this.input.resources === "configured" ? config : { ...config, web: null, resources: { skills: [], extensions: [], tools: [] } };
-    if (!expectedPiCommands(selected, resources.commands)) { this.stop("unavailable", "Unexpected Pi command resources; use a service-specific executable/profile"); return; }
-    await this.events?.resources(config.version, resources.commands, new Set([selected.extension, selected.web, ...selected.resources.extensions].filter(Boolean)).size);
+    await this.events?.resources(config.version, resources.commands, new Set([config.extension, config.web, ...config.resources.extensions].filter(Boolean)).size);
     await this.events?.initialize(() => this.inspectStats());
   }
   private async submitPrompt(fields: RecordValue) {
@@ -420,9 +310,6 @@ class PiRun {
       if (invalid) { this.stop("unavailable", invalid); return; }
       if (profileOverlaps(config.agentDir, resolve(this.input.cwd))) { this.stop("unavailable", "Pi profile must be separate from the working directory"); return; }
       if (this.input.resources === "configured" || this.input.content?.length) prepareContent(this.input);
-      // RPC retry/compaction setters persist settings. Give bounded runs a disposable profile,
-      // sharing Pi-managed auth/models by reference, never changing the service's own settings.
-      this.runProfile = buildProfile(config, this.input);
       this.child = this.spawn(config);
       this.listen(this.child);
       this.touch();
@@ -430,13 +317,14 @@ class PiRun {
     } catch { if (!this.inactive()) this.stop("unavailable", "Could not start Pi"); }
   }
   private spawn(config: PiLaunchConfig) {
-    const browser = this.input.resources === "configured" && config.browserExtension ? config.options.browsers?.ensure() ?? null : null;
+    const browser = config.browserExtension ? config.options.browsers?.ensure() ?? null : null;
     return (config.options.launch ?? launchPiProcess)({ file: config.command, args: piArguments(config, this.input, this.input.systemPrompt, browser), cwd: resolve(this.input.cwd), helperPath: config.options.processHelper,
-      env: { ...piEnvironment(config), PI_CODING_AGENT_DIR: this.runProfile ?? config.agentDir, CHRONA_AGENT_URL: config.options.agentUrl, CHRONA_AGENT_TOKEN: this.input.token, ...(this.input.executionBudget ? { CHRONA_EXECUTION_MAX_TOOL_CALLS: String(this.input.executionBudget.maxToolCalls) } : {}), ...(browser ? { CHRONA_BROWSER: browser } : {}) } });
+      env: { ...piEnvironment(config), CHRONA_AGENT_URL: config.options.agentUrl, CHRONA_AGENT_TOKEN: this.input.token, ...(this.input.executionBudget ? { CHRONA_EXECUTION_MAX_TOOL_CALLS: String(this.input.executionBudget.maxToolCalls) } : {}), ...(browser ? { CHRONA_BROWSER: browser } : {}) } });
   }
   start(config: PiLaunchConfig) {
     this.secrets = [this.input.token, ...Object.entries(piEnvironment(config)).flatMap(([key, value]) => key.endsWith("API_KEY") && value ? [value] : [])];
     const events = this.input.events;
+    if (events?.raw) this.raw = new PiRawRecords(events.raw.bind(events), this.secrets, () => this.stop("failed", "Pi raw event stream is incomplete"));
     const input = events ? { ...this.input, events: { ...events, usage: async (value: Parameters<typeof events.usage>[0]) => { this.detail?.emit({ type: "usage", input: value.input, output: value.output }); await events.usage(value); } } } : this.input;
     this.events = new PiEvents(input, this.secrets, record => this.writeUi(record), message => { void this.abortWith("failed", message).catch(() => {}); });
     if (this.input.execution && this.input.detail) {
@@ -455,6 +343,60 @@ class PiRun {
     const remaining = this.input.deadline.getTime() - Date.now();
     if (remaining <= 0) { void this.abortWith("timed_out").catch(() => {}); return; }
     this.timer = setTimeout(() => this.armDeadline(), Math.min(remaining, 2_147_483_647));
+  }
+  /** Escape hatch on this exact process. Never replays a request after uncertainty. */
+  async native(request: RecordValue): Promise<RecordValue> {
+    const command = nativeRequest(request, this.input.model);
+    if (this.inactive()) throw nativeError("unavailable", "Pi run is not active");
+    if (this.nativeInFlight >= 32) throw nativeError("unavailable", "Too many pending Pi protocol requests");
+    this.nativeInFlight++;
+    try {
+      try { await this.startup; await this.resourcesReady; }
+      catch { throw nativeError("unavailable", "Pi startup did not complete"); }
+      if (this.inactive() || !this.child) throw nativeError("unavailable", "Pi run is not active");
+      return await this.nativeCommand(command);
+    } finally {
+      this.nativeInFlight--;
+      if (!this.inactive() && this.readyToCheck()) this.pollEnd(0);
+    }
+  }
+  private async nativeSend(type: string, fields: RecordValue = {}, envelope = false) {
+    const id = String(this.sequence + 1);
+    try { return await bounded(this.send(type, fields, false, envelope), this.nativeTimeoutMs); }
+    catch {
+      this.stop("failed", "Pi native request outcome is unknown; do not replay");
+      throw nativeError("unknown", "Pi native request outcome is unknown; do not replay");
+    } finally { this.pending.delete(id); }
+  }
+  private async nativeCommand({ type, fields, callerId }: ReturnType<typeof nativeRequest>) {
+    if (type === "bash" && this.input.executionBudget) throw nativeError("unsupported", "Native bash cannot bypass the Run tool admission guard");
+    const wasSettled = this.sessionSettled, version = ++this.epoch;
+    if (promptCommands.has(type)) this.sessionSettled = false;
+    if (type === "abort") return nativeResponse(await this.nativeAbort(), callerId, this.secrets);
+    const response = await this.nativeSend(type, type === "prompt" ? { streamingBehavior: "steer", ...fields } : fields, true);
+    if (response.success === true && !this.inactive()) await this.synchronizeNative();
+    this.nativeSettlement(type, response, version, wasSettled);
+    return nativeResponse(response, callerId, this.secrets);
+  }
+  private async nativeAbort() {
+    let response: RecordValue | undefined;
+    try { response = await this.abortWith("failed"); }
+    catch { throw nativeError("unknown", "Pi abort closure is unconfirmed; do not replay"); }
+    if (!response) throw nativeError("unknown", "Pi abort response is unavailable; do not replay");
+    return response;
+  }
+  private nativeSettlement(type: string, response: RecordValue, version: number, wasSettled: boolean) {
+    // A rejected prompt starts no turn. Restore settlement only if no newer event changed it.
+    if (response.success === false && version === this.epoch) this.sessionSettled = wasSettled;
+    if (type === "prompt" && response.success === true && object(response.data).disposition === "handled" && !this.streaming) this.sessionSettled = true;
+  }
+  private async synchronizeNative() {
+    const state = await this.nativeSend("get_state");
+    if (typeof state.sessionId === "string" && this.sessionId !== null && state.sessionId !== this.sessionId) {
+      this.stop("failed", "Pi native command changed the bound session; outcome is unknown");
+      throw nativeError("unknown", "Pi native state synchronization failed; do not replay");
+    }
+    if (state.isStreaming === true || state.isCompacting === true || Number(state.pendingMessageCount) > 0) this.sessionSettled = false;
   }
   async inject(message: string, images?: ProviderRunInput["images"]) {
     if (this.inactive()) throw new Error("Pi run is not active");
@@ -482,9 +424,9 @@ export function createPiProvider(options: PiProviderOptions): ProviderAdapter {
     },
     complete: createPiCompletion(options),
     start(input) {
-      const run = new PiRun(input, options.idleTimeoutMs);
+      const run = new PiRun(piRunInput(input, options), options.idleTimeoutMs, options.nativeTimeoutMs);
       run.start(config);
-      return { done: run.done, inject: (message, images) => run.inject(message, images), abort: () => run.abort() };
+      return { native: request => run.native(request), done: run.done, inject: (message, images) => run.inject(message, images), abort: () => run.abort() };
     },
   };
 }

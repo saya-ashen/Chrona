@@ -153,7 +153,8 @@
                 "type": "object",
                 "propertyNames": {
                   "type": "string",
-                  "pattern": "^[a-z][a-z0-9-]{1,40}$"
+                  "minLength": 1,
+                  "maxLength": 100
                 },
                 "additionalProperties": {}
               },
@@ -162,7 +163,8 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "pattern": "^[a-z][a-z0-9-]{1,40}$"
+                  "minLength": 1,
+                  "maxLength": 100
                 }
               }
             },
@@ -441,7 +443,6 @@
         }
       },
       "required": [
-        "tier",
         "maxCalls",
         "maxOutputTokens"
       ],

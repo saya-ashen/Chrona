@@ -12,7 +12,7 @@ import { injectedModules, localModules, systemModules } from "./module-registry"
 type Db = StewardPorts["db"] | Prisma.TransactionClient;
 
 /** Target identity, contract binding, and delivery fences share one resolution policy. */
-export type Target = { module: { id: string; name: string; activeHash: string; workspaceId: string }; tool: RoutedTool; system?: SystemModule; agent?: boolean };
+export type Target = { module: { id: string; name: string; activeHash: string; workspaceId: string }; tool: RoutedTool; system?: SystemModule };
 export function assertExpectedTarget(resolved: Target | CallError, expected?: ExpectedModuleTarget) {
   if (!expected) return;
   const parsed = expectedModuleTargetSchema.safeParse(expected);
@@ -77,10 +77,9 @@ export function splitTarget(target: string) {
   if (!module || !tool) throw new CallError("invalid", "Call target must be <module>.<tool>");
   return { module, tool };
 }
-async function localIdentityConflict(db: Db, workspaceId: string, name: string, injected: boolean) {
+async function localIdentityConflict(db: Db, workspaceId: string, name: string) {
   const installed = await db.module.findFirst({ where: { workspaceId, name }, select: { id: true, builtin: true } });
   if (!installed) return false;
-  if (name === "agent" && installed.builtin) return injected ? false : "application";
   return true;
 }
 async function resolveReleaseTarget(db: Db, workspaceId: string, target: string, name: ReturnType<typeof splitTarget>): Promise<Target | CallError | null> {
@@ -88,8 +87,7 @@ async function resolveReleaseTarget(db: Db, workspaceId: string, target: string,
   const local = injected ?? localModules.get(name.module), system = local ?? systemModules.get(name.module);
   if (!system) return null;
   if (local) {
-    const conflict = await localIdentityConflict(db, workspaceId, name.module, !!injected);
-    if (conflict === "application") return null;
+    const conflict = await localIdentityConflict(db, workspaceId, name.module);
     if (conflict) return new CallError("conflict", `Local capability ${name.module} conflicts with an installed application`);
   }
   const tool = system.tools.find(candidate => candidate.name === name.tool);
@@ -107,7 +105,7 @@ export async function resolveTarget(db: Db, workspaceId: string, target: string)
   const manifest = moduleManifestSchema.safeParse(version?.manifest).data;
   const tool = manifest?.tools.find(candidate => candidate.name === name.tool);
   if (!manifest || !tool) return new CallError("not_found", `Tool ${target} not found`);
-  return { module: { ...module, activeHash: module.activeHash }, tool, agent: module.builtin && module.name === "agent" };
+  return { module: { ...module, activeHash: module.activeHash }, tool };
 }
 
 /** An id-based route must still resolve to that exact application. */

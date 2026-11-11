@@ -1,20 +1,22 @@
 import { expect, spyOn, test } from "bun:test";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { testDb } from "@chrona/engine/test-support";
 import { createStewardRuntime } from "./steward-runtime";
-import { sessionTranscript } from "../../../packages/engine/src/modules/steward/transcript";
 import { stewardDataDir } from "../../../packages/integrations/src/steward/module-runtime";
 test("released runtime never selects a test Provider from environment flags", async () => {
-  const db = testDb(), dataDir = mkdtempSync(join(tmpdir(), "chrona-e2e-gate-"));
+  const db = testDb({ injectedAgent: false }), dataDir = mkdtempSync(join(tmpdir(), "chrona-e2e-gate-"));
   const previousGate = process.env.CHRONA_E2E_TEST_ROUTES, previousAgent = process.env.CHRONA_STEWARD_AGENT;
   try {
     for (const [gate, agent] of [["0", "e2e"], ["1", "none"], ["1", "e2e"]] as const) {
       process.env.CHRONA_E2E_TEST_ROUTES = gate;
       process.env.CHRONA_STEWARD_AGENT = agent;
       const runtime = createStewardRuntime(db, { dataDir, port: 48130 });
-      expect(runtime.ports.provider).toBeUndefined();
+      expect(runtime.ports.provider?.name).toBe("registered");
+      expect((await runtime.health()).provider.available).toBe(false);
+      expect(await db.module.count()).toBe(0);
+      expect(runtime.ports.moduleBuiltinResources).toBeUndefined();
       await runtime.stop();
     }
   } finally {
@@ -26,10 +28,9 @@ test("released runtime never selects a test Provider from environment flags", as
   }
 });
 
-test("runtime forwards a dedicated Pi profile, executable and version pin", async () => {
-  const db = testDb(), dataDir = mkdtempSync(join(tmpdir(), "chrona-pi-runtime-"));
+test("runtime configures optional Pi without launching it or forcing a private profile", async () => {
+  const db = testDb({ injectedAgent: false }), dataDir = mkdtempSync(join(tmpdir(), "chrona-pi-runtime-"));
   const command = join(dataDir, "fake-pi");
-  writeFileSync(command, `#!${process.execPath}\nimport {writeFileSync} from 'node:fs';\nimport {join} from 'node:path';\nif(process.argv.includes('--version')){writeFileSync(join(process.env.PI_CODING_AGENT_DIR,'probe.json'),JSON.stringify({agentDir:process.env.PI_CODING_AGENT_DIR}));console.log('0.85.0');process.exit(0)}\nprocess.exit(1);\n`, { mode: 0o755 });
   const keys = ["CHRONA_STEWARD_AGENT", "CHRONA_STEWARD_PI_COMMAND", "CHRONA_STEWARD_PI_AGENT_DIR", "CHRONA_STEWARD_PI_VERSION"] as const;
   const previous = keys.map(key => process.env[key]);
   try {
@@ -40,13 +41,15 @@ test("runtime forwards a dedicated Pi profile, executable and version pin", asyn
       process.env.CHRONA_STEWARD_PI_VERSION = "0.85.0";
       const runtime = createStewardRuntime(db, { dataDir, port: 48130 });
       try {
-        expect(runtime.ports.provider?.name).toBe("pi");
-        expect(JSON.parse(runtime.ports.agentApplication!.env.CHRONA_AGENT_CONFIGURATION).pi).toMatchObject({ command, agentDir: profile, expectedVersion: "0.85.0", agentUrl: "http://127.0.0.1:48130/api/steward-agent" });
+        expect(runtime.ports.provider?.name).toBe("registered");
+        expect(JSON.parse(runtime.ports.providerModules!.pi!.env.CHRONA_PROVIDER_CONFIGURATION)).toMatchObject({ command, ...(custom ? { agentDir: profile } : {}), expectedVersion: "0.85.0", agentUrl: "http://127.0.0.1:48130/api/steward-agent" });
+        if (!custom) expect(JSON.parse(runtime.ports.providerModules!.pi!.env.CHRONA_PROVIDER_CONFIGURATION).agentDir).toBeUndefined();
+        expect(await db.module.count()).toBe(0);
       } finally { await runtime.stop(); }
     }
     process.env.CHRONA_STEWARD_PI_VERSION = "1.3.0";
     const mismatch = createStewardRuntime(db, { dataDir, port: 48130 });
-    try { expect(JSON.parse(mismatch.ports.agentApplication!.env.CHRONA_AGENT_CONFIGURATION).pi.expectedVersion).toBe("1.3.0"); }
+    try { expect(JSON.parse(mismatch.ports.providerModules!.pi!.env.CHRONA_PROVIDER_CONFIGURATION).expectedVersion).toBe("1.3.0"); }
     finally { await mismatch.stop(); }
   } finally {
     keys.forEach((key, i) => { if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i]; });
@@ -54,8 +57,8 @@ test("runtime forwards a dedicated Pi profile, executable and version pin", asyn
   }
 });
 
-test("runtime preserves routed Provider history through the lifecycle wrapper", async () => {
-  const db = testDb(), dataDir = mkdtempSync(join(tmpdir(), "chrona-runtime-history-"));
+test("trusted host injection preserves Provider history through the lifecycle wrapper", async () => {
+  const db = testDb({ injectedAgent: false }), dataDir = mkdtempSync(join(tmpdir(), "chrona-runtime-history-"));
   let selected: { sessionDir: string; limit: number } | undefined;
   const runtime = createStewardRuntime(db, { dataDir, provider: {
     name: "history-fixture", health: async () => ({ available: true, sandboxed: false, error: null }),
@@ -63,18 +66,16 @@ test("runtime preserves routed Provider history through the lifecycle wrapper", 
     async transcript(input) { selected = input; return [{ kind: "text", at: "2026-11-07T00:00:00.000Z", text: "Retained conversation" }]; },
   } });
   try {
-    const workspace = await db.workspace.create({ data: { name: "History" } });
-    const session = await db.session.create({ data: { workspaceId: workspace.id, source: "web", key: "web:history" } });
-    expect(await sessionTranscript(runtime.ports, session.id, 10)).toEqual([{ kind: "text", at: "2026-11-07T00:00:00.000Z", text: "Retained conversation" }]);
-    expect(selected).toEqual({ sessionDir: join(dataDir, "sessions", session.id, ".chrona/sessions"), limit: 10 });
-    const invocation = await db.moduleInvocation.findFirstOrThrow({ where: { workspaceId: workspace.id, target: "agent", tool: "transcript" } });
-    expect(invocation.status).toBe("succeeded");
-    expect(JSON.stringify(invocation)).not.toContain("Retained conversation");
+    const input = { sessionDir: join(dataDir, "sessions", "fixture", ".chrona/sessions"), limit: 10 };
+    expect(await runtime.ports.provider!.transcript!(input)).toEqual([{ kind: "text", at: "2026-11-07T00:00:00.000Z", text: "Retained conversation" }]);
+    expect(selected).toEqual(input);
+    expect(runtime.ports.providerModules).toBeUndefined();
+    expect(await db.module.count()).toBe(0);
   } finally { await runtime.stop(); await db.$disconnect(); }
 });
 
 test("runtime wires default and explicit execution mode", async () => {
-  const db = testDb(), keys = ["CHRONA_STEWARD_EXECUTION_MODE"] as const;
+  const db = testDb({ injectedAgent: false }), keys = ["CHRONA_STEWARD_EXECUTION_MODE"] as const;
   const previous = keys.map(key => process.env[key]);
   try {
     delete process.env.CHRONA_STEWARD_EXECUTION_MODE;
@@ -94,7 +95,7 @@ test("runtime wires default and explicit execution mode", async () => {
 });
 
 test("unknown execution mode fails closed", async () => {
-  const db = testDb(), previous = process.env.CHRONA_STEWARD_EXECUTION_MODE;
+  const db = testDb({ injectedAgent: false }), previous = process.env.CHRONA_STEWARD_EXECUTION_MODE;
   try {
     process.env.CHRONA_STEWARD_EXECUTION_MODE = "unexpected";
     expect(() => createStewardRuntime(db, { dataDir: mkdtempSync(join(tmpdir(), "chrona-mode-invalid-")), provider: null })).toThrow("CHRONA_STEWARD_EXECUTION_MODE supports only trusted-local");
@@ -105,7 +106,7 @@ test("unknown execution mode fails closed", async () => {
 });
 
 test("runtime forwards thrown and stage failures to onError", async () => {
-  const db = testDb(), errors: unknown[] = [], error = new TypeError("approval failed");
+  const db = testDb({ injectedAgent: false }), errors: unknown[] = [], error = new TypeError("approval failed");
   const runtime = createStewardRuntime(db, { dataDir: mkdtempSync(join(tmpdir(), "chrona-runtime-error-")), provider: null, onError: value => { errors.push(value); } });
   const tick = spyOn(runtime.service, "tick");
   try {
@@ -118,7 +119,7 @@ test("runtime forwards thrown and stage failures to onError", async () => {
 });
 
 test("shutdown waits for background finalization before closing modules and returning", async () => {
-  const db = testDb();
+  const db = testDb({ injectedAgent: false });
   const runtime = createStewardRuntime(db, { dataDir: mkdtempSync(join(tmpdir(), "chrona-shutdown-")), provider: null });
   let release!: () => void, entered!: () => void;
   const pending = new Promise<void>(resolve => { release = resolve; });
@@ -140,14 +141,15 @@ test("runtime data directory follows explicit setting then database directory", 
   expect(stewardDataDir({ DATABASE_URL: "file:/tmp/db/test.db" })).toBe("/tmp/db");
   expect(() => stewardDataDir({ DATABASE_URL: "file::memory:" })).toThrow();
 });
-// Fresh runtime bootstraps and builds built-ins, so this startup test needs more than Bun's 5-second default.
+// Fresh runtime initializes ordinary preinstall receipts; no builtin application is seeded.
 test("runtime ticks every 30 seconds, wakes immediately and stops cleanly", async () => {
-  const db = testDb();
+  const db = testDb({ injectedAgent: false });
   let interval = 0, cleared = false;
   const runtime = createStewardRuntime(db, { dataDir: mkdtempSync(join(tmpdir(), "chrona-v4b-runtime-")), provider: null,
     timers: { setInterval: ((_fn: () => void, ms: number) => { interval = ms; return 1; }) as unknown as typeof setInterval, clearInterval: (() => { cleared = true; }) as typeof clearInterval },
   });
   try {
+    runtime.ports.moduleExternalResources = join(runtime.ports.dataDir, "missing-external-fixture");
     await db.workspace.create({ data: { id: "w", name: "Test" } });
     runtime.start(); await runtime.tickOnce();
     expect(interval).toBe(30000);

@@ -16,7 +16,7 @@ async function fixture(overrides = {}) {
   const now = new Date("2026-10-21T00:00:00Z");
   const workspace = await db.workspace.create({ data: { name: "budget", settings: { timezone: "UTC", moduleModel: { ...limits, ...overrides } } } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "budget-test", activeHash: "v1" } });
-  const manifest = moduleManifestSchema.parse({ name: module.name, entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], uses: ["agent.complete"], model: { tier: "arbitrary-tier", maxCalls: 2, maxOutputTokens: 20 } });
+  const manifest = moduleManifestSchema.parse({ name: module.name, entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], uses: ["agent.run"], model: { tier: "arbitrary-tier", maxCalls: 2, maxOutputTokens: 20 } });
   const run = await db.moduleRun.create({ data: { moduleId: module.id, hash: "v1", triggerId: "tool", firedAt: now, createdAt: now, exitCode: 0 } });
   const scope: CallScope = { workspaceId: workspace.id, moduleId: module.id, hash: "v1", manifest, moduleRunId: run.id, eventKey: "event" };
   const ports: StewardPorts = { db, dataDir: "/unused", now: () => now, publicUrl: null };

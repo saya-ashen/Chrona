@@ -1,18 +1,21 @@
 import { expect, test } from "bun:test";
-import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, cp, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import ts from "typescript";
-import { assembleAgentDependencies } from "../build/agent-dependencies";
-import { buildAgentApplication } from "../packages/engine/src/modules/steward/builtin/agent/build";
+import { assembleModuleDependencies, preparePiApplication, stageModuleMaterial } from "../build/agent-dependencies";
+import { moduleGitReleaseSource } from "./module-git-release";
+import { snapshotModuleMaterial } from "../packages/engine/src/modules/steward/module-artifacts";
+import { seedTestModuleRelease } from "../packages/engine/src/modules/steward/module-release-test-fixture";
+import { MODULE_MATERIAL_FILE, MODULE_SOURCE_MAX_BYTES, MODULE_SOURCE_MAX_FILES, parseModuleMaterial } from "../packages/contracts/src/steward/module-material";
 import { readModuleFiles } from "../packages/engine/src/modules/steward/module-preview";
-import { commitModuleSource } from "../packages/engine/src/modules/steward/module-git";
+import { readModuleMaterial, readModuleSource } from "../packages/engine/src/modules/steward/module-git";
 
-const agentPath = "packages/engine/src/modules/steward/builtin/agent";
+const piPath = "packages/engine/src/modules/steward/external/pi";
 
 test("compact ordinary packages preserve runtime versions, public exports, real types and license texts", async () => {
-  const root = await mkdtemp(join(tmpdir(), "chrona-agent-closure-"));
+  const root = await mkdtemp(join(tmpdir(), "chrona-module-closure-"));
   const source = join(root, "source"), output = join(root, "output");
   async function file(path: string, content: string) {
     await mkdir(dirname(path), { recursive: true });
@@ -24,8 +27,8 @@ test("compact ordinary packages preserve runtime versions, public exports, real 
     await file(join(path, "LICENSE"), `Exact copyright and license for ${path}\n`);
   }
   try {
-    await file(join(source, agentPath, "package.json"), JSON.stringify({ name: "agent", version: "1.0.0", dependencies: { child: "file:vendor/child", runtime: "file:vendor/runtime" }, devDependencies: { unused: "*" } }));
-    await file(join(source, agentPath, "bun.lock"), "fixture lock\n");
+    await file(join(output, "package.json"), JSON.stringify({ name: "pi", version: "1.0.0", dependencies: { child: "file:vendor/child", runtime: "file:vendor/runtime" }, devDependencies: { unused: "*" } }));
+    await file(join(output, "bun.lock"), "fixture lock\n");
     await packageAt(join(source, "node_modules/child"), { name: "child", version: "1.0.0" }, 'export const version = "1.0.0" as const;\n');
     const runtime = join(source, "node_modules/runtime"), nested = join(runtime, "node_modules/child");
     await packageAt(runtime, { name: "runtime", version: "1.0.0", exports: { ".": "./index.ts", "./extra": "./extra.ts" }, dependencies: { child: "2.0.0" }, devDependencies: { unused: "*" }, scripts: { test: "node test.js" } }, `
@@ -37,8 +40,7 @@ export const template = (value: number) => \`a : \${value} ; b\`;
     await file(join(runtime, "extra.ts"), 'export type Public = "extra : value"; export const publicValue: Public = "extra : value";\n');
     await packageAt(nested, { name: "child", version: "2.0.0" }, 'export const version = "2.0.0" as const;\n');
     for (const name of ["test.js", "bench.js", "test/unit.js", "orphan.ts"]) await file(join(runtime, name), 'throw new Error("development file must not ship");\n');
-    await mkdir(output);
-    await assembleAgentDependencies(output, source);
+    await assembleModuleDependencies(output, source);
     const packaged = join(output, "vendor/runtime"), manifest = JSON.parse(await readFile(join(packaged, "package.json"), "utf8"));
     for (const name of ["test.js", "bench.js", "test/unit.js", "orphan.ts"]) expect(existsSync(join(packaged, name))).toBe(false);
     expect(Object.keys(manifest.exports)).toEqual([".", "./extra"]);
@@ -52,8 +54,9 @@ export const template = (value: number) => \`a : \${value} ; b\`;
     expect(JSON.parse(await readFile(join(output, "package.json"), "utf8")).devDependencies).toBeUndefined();
     // Runtime and declaration inference must both retain the nested version,
     // rather than silently resolving the root package's different version.
-    const installed = Bun.spawn([process.execPath, "install", "--ignore-scripts", "--no-cache"], { cwd: output, stdout: "pipe", stderr: "pipe" });
-    expect(await installed.exited).toBe(0);
+    // Link the local file closure directly; verification must never invoke an installer.
+    await mkdir(join(output, "node_modules"));
+    for (const name of ["runtime", "child"]) await symlink(join(output, "vendor", name), join(output, "node_modules", name), "junction");
     const probe = Bun.spawn([process.execPath, "--no-install", "-e", 'import {nestedVersion,literal,template} from "runtime"; import {publicValue} from "runtime/extra"; import {version} from "child"; console.log(JSON.stringify([version,nestedVersion,literal("a : b ; c"),template(7),publicValue]));'], { cwd: output, stdout: "pipe", stderr: "pipe" });
     const [stdout, stderr, code] = await Promise.all([new Response(probe.stdout).text(), new Response(probe.stderr).text(), probe.exited]);
     expect(stderr).toBe(""); expect(code).toBe(0);
@@ -67,14 +70,54 @@ export const template = (value: number) => \`a : \${value} ; b\`;
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
-test("the complete generated Agent release fits normal module Git limits", async () => {
-  const root = await mkdtemp(join(tmpdir(), "chrona-agent-size-")), agent = join(root, "agent");
+test("generic staged material preserves generated bytes and executable modes and rejects tampering, unlisted files and oversized source", async () => {
+  const root = await mkdtemp(join(tmpdir(), "chrona-staged-material-")), resources = join(root, "resources"), moduleDir = join(resources, "sample");
+  const build = { commands: ["build"], toolchain: "fixture", target: "bun" };
   try {
-    await cp(resolve(import.meta.dir, "..", agentPath), agent, { recursive: true, filter: path => !path.split(/[\\/]/).some(part => ["node_modules", "vendor"].includes(part)) });
-    await assembleAgentDependencies(agent);
-    await buildAgentApplication(agent);
-    const files = await readModuleFiles(agent, "Unsafe Agent release");
-    const types = files.filter(file => file.path.includes("/types/")).map(file => join(agent, file.path));
+    await mkdir(join(moduleDir, "dist"), { recursive: true });
+    await writeFile(join(moduleDir, "module.json"), JSON.stringify({ name: "sample", entry: "index.ts", tests: ["test.ts"] }));
+    await writeFile(join(moduleDir, "index.ts"), 'import "./dist/runtime.js";');
+    await writeFile(join(moduleDir, "test.ts"), "export const test = () => true;");
+    const artifact = Buffer.alloc(MODULE_SOURCE_MAX_BYTES + 1, 0x61);
+    await writeFile(join(moduleDir, "dist/runtime.js"), artifact);
+    await chmod(join(moduleDir, "dist/runtime.js"), 0o755);
+    const record = await stageModuleMaterial(moduleDir, { artifacts: ["dist"], build });
+    expect(record.source).toEqual(["index.ts", "module.json", "test.ts"]);
+    expect(record.artifacts).toHaveLength(1);
+    expect(record.artifacts[0]).toMatchObject({ path: "dist/runtime.js", executable: true });
+    expect((await moduleGitReleaseSource(moduleDir)).map(file => file.path)).toEqual([MODULE_MATERIAL_FILE, "index.ts", "module.json", "test.ts"]);
+    const revision = await seedTestModuleRelease(resources, "sample");
+    expect((await readModuleMaterial({ platform: join(resources, ".test-release-git"), moduleId: "sample", commit: revision.commit })).find(file => file.path === "dist/runtime.js")).toMatchObject({ bytes: artifact, executable: true });
+    await writeFile(join(moduleDir, "dist/runtime.js"), "tampered");
+    await expect(moduleGitReleaseSource(moduleDir)).rejects.toThrow();
+    await expect(seedTestModuleRelease(resources, "sample")).rejects.toThrow();
+    await writeFile(join(moduleDir, "dist/runtime.js"), artifact);
+    await chmod(join(moduleDir, "dist/runtime.js"), 0o644);
+    await expect(seedTestModuleRelease(resources, "sample")).rejects.toThrow();
+    await chmod(join(moduleDir, "dist/runtime.js"), 0o755);
+    await writeFile(join(moduleDir, "unlisted.ts"), "unexpected");
+    await expect(moduleGitReleaseSource(moduleDir)).rejects.toThrow();
+    await expect(seedTestModuleRelease(resources, "sample")).rejects.toThrow();
+    await rm(join(moduleDir, "unlisted.ts"));
+    await symlink("runtime.js", join(moduleDir, "dist/link.js"));
+    await expect(stageModuleMaterial(moduleDir, { artifacts: ["dist"], build })).rejects.toThrow("regular files");
+    await rm(join(moduleDir, "dist/link.js"));
+    await expect(stageModuleMaterial(moduleDir, { artifacts: ["../outside"], build })).rejects.toThrow("Unsafe");
+    await expect(stageModuleMaterial(moduleDir, { artifacts: ["missing"], build })).rejects.toThrow("missing");
+    await writeFile(join(moduleDir, "index.ts"), Buffer.alloc(MODULE_SOURCE_MAX_BYTES + 1));
+    await expect(stageModuleMaterial(moduleDir, { artifacts: ["dist"], build })).rejects.toThrow();
+    await expect(seedTestModuleRelease(resources, "sample")).rejects.toThrow();
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("the complete generated Pi release preserves artifacts within ordinary material and Git source limits", async () => {
+  const root = await mkdtemp(join(tmpdir(), "chrona-pi-size-")), resources = join(root, "resources/external"), pi = join(resources, "pi");
+  try {
+    await cp(resolve(import.meta.dir, "..", piPath), pi, { recursive: true, filter: path => !path.split(/[\\/]/).some(part => ["node_modules", "vendor"].includes(part)) });
+    await preparePiApplication(join(root, "resources"));
+    const record = parseModuleMaterial(JSON.parse(await readFile(join(pi, MODULE_MATERIAL_FILE), "utf8")));
+    const files = await readModuleFiles(pi, "Unsafe Pi release");
+    const types = files.filter(file => file.path.includes("/types/")).map(file => join(pi, file.path));
     const declarations = ts.createProgram(types, { noEmit: true, target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler });
     expect(declarations.getSyntacticDiagnostics().map(error => `${error.file?.fileName}: ${ts.flattenDiagnosticMessageText(error.messageText, "\n")}`)).toEqual([]);
     const probe = join(root, "zod-api.ts");
@@ -115,11 +158,20 @@ z.toJSONSchema(record);
     const original = diagnostics(resolve(import.meta.dir, "../node_modules/zod/index.d.cts"));
     expect(original).toHaveLength(10);
     expect(original.every(error => error.file === "probe")).toBe(true);
-    expect(diagnostics(join(agent, "vendor/zod/types/index.d.ts"))).toEqual(original);
-    expect(files.length).toBeLessThanOrEqual(200);
-    expect(files.reduce((bytes, file) => bytes + file.bytes.byteLength, 0)).toBeLessThanOrEqual(1024 * 1024);
-    // Exercise the ordinary validator itself; no Agent exception or larger cap.
-    const revision = await commitModuleSource({ platform: join(root, "platform"), moduleId: "agent", versionId: "compact", files, message: "Compact Agent release" });
+    expect(diagnostics(join(pi, "vendor/zod/types/index.d.ts"))).toEqual(original);
+    expect(record.source).toEqual(expect.arrayContaining(["module.json", "package.json", "bun.lock", "runtime.ts", "test.ts", "build.ts", "LICENSE"]));
+    expect(record.artifacts.map(file => file.path)).toEqual(expect.arrayContaining(["runtime.js", "test.js", "vendor/zod/runtime/index.js", "vendor/zod/types/index.d.ts"]));
+    const source = await moduleGitReleaseSource(pi);
+    expect(source.length).toBeLessThanOrEqual(MODULE_SOURCE_MAX_FILES);
+    expect(source.reduce((bytes, file) => bytes + file.bytes.byteLength, 0)).toBeLessThanOrEqual(MODULE_SOURCE_MAX_BYTES);
+    expect(source.map(file => file.path)).toEqual([MODULE_MATERIAL_FILE, ...record.source].sort((a, b) => a.localeCompare(b)));
+    // The actual synthetic seed must retain full verified bytes in the artifact
+    // store while its Git tree matches the production release source selector.
+    const revision = await seedTestModuleRelease(resources, "pi");
     expect(revision.commit).toMatch(/^[a-f0-9]{40}$/);
+    const identity = { platform: join(resources, ".test-release-git"), moduleId: "pi", commit: revision.commit };
+    expect((await readModuleSource(identity)).map(file => file.path)).toEqual(source.map(file => file.path));
+    const restored = await readModuleMaterial(identity);
+    expect(restored.map(file => ({ path: file.path, bytes: Buffer.from(file.bytes), executable: !!file.executable }))).toEqual((await snapshotModuleMaterial(resources, "pi", { verifyTree: true })).map(file => ({ path: file.path, bytes: Buffer.from(file.bytes), executable: !!file.executable })));
   } finally { await rm(root, { recursive: true, force: true }); }
 }, 60_000);

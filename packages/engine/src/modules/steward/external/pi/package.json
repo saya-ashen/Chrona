@@ -1,0 +1,16 @@
+{
+  "name": "chrona-provider-pi",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@chrona/contracts": "file:vendor/@chrona/contracts",
+    "@chrona/logging": "file:vendor/@chrona/logging",
+    "@chrona/pi": "file:vendor/@chrona/pi",
+    "zod": "file:vendor/zod"
+  },
+  "scripts": {
+    "build": "bun run build.ts",
+    "test": "bun run build.ts && bun test . && bun run test.ts"
+  }
+}

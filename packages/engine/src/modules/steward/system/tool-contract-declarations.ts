@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { APPROVAL_STATUSES, settingsSchema as kernelSettingsSchema, candidateAdmissionInputSchema, candidateAdmissionOutputSchema, candidateSourceInputSchema, candidateSourceOutputSchema, candidateSubmitInputSchema, candidateSubmitOutputSchema, candidateCheckOutputSchema, modulesToolInputSchemas, pageInput, pageOutput, timerSetInput, timerViewSchema, lifecycleOperationSchema, updateSettingsSchema } from "@chrona/contracts/steward";
+import { kernelAgentInputs, kernelAgentOutputs, APPROVAL_STATUSES, settingsSchema as kernelSettingsSchema, candidateAdmissionInputSchema, candidateAdmissionOutputSchema, candidateSourceInputSchema, candidateSourceOutputSchema, candidateSubmitInputSchema, candidateSubmitOutputSchema, candidateCheckOutputSchema, modulesToolInputSchemas, pageInput, pageOutput, timerSetInput, timerViewSchema, lifecycleOperationSchema, updateSettingsSchema } from "@chrona/contracts/steward";
 import * as outputs from "../system-outputs";
 import { moduleDiagnosticsOutputSchema, moduleHealthSummarySchema } from "../module-diagnostics";
 import { activityRecordsOutput } from "../activity";
@@ -15,6 +15,13 @@ const readers = ["modules", "owner", "provider"] as const;
 
 /** Shared build source and runtime validators; importing declarations never registers handlers. */
 export const publicSystemTools = {
+  agent: declaredSystemTools("agent", Object.keys(kernelAgentInputs).map(name => {
+    const key = name as keyof typeof kernelAgentInputs;
+    return tool(key, `Kernel Agent ${key}. Provider identity and Run ownership are checked by the kernel.`, {}, [], {
+      visibility: key === "providers" ? ["modules", "owner"] : ["modules"],
+      idempotent: ["register", "providers", "read"].includes(key), input: kernelAgentInputs[key], output: kernelAgentOutputs[key],
+    });
+  })),
   activity: declaredSystemTools("activity", [
     tool("runtime", "Runtime health facts without application presentation.", {}, [], { idempotent: true, visibility: ["modules", "owner"], output: z.lazy(() => outputs.runtimeOutput) }),
     tool("runs", "Bounded execution status, progress, usage and pending interactions. Read-only runtime facts; no transcript or execution authority.", { session: text("Optional exact session id") }, [], { idempotent: true, visibility: ["modules", "owner"], input: pageInput.extend({ sessionId: z.string().optional() }), output: z.lazy(() => pageOutput(outputs.runsOutput.element)) }),

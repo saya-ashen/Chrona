@@ -1,15 +1,21 @@
-import { expect, spyOn, test } from "bun:test";
-import { chmod, mkdtemp, readFile, stat, symlink, writeFile } from "node:fs/promises";
+import { afterEach, expect, spyOn, test } from "bun:test";
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createPiProvider } from "./pi-provider";
 import { launchPiProcess } from "./pi-process";
 import type { ProviderRunInput } from "@chrona/contracts/steward";
 
+const directories: string[] = [];
+afterEach(async () => {
+  await Promise.all(directories.splice(0).map(path => rm(path, { recursive: true, force: true })));
+});
+
 /** Every executable is synthetic; no installed Pi, credentials, model or QQ. */
 async function fixture(mode = "normal") {
   const cwd = await mkdtemp(join(tmpdir(), "chrona-pi-lifecycle-"));
   const agentDir = await mkdtemp(join(tmpdir(), "chrona-pi-private-"));
+  directories.push(cwd, agentDir);
   const command = join(cwd, "fake-pi"), extension = join(cwd, "bridge.ts"), web = join(cwd, "web.ts");
   await writeFile(extension, ""); await writeFile(web, "");
   await writeFile(command, `#!${process.execPath}
@@ -116,8 +122,6 @@ test("a trusted launcher withholds done until owned process closure is confirmed
 test("unknown launcher closure rejects done instead of publishing stopped completion", async () => {
   const f = await fixture();
   const uncertainty = new Error("Owned cgroup identity could not be verified");
-  // A model pin creates a disposable profile; the fake's mismatched model makes it close without a model call.
-  f.input.model = "synthetic/model";
   let profile = "";
   const provider = createPiProvider({ ...f.options, launch(input) {
     const process = launchPiProcess(input);
@@ -129,8 +133,9 @@ test("unknown launcher closure rejects done instead of publishing stopped comple
   await expect(handle.done).rejects.toBe(uncertainty);
   expect(await f.marked("last-write")).toBe(true);
   await expect(handle.abort()).rejects.toBe(uncertainty);
-  expect(profile).not.toBe(f.agentDir);
+  expect(profile).toBe(f.agentDir);
   expect((await stat(profile)).isDirectory()).toBe(true);
+  expect(await readdir(profile)).toEqual([]);
 });
 
 test("done waits for the child's final write and exit", async () => {
@@ -244,22 +249,28 @@ test("cancel interrupts a stuck metadata handshake and rejects waiting injection
   expect((await handle.done).outcome).toBe("failed");
   expect((await f.commands()).some(c => c.type === "prompt")).toBe(false);
 });
-test("uses the dedicated profile and denies project resource trust", async () => {
+test("uses the selected user profile without overriding resource approval", async () => {
   const f = await fixture();
   expect((await f.provider.start(f.input).done).outcome).toBe("finished");
   const launch = JSON.parse(await readFile(join(f.cwd, "launch.json"), "utf8"));
   expect(launch.agentDir).toBe(f.agentDir);
-  expect(launch.args).toContain("--no-approve");
+  expect(launch.args).not.toContain("--no-approve");
+  expect((await f.commands()).map(c => c.type)).not.toContain("set_auto_retry");
+  expect((await f.commands()).map(c => c.type)).not.toContain("set_auto_compaction");
 });
-test("unexpected command resources fail before any model prompt; explicitly loaded resources pass", async () => {
-  const rejected = await fixture("unexpected-command"), handle = rejected.provider.start(rejected.input);
-  const injection = handle.inject("Must wait for resource validation").then(() => false, () => true);
-  expect((await handle.done).outcome).toBe("unavailable");
-  expect(await injection).toBe(true);
-  expect((await rejected.commands()).some(c => ["prompt", "steer", "follow_up"].includes(c.type))).toBe(false);
-  for (const mode of ["trusted-command", "trusted-command-legacy"]) {
-    const allowed = await fixture(mode);
-    expect((await allowed.provider.start(allowed.input).done).outcome).toBe("finished");
+test.each(["unexpected-command", "trusted-command", "trusted-command-legacy"])("accepts full selected user resources including %s", async mode => {
+  for (const resources of ["minimal", "configured"] as const) {
+    const f = await fixture(mode);
+    expect((await f.provider.start({ ...f.input, resources }).done).outcome).toBe("finished");
+    const commands = (await f.commands()).map(c => c.type);
+    expect(commands).toContain("get_commands");
+    expect(commands.filter(type => type === "prompt")).toHaveLength(1);
+    expect(commands).not.toContain("set_auto_retry");
+    expect(commands).not.toContain("set_auto_compaction");
+    const launch = JSON.parse(await readFile(join(f.cwd, "launch.json"), "utf8"));
+    expect(launch.agentDir).toBe(f.agentDir);
+    expect(launch.args).toContain(f.options.webExtension);
+    for (const flag of ["--no-approve", "--no-extensions", "--no-skills", "--no-prompt-templates", "--no-themes", "--tools"]) expect(launch.args).not.toContain(flag);
   }
 });
 test("rejects a version mismatch before model work", async () => {
@@ -280,16 +291,43 @@ test("expired deadlines never start the Provider", async () => {
   expect((await f.provider.start({ ...f.input, deadline: new Date(Date.now() - 1) }).done).outcome).toBe("timed_out");
   expect(await f.marked("launch.json")).toBe(false);
 });
-test("does not fall back to PATH or a shared profile when configuration is missing", async () => {
+test("still requires an explicit executable and rejects invalid explicit profiles", async () => {
   const f = await fixture();
   await symlink(f.options.command, join(f.cwd, "pi"));
   const previous = process.env.PATH; process.env.PATH = f.cwd;
-  try { expect((await createPiProvider({ ...f.options, command: undefined }).health()).available).toBe(false); }
-  finally { if (previous === undefined) delete process.env.PATH; else process.env.PATH = previous; }
-  for (const agentDir of [undefined, "relative-profile", join(f.cwd, "missing")]) {
+  try {
+    const provider = createPiProvider({ ...f.options, command: undefined });
+    expect((await provider.health()).available).toBe(false);
+    expect((await provider.start(f.input).done).outcome).toBe("unavailable");
+    expect(await f.marked("launch.json")).toBe(false);
+  } finally { if (previous === undefined) delete process.env.PATH; else process.env.PATH = previous; }
+  for (const agentDir of ["relative-profile", join(f.cwd, "missing")]) {
     const provider = createPiProvider({ ...f.options, agentDir });
     expect((await provider.health()).available).toBe(false);
     expect((await provider.start(f.input).done).outcome).toBe("unavailable");
+  }
+});
+test.each(["option", "environment", "default", "missing-default"])("selects the %s user profile with a fake executable", async source => {
+  const f = await fixture();
+  const fakeHome = await mkdtemp(join(tmpdir(), "chrona-pi-home-"));
+  directories.push(fakeHome);
+  const defaultProfile = join(fakeHome, ".pi", "agent");
+  if (source !== "missing-default") await mkdir(defaultProfile, { recursive: true });
+  const previousHome = process.env.HOME, previousProfile = process.env.PI_CODING_AGENT_DIR;
+  process.env.HOME = fakeHome;
+  if (source === "default" || source === "missing-default") delete process.env.PI_CODING_AGENT_DIR;
+  else process.env.PI_CODING_AGENT_DIR = source === "option" ? join(fakeHome, "unselected-profile") : f.agentDir;
+  try {
+    const provider = createPiProvider({ ...f.options, agentDir: source === "option" ? f.agentDir : undefined });
+    expect((await provider.health()).available).toBe(true);
+    expect((await provider.start(f.input).done).outcome).toBe("finished");
+    const launch = JSON.parse(await readFile(join(f.cwd, "launch.json"), "utf8"));
+    expect(launch.agentDir).toBe(source === "option" || source === "environment" ? f.agentDir : defaultProfile);
+    expect(launch.args).not.toContain("--no-approve");
+    if (source === "missing-default") await expect(stat(defaultProfile)).rejects.toMatchObject({ code: "ENOENT" });
+  } finally {
+    if (previousHome === undefined) delete process.env.HOME; else process.env.HOME = previousHome;
+    if (previousProfile === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = previousProfile;
   }
 });
 test("refuses profile symlinks and profile/workspace overlap", async () => {
@@ -298,11 +336,11 @@ test("refuses profile symlinks and profile/workspace overlap", async () => {
     expect((await createPiProvider({ ...f.options, ...options }).health()).available).toBe(false);
   }
 });
-test.skipIf(process.platform === "win32")("refuses a group/world-accessible profile", async () => {
+test.skipIf(process.platform === "win32")("uses an explicitly selected normal user profile with group-readable permissions", async () => {
   const f = await fixture(); await chmod(f.agentDir, 0o755);
-  expect((await f.provider.health()).available).toBe(false);
-  expect((await f.provider.start(f.input).done).outcome).toBe("unavailable");
-  expect(await f.marked("launch.json")).toBe(false);
+  expect((await f.provider.health()).available).toBe(true);
+  expect((await f.provider.start(f.input).done).outcome).toBe("finished");
+  expect(await f.marked("launch.json")).toBe(true);
 });
 test.each(["select", "confirm", "input", "editor"])("unbridged %s fails explicitly rather than silently approving or waiting for deadline", async method => {
   const f = await fixture(`ui-${method}`);

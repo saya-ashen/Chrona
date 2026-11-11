@@ -120,10 +120,9 @@ test("fixed module seeds preserve paused source materials and regenerate active 
       await writeFile(join(dir, "index.ts"), "// entry\n");
     }
     await buildExecutionContracts(join(resourcesRoot, "external"));
-    const { buildAgentApplication } = await import("../packages/engine/src/modules/steward/builtin/agent/build");
-    await buildAgentApplication(join(resourcesRoot, "builtin/agent"));
-    const { assembleAgentDependencies } = await import("../build/agent-dependencies");
-    await assembleAgentDependencies(join(resourcesRoot, "builtin/agent"));
+    await cp(join(import.meta.dirname, "../packages/engine/src/modules/steward/external/pi"), join(resourcesRoot, "external/pi"), { recursive: true, filter: path => !path.split(/[\\/]/).some(part => ["node_modules", "vendor", ".git"].includes(part)) });
+    const { preparePiApplication } = await import("../build/agent-dependencies");
+    await preparePiApplication(resourcesRoot);
     const { buildEntryConversations } = await import("../build/entry-conversations");
     await buildEntryConversations(resourcesRoot);
     const lock = await prepareModuleGitRelease({ root, resourcesRoot, seedDir, hostCommit: "a".repeat(40), hostTimestamp: "1735689600" });
@@ -141,7 +140,7 @@ test("fixed module seeds preserve paused source materials and regenerate active 
       // Retained bundles record source provenance, but have no runtime installation tree.
       expect(await Bun.file(join(resourcesRoot, "module-git", `${source.split("/").pop()}.bundle`)).exists()).toBe(true);
     }
-    for (const name of ["web", "notify", "qq", "author", "files", "events", "memory-local", "mcp", "mind", "coding", "coding-web", "remote-execution"]) expect(await Bun.file(join(resourcesRoot, "external", name, "module.json")).exists()).toBe(true);
+    for (const name of ["web", "notify", "qq", "author", "files", "events", "memory-local", "mcp", "mind", "coding", "coding-web", "remote-execution", "pi"]) expect(await Bun.file(join(resourcesRoot, "external", name, "module.json")).exists()).toBe(true);
     const { BUILTIN_MODULE_NAMES, OPTIONAL_EXTERNAL_MODULE_NAMES, PREINSTALLED_MODULE_NAMES } = await import("@chrona/contracts/steward");
     for (const module of [{ name: "mind", source: "external/mind" }, { name: "coding", source: "external/coding" }, { name: "coding-web", source: "external/coding-web" }, { name: "remote-execution", source: "external/remote-execution" }] as const) {
       const { name } = module;
@@ -159,7 +158,10 @@ test("fixed module seeds preserve paused source materials and regenerate active 
     expect(buildArtifacts.moduleGit.modules).toContainEqual({ name: "author", source: "external/author" });
     expect(lock.modules.find(module => module.name === "author")?.bundle).toBe("author.bundle");
     expect(await Bun.file(join(resourcesRoot, "module-git/author.bundle")).exists()).toBe(true);
-    expect(await Bun.file(join(resourcesRoot, "builtin/agent/module.json")).exists()).toBe(true);
+    expect(await Bun.file(join(resourcesRoot, "builtin/agent/module.json")).exists()).toBe(false);
+    expect(lock.modules.find(module => module.name === "pi")?.bundle).toBe("pi.bundle");
+    expect(await Bun.file(join(resourcesRoot, "module-git/pi.bundle")).exists()).toBe(true);
+    expect(await Bun.file(join(resourcesRoot, "external/pi/vendor/zod/package.json")).exists()).toBe(true);
     expect(await readFile(join(resourcesRoot, "external/web/LICENSE"), "utf8")).toBe(await readFile(join(root, "LICENSE"), "utf8"));
   } finally {
     if (previous === undefined) delete process.env.CHRONA_MODULE_GIT_SEEDS;
@@ -167,3 +169,10 @@ test("fixed module seeds preserve paused source materials and regenerate active 
     await rm(root, { recursive: true, force: true });
   }
 }, 30_000);
+
+test("release manifest requires external modules and has no builtin packaging input", () => {
+  expect(buildArtifacts.resources.some(resource => resource.to === "resources/external" && resource.required)).toBe(true);
+  expect(buildArtifacts.resources.some(resource => String(resource.to).startsWith("resources/builtin"))).toBe(false);
+  expect(buildArtifacts.moduleGit.modules).toContainEqual({ name: "pi", source: "external/pi" });
+  expect(buildArtifacts.moduleGit.modules.some(module => String(module.name) === "agent")).toBe(false);
+});

@@ -12,9 +12,8 @@ export const baselineDirectory = join(repositoryRoot, "packages/contracts/fixtur
 const moduleRoot = join(repositoryRoot, "packages/engine/src/modules/steward");
 const moduleToolsSchema = moduleManifestSchema.shape.tools;
 
-export async function readAgentTools(): Promise<unknown> {
-  const manifest = JSON.parse(await readFile(join(moduleRoot, "builtin/agent/module.json"), "utf8"));
-  return manifest.tools;
+export async function readAgentTools(): Promise<SystemTool[]> {
+  return publicSystemTools.agent;
 }
 
 /** Include retained paused applications: persisted bindings are independent of runtime availability. */
@@ -28,7 +27,6 @@ export async function collectContractHashes() {
     }
   };
   for (const [name, tools] of Object.entries(publicSystemTools)) add(name, tools);
-  add("agent", moduleToolsSchema.parse(await readAgentTools()));
   const externalRoot = join(moduleRoot, "external");
   for (const directory of (await readdir(externalRoot, { withFileTypes: true })).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)) {
     if (!directory.isDirectory()) continue;
@@ -76,9 +74,8 @@ if (import.meta.main) {
   if (process.argv[2] !== "--write-baseline") throw new Error("Baseline capture requires --write-baseline; never regenerate to accept an unexplained hash change");
   const fixtures = [
     ["contract-hashes.json", await collectContractHashes()],
-    ["agent-tools.json", await readAgentTools()],
     ["contract-hash-cases.json", syntheticContracts()],
   ] as const;
   for (const [name, value] of fixtures) await writeFile(join(baselineDirectory, name), `${JSON.stringify(value, null, 2)}\n`);
-  console.log(`Captured ${Object.keys(fixtures[0][1]).length} tool hashes and ${fixtures[2][1].length} synthetic contracts`);
+  console.log(`Captured ${Object.keys(fixtures[0][1]).length} tool hashes and ${fixtures[1][1].length} synthetic contracts`);
 }

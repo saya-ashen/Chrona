@@ -1,13 +1,13 @@
 import { startRescueListener } from "./rescue";
 import { createModuleRuntimePorts, resourcePath } from "../../../packages/integrations/src/steward/module-runtime";
 import type { PrismaClient } from "@chrona/db";
-import { createAgentClient, stopAgentRuns, moduleSupervisor, createStewardService, createExecutions, createExecutionV2Admission, createExecutionWorkspaceCleanup, createExecutionEventStore, createExternalModuleInstaller, CallError, type StewardPorts } from "@chrona/engine";
+import { createRegisteredProviderClient, stopAgentRuns, moduleSupervisor, createStewardService, createExecutions, createExecutionV2Admission, createExecutionWorkspaceCleanup, createExecutionEventStore, createExternalModuleInstaller, CallError, type StewardPorts } from "@chrona/engine";
 import { loadExecutionProjects, loadExecutionPlacements } from "./config/execution-projects";
 import { createExecutionProjectRegistry } from "./config/execution-project-registry";
 import { createServerWorkspacePreparer } from "./execution-server-workspace";
 import { createExecutionWorkspaceCleanupHost } from "./execution-workspace-cleanup";
 import type { ProviderAdapter } from "@chrona/contracts/steward";
-import { createAgentApplicationHost } from "../../../packages/integrations/src/steward/agent-application-host";
+import { createPiApplicationHost } from "../../../packages/integrations/src/steward/agent-application-host";
 
 type RuntimeOptions = {
   now?: () => Date; onError?: (error: unknown) => void; port?: number; provider?: ProviderAdapter | null;
@@ -36,8 +36,8 @@ function executionInitialization(ports: StewardPorts) {
 }
 export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions = {}) {
   const injected = options.provider;
-  const agentApplication = injected === undefined && options.port ? createAgentApplicationHost({ port: options.port, dataDir: options.dataDir }) : undefined;
-  const configured = injected ?? (injected === undefined && agentApplication && process.env.CHRONA_STEWARD_AGENT === "pi" ? createAgentClient(() => ports, "pi") : null);
+  const providerModules = injected === undefined && options.port ? { pi: createPiApplicationHost({ port: options.port, dataDir: options.dataDir }) } : undefined;
+  const configured = injected === undefined ? createRegisteredProviderClient(() => ports) : injected;
   const handles = new Set<ReturnType<ProviderAdapter["start"]>>();
   let stopping = false, pending = false;
   const provider: ProviderAdapter | undefined = configured ? { name: configured.name, supportsRunModel: configured.supportsRunModel, health: () => configured.health(), ...(configured.complete ? { complete: configured.complete } : {}), ...(configured.transcript ? { transcript: configured.transcript } : {}), start(input) {
@@ -47,7 +47,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
     return handle;
   } } : undefined;
   const ports: StewardPorts = {
-    ...createModuleRuntimePorts(db, options), provider, agentApplication,
+    ...createModuleRuntimePorts(db, options), provider, providerModules,
     chatTimeoutMs: options.chatTimeoutMs,
     onQueued: () => tickOnce(), onRunFinished: async () => { wake(); },
   };

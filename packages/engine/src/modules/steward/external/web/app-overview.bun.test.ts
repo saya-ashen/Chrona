@@ -43,18 +43,19 @@ test("app details resolve names and ids and preserve lifecycle, Git and discover
   }
 });
 
-test("kernel directory groups only the five known namespaces from actual reachable contracts", async () => {
+test("kernel directory groups only the known kernel namespaces from actual reachable contracts", async () => {
   const f = fixture();
-  const names = ["approvals", "modules", "settings", "secrets", "activity", "timers"];
+  const names = ["agent", "approvals", "modules", "settings", "secrets", "activity", "timers"];
   const kernelTools = names.map(name => contract(`${name}.read`));
-  f.state.tools = [...kernelTools, f.appTool, ...["agent", "notify", "author", "web", "events", "workspace-local", "content-local", "runtime-callback", "modules-extra"].map(name => contract(`${name}.read`)), contract("settings.app-tool", { moduleId: "ordinary-id" })];
+  f.state.tools = [...kernelTools, f.appTool, ...["notify", "author", "web", "events", "workspace-local", "content-local", "runtime-callback", "modules-extra"].map(name => contract(`${name}.read`)), contract("settings.app-tool", { moduleId: "ordinary-id" })];
   const directory = await systemApps(f.call);
   expect(directory).toEqual(names.map((name, index) => ({ name, origin: "kernel", description: expect.any(String), tools: [kernelTools[index]] })));
   expect(f.calls).toEqual([["modules.describe", {}]]);
   if (!Array.isArray(directory)) throw new Error("Expected a kernel directory");
-  expect(await systemApps(f.call, "modules")).toEqual(directory[1]!);
+  const modules = directory.find(entry => entry.name === "modules")!;
+  expect(await systemApps(f.call, "modules")).toEqual(modules);
   const overview = await appOverview(f.call, "modules");
-  expect(overview).toEqual({ kind: "system", ...directory[1]!, activity: null });
+  expect(overview).toEqual({ kind: "system", ...modules, activity: null });
   expect(f.calls.every(([target]) => target === "modules.describe")).toBe(true);
 });
 

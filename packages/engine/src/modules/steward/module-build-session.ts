@@ -251,7 +251,7 @@ async function admitBuild(ports: StewardPorts, workspaceId: string, input: Build
     const prompt = await prepareBuild(ports, workspaceId, cwd, request, references);
     const state = await db.$transaction(async tx => {
       for (const name of requestModules(request)) await assertExternalName(tx, workspaceId, name, "build");
-      const queued = await createRuns(ports, workspaceId).enqueue({ sessionId: session.id, lane: "build", trigger: "build", label: session.title, prompt }, tx);
+      const queued = await createRuns(ports, workspaceId).enqueue({ sessionId: session.id, lane: "build", trigger: "build", label: session.title, prompt, ...(execution ? { providerId: execution.provider, providerOptions: { model: execution.model } } : {}) }, tx);
       if (execution) await tx.buildExecutionAdmission.create({ data: { runId: queued.id, ...execution } });
       return (await buildQueue(tx, workspaceId)).get(session.id)!;
     });

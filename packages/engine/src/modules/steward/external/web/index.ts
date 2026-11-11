@@ -22,7 +22,7 @@ const files: Record<string, string> = { "/app.js": "text/javascript; charset=utf
 const headers = { "cache-control": "no-cache", "x-content-type-options": "nosniff", "referrer-policy": "same-origin",
   "content-security-policy": "default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob:; frame-src blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'" };
 const preferences = createPreferences(chrona.paths.data);
-const call = (target: string, args: Args = {}) => target === "web.settings" ? preferences.tool(args) : applicationCall(target, Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined)), /^modules\.(enable|disable|rollback|remove)$/.test(target) ? { key: typeof args.requestKey === "string" ? args.requestKey : crypto.randomUUID() } : {});
+const call = (target: string, args: Args = {}, options: { key?: string } = {}) => target === "web.settings" ? preferences.tool(args) : applicationCall(target, Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined)), /^modules\.(enable|disable|rollback|remove)$/.test(target) ? { key: typeof args.requestKey === "string" ? args.requestKey : crypto.randomUUID() } : options);
 const ownSettings = new Map<string, (args: Args) => Promise<unknown>>([
   ["web.ui-settings", args => webSettings(call, preferences, args)],
   ["web.ui-preferences", args => webPreferences(call, args)],
@@ -204,7 +204,7 @@ async function api(request: Request, path: string[]) {
 async function moduleCall(body: Args) {
   // Conversations, approvals and app records have their own routes above.
   const target = String(body.target), args = (body.args ?? {}) as Args;
-  if (!/^[a-z][a-z0-9-]{1,40}\.[a-z][a-z0-9-]{1,40}$/.test(target) || /^(chat|approvals|modules|settings|schedules|secrets)\./.test(target)) throw Object.assign(new Error(`Unknown module tool ${target}`), { code: "not_found" });
+  if (!/^[a-z][a-z0-9-]{1,40}\.[a-z][a-z0-9-]{1,40}$/.test(target) || /^(approvals|modules|settings|schedules|secrets)\./.test(target)) throw Object.assign(new Error(`Unknown module tool ${target}`), { code: "not_found" });
   if (body.page && typeof body.page === "object") {
     const ref = body.page as { module: string; id: string; revision: string }, page = await pages.get(ref.module, ref.id);
     if (!page || page.revision !== ref.revision || !target.startsWith(`${page.module}.`) || !Object.hasOwn(page.contracts, target.slice(page.module.length + 1))) throw Object.assign(new Error("页面或工具已变化，请重新打开页面"), { code: "conflict" });

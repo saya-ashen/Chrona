@@ -95,7 +95,7 @@ Text writes and reads retain their 64 KiB file limit. Binary-safe material trans
 
 ## Runtime boundary and integration
 
-The current Agent uses the existing conversation Run; Author never invokes `agent.context`, `agent.run` or other model tools. The returned prompt guides that ongoing work without creating an execution or granting permissions. If the current Run lacks a required tool, report that blocker. Do not introduce another queue or relax routing, owner admission, budgets or activation checks.
+The current Agent uses the existing conversation Run; Author never invokes `agent.run` or other model tools. The returned prompt guides that ongoing work without creating an execution or granting permissions. If the current Run lacks a required tool, report that blocker. Do not introduce another queue or relax routing, owner admission, budgets or activation checks.
 
 Author forwards the existing camelCase interfaces:
 

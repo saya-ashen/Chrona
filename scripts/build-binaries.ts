@@ -6,8 +6,7 @@ import { dirname, resolve } from "node:path";
 
 import { buildArtifacts, buildTargets, currentBuildTarget, omitPausedRuntimeModules, parseBuildTarget, type BuildTargetName, type ReleaseResource } from "../build/manifest";
 import { normalizeElfInterpreterFile, removeElfLibraryPathsFile } from "../build/portable-elf";
-import { assembleAgentDependencies } from "../build/agent-dependencies";
-import { buildAgentApplication } from "../packages/engine/src/modules/steward/builtin/agent/build";
+import { preparePiApplication } from "../build/agent-dependencies";
 import { buildEntryConversations } from "../build/entry-conversations";
 import { copyModuleGitRelease, stageModuleGitLicense } from "./module-git-release";
 import { buildProcessHelper } from "../packages/process/scripts/build-helper";
@@ -40,7 +39,7 @@ async function copyResource(resource: ReleaseResource, releaseDir: string) {
 
   await mkdir(dirname(dst), { recursive: true });
   await rm(dst, { recursive: true, force: true });
-  await cp(src, dst, { recursive: true, filter: path => !["resources/builtin", "resources/external"].includes(resource.to) || !path.slice(src.length).split(/[\\/]/).some(part => ["node_modules", ".git", ".venv", ".chrona"].includes(part)) });
+  await cp(src, dst, { recursive: true, filter: path => resource.to !== "resources/external" || !path.slice(src.length).split(/[\\/]/).some(part => ["node_modules", ".git", ".venv", ".chrona"].includes(part)) });
   log("copy", `${resource.from} → ${resource.to}`);
 }
 
@@ -75,8 +74,7 @@ export function compileArgs(target: BuildTargetName, binaryPath: string) {
 export async function prepareReleaseModules(resourcesRoot: string) {
   await buildEntryConversations(resourcesRoot);
   // Paused application sources are verified as retained materials, without regenerating their retired contracts.
-  await buildAgentApplication(resolve(resourcesRoot, "builtin/agent"));
-  await assembleAgentDependencies(resolve(resourcesRoot, "builtin/agent"));
+  await preparePiApplication(resourcesRoot);
   const seedDir = resolve(process.env.CHRONA_MODULE_GIT_SEEDS ?? resolve(ROOT, buildArtifacts.moduleGit.seedDir));
   await stageModuleGitLicense(resourcesRoot, resolve(ROOT, buildArtifacts.moduleGit.seedDir, "LICENSE"), resolve(ROOT, buildArtifacts.moduleGit.seedDir, "THIRD-PARTY-NOTICES.txt"));
   await copyModuleGitRelease(seedDir, resourcesRoot);

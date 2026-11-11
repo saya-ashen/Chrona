@@ -20,10 +20,8 @@ const module = await startModule("offline-entry.ts", { stubs: {
   "timers.list": () => ({ items: scheduled ? [scheduled] : [], nextCursor: null }),
   "timers.set": (args: Record<string, unknown>) => { scheduled = { id: "mind-review", revision: "sdk-revision", status: "active", schedule: args.schedule }; return scheduled; },
   "timers.cancel": () => { if (scheduled) scheduled.status = "cancelled"; return { cancelled: true }; },
-  "agent.get": () => ({ contextId: "context-sdk", runId: "run-sdk", status: "running", active: true }),
-  "agent.context": () => ({ contextId: "context-sdk" }),
   "agent.run": () => ({ contextId: "context-sdk", runId: "run-sdk", status: "running", active: true }),
-  "agent.stream": () => ({ items: [], after: 0, interactions: [] }),
+  "agent.read": () => ({ run: { contextId: "context-sdk", runId: "run-sdk", status: "running", active: true }, items: [], nextCursor: null, ended: false, interactions: [] }),
 } });
 const now = new Date().toISOString();
 const owner = { kind: "owner" as const, via: "test" };
@@ -63,6 +61,19 @@ try {
   assert.equal((scheduled as { status: string } | null)?.status, "cancelled");
   const checked = outputs.check.parse(await send("check", {})); assert.equal(checked.runtime.phase, "running");
   const starts = module.calls.filter((call: { params: { target?: string } }) => targetName(call.params.target) === "agent.run"); assert.equal(starts.length, 1);
+  assert.equal(starts[0].params.target, "agent.run");
+  assert.equal(typeof starts[0].params.key, "string");
+  assert.ok(starts[0].params.key);
+  const input = starts[0].params.args as Record<string, unknown>;
+  assert.equal(input.contextId, undefined);
+  assert.equal(input["request-key"], undefined);
+  assert.equal(input.key, undefined);
+  const reads = module.calls.filter((call: { params: { target?: unknown } }) => targetName(call.params.target) === "agent.read");
+  assert.ok(reads.length > 0);
+  for (const read of reads) {
+    assert.equal(read.params.target, "agent.read");
+    assert.equal((read.params.args as Record<string, unknown>).runId, "run-sdk");
+  }
   const decisions = outputs.decisions.parse(await send("decisions", { limit: 5 })); assert.equal(decisions.decisions.length, 1);
   assert.ok(!module.calls.some((call: { params: { target?: string } }) => targetName(call.params.target) === "notify.send"));
   console.log("PASS mind: actual SDK entry, absent Web retry, caller boundary, output contracts and one Agent run");

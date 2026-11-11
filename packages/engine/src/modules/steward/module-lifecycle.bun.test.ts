@@ -9,7 +9,8 @@ import { createModules } from "./modules";
 import { testModuleProcess } from "./module-test-process";
 import { testDb } from "./test-db";
 import { seedTestModuleRelease } from "./module-release-test-fixture";
-import { resolveBuiltinRelease } from "./module-release";
+import { moduleContext } from "./module-context";
+import { propose } from "./module-proposal";
 import { createPages } from "./external/web/pages";
 import type { StewardPorts } from "./ports";
 import "./module-effects";
@@ -21,24 +22,28 @@ async function fixture() {
   const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-lifecycle-");
   const workspace = await db.workspace.create({ data: { name: "lifecycle", settings: { notifications: { timezone: "UTC", dailyCap: 5, quietHours: { start: "23:00", end: "08:00" }, digestAt: "09:00" } } } });
   const peer = testModuleProcess(async () => ({ result: {} }));
-  const ports: StewardPorts = { db, dataDir, moduleBuiltinResources: join(dataDir, "builtin"), publicUrl: null, now: () => new Date("2026-11-05T12:00:00Z"), sandbox: { available: true, isolated: true, startModule: peer.startModule } };
+  const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => new Date("2026-11-05T12:00:00Z"), sandbox: { available: true, isolated: true, startModule: peer.startModule } };
   cleanups.push(async () => { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
-  async function app(name: string, uses: string[] = [], builtin = false) {
+  async function app(name: string, uses: string[] = [], offlineRelease = false) {
     const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses, authority: uses.includes("*") ? "owner" : undefined });
-    let activeHash = name;
-    if (builtin) {
-      const code = join(ports.moduleBuiltinResources!, name);
+    let module;
+    if (offlineRelease) {
+      const resources = join(dataDir, "external"), code = join(resources, name);
       await mkdir(code, { recursive: true });
       await writeFile(join(code, "module.json"), JSON.stringify(manifest));
       await writeFile(join(code, "index.ts"), "// Synthetic peer transport; never executed\n");
       await writeFile(join(code, "test.ts"), "// Synthetic release fixture\n");
-      await seedTestModuleRelease(ports.moduleBuiltinResources!, name);
-      activeHash = (await resolveBuiltinRelease(ports, name)).hash;
+      const git = await seedTestModuleRelease(resources, name);
+      const candidate = await propose(moduleContext(ports, workspace.id), { root: resources, dir: name, sourceCommit: git.commit, gitBundle: git, intent: { changes: ["Offline release fixture"] } }, "user");
+      const moduleId = candidate.moduleId!, activeHash = candidate.hash;
+      await db.moduleVersion.update({ where: { moduleId_hash: { moduleId, hash: activeHash } }, data: { status: "approved" } });
+      module = await db.module.update({ where: { id: moduleId }, data: { activeHash } });
       await cp(code, join(dataDir, "platform/store", activeHash), { recursive: true });
+    } else {
+      module = await db.module.create({ data: { workspaceId: workspace.id, name, activeHash: name } });
+      await db.moduleVersion.create({ data: { moduleId: module.id, hash: name, manifest, source: "user", status: "approved", intent: {}, report: {} } });
     }
-    const module = await db.module.create({ data: { workspaceId: workspace.id, name, activeHash, builtin } });
-    await db.moduleVersion.create({ data: { moduleId: module.id, hash: activeHash, manifest, source: "user", status: "approved", intent: {}, report: {} } });
-    const caller: Caller = { kind: "module", module: name, moduleId: module.id, hash: activeHash };
+    const caller: Caller = { kind: "module", module: name, moduleId: module.id, hash: module.activeHash! };
     return { ...module, caller };
   }
   const entry = await app("web", ["*"]), target = await app("gmail");
@@ -97,9 +102,15 @@ test("web removal approval backs up data, removes the app and schedules, and cle
   expect(await pages.get("gmail", "inbox")).toBeNull();
   const audit = await f.db.audit.findFirstOrThrow({ where: { kind: "module_removed", subjectId: f.target.id } });
   expect(await readFile(join((audit.details as { backup: string }).backup, "data", "mail.json"), "utf8")).toBe("[1]");
-  const agent = await f.app("agent", [], true);
-  expect(await f.call("modules.remove", { moduleId: agent.id, reason: "try" })).toMatchObject({ status: "failed", error: { code: "forbidden", message: "Built-in agent cannot remove" } });
-  expect(await f.db.module.findUnique({ where: { id: agent.id } })).not.toBeNull();
+  const pi = await f.app("pi", [], true);
+  const removePi = await f.call("modules.remove", { moduleId: pi.id, reason: "remove ordinary Provider application" }) as { status: string; approvalId: string };
+  expect(removePi.status).toBe("pending_approval");
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: pi.id } })).toMatchObject({ builtin: false, activeHash: pi.activeHash });
+  expect(await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: pi.id, hash: pi.activeHash! } } })).toMatchObject({ source: "user", status: "approved", report: { git: { commit: pi.activeHash } } });
+  await f.call("approvals.resolve", { approval: removePi.approvalId, decision: "approve" });
+  expect(await f.db.module.findUnique({ where: { id: pi.id } })).toBeNull();
+  expect(await f.db.moduleVersion.count({ where: { moduleId: pi.id } })).toBe(0);
+  expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_removed", subjectId: pi.id } })).toMatchObject({ details: { hash: pi.activeHash } });
   const owner: Caller = { kind: "owner", via: "test" };
   const removeWeb = await f.call("modules.remove", { moduleId: f.entry.id, reason: "remove ordinary application" }, owner) as { status: string; approvalId: string };
   expect(removeWeb.status).toBe("pending_approval");

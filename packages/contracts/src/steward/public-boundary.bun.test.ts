@@ -10,8 +10,8 @@ test("shared modules inputs expose only schemas used by the public router", () =
   expect(contracts.modulesToolInputSchemas.rollback.safeParse({ module: "example", hash: "a".repeat(64), dir: "checkout" }).success).toBe(false);
 });
 
-test("public kernel namespace vocabulary matches the six registered services", () => {
-  const expected: Array<(typeof contracts.KERNEL_MODULE_NAMES)[number]> = ["activity", "approvals", "modules", "secrets", "settings", "timers"];
+test("public kernel namespace vocabulary matches the seven registered services", () => {
+  const expected: Array<(typeof contracts.KERNEL_MODULE_NAMES)[number]> = ["activity", "agent", "approvals", "modules", "secrets", "settings", "timers"];
   expect([...contracts.KERNEL_MODULE_NAMES].sort()).toEqual(expected);
   expect([...contracts.SYSTEM_MODULES].sort()).toEqual(expected);
 });

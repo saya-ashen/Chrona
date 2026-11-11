@@ -3,7 +3,7 @@ import { chrona, ModelError, type CallTarget, type CallOptions } from "chrona";
 
 type Args = Record<string, unknown>;
 type Page = { items: unknown[]; nextCursor: string | null };
-const kernel = /^(modules|approvals|settings|secrets|activity|timers|runtime-callback|workspace-local)\./;
+const kernel = /^(agent|modules|approvals|settings|secrets|activity|timers|runtime-callback|workspace-local)\./;
 const paged = new Set(["modules.list", "modules.describe", "modules.health", "approvals.list", "secrets.list", "activity.runs", "activity.records", "activity.usage"]);
 function address(target: string, expected?: CallOptions["expectedTarget"]): CallTarget {
   if (kernel.test(target)) return target as CallTarget;
@@ -14,13 +14,12 @@ function address(target: string, expected?: CallOptions["expectedTarget"]): Call
 }
 /** Private app journals keep their command identities; the wire carries keys only in call options. */
 function argumentsFor(target: string, args: Args, options: CallOptions) {
-  if (!kernel.test(target) && !target.startsWith("agent.")) return { input: args, options };
+  if (!kernel.test(target)) return { input: args, options };
   const { ["request-key"]: requestKey, requestKey: camelRequestKey, ["command-key"]: commandKey, commandKey: camelCommandKey, ...input } = args;
   const key = [options.key, requestKey, camelRequestKey, commandKey, camelCommandKey].find(value => value !== undefined);
-  if (target === "agent.work-lookup" || target === "modules.receipt" && !input.receiptId) input.key = key;
-  if (["agent.respond", "agent.work-respond"].includes(target) && typeof input.answer === "string") input.answer = JSON.parse(input.answer);
+  if (target === "modules.receipt" && !input.receiptId) input.key = key;
   if (target === "modules.describe" && typeof input.target === "string") input.target = address(input.target);
-  return { input, options: { ...options, ...(key === undefined || target === "agent.work-lookup" ? {} : { key: String(key) }) } };
+  return { input, options: { ...options, ...(key === undefined ? {} : { key: String(key) }) } };
 }
 async function completePages(target: CallTarget, input: Args, page: Page, options: CallOptions) {
   while (page.nextCursor) {

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { safeProviderPayload } from "./agent-provider-redaction";
 import type { Prisma } from "@chrona/db";
 import { providerAnswerSchema, providerInteractionSchema, providerProgressSchema, providerQuestionSchema, providerResourcesSchema, providerUsageSchema, type ProviderAnswer, type ProviderEvents, type ProviderInteraction } from "@chrona/contracts/steward";
 import { providerRunActive, providerText, safeProviderQuestion, validProviderAnswer } from "@chrona/domain/steward/provider";
@@ -80,6 +81,7 @@ export function createProviderChannel(ports: StewardPorts, run: RunIdentity, onI
     } catch (error) { await entry.settle({ decision: "cancel" }, "interrupted"); throw error; }
   }
   const events: ProviderEvents = {
+    async raw(value) { if (!closed) await write("raw", safeProviderPayload(value, [run.token ?? ""])); },
     async progress(raw) {
       if (closed) return;
       const value = parseInput(providerProgressSchema, raw);

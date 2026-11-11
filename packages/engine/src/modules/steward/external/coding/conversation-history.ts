@@ -1,6 +1,6 @@
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { callAgent } from "./agent";
+import { callAgent, readCodingObservation } from "./agent";
 import { executionEventPageSchema, executionSnapshotSchema, type ExecutionSnapshot, type ExecutionEventPage, type ExecutionEventPayload, type ExecutionView } from "./contract.js";
 import { codingError, readCodingWork, writeCodingWork, type CodingContext } from "./storage";
 import { saveSessionFile } from "./sessions";
@@ -89,6 +89,12 @@ function applySnapshot(history: ConversationHistory, snapshot: ExecutionSnapshot
   if (!final.truncated || found.content.length <= final.text.length) found.content = final.text;
   found.status = final.truncated ? "回复可能不完整" : "";
 }
+function applyFullReply(history: ConversationHistory, snapshot: ExecutionSnapshot, text: string | undefined) {
+  if (!snapshot.finalMessage || text === undefined) return;
+  const found = message(history, snapshot.finalMessage.messageId, new Date().toISOString());
+  if (!snapshot.missing || text.length >= found.content.length) found.content = text;
+  found.status = snapshot.stopConfirmed ? "" : "回复中";
+}
 function matchesExecution(actual: Pick<ExecutionView, "workId" | "sessionId" | "runId" | "attemptId">, expected: ExecutionView): boolean {
   return actual.workId === expected.workId && actual.sessionId === expected.sessionId && actual.runId === expected.runId && actual.attemptId === expected.attemptId;
 }
@@ -101,32 +107,33 @@ export async function refreshHistory(context: CodingContext, view: ExecutionView
     if (!executionEventPageSchema.safeParse(page).success || page.events.some(event => !matchesExecution(event, view))) throw codingError("conflict", "Conversation event identity changed");
     applyPage(history, page);
   }
-  const snapshot = await callAgent<ExecutionSnapshot>(context, "snapshot", target);
+  const observed = await readCodingObservation(context, target), snapshot = observed.snapshot;
   if (!executionSnapshotSchema.safeParse(snapshot).success || !matchesExecution(snapshot, view)) throw codingError("conflict", "Conversation snapshot identity changed");
   applySnapshot(history, snapshot);
+  applyFullReply(history, snapshot, observed.text);
   await saveSessionFile(context, `history-${view.workId}.json`, history);
   return history;
 }
 const stopped = (snapshot: Pick<ExecutionView, "stopConfirmed" | "status">) => snapshot.stopConfirmed && ["completed", "failed", "cancelled"].includes(snapshot.status);
-async function optionalResult(context: CodingContext, view: ExecutionView, history: ConversationHistory) {
-  try { const work = await readCodingWork(context, view.workId); await reconcileCodingResult(context, work, view); await writeCodingWork(context, work); }
-  catch (error) {
-    if (!["unavailable", "not_found", "unsupported", "too_large"].includes((error as { code?: string }).code ?? "")) throw error;
-    history.limited = true;
-  }
+async function captureResult(context: CodingContext, view: ExecutionView) {
+  const work = await readCodingWork(context, view.workId);
+  await reconcileCodingResult(context, work, view); await writeCodingWork(context, work);
 }
 export async function readConversationWork(context: CodingContext, workId: string, projectRef: string, cachedOnly: boolean) {
   let history = await loadHistory(context, workId);
   let view: ExecutionView | undefined;
-  if (cachedOnly && history.snapshot && stopped(history.snapshot) && history.sequence >= history.snapshot.highWatermark) return { history, view: { ...history.snapshot, projectRef } };
+  if (cachedOnly && history.snapshot && stopped(history.snapshot) && history.sequence >= history.snapshot.highWatermark) {
+    const view = { ...history.snapshot, projectRef }; await captureResult(context, view); return { history, view };
+  }
   try {
     view = await getCodingWorkState(context, { workId });
     history = await refreshHistory(context, view, history);
-    await optionalResult(context, view, history);
+
   } catch (error) {
     if (!["not_found", "unavailable"].includes((error as { code?: string }).code ?? "")) throw error;
     history.limited = true;
     if (history.snapshot && stopped(history.snapshot)) view = { ...history.snapshot, projectRef };
   }
+  if (view) await captureResult(context, view);
   return { history, view };
 }

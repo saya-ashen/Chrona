@@ -7,7 +7,7 @@
 | 文档 | 解决的问题 |
 | --- | --- |
 | [产品目标](zh/steward-goals.md) | 为什么做、用户价值与真实使用验收；最高产品依据 |
-| [内核 API 目标规范](zh/kernel-api-design.md) | 公开合同设计及相对原实现的变化；未冻结 |
+| [内核 API 目标规范](zh/kernel-api-design.md) | 公开合同与待实现的七工具 Agent／Provider 注册制；未冻结 |
 | [内核 API 实施记录](zh/kernel-api-implementation.md) | 当前实现、自动检查及未覆盖范围 |
 | [API 消费者验收](zh/kernel-api-acceptance.md) | 独立 HTTP/SDK 验收、覆盖边界和冻结门槛 |
 | [持续关注与恢复](zh/continuous-steward-journey.md) | timer、来源、记忆纠正、恢复与用量的实施证据及未完成项 |

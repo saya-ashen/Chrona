@@ -1,10 +1,10 @@
 import { MAX_ARTIFACT_BYTES } from "./output";
-import { callAgent } from "./agent";
+import { callAgent, lookupCodingWork } from "./agent";
 import { createHash } from "node:crypto";
-import { link, mkdir, open, readFile, rm } from "node:fs/promises";
+import { link, mkdir, open, readFile, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { executionSnapshotSchema, executionResultSourceSchema, type ExecutionView, type ExecutionSnapshot, type ExecutionResultSource } from "./contract.js";
-import { codingError, lookupCodingWork, readCodingWork, writeCodingWork, type CodingContext, type CodingWork } from "./storage";
+import { executionSnapshotSchema, executionResultSourceSchema, type ExecutionView, type ExecutionSnapshot, type ExecutionResultSource, type ExecutionResult } from "./contract.js";
+import { codingError, readCodingWork, writeCodingWork, type CodingContext, type CodingWork } from "./storage";
 
 async function immutableArtifact(dir: string, artifactRef: string, text: string) {
   await mkdir(dir, { recursive: true });
@@ -23,15 +23,25 @@ async function immutableArtifact(dir: string, artifactRef: string, text: string)
   const directory = await open(dir, "r");
   try { await directory.sync(); } finally { await directory.close(); }
 }
-function matchesExecution(actual: Pick<ExecutionView, "workId" | "sessionId" | "runId" | "attemptId">, expected: ExecutionView): boolean {
+function matchesExecution(actual: Pick<ExecutionView, "workId" | "sessionId" | "runId" | "attemptId">, expected: Pick<ExecutionView, "workId" | "sessionId" | "runId" | "attemptId">): boolean {
   return actual.workId === expected.workId && actual.sessionId === expected.sessionId && actual.runId === expected.runId && actual.attemptId === expected.attemptId;
+}
+async function storedArtifact(context: CodingContext, result: ExecutionResult) {
+  if (!/^coding-result-[a-f0-9]{64}$/.test(result.artifactRef)) throw codingError("conflict", "Invalid result artifact identity");
+  const path = join(context.dir, "artifacts", `${result.artifactRef}.json`);
+  if ((await stat(path)).size > MAX_ARTIFACT_BYTES) throw codingError("too_large", "Coding result exceeds artifact budget");
+  const text = await readFile(path, "utf8"), hash = createHash("sha256").update(text).digest("hex");
+  if (`result-${hash}` !== result.resultId || `coding-result-${hash}` !== result.artifactRef) throw codingError("conflict", "Result artifact changed");
+  const artifact = JSON.parse(text) as ExecutionResultSource;
+  if (!matchesExecution(artifact, result) || JSON.stringify(artifact.baseline) !== JSON.stringify(result.baseline)) throw codingError("conflict", "Result artifact identity changed");
+  return text;
 }
 /** Read-side result capture never starts another execution. */
 export async function reconcileCodingResult(context: CodingContext, work: CodingWork, view: ExecutionView): Promise<void> {
   if (!view.stopConfirmed || !["completed", "failed", "cancelled"].includes(view.status)) return;
   const existing = work.results.find(result => result.attemptId === view.attemptId);
   if (existing) {
-    const text = await readFile(join(context.dir, "artifacts", `${existing.artifactRef}.json`), "utf8");
+    const text = await storedArtifact(context, existing);
     await immutableArtifact(context.content, existing.artifactRef, text);
     return;
   }
@@ -62,6 +72,14 @@ function artifactText(artifact: ExecutionResultSource & { finalMessage: NonNulla
   return JSON.stringify(artifact);
 }
 async function refreshCodingResults(context: CodingContext, input: { workId: string }) {
+  const stored = await readCodingWork(context, input.workId);
+  if (stored.results.length) {
+    for (const result of stored.results) {
+      const text = await storedArtifact(context, result);
+      await immutableArtifact(context.content, result.artifactRef, text);
+    }
+    return;
+  }
   const { work, view } = await lookupCodingWork(context, input);
   await reconcileCodingResult(context, work, view);
   await writeCodingWork(context, work);

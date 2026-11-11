@@ -15,7 +15,7 @@ const sandbox = createScriptSandbox({  });
   try {
     const runtime = createScriptSandbox({ dataDir: dir });
     const code = join(dir, "platform/store/sdk"); await mkdir(code, { recursive: true });
-    const manifest = moduleManifestSchema.parse({ name: "sdk-check", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["notify.send", "agent.complete", "agent.completion"], model: { tier: "fast", maxCalls: 1, maxOutputTokens: 20 }, data: { schema: 2, migrate: "migrate.ts" },
+    const manifest = moduleManifestSchema.parse({ name: "sdk-check", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["notify.send", "agent.run", "agent.read"], model: { tier: "fast", maxCalls: 1, maxOutputTokens: 20 }, data: { schema: 2, migrate: "migrate.ts" },
       keepAlive: true,
       tools: [{ name: "lookup", description: "Lookup", idempotent: true, parameters: { type: "object", properties: {} },
           output: {}
@@ -29,12 +29,16 @@ on('tool', async ev => {
   const state = chrona.paths.data + '/state';
   if (existsSync(state) && readFileSync(state, 'utf8') !== 'migrated') throw new Error('migration missing');
   const key = ev.id + ':' + ev.firedAt;
-  const started = await chrona.call({moduleId:chrona.dependencies.agent,tool:'complete'}, { prompt: 'Never send this to a real model', 'max-output-tokens': 20 }, { key });
-  if ((await chrona.call({moduleId:chrona.dependencies.agent,tool:'complete'}, { prompt: 'Never send this to a real model', 'max-output-tokens': 20 }, { key })).operationId !== started.operationId) throw new Error('completion receipt changed');
-  const completion = await chrona.call({moduleId:chrona.dependencies.agent,tool:'completion'}, { 'operation-id': started.operationId });
-  if (completion.failure || !completion.result) throw new Error('completion failed or unconfirmed');
-  if (!['Chrona test model response', 'Stub summary'].includes(completion.result.text)) throw new Error('unexpected model response');
-  const params = { key, level: 'now', title: 'Build', body: completion.result.text };
+  const args = { kind: 'completion', prompt: 'Never send this to a real model', providerOptions: { maxOutputTokens: 20 } };
+  const started = await chrona.call({moduleId:chrona.dependencies.agent,tool:'run'}, args, { key });
+  const replayed = await chrona.call({moduleId:chrona.dependencies.agent,tool:'run'}, args, { key });
+  if (!started.runId || !started.contextId || replayed.runId !== started.runId || replayed.contextId !== started.contextId) throw new Error('completion receipt changed');
+  const page = await chrona.call({moduleId:chrona.dependencies.agent,tool:'read'}, { runId: started.runId });
+  if (!page.ended || page.run.runId !== started.runId || page.run.contextId !== started.contextId || page.run.status !== 'finished' || page.run.active) throw new Error('completion failed or unconfirmed');
+  const completion = page.items.find(item => item.kind === 'completion')?.payload;
+  if (!completion || !['Chrona test model response', 'Stub summary'].includes(completion.text)) throw new Error('unexpected model response');
+  if (!Number.isInteger(completion.inputTokens) || completion.inputTokens < 0 || !Number.isInteger(completion.outputTokens) || completion.outputTokens < 0 || completion.outputTokens > args.providerOptions.maxOutputTokens) throw new Error('unexpected model usage');
+  const params = { key, level: 'now', title: 'Build', body: completion.text };
   await chrona.call({moduleId:chrona.dependencies.notify,tool:'send'}, params, { mode: 'async', key });
   if (!(await chrona.call({moduleId:chrona.dependencies.notify,tool:'send'}, params, { mode: 'async', key })).duplicate) throw new Error('dedup missing');
 });
@@ -46,15 +50,19 @@ import { strict as assert } from 'node:assert';
 import { writeFileSync } from 'node:fs';
 if (${runtime.health.isolated}) for (const path of ['/node_modules/chrona/sdk.ts', '/node_modules/chrona/testing.ts']) assert.throws(() => writeFileSync(path, 'changed'));
 const module = await startModule('index.ts', { stubs: {
-  'agent.complete': (_args, options) => ({ operationId: options.key }),
-  'agent.completion': () => ({ result: { text: 'Stub summary', inputTokens: 1, outputTokens: 2 }, failure: false }),
+  'agent.run': (_args, options) => ({ runId: 'stub:' + options.key, contextId: 'stub-context', status: 'finished', active: false }),
+  'agent.read': args => ({ run: { runId: args.runId, contextId: 'stub-context', status: 'finished', active: false }, items: [{ sequence: 0, at: new Date(0).toISOString(), kind: 'completion', payload: { text: 'Stub summary', inputTokens: 1, outputTokens: 2 } }], nextCursor: null, ended: true, interactions: [] }),
 } });
 try {
   const now = '2026-10-21T04:00:00.000Z';
   const reply = await module.send({ trigger: { kind: 'tool', id: 'lookup', args: {}, firedAt: now }, now, params: {} });
   assert.equal(reply.error, undefined);
-  assert.deepEqual(module.calls.map(call => typeof call.params.target === "string" ? call.params.target : call.params.target.moduleId + "." + call.params.target.tool), ['agent.complete', 'agent.complete', 'agent.completion', 'notify.send', 'notify.send']);
+  assert.deepEqual(module.calls.map(call => typeof call.params.target === "string" ? call.params.target : call.params.target.moduleId + "." + call.params.target.tool), ['agent.run', 'agent.run', 'agent.read', 'notify.send', 'notify.send']);
+  assert.deepEqual(module.calls[0].params.args, { kind: 'completion', prompt: 'Never send this to a real model', providerOptions: { maxOutputTokens: 20 } });
   assert.deepEqual(module.calls[0].params.args, module.calls[1].params.args);
+  assert.equal(module.calls[0].params.key, 'lookup:' + now);
+  assert.equal(module.calls[1].params.key, module.calls[0].params.key);
+  assert.deepEqual(module.calls[2].params.args, { runId: 'stub:lookup:' + now });
   assert.equal(module.calls[3].params.args.body, 'Stub summary');
   assert.equal(module.calls[3].params.key, 'lookup:' + now);
 } finally { await module.stop(); }
@@ -63,6 +71,8 @@ try {
   const now = '2026-10-21T04:00:00.000Z';
   const reply = await defaultModule.send({ trigger: { kind: 'tool', id: 'lookup', args: {}, firedAt: now }, now, params: {} });
   assert.equal(reply.error, undefined);
+  assert.deepEqual(defaultModule.calls.map(call => call.params.target.tool), ['run', 'run', 'read', 'send', 'send']);
+  assert.deepEqual(defaultModule.calls[2].params.args, { runId: 'agent.run:lookup:' + now });
   assert.equal(defaultModule.calls[3].params.args.body, 'Chrona test model response');
 } finally { await defaultModule.stop(); }
 `);

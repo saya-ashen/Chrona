@@ -6,17 +6,19 @@ import { join } from "node:path";
 import { moduleContext } from "./module-context";
 import { commitModuleSource } from "./module-git";
 import { readVersionSource } from "./module-source";
+import { propose } from "./module-proposal";
+import { seedTestModuleRelease } from "./module-release-test-fixture";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 
-async function fixture() {
+async function fixture(name = "sample") {
   const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-module-source-");
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "source" } });
-  const module = await db.module.create({ data: { workspaceId: workspace.id, name: "sample" } });
+  const module = await db.module.create({ data: { workspaceId: workspace.id, name } });
   const context = moduleContext({ db, dataDir, now: () => new Date() } as StewardPorts, workspace.id);
   const files = [{ path: "index.ts", bytes: Buffer.from("export {};\n") }];
   async function version(hash: string, report: object = {}) {
@@ -60,28 +62,30 @@ test("a commit hash cannot use another commit's provenance", async () => {
   await expect(readVersionSource(f.context, f.module.id, "a".repeat(40))).rejects.toMatchObject({ code: "conflict" });
 });
 
-test("legacy built-in source imports only the exact trusted release when no store exists", async () => {
-  const f = await fixture(), resources = join(f.context.ports.dataDir, "release"), code = join(resources, "agent");
-  f.context.ports.moduleBuiltinResources = resources;
-  const manifest = moduleManifestSchema.parse({ name: "agent", entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true });
+test("ordinary Pi source stays pinned to its approved offline release without a runtime store or release fallback", async () => {
+  const f = await fixture("pi"), resources = join(f.context.ports.dataDir, "external"), code = join(resources, "pi");
+  const manifest = moduleManifestSchema.parse({ name: "pi", entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true });
   const files = [
-    { path: "index.ts", bytes: Buffer.from("legacy release") },
+    { path: "index.ts", bytes: Buffer.from("export {};\n") },
     { path: "module.json", bytes: Buffer.from(JSON.stringify(manifest)) },
     { path: "test.ts", bytes: Buffer.from("// synthetic") },
   ];
   await mkdir(code, { recursive: true });
-  const digest = createHash("sha256");
-  for (const file of files) { await writeFile(join(code, file.path), file.bytes); digest.update(file.path).update("\0").update(file.bytes).update("\0"); }
-  const hash = digest.digest("hex");
-  await f.db.module.update({ where: { id: f.module.id }, data: { name: "agent", builtin: true, activeHash: hash } });
-  const version = await f.version(hash);
-  await f.db.moduleVersion.update({ where: { id: version.id }, data: { source: "builtin", manifest } });
+  for (const file of files) await writeFile(join(code, file.path), file.bytes);
+  const git = await seedTestModuleRelease(resources, "pi");
+  const proposal = await propose(f.context, { root: resources, dir: "pi", sourceCommit: git.commit, gitBundle: git, intent: { changes: ["Offline Pi source fixture"] } }, "user");
+  const hash = proposal.hash;
+  expect(proposal).toMatchObject({ moduleId: f.module.id, hash: git.commit, status: "building" });
+  const version = await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: f.module.id, hash } }, data: { status: "approved" } });
+  await f.db.module.update({ where: { id: f.module.id }, data: { activeHash: hash } });
   expect(await readVersionSource(f.context, f.module.id, hash)).toEqual(files);
-  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ name: "agent", builtin: true, activeHash: hash });
-  expect(await f.db.moduleVersion.findUniqueOrThrow({ where: { id: version.id } })).toMatchObject({ hash, status: "pending_review", source: "builtin" });
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ name: "pi", builtin: false, activeHash: hash });
+  expect(await f.db.moduleVersion.findUniqueOrThrow({ where: { id: version.id } })).toMatchObject({ hash, status: "approved", source: "user", report: { git: { commit: hash } } });
   await expect(stat(join(f.context.store, hash))).rejects.toMatchObject({ code: "ENOENT" });
-  await f.db.moduleVersion.update({ where: { id: version.id }, data: { report: { tests: [] } } });
   await writeFile(join(code, "index.ts"), "new release cannot impersonate old source");
+  expect(await readVersionSource(f.context, f.module.id, hash)).toEqual(files);
+  await f.db.moduleVersion.update({ where: { id: version.id }, data: { report: { tests: [] } } });
   await expect(readVersionSource(f.context, f.module.id, hash)).rejects.toMatchObject({ code: "conflict" });
+  expect(await f.db.moduleVersion.findUniqueOrThrow({ where: { id: version.id } })).toMatchObject({ hash, status: "approved", source: "user", report: { tests: [] } });
   expect(await readFile(join(code, "index.ts"), "utf8")).toBe("new release cannot impersonate old source");
 });

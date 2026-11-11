@@ -23,7 +23,7 @@ export function isHandlerRejection(error: unknown) {
 export type Process = ReturnType<NonNullable<NonNullable<StewardPorts["sandbox"]>["startModule"]>>;
 export type Timers = Pick<typeof globalThis, "setTimeout" | "clearTimeout">;
 export type Options = { timers?: Timers; idleMs?: number; backoffMs?: number };
-export type DeliveryOptions = { chain?: string[]; path?: string[]; timeoutMs?: number; activationId?: string | null; beforeDelivery?: () => Promise<void>; dispatch?: (send: () => void) => Promise<void>; validateResult?: (result: unknown) => string | null };
+export type DeliveryOptions = { private?: boolean; chain?: string[]; path?: string[]; timeoutMs?: number; activationId?: string | null; beforeDelivery?: () => Promise<void>; dispatch?: (send: () => void) => Promise<void>; validateResult?: (result: unknown) => string | null };
 export type Instance = {
   moduleId: string; hash: string; activationId: string | null; manifest: ModuleManifest; scope: CallScope;
   queue: Promise<unknown>; start?: Promise<void>; httpReady?: ReturnType<typeof moduleHttpReady>;
@@ -31,6 +31,7 @@ export type Instance = {
   idle?: ReturnType<typeof setTimeout>; retiring: boolean; closing: boolean; busy: boolean; connected?: boolean;
   exit?: { code: number | null; signal: string | null };
   failureEvidence?: ModuleFailureEvidence; failureRecorded?: boolean;
+  privateTransport?: boolean;
   stopUnknown?: Error; closePromise?: Promise<void>; retirement?: Promise<void>;
 };
 export function triggerKey({ trigger }: ModuleEvent) {
@@ -43,14 +44,30 @@ export function triggerKey({ trigger }: ModuleEvent) {
 }
 export const keyOf = (moduleId: string, hash: string, activationId: string | null) => `${moduleId}:${hash}:${activationId ?? "untracked"}`;
 function failurePhase(event: ModuleEvent | undefined, connected: boolean | undefined) { return event ? "event" : connected ? "process" : "start"; }
-function processEvidence(instance: Partial<Pick<Instance, "process" | "exit">>) {
+function processEvidence(instance: Partial<Pick<Instance, "process" | "exit" | "privateTransport">>) {
   const process = instance.process, exit = instance.exit;
   return { pid: process?.pid ?? null, exitCode: exit?.code ?? null, signal: exit?.signal ?? null,
-    stderr: diagnosticText(process?.stderr() ?? "", 4000, true) };
+    stderr: instance.privateTransport ? "[private process output omitted]" : diagnosticText(process?.stderr() ?? "", 4000, true) };
 }
-export function evidence(instance: Partial<Pick<Instance, "connected" | "process" | "exit">>, error: string, runId?: string, event?: ModuleEvent): ModuleFailureEvidence {
-  return { phase: failurePhase(event, instance.connected), reason: diagnosticText(error, 1000),
+export function evidence(instance: Partial<Pick<Instance, "connected" | "process" | "exit" | "privateTransport">>, error: string, runId?: string, event?: ModuleEvent): ModuleFailureEvidence {
+  return { phase: failurePhase(event, instance.connected), reason: instance.privateTransport ? "Private operation failed" : diagnosticText(error, 1000),
     runId: runId ?? null, triggerId: event ? triggerKey(event) : "process", delivery: null, ...processEvidence(instance) };
+}
+
+export function failureDetail(instance: Instance, input: { error: string; runId?: string; event?: ModuleEvent; delivery?: DeliveryStage; triggerId: string }) {
+  const { error, runId, event, delivery, triggerId } = input;
+  const observed = instance.privateTransport ? evidence(instance, error, runId, event) : instance.failureEvidence ?? evidence(instance, error, runId, event);
+  return { ...observed, reason: instance.privateTransport ? "Private operation failed" : diagnosticText(error, 1000), runId: runId ?? null, triggerId, delivery: delivery ?? null };
+}
+export function deliveryFailure(error: unknown, privateTransport?: boolean) {
+  if (!privateTransport) return error;
+  const failure = error as { code?: string; stage?: DeliveryStage };
+  return Object.assign(new Error("Private operation failed"), { code: failure.code, stage: failure.stage });
+}
+export function handlerFailureData(error: unknown, privateTransport?: boolean) {
+  const failure = error as { deliveryRejected?: boolean };
+  const reason = error instanceof Error ? error.message : String(error);
+  return { exitCode: 1, error: privateTransport ? "Private operation failed" : diagnosticText(reason, 1000), ...(failure.deliveryRejected ? { output: { delivery: "not_sent" } } : {}) };
 }
 
 /** A retired or closing owner cannot serve a new delivery. */

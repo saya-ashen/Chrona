@@ -31,7 +31,7 @@ export async function finishRunIn(ports: StewardPorts, workspaceId: string, tx: 
   const run = await tx.run.findFirst({ where: { id: runId, workspaceId }, include: { session: true } });
   if (!run) throw new StewardError("not_found", "Run not found");
   const attempt = await tx.executionAttempt.findUnique({ where: { runId } });
-  const agentContext = await isAgentContext(tx, run.sessionId);
+  const agentContext = await hasProviderStopGuard(tx, run);
   if (attempt?.stopConfirmedAt) return false;
   if (!mayFinalizeRun(run.status, evidence, !!attempt, agentContext, run.stopStatus)) return false;
   const knownStop = (!attempt && !agentContext) || !!evidence;
@@ -50,6 +50,9 @@ async function finishOrdinaryRun(ports: StewardPorts, tx: Prisma.TransactionClie
 }
 function canReconcileStop(evidence: boolean, attempt: boolean, agentContext: boolean, stopStatus: string) {
   return evidence && (attempt || agentContext && stopStatus === "unknown");
+}
+async function hasProviderStopGuard(tx: Prisma.TransactionClient, run: RunRow) {
+  return await isAgentContext(tx, run.sessionId) || !!await tx.agentRunProvider.findUnique({ where: { runId: run.id } });
 }
 async function isAgentContext(tx: Prisma.TransactionClient, sessionId: string | null) {
   return !!(sessionId && await tx.agentContext.findUnique({ where: { sessionId } }));

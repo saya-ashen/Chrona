@@ -79,7 +79,7 @@ test("owner tools list every toolset and call as the user", async () => {
     "m_approvals_list", "m_approvals_resolve",
     "m_modules_list", "m_modules_describe", "m_modules_health", "m_modules_admit", "m_modules_receipt",
     "m_modules_enable", "m_modules_disable", "m_modules_rollback", "m_modules_remove", "m_modules_operation", "m_settings_update",
-    "m_secrets_set", "m_secrets_remove", "m_secrets_list", "m_activity_runtime", "m_activity_runs", "m_activity_records", "m_activity_usage", "m_activity_consumer", "m_mail_sort_find_mail",
+    "m_secrets_set", "m_secrets_remove", "m_secrets_list", "m_activity_runtime", "m_activity_runs", "m_activity_records", "m_activity_usage", "m_activity_consumer", "m_agent_providers", "m_mail_sort_find_mail",
     "m_notify_settings", "m_notify_ui_settings", "m_notify_activity", "m_notify_list", "m_notify_status", "m_notify_feedback", "m_notify_retry",
   ]);
   expect(toolsets.find(set => set.name === "module_mail_sort")).toEqual({ name: "module_mail_sort", description: "Find matching mail", tools: ["m_mail_sort_find_mail"] });

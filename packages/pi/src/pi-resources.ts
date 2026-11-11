@@ -5,6 +5,7 @@ const name = z.string().regex(/^[\w:.-]{1,100}$/);
 export const piResourcesSchema = z.object({
   skills: z.array(z.string().min(1).max(2000)).max(30).default([]),
   extensions: z.array(z.string().min(1).max(2000)).max(20).default([]),
+  /** Describes manifest tools; admission belongs to the bridge catalog and Pi's native settings. */
   tools: z.array(name).max(100).default([]),
 }).strict();
 export type PiResources = z.infer<typeof piResourcesSchema>;
@@ -16,7 +17,7 @@ function entry(path: string, roots: string[]) {
   const stat = statSync(path);
   if (!stat.isFile() || process.platform !== "win32" && (stat.mode & 0o022) !== 0) throw new Error("Unsafe Pi resource file");
 }
-/** Read an owner-chosen manifest, not model text or Pi's ambient package/skill settings. */
+/** Read owner-chosen additions to Pi's ambient resources, never a replacement profile or tool allowlist. */
 export function readPiResources(file: string | undefined, profile: string, workspace?: string): { resources: PiResources; error: string | null } {
   if (file === undefined) return { resources: empty(), error: null };
   try {
@@ -34,14 +35,4 @@ export const modernPi = (version: string) => { const m = /^1\.(\d+)\.\d+$/.exec(
 export function resourceVersionError(resources: PiResources, version: string): string | null {
   if (resources.extensions.some(value => builtins.has(value)) && !modernPi(version)) return "Native Pi builtins require a Pi 1.x pin of 1.3.0 or later";
   return null;
-}
-export function resourceCommand(resources: PiResources, source: unknown, path: unknown, baseExtensions: string[]): boolean {
-  if (typeof path !== "string") return false;
-  if (source === "extension" && builtins.has(path)) return resources.extensions.includes(path);
-  try {
-    if (!isAbsolute(path)) return false;
-    const candidates = source === "extension" ? [...baseExtensions, ...resources.extensions.filter(value => !builtins.has(value))] : source === "skill" ? resources.skills : [];
-    const canonical = realpathSync(path);
-    return candidates.some(candidate => realpathSync(candidate) === canonical);
-  } catch { return false; }
 }

@@ -2,6 +2,8 @@ import { afterEach, expect, test } from "bun:test";
 import "./module-effects";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { createHash } from "node:crypto";
+import { readModuleFiles } from "./module-preview";
 import { moduleManifestSchema, type ModuleEvent } from "@chrona/contracts/steward";
 import { createModuleSupervisor, moduleSupervisor } from "./module-supervisor";
 import { registerSystemModules } from "./system-modules";
@@ -15,7 +17,7 @@ import { moduleIncidents } from "./module-diagnostics";
 import { moduleContext } from "./module-context";
 import { recordModuleActivation, moduleEvolutionOutcomes, updateModuleEvolution } from "./module-evolution";
 import { moduleFailurePolicy, recordModuleExecution } from "./module-failure-policy";
-import { resolveBuiltinRelease } from "./module-release";
+import { seedTestModuleRelease } from "./module-release-test-fixture";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -29,7 +31,7 @@ function clock() {
     advance(ms: number) { time += ms; for (const [id, task] of [...tasks]) if (task.at <= time) { tasks.delete(id); task.fn(); } } };
 }
 async function fixture({ shared = false, keepAlive = false, listen, uses = ["notify.send", "provider.wake"], handler = async () => ({}) }: { shared?: boolean; keepAlive?: boolean; listen?: string; uses?: string[]; handler?: Parameters<typeof testModuleProcess>[0] } = {}) {
-  const db = testDb(), dataDir = await mkdtemp("/tmp/cms-test-");
+  const db = testDb({ injectedAgent: false }), dataDir = await mkdtemp("/tmp/cms-test-");
   const workspace = await db.workspace.create({ data: { name: "supervisor" } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "v1" } });
   const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", tests: ["test.ts"], keepAlive, listen, effects: [], uses, tools: [{ name: "daily", description: "Ordinary application operation", visibility: ["owner"], parameters: { type: "object", properties: {} },
@@ -111,7 +113,7 @@ test("ordinary tool delivery records observed behavior without readiness claims"
 });
 
 test.each([false, true] as const)("start failure rolls back once before delivery; rollback target failure does not bounce (oldFails=%s)", async oldFails => {
-  const db = testDb(), dataDir = await mkdtemp("/tmp/cms-auto-rollback-");
+  const db = testDb({ injectedAgent: false }), dataDir = await mkdtemp("/tmp/cms-auto-rollback-");
   const workspace = await db.workspace.create({ data: { name: "auto rollback" } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "v2", dataSchema: 1 } });
   const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", keepAlive: true, tests: ["test.ts"], listen: "/api/example", effects: ["network"] });
@@ -133,7 +135,7 @@ test.each([false, true] as const)("start failure rolls back once before delivery
 });
 
 test.each(["handler", "lost"] as const)("post-delivery %s failures never trigger automatic code rollback", async stage => {
-  const db = testDb(), dataDir = await mkdtemp("/tmp/cms-post-delivery-");
+  const db = testDb({ injectedAgent: false }), dataDir = await mkdtemp("/tmp/cms-post-delivery-");
   const workspace = await db.workspace.create({ data: { name: "post-delivery" } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "v2", dataSchema: 1 } });
   const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", keepAlive: true, tests: ["test.ts"], tools: [{ name: "daily", description: "Ordinary application operation", visibility: ["owner"], parameters: { type: "object", properties: {} },
@@ -571,7 +573,7 @@ test("normal lazy idle stop and administrative stop do not produce faults", asyn
   expect(await moduleIncidents(f.db, f.module.workspaceId, f.module.id)).toEqual([]);
 });
 test("activated reaches opted-in modules once per version and again when a module they use changes version", async () => {
-  const db = testDb(), dataDir = await mkdtemp("/tmp/cms-activated-");
+  const db = testDb({ injectedAgent: false }), dataDir = await mkdtemp("/tmp/cms-activated-");
   const workspace = await db.workspace.create({ data: { name: "activated" } });
   const create = async (name: string, hash: string, extra: Record<string, unknown>) => {
     const module = await db.module.create({ data: { workspaceId: workspace.id, name, activeHash: hash } });
@@ -601,30 +603,35 @@ test("activated reaches opted-in modules once per version and again when a modul
 });
 
 
-test.each([false, true])("builtin startup uses trusted release code and never stored fallback (drift=%s)", async drift => {
+test.each(["trusted", "renamed", "fork", "unapproved", "drift", "manifest-drift", "missing-seed", "legacy-snapshot"] as const)("Provider host bindings require approved exact release identity (%s)", async kind => {
   const f = await fixture({ keepAlive: true });
-  const root = join(f.ports.dataDir, "release"), codeDir = join(root, "agent");
+  const root = join(f.ports.dataDir, "external"), codeDir = join(root, "pi");
   await mkdir(codeDir, { recursive: true });
-  const manifest = moduleManifestSchema.parse({ ...f.manifest, name: "agent" });
+  const manifest = moduleManifestSchema.parse({ ...f.manifest, name: "pi" });
   await writeFile(join(codeDir, "module.json"), JSON.stringify(manifest));
   await writeFile(join(codeDir, "index.ts"), "export {};");
-  f.ports.moduleBuiltinResources = root;
-  const files = await import("./module-preview").then(({ readModuleFiles }) => readModuleFiles(codeDir, "unsafe fixture"));
-  const digest = new Bun.CryptoHasher("sha256");
-  for (const file of files.sort((a, b) => a.path.localeCompare(b.path))) digest.update(file.path).update("\0").update(file.bytes).update("\0");
-  const release = await resolveBuiltinRelease(f.ports, "agent", digest.digest("hex"));
-  await f.db.module.update({ where: { id: f.module.id }, data: { name: "agent", builtin: true, activeHash: release.hash } });
-  await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash: release.hash, manifest, source: "builtin", status: "approved", intent: {}, report: {} } });
-  await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.module.workspaceId), tx, { moduleId: f.module.id, hash: release.hash, previousHash: null, generationId: "release" }));
-  if (drift) await writeFile(join(codeDir, "index.ts"), "changed after registration");
+  const release = await seedTestModuleRelease(root, "pi");
+  const snapshot = createHash("sha256");
+  for (const file of (await readModuleFiles(codeDir, "Host identity fixture")).sort((a, b) => a.path.localeCompare(b.path))) snapshot.update(file.path).update("\0").update(file.bytes).update("\0");
+  const hash = kind === "fork" ? "b".repeat(40) : kind === "legacy-snapshot" ? snapshot.digest("hex") : release.commit;
+  await f.db.module.update({ where: { id: f.module.id }, data: { name: kind === "renamed" ? "another-provider" : "pi", builtin: false, activeHash: hash } });
+  await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash, manifest: kind === "manifest-drift" ? { ...manifest, description: "different" } : manifest, source: "user", status: kind === "unapproved" ? "pending_review" : "approved", intent: {}, report: {} } });
+  await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.module.workspaceId), tx, { moduleId: f.module.id, hash, previousHash: "v1", generationId: "release" }));
+  const privileged = testModuleProcess(async () => ({}));
+  f.ports.moduleExternalResources = root;
+  f.ports.providerModules = { pi: { env: { CHRONA_PROVIDER_CONFIGURATION: "trusted-host-fixture" }, startModule: privileged.startModule } };
+  if (kind === "drift") await writeFile(join(codeDir, "index.ts"), "changed after approval");
+  if (kind === "missing-seed") await rm(join(f.ports.dataDir, "module-git"), { recursive: true });
   await f.supervisor.reconcile();
-  expect(f.processes.map(process => process.input.codeDir)).toEqual(drift ? [] : [release.codeDir]);
-  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ activeHash: release.hash });
-  if (drift) {
-    const outcome = await moduleEvolutionOutcomes(f.db, f.module.workspaceId, f.module.id);
-    expect(outcome[0]).toMatchObject({ status: "failed", rollback: { attempted: false, result: "blocked" } });
-    expect(outcome[0]!.rollback.reason).toBeTruthy();
+  expect(privileged.processes).toHaveLength(kind === "trusted" ? 1 : 0);
+  if (kind === "trusted") {
+    expect(privileged.processes[0]!.input.env?.CHRONA_PROVIDER_CONFIGURATION).toBe("trusted-host-fixture");
+    expect(privileged.processes[0]!.input.codeDir).toBe(join(f.ports.dataDir, "platform/store", hash));
+  } else {
+    expect(f.processes).toHaveLength(kind === "unapproved" || kind === "renamed" ? 0 : 1);
+    for (const process of f.processes) expect(process.input.env).not.toHaveProperty("CHRONA_PROVIDER_CONFIGURATION");
   }
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ activeHash: hash });
 });
 
 
@@ -639,16 +646,16 @@ test("internal delivery fence rejects before execution and never sends an event"
 });
 
 
-test.each(["user", "build", "builtin"])("approved Git builtin from %s runs from store without release resources", async source => {
+test.each(["user", "build", "builtin"])("approved ordinary Pi from %s runs from store without a privileged host binding", async source => {
   const f = await fixture({ keepAlive: true }), hash = "a".repeat(40);
-  const manifest = moduleManifestSchema.parse({ ...f.manifest, name: "agent" });
-  await f.db.module.update({ where: { id: f.module.id }, data: { name: "agent", builtin: true, activeHash: hash } });
+  const manifest = moduleManifestSchema.parse({ ...f.manifest, name: "pi" });
+  await f.db.module.update({ where: { id: f.module.id }, data: { name: "pi", builtin: false, activeHash: hash } });
   await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash, manifest, source, status: "approved", intent: {}, report: {} } });
   await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.module.workspaceId), tx, { moduleId: f.module.id, hash, previousHash: "v1", generationId: "custom" }));
   f.ports.moduleBuiltinResources = join(f.ports.dataDir, "missing-release");
   await f.supervisor.reconcile();
   expect(f.processes.map(process => process.input.codeDir)).toEqual([join(f.ports.dataDir, "platform/store", hash)]);
-  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ builtin: true, activeHash: hash, status: "active" });
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ builtin: false, activeHash: hash, status: "active" });
 });
 
 test("audit retention cannot reset activation ownership, failure streak or receipt deduplication", async () => {

@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { testDb } from "./test-db";
-import { moduleManifestSchema } from "@chrona/contracts/steward";
+import { BUILTIN_MODULE_NAMES, KERNEL_MODULE_NAMES, moduleManifestSchema } from "@chrona/contracts/steward";
 import { registerSystemModules } from "./system-modules";
 import { callSync, kernelOrigin, listLocalModules, moduleCallbackContractHash } from "./module-calls";
 import { moduleTools } from "./module-tools";
@@ -24,13 +24,13 @@ async function fixture() {
   }
   return { db, workspaceId, ports, app };
 }
-test("actual private runtime host is absent from public tools and rejects ordinary callback or admission callers", async () => {
+test("private event host stays undiscoverable and accepts only its admitted Provider module version", async () => {
   registerSystemModules(); registerProviderCallbacks();
-  const f = await fixture(), ordinary = await f.app("ordinary", { uses: ["*"],
-      authority: "owner"
-});
+  const f = await fixture(), ordinary = await f.app("ordinary", { uses: ["*"], authority: "owner" });
+  const provider = await f.app("pi", { uses: ["runtime-callback.event"] });
+  const providerOrigin = { workspaceId: f.workspaceId, caller: provider, chain: [], path: [] };
   const host = listLocalModules().find(module => module.name === "runtime-callback");
-  expect(host?.tools.map(tool => tool.name).sort()).toEqual(["agent-admit", "agent-settle", "event"]);
+  expect(host?.tools.map(tool => tool.name).sort()).toEqual(["event"]);
   for (const audience of ["owner", "provider", "modules"] as const) {
     expect((await moduleTools(f.ports, { workspaceId: f.workspaceId, audience })).some(tool => tool.module.name === "runtime-callback")).toBe(false);
   }
@@ -39,22 +39,38 @@ test("actual private runtime host is absent from public tools and rejects ordina
     expect((reply.output as { items: { target: unknown }[] }).items.some(tool => typeof tool.target === "string" && tool.target.startsWith("runtime-callback."))).toBe(false);
   }
   const origin = { workspaceId: f.workspaceId, caller: ordinary, chain: [], path: [] };
-  await expect(callSync(f.ports, origin, "runtime-callback.agent-admit", { callId: "forged", operation: "run" })).rejects.toMatchObject({ code: "forbidden" });
-  await expect(callSync(f.ports, origin, "runtime-callback.agent-settle", { reservationId: "forged", failed: true })).rejects.toMatchObject({ code: "forbidden" });
+  await expect(callSync(f.ports, origin, "runtime-callback.agent-admit", { callId: "forged", operation: "run" })).rejects.toMatchObject({ code: "not_found" });
+  await expect(callSync(f.ports, origin, "runtime-callback.agent-settle", { reservationId: "forged", failed: true })).rejects.toMatchObject({ code: "not_found" });
   let delivered = 0;
-  const callback = retainProviderCallbacks(f.ports, f.workspaceId, { events: { progress: async () => { delivered++; }, usage: async () => {}, resources: async () => {}, question: async () => ({ decision: "cancel" }) } });
+  const callback = retainProviderCallbacks(f.ports, f.workspaceId, { provider: { moduleId: provider.moduleId, hash: provider.hash }, events: { progress: async () => { delivered++; }, usage: async () => {}, resources: async () => {}, question: async () => ({ decision: "cancel" }) } });
   const args = { callbackId: callback.id, event: { kind: "progress", value: { phase: "thinking", tool: null } } };
   try {
     await expect(callSync(f.ports, origin, "runtime-callback.event", args)).rejects.toMatchObject({ code: "forbidden" });
+    await expect(callSync(f.ports, kernelOrigin(f.workspaceId), "runtime-callback.event", args)).rejects.toMatchObject({ code: "forbidden" });
+    await expect(callSync(f.ports, { ...providerOrigin, caller: { ...provider, hash: "another-version" } }, "runtime-callback.event", args)).rejects.toMatchObject({ code: "forbidden" });
+    await f.db.module.update({ where: { id: provider.moduleId }, data: { status: "paused" } });
+    await expect(callSync(f.ports, providerOrigin, "runtime-callback.event", args)).rejects.toMatchObject({ code: "forbidden" });
+    await f.db.module.update({ where: { id: provider.moduleId }, data: { status: "active" } });
     expect(delivered).toBe(0);
-    expect((await callSync(f.ports, kernelOrigin(f.workspaceId), "runtime-callback.event", args)).output).toBeNull();
+    expect((await callSync(f.ports, providerOrigin, "runtime-callback.event", args)).output).toBeNull();
     expect(delivered).toBe(1);
     const other = await f.db.workspace.create({ data: { name: "foreign" } });
     await expect(callSync(f.ports, kernelOrigin(other.id), "runtime-callback.event", args)).rejects.toMatchObject({ code: "not_found" });
   } finally { callback.release(); }
-  await expect(callSync(f.ports, kernelOrigin(f.workspaceId), "runtime-callback.event", args)).rejects.toMatchObject({ code: "not_found" });
+  await expect(callSync(f.ports, providerOrigin, "runtime-callback.event", args)).rejects.toMatchObject({ code: "not_found" });
   expect(delivered).toBe(1);
   expect(await f.db.run.count()).toBe(0);
+});
+test("Agent is a reserved kernel manifest name while approved Pi is an ordinary module", async () => {
+  expect(KERNEL_MODULE_NAMES).toContain("agent");
+  expect(BUILTIN_MODULE_NAMES).toEqual([]);
+  const parsed = moduleManifestSchema.safeParse({ name: "agent", entry: "index.ts", tests: ["test.ts"], effects: [] });
+  expect(parsed.success).toBe(false);
+  if (!parsed.success) expect(parsed.error.issues).toContainEqual(expect.objectContaining({ path: ["name"], code: "custom", message: "Name is reserved for a Chrona system module" }));
+  const f = await fixture(), pi = await f.app("pi");
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: pi.moduleId } })).toMatchObject({ name: "pi", builtin: false, activeHash: pi.hash });
+  expect(await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: pi.moduleId, hash: pi.hash } } })).toMatchObject({ status: "approved" });
+  expect(await f.db.module.count({ where: { workspaceId: f.workspaceId, name: "agent" } })).toBe(0);
 });
 test("retired contribution declarations are rejected instead of granting a kernel discovery surface", async () => {
   registerSystemModules();

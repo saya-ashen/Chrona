@@ -6,10 +6,10 @@ import { selectRunReport } from "./report-candidates";
 import { compactTerminalPrompts, SETTLEMENT_RESERVE_BYTES } from "./retention";
 import type { Call, Decision, State } from "./types";
 
-const contextResponse = z.object({ contextId: z.string().min(1).max(128) });
 const runResponse = z.object({ runId: z.string().min(1).max(128), contextId: z.string(), status: z.string(), active: z.boolean() });
-const streamResponse = z.object({
-  items: z.array(z.object({ sequence: z.number().int().nonnegative(), payload: z.unknown(), kind: z.string() })).max(100), after: z.number().int().nonnegative(),
+const readResponse = z.object({
+  run: runResponse, nextCursor: z.string().min(1).nullable(), ended: z.boolean(),
+  items: z.array(z.object({ sequence: z.number().int().nonnegative(), payload: z.unknown(), kind: z.string() })).max(100),
   interactions: z.array(z.object({ id: z.string(), status: z.string(), expiresAt: z.string(), question: z.object({ title: z.string().optional(), message: z.string() }) })).max(100),
 });
 export const REASONING_TOOLS: Decision["tools"] = ["mind.agenda", "mind.propose", "mind.report"];
@@ -27,7 +27,7 @@ function prepare(state: State, selection: Selection, now: string) {
   if (prompt.length > 100_000) capacity("Selected evidence exceeds the bounded reasoning snapshot");
   const sourceKinds = [...new Map(selection.signals.map(s => [`${s.moduleId}:${s.kind}`, { source: s.moduleId, kind: s.kind }])).values()];
   const decision: Decision = { id, at: now, kind: selection.kind, concernIds: selection.concerns.map(c => c.id), signalIds: selection.signals.map(s => s.id), revisions: Object.fromEntries(selection.concerns.map(c => [c.id, c.revision])), sourceKinds,
-    phase: "prepared", contextKey: `${id}:context`, runKey: `${id}:run`, contextId: null, runId: null, prompt, tools: [...REASONING_TOOLS], report: null, finishedAt: null, error: null, interactions: [], notification: null };
+    phase: "prepared", runKey: `${id}:run`, contextId: null, runId: null, prompt, tools: [...REASONING_TOOLS], report: null, finishedAt: null, error: null, interactions: [], notification: null };
   state.decisions.push(decision); state.runtime.currentDecisionId = id;
   state.runtime.lastError = null;
   // Coalesce missed days only when that review has been durably admitted.
@@ -118,27 +118,14 @@ export class MindRuntime {
   private async reconcile(snapshot: Decision, now: string) {
     try {
       let decision = snapshot;
-      if (!decision.contextId) {
-        // All input including each request key was committed by prepare before any outbound call.
-        const response = contextResponse.parse(await this.call("agent.context", { "request-key": decision.contextKey }, { key: decision.contextKey }));
-        decision = await this.change(decision.id, row => { row.contextId = response.contextId; }, true);
-      }
       if (!decision.runId) {
-        const response = runResponse.parse(await this.call("agent.run", { "context-id": decision.contextId, "request-key": decision.runKey, prompt: decision.prompt, content: [], lane: decision.kind === "manual" ? "foreground" : "background", tools: decision.tools }, { key: decision.runKey }));
-        if (response.contextId !== decision.contextId) throw new Error("Agent returned a different reasoning context");
-        decision = await this.change(decision.id, row => { row.runId = response.runId; row.phase = response.status === "unknown" ? "unknown" : "running"; row.error = null; }, true);
+        // The full input and key are durable before the first call, including a lost reply.
+        const response = runResponse.parse(await this.call("agent.run", { ...(decision.contextId ? { contextId: decision.contextId } : {}), prompt: decision.prompt, content: [], lane: decision.kind === "manual" ? "foreground" : "background", tools: decision.tools }, { key: decision.runKey }));
+        if (decision.contextId && response.contextId !== decision.contextId) throw new Error("Agent returned a different reasoning context");
+        decision = await this.change(decision.id, row => { row.contextId = response.contextId; row.runId = response.runId; row.phase = response.status === "unknown" ? "unknown" : "running"; row.error = null; }, true);
       }
-      const run = runResponse.parse(await this.call("agent.get", { "run-id": decision.runId }));
-      if (run.runId !== decision.runId || run.contextId !== decision.contextId) throw new Error("Agent returned a different reasoning run");
-      let page: z.infer<typeof streamResponse>, after = decision.after ?? 0;
-      do {
-        page = streamResponse.parse(await this.call("agent.stream", { "run-id": decision.runId, after, limit: 100 }));
-        if (page.items.length && page.after <= after) throw new Error("Agent stream did not advance");
-        decision = await this.change(decision.id, row => {
-          selectRunReport(row, page.items); row.after = page.after;
-        }, true);
-        after = page.after;
-      } while (page.items.length === 100);
+      const page = await this.readRun(decision);
+      const run = page.run;
       await this.store.update(state => {
         const row = state.decisions.find(d => d.id === decision.id)!;
         if (state.runtime.currentDecisionId !== row.id || row.finishedAt) return;
@@ -146,12 +133,29 @@ export class MindRuntime {
         row.error = null;
         if (run.status === "unknown") row.phase = "unknown";
         else if (run.active) row.phase = row.interactions.length ? "waiting" : "running";
-        else finalize(state, row, run.status, now);
+        else if (page.ended) finalize(state, row, run.status, now);
       });
     } catch (error) {
-      // Lost response may already have created context/run. Retain the same keys and capacity forever until reconciled.
+      // Lost response may already have created a run and context. Retain the same keys and capacity forever until reconciled.
       await this.change(snapshot.id, row => { row.phase = "unknown"; row.error = String(error).slice(0, 500); }, true);
     }
+  }
+  /** Persist each authenticated event page and its opaque cursor in the same private transaction. */
+  private async readRun(decision: Decision) {
+    let page: z.infer<typeof readResponse>, cursor = decision.cursor ?? null;
+    const seen = new Set<string>();
+    if (cursor) seen.add(cursor);
+    do {
+      page = readResponse.parse(await this.call("agent.read", { runId: decision.runId, ...(cursor ? { cursor } : {}), limit: 100 }));
+      if (page.run.runId !== decision.runId || page.run.contextId !== decision.contextId) throw new Error("Agent returned a different reasoning run");
+      if (page.items.length && page.nextCursor && seen.has(page.nextCursor)) throw new Error("Agent read cursor did not advance");
+      decision = await this.change(decision.id, row => {
+        selectRunReport(row, page.items); row.cursor = page.nextCursor;
+      }, true);
+      cursor = page.nextCursor;
+      if (cursor) seen.add(cursor);
+    } while (cursor && page.items.length > 0);
+    return page;
   }
   private change(id: string, mutate: (decision: Decision) => void, activeOnly = false) {
     return this.store.update(state => { const row = state.decisions.find(d => d.id === id)!; if (!activeOnly || state.runtime.currentDecisionId === id && !row.finishedAt) mutate(row); return row; });

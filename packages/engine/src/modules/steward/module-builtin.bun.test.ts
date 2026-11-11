@@ -1,196 +1,50 @@
 import { afterEach, expect, test } from "bun:test";
-import { chmod, link, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { BUILTIN_MODULE_NAMES, moduleManifestSchema } from "@chrona/contracts/steward";
+import { BUILTIN_MODULE_NAMES } from "@chrona/contracts/steward";
 import { testDb } from "./test-db";
 import { registerBuiltins } from "./module-builtin";
-import { resolveBuiltinRelease } from "./module-release";
-import { seedTestModuleRelease } from "./module-release-test-fixture";
-import { getModuleLocalHead } from "./module-git";
-import { getModuleUpstreamHead } from "./module-git-upstream";
 import type { StewardPorts } from "./ports";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await close(); });
 async function fixture() {
-  const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-release-test-");
+  const db = testDb({ injectedAgent: false }), dataDir = await mkdtemp("/tmp/chrona-no-builtin-");
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "Release" } });
-  let executions = 0;
-  const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-11-05T00:00:00Z"), publicUrl: null, moduleBuiltinResources: join(dataDir, "builtin"), sandbox: {
-    available: true, isolated: false,
-    startModule() { executions++; throw new Error("Registrar must not start module processes"); },
-    async runModule() { executions++; throw new Error("Registrar must not execute author tests"); },
-  } };
-  async function write(name: string, revision: number, extra: Record<string, unknown> = {}) {
-    const dir = join(ports.moduleBuiltinResources!, name); await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, "module.json"), JSON.stringify(moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [], ...extra })));
-    await writeFile(join(dir, "index.ts"), `// release ${revision}\n`);
-    await writeFile(join(dir, "test.ts"), "// author checked before release\n");
-    await seedTestModuleRelease(ports.moduleBuiltinResources!, name);
-  }
-  for (const name of BUILTIN_MODULE_NAMES) await write(name, 1);
-  const current = (name = "agent") => db.module.findUniqueOrThrow({ where: { workspaceId_name: { workspaceId: workspace.id, name } } });
-  return { db, ports, workspaceId: workspace.id, write, current, executions: () => executions, start: () => registerBuiltins(ports, workspace.id) };
+  const forbidden = () => { throw new Error("Builtin registration must not install dependencies or execute modules"); };
+  const ports: StewardPorts = {
+    db, dataDir, now: () => new Date("2026-11-05T00:00:00Z"), publicUrl: null,
+    moduleBuiltinResources: join(dataDir, "builtin"),
+    sandbox: { available: true, isolated: false, startModule: forbidden, runModule: forbidden },
+    packages: { install: forbidden },
+  };
+  return { db, ports, workspaceId: workspace.id, start: () => registerBuiltins(ports, workspace.id) };
 }
 
-test("only Agent binds trusted release metadata without builds or extra directory registration", async () => {
-  const f = await fixture();
-  await f.write("surprise", 1);
-  await f.write("web", 1); await f.write("notify", 1);
-  expect([...BUILTIN_MODULE_NAMES]).toEqual(["agent"]);
-  await f.start();
-  expect((await f.db.module.findMany()).map(m => m.name).sort()).toEqual([...BUILTIN_MODULE_NAMES].sort());
-  expect(await f.current()).toMatchObject({ builtin: true, status: "active", dataSchema: 1 });
-  expect(await f.db.moduleVersion.findMany()).toHaveLength(BUILTIN_MODULE_NAMES.length);
-  expect(await f.db.moduleVersion.count({ where: { status: "approved", source: "builtin" } })).toBe(BUILTIN_MODULE_NAMES.length);
+test("boot ignores former builtin resources and creates no module, approval or generation", async () => {
+  const f = await fixture(), dir = join(f.ports.moduleBuiltinResources!, "agent");
+  await mkdir(dir, { recursive: true });
+  await writeFile(join(dir, "module.json"), '{"name":"agent","entry":"index.ts"}');
+  await writeFile(join(dir, "index.ts"), "throw new Error('Former builtin must never run');\n");
+  expect([...BUILTIN_MODULE_NAMES]).toEqual([]);
+  await Promise.all([f.start(), f.start(), registerBuiltins({ ...f.ports }, f.workspaceId)]);
+  expect(await f.db.module.count()).toBe(0);
+  expect(await f.db.moduleVersion.count()).toBe(0);
   expect(await f.db.approval.count()).toBe(0);
-  expect(await f.db.generation.count()).toBe(BUILTIN_MODULE_NAMES.length);
-  const hash = (await f.current()).activeHash;
-  await f.start();
-  expect((await f.current()).activeHash).toBe(hash);
-  expect(await f.db.generation.count()).toBe(BUILTIN_MODULE_NAMES.length);
-  expect(f.executions()).toBe(0);
-});
-
-test.each(["web", "notify", "mcp", "files", "events"])("registrar never migrates the old %s identity or custom data", async name => {
-  const f = await fixture();
-  const row = await f.db.module.create({ data: { workspaceId: f.workspaceId, name, builtin: true, activeHash: "owner-custom", status: "paused", dataSchema: 7 } });
-  const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [], data: { schema: 7 } });
-  await f.db.moduleVersion.create({ data: { moduleId: row.id, hash: "owner-custom", manifest, source: "user", status: "approved", intent: {}, report: {} } });
-  const dir = join(f.ports.dataDir, "platform/data", row.id); await mkdir(dir, { recursive: true }); await writeFile(join(dir, "owner.json"), '{"keep":true}');
-  const versions = await f.db.moduleVersion.findMany({ where: { moduleId: row.id } });
-  await f.start(); await f.start();
-  expect(await f.current(name)).toMatchObject({ id: row.id, builtin: true, activeHash: "owner-custom", status: "paused", dataSchema: 7 });
-  expect(await f.db.moduleVersion.findMany({ where: { moduleId: row.id } })).toEqual(versions);
-  expect(await readFile(join(dir, "owner.json"), "utf8")).toBe('{"keep":true}');
-  expect(f.executions()).toBe(0);
-});
-
-test("registrar does not migrate old identities when release resources are absent", async () => {
-  const f = await fixture();
-  const row = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "mcp", builtin: true } });
-  f.ports.moduleBuiltinResources = undefined;
-  await f.start();
-  expect(await f.current("mcp")).toMatchObject({ id: row.id, builtin: true });
-});
-
-test("parallel first registrations share the Git seed and activate each builtin once", async () => {
-  const f = await fixture();
-  for (const name of BUILTIN_MODULE_NAMES) await seedTestModuleRelease(f.ports.moduleBuiltinResources!, name, `https://github.com/chrona-fixture/${name}.git`);
-  const starts = [f.start(), registerBuiltins({ ...f.ports }, f.workspaceId), f.start()];
-  expect(starts[1]).toBe(starts[0]);
-  await Promise.all(starts);
-  for (const name of BUILTIN_MODULE_NAMES) {
-    const module = await f.current(name), release = await resolveBuiltinRelease(f.ports, name);
-    expect(module).toMatchObject({ status: "active", activeHash: release.hash, builtin: true });
-    const location = { platform: join(f.ports.dataDir, "platform"), moduleId: module.id };
-    expect(await getModuleLocalHead(location)).toBe(release.hash);
-    expect(await getModuleUpstreamHead({ ...location, branch: release.git!.branch })).toBe(release.hash);
-    expect(await readFile(join(f.ports.dataDir, "platform/store", release.hash, "index.ts"), "utf8")).toBe("// release 1\n");
-  }
-  expect(await f.db.moduleVersion.count()).toBe(BUILTIN_MODULE_NAMES.length);
-  expect(await f.db.generation.count()).toBe(BUILTIN_MODULE_NAMES.length);
-  await f.start();
-  expect(await f.db.generation.count()).toBe(BUILTIN_MODULE_NAMES.length);
-  expect(f.executions()).toBe(0);
-});
-
-test.each(["release", "missing", "schema"])("existing active builtin ignores %s release changes and keeps its accepted record", async change => {
-  const f = await fixture(); await f.start();
-  const first = await f.current();
-  const versions = await f.db.moduleVersion.findMany({ where: { moduleId: first.id } });
-  const dir = join(f.ports.dataDir, "platform/data", first.id); await mkdir(dir, { recursive: true }); await writeFile(join(dir, "owner.json"), '{"keep":true}');
-  if (change === "missing") await rm(f.ports.moduleBuiltinResources!, { recursive: true });
-  else await f.write("agent", 2, change === "schema" ? { data: { schema: 2 }, packages: ["chrona-fixture-program-does-not-exist"] } : {});
-  await f.start();
-  expect(await f.current()).toMatchObject({ activeHash: first.activeHash, builtin: true, status: "active", dataSchema: 1 });
-  expect(await f.db.moduleVersion.findMany({ where: { moduleId: first.id } })).toEqual(versions);
-  expect(await f.db.generation.count()).toBe(BUILTIN_MODULE_NAMES.length);
-  expect(await readFile(join(dir, "owner.json"), "utf8")).toBe('{"keep":true}');
-  expect(f.executions()).toBe(0);
-});
-
-test("missing runtime or host dependency reports a paused builtin without running installer", async () => {
-  const f = await fixture();
-  await f.write("agent", 2, { packages: ["chrona-fixture-program-does-not-exist"] });
-  await expect(f.start()).rejects.toThrow("Required host program unavailable");
-  expect(await f.current()).toMatchObject({ status: "paused", activeHash: null });
-  expect(f.executions()).toBe(0);
-});
-
-test("read-only hardlinked release resources retain their bytes and seed a separate runtime store", async () => {
-  const f = await fixture(), path = join(f.ports.moduleBuiltinResources!, "agent/index.ts");
-  const bytes = await readFile(path);
-  await link(path, join(f.ports.dataDir, "same-file")); await chmod(path, 0o444);
-  await f.start(); await f.start();
-  expect(await readFile(path)).toEqual(bytes);
-  expect((await f.current()).activeHash).toBe((await resolveBuiltinRelease(f.ports, "agent")).hash);
-  expect(await readFile(join(f.ports.dataDir, "platform/store", (await f.current()).activeHash!, "index.ts"))).toEqual(bytes);
-  expect(f.executions()).toBe(0);
-});
-
-test("external row with reserved builtin name fails closed and is never promoted", async () => {
-  const f = await fixture();
-  const row = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "agent", builtin: false } });
-  await expect(f.start()).rejects.toThrow("identity conflicts");
-  expect(await f.db.module.findUniqueOrThrow({ where: { id: row.id } })).toMatchObject({ builtin: false, activeHash: null });
-  expect(await f.db.moduleVersion.count({ where: { moduleId: row.id } })).toBe(0);
-});
-
-
-test.each([false, true])("trusted seed prepares runtime dependencies before approval (failure=%s)", async failure => {
-  const f = await fixture(), root = f.ports.moduleBuiltinResources!;
-  await writeFile(join(root, "agent/package.json"), JSON.stringify({ name: "seed-dependency-fixture", private: true }));
-  await writeFile(join(root, "agent/bun.lock"), "synthetic lock handled by the fixture adapter");
-  await seedTestModuleRelease(root, "agent", "https://github.com/chrona-fixture/agent.git");
-  let installs = 0;
-  f.ports.packages = { async install({ dir }) {
-    installs++;
-    expect(await readFile(join(dir, "package.json"), "utf8")).toContain("seed-dependency-fixture");
-    // A separate write transaction must remain possible while dependency work runs.
-    await f.db.$transaction(async tx => {
-      expect(await tx.moduleVersion.count({ where: { module: { name: "agent" } } })).toBe(0);
-    });
-    if (!failure) {
-      await mkdir(join(dir, "node_modules/seed-runtime"), { recursive: true });
-      await writeFile(join(dir, "node_modules/seed-runtime/index.js"), "export default 'prepared';");
-    }
-    return { errors: failure ? ["Seed dependency preparation failed"] : [], installed: { npm: true, python: false, packages: {} } };
-  } };
-  if (failure) {
-    const results = await Promise.allSettled([f.start(), f.start(), registerBuiltins({ ...f.ports }, f.workspaceId)]);
-    for (const result of results) {
-      expect(result.status).toBe("rejected");
-      if (result.status === "rejected") expect(result.reason.message).toContain("Seed dependency preparation failed");
-    }
-    const module = await f.current();
-    expect(module).toMatchObject({ activeHash: null, status: "paused" });
-    expect(await f.db.moduleVersion.count({ where: { moduleId: module.id } })).toBe(0);
-    expect(installs).toBe(1);
-    const location = { platform: join(f.ports.dataDir, "platform"), moduleId: module.id };
-    const local = await getModuleLocalHead(location);
-    failure = false;
-    await Promise.all([f.start(), f.start()]);
-    expect(await f.current()).toMatchObject({ activeHash: local, status: "paused" });
-    expect(await getModuleLocalHead(location)).toBe(local);
-    expect(await getModuleUpstreamHead({ ...location, branch: (await resolveBuiltinRelease(f.ports, "agent")).git!.branch })).toBe(local);
-    expect(await f.db.moduleVersion.count()).toBe(BUILTIN_MODULE_NAMES.length);
-    expect(await f.db.generation.count()).toBe(BUILTIN_MODULE_NAMES.length);
-    expect(installs).toBe(2);
-  } else {
-    await f.start();
-    const module = await f.current();
-    expect(await readFile(join(f.ports.dataDir, "platform/store", module.activeHash!, "node_modules/seed-runtime/index.js"), "utf8")).toContain("prepared");
-    expect(await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } })).toMatchObject({ source: "builtin", status: "approved", report: { dependencies: { npm: true } } });
-    expect(installs).toBe(1);
-  }
-  expect(f.executions()).toBe(0);
-});
-
-test("registrar never selects an existing ordinary Notify as default fact consumer", async () => {
-  const f = await fixture();
-  await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "notify", activeHash: "owner-notify", builtin: false } });
-  await f.start(); await f.start();
+  expect(await f.db.generation.count()).toBe(0);
   expect(await f.db.kernelFactConsumer.count()).toBe(0);
+});
+
+test("boot preserves an ordinary Pi's paused version and data without selecting a new release", async () => {
+  const f = await fixture();
+  const module = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "pi", builtin: false, status: "paused", activeHash: "owner-selected" } });
+  const dir = join(f.ports.dataDir, "platform/data", module.id);
+  await mkdir(dir, { recursive: true }); await writeFile(join(dir, "owner.json"), '{"keep":true}');
+  f.ports.moduleBuiltinResources = undefined;
+  await f.start(); await f.start();
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: module.id } })).toEqual(module);
+  expect(await f.db.moduleVersion.count()).toBe(0);
+  expect(await f.db.generation.count()).toBe(0);
+  expect(await readFile(join(dir, "owner.json"), "utf8")).toBe('{"keep":true}');
 });

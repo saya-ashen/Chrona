@@ -65,6 +65,34 @@ test("independent unpublished seeds clone offline at their exact commits and unc
   } finally { await rm(f.root, { recursive: true, force: true }); }
 }, 30_000);
 
+test("Pi seed migration retains retired Agent metadata and history while packaging only active modules", async () => {
+  const f = await fixture();
+  try {
+    const initial = await prepareModuleGitRelease(f), pi = initial.modules.find(entry => entry.name === "pi")!;
+    // Model an earlier lock with Agent instead of Pi, retaining a real bundle and exact history.
+    const historical = { ...pi, name: "agent", repository: "https://github.com/chrona-core/chrona-module-agent", bundle: "agent.bundle" };
+    await cp(join(f.seedDir, pi.bundle), join(f.seedDir, historical.bundle));
+    const historicalBytes = await readFile(join(f.seedDir, historical.bundle));
+    const old = { version: 1, modules: initial.modules.map(entry => entry.name === "pi" ? historical : entry) };
+    await writeFile(join(f.seedDir, "lock.json"), JSON.stringify(old));
+    await rm(join(f.seedDir, "pi.bundle"));
+    await rm(join(f.seedDir, "repos/pi.git"), { recursive: true });
+    await expect(copyModuleGitRelease(f.seedDir, f.resourcesRoot)).rejects.toThrow("incomplete: pi");
+    const migrated = await prepareModuleGitRelease(f);
+    expect(migrated.modules.find(entry => entry.name === "agent")).toEqual(historical);
+    expect(await readFile(join(f.seedDir, historical.bundle))).toEqual(historicalBytes);
+    expect(migrated.modules.filter(entry => entry.name !== "agent")).toEqual(initial.modules);
+    const plan = JSON.parse(await readFile(join(f.seedDir, "publish-plan.json"), "utf8"));
+    expect(plan.modules.some((entry: { name: string }) => entry.name === "agent")).toBe(false);
+    expect(plan.modules.some((entry: { name: string }) => entry.name === "pi")).toBe(true);
+    expect(await copyModuleGitRelease(f.seedDir, f.resourcesRoot)).toEqual(initial);
+    expect(await Bun.file(join(f.resourcesRoot, "module-git/agent.bundle")).exists()).toBe(false);
+    expect(JSON.parse(await readFile(join(f.seedDir, "lock.json"), "utf8"))).toEqual(migrated);
+    await rm(join(f.seedDir, "repos"), { recursive: true });
+    expect(await prepareModuleGitRelease({ ...f, hostCommit: "b".repeat(40), hostTimestamp: "1735776000" })).toEqual(migrated);
+  } finally { await rm(f.root, { recursive: true, force: true }); }
+}, 30_000);
+
 test("clean seed generation is deterministic and rejects mismatched packaged code, incomplete bundles and checksums", async () => {
   const f = await fixture(), second = await fixture();
   try {

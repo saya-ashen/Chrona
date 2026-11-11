@@ -2,16 +2,15 @@ import type { Health } from "@chrona/contracts/steward";
 import { localDayKey } from "@chrona/domain/steward/local-day";
 import type { StewardPorts } from "./ports";
 import { budgetTimezone } from "./settings";
-import { runtimeCall } from "./local-runtime";
+import { listAgentProviders } from "./agent-provider";
 
 /** Facts owned by the runtime; application health and page composition stay with modules. */
 export async function runtimeHealth(ports: StewardPorts, workspaceId: string) {
   const at = ports.now(), timezone = budgetTimezone((await ports.db.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings);
   let provider: Health["provider"] = { name: "unconfigured", available: false, sandboxed: false, lastError: null };
-  if (ports.provider) {
-    try { const h = await runtimeCall<{ name: string; available: boolean; sandboxed: boolean; error: string | null }>(ports, workspaceId, "agent.health", {}); provider = { name: h.name, available: h.available, sandboxed: h.sandboxed, lastError: h.error?.slice(0, 500) ?? null }; }
-    catch { provider = { name: ports.provider.name, available: false, sandboxed: false, lastError: "Provider health check failed" }; }
-  }
+  const registered = await listAgentProviders(ports, workspaceId, { limit: 100 });
+  const available = registered.items.filter(item => item.available);
+  if (registered.items.length) provider = { name: available.length === 1 ? available[0]!.name : "registered", available: available.length > 0, sandboxed: ports.sandbox?.isolated ?? false, lastError: available.length ? null : "No available registered provider" };
   const [runs, state] = await Promise.all([
     ports.db.run.findMany({ where: { workspaceId, OR: [{ status: { in: ["queued", "running"] } }, { createdAt: { gte: new Date(at.getTime() - 48 * 3600000) } }] } }),
     ports.db.stewardState.findUnique({ where: { workspaceId } }),

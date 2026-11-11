@@ -1,10 +1,11 @@
+import { testProviderPorts } from "./test-provider";
 import { afterEach, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { cp, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { moduleManifestSchema, type ProviderRunInput } from "@chrona/contracts/steward";
+import { moduleManifestSchema, type ProviderAdapter, type ProviderRunInput } from "@chrona/contracts/steward";
 import { createStewardService } from "./service";
 import type { StewardPorts } from "./ports";
 import { testModuleSandbox } from "./module-test-process";
@@ -13,6 +14,7 @@ import { createModules } from "./modules";
 import { handleModuleCall } from "./module-effects";
 import { sessionTranscript } from "./transcript";
 import { liveRuns } from "./runs";
+import { startLocalProvider } from "./local-runtime";
 import { moduleSupervisor } from "./module-supervisor";
 import { approvalNoticeBody } from "./external/notify/approval";
 import { buildControl, startOwnerBuild } from "./owner-build";
@@ -37,7 +39,7 @@ const manifest = { name: "mail-sort", entry: "index.ts", keepAlive: true, effect
 const entry = 'import { on } from "chrona"; on("tool", () => ({ result: {} }));';
 
 /** Retained private build machinery; no retired routed build tool is installed by this fixture. */
-async function fixture() {
+async function fixture(provider: Partial<ProviderAdapter> = {}) {
   const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-build-session-"));
   const starts: ProviderRunInput[] = [];
   const ports: StewardPorts = { db, dataDir, now: () => new Date(), publicUrl: null,
@@ -46,10 +48,12 @@ async function fixture() {
     sandbox: testModuleSandbox(async () => ({ status: "succeeded", output: '{"effects":[]}', error: null, exitCode: 0 })),
     provider: { name: "fake", async health() { return { available: true, sandboxed: true, error: null }; }, start(input) {
       starts.push(input);
-      return { async inject() {}, async abort() {}, done: Promise.resolve({ outcome: "finished" as const, sessionId: null, error: null }) };
-    } },
+      const completion = Promise.withResolvers<Awaited<ReturnType<ProviderAdapter["start"]>["done"]>>();
+      return { async inject() {}, async abort() { completion.resolve({ outcome: "finished", sessionId: null, error: null }); }, done: completion.promise };
+    }, ...provider },
   };
   cleanups.push(async () => { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
+  await testProviderPorts(ports);
   const service = createStewardService(ports);
   const workspaceId = (await db.workspace.create({ data: { name: "private build" } })).id, api = service.forWorkspace(workspaceId);
   const session = await db.session.create({ data: { workspaceId, key: "web:build", source: "web" } });
@@ -64,13 +68,27 @@ async function fixture() {
   const start = async (raw: unknown) => startBuild(ports, workspaceId, requester.id, parseInput(buildRequestSchema, raw));
   const revise = async (raw: unknown) => buildControl(ports, workspaceId, { kind: "provider", runId: requester.id }, "revise-build", raw as Record<string, unknown>);
   const stop = (sessionId: string) => controlBuild(ports, workspaceId, sessionId);
-  return { db, dataDir, ports, service, api, governance: createBuildGovernance(ports, workspaceId), workspaceId, session, requester, starts, writeModule, start, revise, stop };
+  async function launch(run: typeof requester, beforeAbort?: () => Promise<void>) {
+    const handle = await startLocalProvider(ports, workspaceId, { runId: run.id, token: run.token, cwd: run.cwd, lane: "build", prompt: run.prompt,
+      systemPrompt: "", resources: "configured", sessionId: null, sessionDir: join(run.cwd, ".chrona/sessions"), deadline: run.deadlineAt });
+    let settled = false;
+    const done = handle.done.then(outcome => { settled = true; return outcome; });
+    // These retained build tests own the same completion finalization that tick normally runs.
+    liveRuns.set(run.id, { ...handle, done, async abort() {
+      await beforeAbort?.();
+      await handle.abort();
+      await api.runs.finish(run.id, await done, { stopEvidence: "provider_exited" });
+    } });
+    cleanups.push(async () => { if (!settled) await handle.abort(); await done; liveRuns.delete(run.id); });
+  }
+  return { db, dataDir, ports, service, api, governance: createBuildGovernance(ports, workspaceId), workspaceId, session, requester, starts, writeModule, start, revise, stop, launch };
 }
 
 test("private stop/revise preserves files, cancels old capabilities and continues in the same session", async () => {
   const f = await fixture();
   const { sessionId } = await f.start(request) as { sessionId: string };
   const old = (await f.api.runs.claimNext("build"))!;
+  await f.launch(old);
   await writeFile(join(old.cwd, "draft.txt"), "keep this work");
   await expect(f.revise({ session: sessionId, requirements: "  " })).rejects.toThrow();
   expect((await f.db.run.findUniqueOrThrow({ where: { id: old.id } })).status).toBe("running");
@@ -103,20 +121,21 @@ test("revision waits for abort before reusing the directory; abort failure never
   const f = await fixture();
   const { sessionId } = await f.start(request) as { sessionId: string };
   const old = (await f.api.runs.claimNext("build"))!;
-  cleanups.push(async () => { liveRuns.delete(old.id); });
-  let aborted = false;
-  liveRuns.set(old.id, { async inject() {}, async abort() {
+  let aborted = false, failAbort = true;
+  await f.launch(old, async () => {
     expect(await f.db.run.count({ where: { sessionId, status: "queued" } })).toBe(0);
     await Bun.sleep(20);
     aborted = true;
-    throw new Error("abort failed");
-  }, done: Promise.resolve({ outcome: "failed", sessionId: null, error: "aborted" }) });
+    if (failAbort) throw new Error("abort failed");
+  });
   await expect(f.revise({ session: sessionId, requirements: "new goal" })).rejects.toThrow("abort failed");
   expect(aborted).toBe(true);
   expect(await f.db.run.count({ where: { sessionId } })).toBe(1);
-  liveRuns.set(old.id, { async inject() {}, async abort() { await Bun.sleep(20); }, done: Promise.resolve({ outcome: "failed", sessionId: null, error: "aborted" }) });
+  failAbort = false;
   expect(await f.revise({ session: sessionId, requirements: "new goal" })).toMatchObject({ status: "build_revised" });
+  expect(await f.db.run.findUniqueOrThrow({ where: { id: old.id } })).toMatchObject({ status: "cancelled", stopStatus: "confirmed" });
   expect(await f.db.run.count({ where: { sessionId, status: "queued" } })).toBe(1);
+  expect((await f.api.runs.claimNext("build"))?.sessionId).toBe(sessionId);
 });
 
 for (const limit of [0, 2, 20]) test(`daily new-build allowance ${limit} is owner configurable and matches settings usage`, async () => {
@@ -146,7 +165,8 @@ test("persistent FIFO survives service recreation and tied clocks; waiting has n
     expect(run.deadlineAt!.getTime() - run.startedAt.getTime()).toBe(75 * 60_000);
     expect(run.prompt).toContain("at most 3 candidate submissions");
     expect(await api.runs.claimNext("build")).toBeNull();
-    await api.runs.finish(run.id, { outcome: "failed", sessionId: null, error: "fixture failure" });
+    // FIFO exercises claiming only; this fixture has not launched a Provider operation.
+    await api.runs.finish(run.id, { outcome: "failed", sessionId: null, error: "fixture failure" }, { stopEvidence: "never_started" });
   }
   expect(await api.runs.claimNext("build")).toBeNull();
   expect(await f.db.run.count({ where: { lane: "build" } })).toBe(3);
@@ -163,9 +183,13 @@ test("identical outstanding requests are idempotent across service recreation, b
   const claimed = (await f.api.runs.claimNext("build"))!;
   expect(await f.start(request)).toMatchObject({ status: "build_running", runId: claimed.id, duplicate: true });
   await f.stop(a!.sessionId);
+  // A claim without a launched operation has no Provider stop receipt to confirm cancellation.
+  expect(await f.db.run.findUniqueOrThrow({ where: { id: claimed.id } })).toMatchObject({ status: "failed", stopStatus: "unknown" });
   const next = await f.start(request) as { sessionId: string };
   expect(next.sessionId).not.toBe(a!.sessionId);
   expect((await f.governance.get()).buildUsage.used).toBe(2);
+  expect(await f.api.runs.claimNext("build")).toBeNull();
+  expect(f.starts).toHaveLength(0);
 });
 
 test("queue bound rejects without consuming admission; cancellation frees space and a full queue cannot destroy a running revision", async () => {
@@ -218,9 +242,7 @@ test("missing required references reject before admitting or charging a build", 
 const ownerRequest = { name: "mail-sort", goal: "Only the authorized change", intent, requestKey: "one-user-authorization",
   execution: { provider: "pi" as const, model: "openai/gpt-6.1-sol", timeoutMinutes: 10, maxSubmissions: 1 } };
 async function ownerFixture() {
-  const f = await fixture();
-  f.ports.provider = { ...f.ports.provider!, name: "pi", supportsRunModel: true };
-  return f;
+  return fixture({ name: "pi", supportsRunModel: true });
 }
 test("owner builds pin their own limits and model, deduplicate even after completion, and never resume", async () => {
   const f = await ownerFixture();
@@ -238,7 +260,8 @@ test("owner builds pin their own limits and model, deduplicate even after comple
   expect(claimed.model).toBe("openai/gpt-6.1-sol");
   expect(claimed.deadlineAt!.getTime() - claimed.startedAt.getTime()).toBe(600_000);
   expect((await f.db.audit.findFirstOrThrow({ where: { kind: "run_claimed", subjectId: claimed.id } })).details).toMatchObject({ builds: { timeoutMinutes: 10, maxSubmissions: 1 } });
-  await f.api.runs.finish(claimed.id, { outcome: "timed_out", sessionId: null, error: "deadline" });
+  // Only the bounded claim is exercised; no Provider process was launched.
+  await f.api.runs.finish(claimed.id, { outcome: "timed_out", sessionId: null, error: "deadline" }, { stopEvidence: "never_started" });
   expect(await startOwnerBuild(f.ports, f.workspaceId, ownerRequest)).toMatchObject({ runId: claimed.id, status: "timed_out", duplicate: true });
   await expect(controlBuild(f.ports, f.workspaceId, started.sessionId, "continue")).rejects.toMatchObject({ code: "forbidden" });
   expect(await f.db.run.count({ where: { sessionId: started.sessionId } })).toBe(1);
@@ -265,7 +288,14 @@ test("owner build validation rejects host paths, multiple modules, unsupported p
 test("a changed Provider cannot claim a bounded owner build with a fallback", async () => {
   const f = await ownerFixture();
   const started = await startOwnerBuild(f.ports, f.workspaceId, ownerRequest);
+  const binding = await f.db.agentRunProvider.findUniqueOrThrow({ where: { runId: started.runId } });
+  await f.db.module.update({ where: { id: binding.moduleId }, data: { name: "retired-provider", status: "paused" } });
+  await f.db.agentProvider.deleteMany({ where: { workspaceId: f.workspaceId, moduleId: binding.moduleId } });
   f.ports.provider = { ...f.ports.provider!, name: "different" };
+  await testProviderPorts(f.ports);
+  const replacement = await f.db.agentProvider.findUniqueOrThrow({ where: { workspaceId_id: { workspaceId: f.workspaceId, id: "different" } } });
+  expect(replacement.moduleId).not.toBe(binding.moduleId);
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: replacement.moduleId } })).toMatchObject({ status: "active", activeHash: replacement.hash });
   expect(await f.api.runs.claimNext("build")).toBeNull();
   expect(await f.db.run.findUniqueOrThrow({ where: { id: started.runId } })).toMatchObject({ status: "failed" });
   expect(f.starts).toHaveLength(0);
@@ -446,7 +476,7 @@ test("private proposals reject public tools without an output contract before ex
   const proposal = await modules.propose({ root: f.requester.cwd, dir: request.name, intent }, "provider");
   await modules.buildPending();
   expect(proposal).toMatchObject({ status: "rejected", moduleId: null });
-  expect(await f.db.moduleVersion.count({ where: { module: { workspaceId: f.workspaceId } } })).toBe(0);
+  expect(await f.db.moduleVersion.count({ where: { module: { workspaceId: f.workspaceId, name: request.name } } })).toBe(0);
   expect(executed).toBe(0);
 });
 
@@ -479,6 +509,7 @@ test("private build claim snapshots stay fixed after governance changes; revisio
   const f = await fixture();
   await f.governance.update({ maxSubmissions: 1 });
   const started = await f.start(request), run = (await f.api.runs.claimNext("build"))!;
+  await f.launch(run);
   const snapshot = await f.db.audit.findFirstOrThrow({ where: { kind: "run_claimed", subjectId: run.id } });
   expect(snapshot.details).toMatchObject({ builds: { maxSubmissions: 1 } });
   await f.governance.update({ maxSubmissions: 2 });
@@ -612,6 +643,7 @@ test("a new candidate of one member expires the group approval", async () => {
 
 test("private revisions preserve work and require every reference before cancelling the running build", async () => {
   const f = await fixture(), started = await f.start(request), old = (await f.api.runs.claimNext("build"))!;
+  await f.launch(old);
   await writeFile(join(old.cwd, "draft.txt"), "retained draft");
   await mkdir(f.requester.cwd, { recursive: true });
   await expect(f.revise({ session: started.sessionId, requirements: "Add references", files: ["missing.txt"] })).rejects.toMatchObject({ code: "not_found" });
@@ -629,7 +661,7 @@ test("private revisions preserve work and require every reference before cancell
   expect(next.cwd).toBe(old.cwd);
   expect(next.prompt).toContain(saved.files[0]);
   expect((await f.governance.get()).buildUsage.used).toBe(1);
-  expect(f.starts).toHaveLength(0);
+  expect(f.starts).toHaveLength(1);
 });
 
 test("private checkout preserves customization and proposals freeze valid source before checks", async () => {

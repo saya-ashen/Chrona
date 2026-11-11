@@ -15,7 +15,7 @@ Chrona 是随用户需求生长的个人工具。默认中文，代码、命令�
 ## 不可破坏的边界
 
 - 只有 kernel 与应用。业务策略、会话、记忆、展示、配置和通知归应用；共享复用本身不构成提升到 kernel 的理由。
-- Agent 是唯一不可动态替换的内置应用，Pi 是唯一内置 Provider。其他应用预装不授予权力，不自动补装已移除应用或覆盖用户选择。
+- 通用 Agent API 归 kernel；具体 Provider 通过应用登记，Pi 是默认预装、可停用或移除的普通 Provider 应用，kernel 不依赖 Pi。以 `kernel-api-design.md` 第 9 节七工具合同为实现目标，旧 Agent 内置实现须迁出。预装不授予权力，不自动补装已移除应用或覆盖用户选择。
 - 保留唯一 Run 队列、真实 caller、精确授权、硬预算、租约、取消、未知停止占用和实际停止证据；不能用错误文案推导授权或停止。
 - caller、Run token、宿主 cwd/session 和回调身份由内核绑定，不能从应用参数自授。元数据、外部文本和模型回复不授予权限。
 - owner 准入检查当前批准版本的显式 `authority: "owner"`；`uses` 仅声明合同，`["*"]` 不授予权限。
@@ -45,7 +45,7 @@ Chrona 是随用户需求生长的个人工具。默认中文，代码、命令�
 | --- | --- |
 | 依赖方向 | `apps → packages/engine → packages/domain → packages/contracts`；路由校验并委托，domain 无 I/O |
 | 合同／kernel | `packages/contracts/src/steward`、`packages/engine/src/modules/steward`；[当前边界](docs/zh/kernel-permanent-boundary-contract.md) |
-| 应用 | `steward/builtin/agent`、`steward/external/`；[普通应用迁移](docs/zh/application-migration.md) |
+| 应用 | `steward/external/`（含普通 Provider 应用 `pi`）；[普通应用迁移](docs/zh/application-migration.md) |
 | 宿主／SDK／Pi | `packages/integrations/src/steward`、`packages/pi`；[Agent](docs/zh/agent-builtin-application.md) |
 | Web | `external/web/src/pages.tsx`、`src/system/`、`app.js`；[组合与外壳](docs/zh/web-components-and-shell.md)、[可执行组件](docs/zh/web-executable-components.md) |
 | 设置／材料 | [应用设置](docs/zh/application-settings.md)、[版本材料](docs/zh/author-version-materials.md)、[当前对话创作](docs/zh/author-current-conversation.md) |

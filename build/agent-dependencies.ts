@@ -1,10 +1,12 @@
-import { cp, mkdir, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { lstat, mkdir, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import { bundleDeclarations } from "./agent-declaration-bundle";
+import { isModuleMaterialPath, MODULE_MATERIAL_FILE, parseModuleMaterial, type ModuleMaterial } from "../packages/contracts/src/steward/module-material";
+import { moduleGitReleaseSource } from "../scripts/module-git-release";
 
 const ROOT = resolve(import.meta.dirname, "..");
-const AGENT = "packages/engine/src/modules/steward/builtin/agent";
 type Package = { name: string; version: string; dependencies?: Record<string, string>; optionalDependencies?: Record<string, string>; peerDependencies?: Record<string, string>; exports?: Record<string, unknown>; main?: string; types?: string; [key: string]: unknown };
 const json = async (file: string): Promise<Package> => JSON.parse(await readFile(file, "utf8"));
 const portable = (path: string) => path.split(sep).join("/");
@@ -14,7 +16,7 @@ async function installedPackage(name: string, from: string): Promise<string> {
     const candidate = join(dir, "node_modules", name);
     try { await stat(join(candidate, "package.json")); return await realpath(candidate); }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
-    if (dirname(dir) === dir) throw new Error(`Agent dependency ${name} is not installed (from ${from})`);
+    if (dirname(dir) === dir) throw new Error(`Module dependency ${name} is not installed (from ${from})`);
   }
 }
 
@@ -61,14 +63,14 @@ function exportTarget(value: unknown, condition: "types" | "import"): string | u
 }
 
 function dependencyEntries(name: string, dir: string, original: Package) {
-  // Zod's root exports the complete API Agent uses, including locales. Workspace
+  // Zod's root exports the complete API the module uses, including locales. Workspace
   // packages retain every declared public export, notably all of Pi.
   const publicExports = name === "zod" ? { ".": original.exports?.["."] } : original.exports ?? { ".": original.main ?? "./index.js" };
   const runtimeEntries = new Map<string, string>(), typeEntries = new Map<string, string>();
   for (const [key, value] of Object.entries(publicExports)) {
-    if (key.includes("*") || key === "./package.json") throw new Error(`Unsupported Agent dependency export: ${name}${key}`);
+    if (key.includes("*") || key === "./package.json") throw new Error(`Unsupported module dependency export: ${name}${key}`);
     const runtime = exportTarget(value, "import"), types = exportTarget(value, "types");
-    if (!runtime) throw new Error(`Missing Agent dependency runtime export: ${name}${key}`);
+    if (!runtime) throw new Error(`Missing module dependency runtime export: ${name}${key}`);
     runtimeEntries.set(key, resolve(dir, runtime));
     typeEntries.set(key, resolve(dir, types ?? original.types ?? runtime));
   }
@@ -91,7 +93,7 @@ async function writeTypes(name: string, dir: string, target: string, entries: Ma
   const emitted = program.emit(undefined, (file, text) => {
     if (file.startsWith(dir + sep)) declarations.set(relative(dir, file), compactTypes(text, file));
   }, undefined, true);
-  if (emitted.emitSkipped || emitted.diagnostics.length) throw new Error(`Agent dependency declarations failed: ${name}`);
+  if (emitted.emitSkipped || emitted.diagnostics.length) throw new Error(`Module dependency declarations failed: ${name}`);
   // Inferred Zod schemas have larger .d.ts output than their authored types.
   // Types may point to typed source; runtime always loads the JS bundle.
   const bytes = (files: Map<string, string>) => [...files.values()].reduce((sum, text) => sum + Buffer.byteLength(text), 0);
@@ -109,19 +111,19 @@ async function writeTypes(name: string, dir: string, target: string, entries: Ma
  * Third-party implementation dependencies are bundled, with their licenses; no
  * registry lookup, host-source path, macro, or installer exception is required.
  */
-export async function assembleAgentDependencies(agentDir: string, sourceRoot = ROOT) {
-  const sourceAgent = join(sourceRoot, AGENT), manifest = await json(join(sourceAgent, "package.json"));
+export async function assembleModuleDependencies(moduleDir: string, sourceRoot = ROOT) {
+  const manifest = await json(join(moduleDir, "package.json"));
   const names = Object.keys(manifest.dependencies ?? {}).sort();
   const installed = new Map(await Promise.all(names.map(async name => [name, await installedPackage(name, sourceRoot)] as const)));
-  await rm(join(agentDir, "vendor"), { recursive: true, force: true });
+  await rm(join(moduleDir, "vendor"), { recursive: true, force: true });
   for (const name of names) {
     const dir = installed.get(name)!, original = await json(join(dir, "package.json"));
-    if (original.name !== name) throw new Error(`Agent dependency name mismatch: ${name}`);
-    const target = join(agentDir, "vendor", name);
+    if (original.name !== name) throw new Error(`Module dependency name mismatch: ${name}`);
+    const target = join(moduleDir, "vendor", name);
     await mkdir(target, { recursive: true });
     const { runtimeEntries, typeEntries } = dependencyEntries(name, dir, original);
     const required = new Set<string>();
-    const built = await Bun.build({ entrypoints: [...new Set(runtimeEntries.values())], target: "bun", minify: true, splitting: true, plugins: [{ name: "ordinary-agent-dependencies", setup(builder) {
+    const built = await Bun.build({ entrypoints: [...new Set(runtimeEntries.values())], target: "bun", minify: true, splitting: true, plugins: [{ name: "ordinary-module-dependencies", setup(builder) {
       builder.onResolve({ filter: /^[^./]/ }, async args => {
         const dependency = args.path.match(/^(@[^/]+\/[^/]+|[^/]+)/)?.[0];
         if (dependency && dependency !== name && installed.has(dependency) && await installedPackage(dependency, args.resolveDir) === installed.get(dependency)) {
@@ -130,7 +132,7 @@ export async function assembleAgentDependencies(agentDir: string, sourceRoot = R
         }
       });
     } }], outdir: join(target, "runtime"), naming: { entry: "[dir]/[name].js", chunk: "chunk-[hash].js" } });
-    if (!built.success) throw new AggregateError(built.logs, `Agent dependency bundle failed: ${name}`);
+    if (!built.success) throw new AggregateError(built.logs, `Module dependency bundle failed: ${name}`);
     // Bun's entry paths are relative to their common ancestor.
     let common = dirname([...runtimeEntries.values()][0]!);
     while ([...runtimeEntries.values()].some(entry => !entry.startsWith(common + sep))) common = dirname(common);
@@ -149,7 +151,7 @@ export async function assembleAgentDependencies(agentDir: string, sourceRoot = R
       const licenses = (await readdir(packageDir)).filter(file => /^(?:licen[cs]e|copying|notice)(?:[.-]|$)/i.test(file)).sort();
       if (!licenses.length && packageDir.startsWith(join(sourceRoot, "packages") + sep)) notices.push(await readFile(join(sourceRoot, "LICENSE"), "utf8"));
       else {
-        if (!licenses.length) throw new Error(`Missing license for bundled Agent dependency ${pkg.name}`);
+        if (!licenses.length) throw new Error(`Missing license for bundled module dependency ${pkg.name}`);
         for (const file of licenses) notices.push(`${file}\n${await readFile(join(packageDir, file), "utf8")}`);
       }
       for (const dependency of Object.keys({ ...pkg.dependencies, ...pkg.optionalDependencies, ...pkg.peerDependencies }).sort()) {
@@ -164,6 +166,47 @@ export async function assembleAgentDependencies(agentDir: string, sourceRoot = R
     await writeFile(join(target, "package.json"), JSON.stringify({ name, version: original.version, type: "module", license: original.license, exports: packagedExports, dependencies }, null, 2) + "\n");
   }
   const { devDependencies: _dev, ...packaged } = manifest;
-  await writeFile(join(agentDir, "package.json"), JSON.stringify(packaged, null, 2) + "\n");
-  if (resolve(sourceAgent) !== resolve(agentDir)) await cp(join(sourceAgent, "bun.lock"), join(agentDir, "bun.lock"));
+  await writeFile(join(moduleDir, "package.json"), JSON.stringify(packaged, null, 2) + "\n");
+}
+
+// Retained for the existing integration fixture outside the build transition.
+export { assembleModuleDependencies as assembleAgentDependencies };
+
+/** Record explicit build outputs without removing source, types, tests or dependency material. */
+export async function stageModuleMaterial(moduleDir: string, input: { artifacts: string[]; build: ModuleMaterial["build"] }): Promise<ModuleMaterial> {
+  if (input.artifacts.some(path => path === MODULE_MATERIAL_FILE || !isModuleMaterialPath(path))) throw new Error("Unsafe generated module artifact path");
+  const files: { path: string; bytes: Buffer; executable: boolean }[] = [];
+  const ignored = new Set([".git", "node_modules", ".venv", ".chrona"]);
+  async function walk(prefix: string) {
+    for (const entry of await readdir(join(moduleDir, prefix), { withFileTypes: true })) {
+      if (!prefix && (ignored.has(entry.name) || entry.name === MODULE_MATERIAL_FILE)) continue;
+      const path = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (!isModuleMaterialPath(path)) throw new Error(`Unsafe staged module path: ${path}`);
+      if (entry.isDirectory()) await walk(path);
+      else if (entry.isFile()) files.push({ path, bytes: await readFile(join(moduleDir, path)), executable: !!((await lstat(join(moduleDir, path))).mode & 0o111) });
+      else throw new Error(`Staged module material must contain regular files: ${path}`);
+    }
+  }
+  await walk("");
+  files.sort((a, b) => a.path.localeCompare(b.path));
+  const generated = (path: string) => input.artifacts.some(output => path === output || path.startsWith(output + "/"));
+  for (const output of input.artifacts) if (!files.some(file => file.path === output || file.path.startsWith(output + "/"))) throw new Error(`Generated module output is missing: ${output}`);
+  const record = parseModuleMaterial({ schema: 1, source: files.filter(file => !generated(file.path)).map(file => file.path), artifacts: files.filter(file => generated(file.path)).map(file => ({ path: file.path, sha256: createHash("sha256").update(file.bytes).digest("hex"), ...(file.executable ? { executable: true } : {}) })), build: input.build });
+  await writeFile(join(moduleDir, MODULE_MATERIAL_FILE), JSON.stringify(record, null, 2) + "\n");
+  // Use exactly the production release validator, including both size policies,
+  // complete-tree coverage, artifact digests and executable modes.
+  await moduleGitReleaseSource(moduleDir);
+  return record;
+}
+
+/** Build the staged Provider application before pinning or verifying its Git material. */
+export async function preparePiApplication(resourcesRoot: string): Promise<void> {
+  const { buildPiApplication } = await import("../packages/engine/src/modules/steward/external/pi/build");
+  const moduleDir = resolve(resourcesRoot, "external/pi");
+  await buildPiApplication(moduleDir);
+  await assembleModuleDependencies(moduleDir);
+  // Release seed preparation stages this shared license too. Include it before
+  // recording material so that later identical staging keeps complete coverage.
+  await writeFile(join(moduleDir, "LICENSE"), await readFile(join(ROOT, "LICENSE")));
+  await stageModuleMaterial(moduleDir, { artifacts: ["runtime.js", "test.js", "vendor"], build: { commands: ["bun build.ts", "assembleModuleDependencies"], toolchain: `bun ${Bun.version}`, target: "bun" } });
 }

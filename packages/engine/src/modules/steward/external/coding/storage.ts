@@ -1,4 +1,3 @@
-import { callAgent } from "./agent";
 import { mkdir, open, readFile, rename, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { ModelError } from "chrona";
@@ -53,13 +52,4 @@ export function remember(work: CodingWork, view: ExecutionView) {
   if (view.workId !== work.start.workId || view.projectRef !== work.start.projectRef
     || work.ref && (work.ref.sessionId !== view.sessionId || work.ref.runId !== view.runId || work.ref.attemptId !== view.attemptId)) throw codingError("conflict", "Execution does not match coding work");
   work.ref = { workId: view.workId, sessionId: view.sessionId, runId: view.runId, attemptId: view.attemptId };
-}
-
-export async function lookupCodingWork(context: CodingContext, input: { workId: string }) {
-  const work = await readCodingWork(context, input.workId);
-  const view = work.ref
-    ? await callAgent<ExecutionView>(context, "get", input)
-    : await callAgent<ExecutionView>(context, "lookup-start", { commandKey: work.start.commandKey });
-  remember(work, view);
-  return { work, view };
 }

@@ -3,7 +3,8 @@ export { routedTargetName } from "./module-call-target";
 import { systemError, systemFailureData, deliveryErrorCode, checkSystemOutput, checkModuleOutput, moduleOutputError, validArgs, stageOf, message } from "./module-call-output";
 export { checkSystemOutput, checkModuleOutput, moduleOutputError } from "./module-call-output";
 import { appendRunToolResultIn } from "./run-events";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { moduleRequestDigest as requestDigest } from "./module-request-digest";
 import { Prisma } from "@chrona/db/generated/prisma/client";
 import { MAX_CALL_DEPTH, RUN_LIMITS, type ModuleEvent, expectedModuleTargetSchema, type ExpectedModuleTarget, type RoutedTarget } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
@@ -13,8 +14,6 @@ import { currentModuleEvolution } from "./module-evolution";
 import { StewardError } from "./errors";
 import type { SystemTool } from "./module-system-types";
 export type { SystemTool, SystemModule } from "./module-system-types";
-import { authorizeAgentRequest } from "./agent-application";
-import { retainAgentCaller } from "./agent-caller-context";
 import { isAgentContextEntry } from "./agent-context-entry";
 import { admitted } from "./module-call-admission";
 export { admitted } from "./module-call-admission";
@@ -49,15 +48,12 @@ const callerName = (caller: Caller) => caller.kind === "module" || caller.kind =
 export const kernelOrigin = (workspaceId: string): CallOrigin => ({ workspaceId, caller: { kind: "kernel" }, chain: [], path: [] });
 export const systemOrigin = (workspaceId: string, module: string): CallOrigin => ({ workspaceId, caller: { kind: "system", module }, chain: [], path: [] });
 
-function requestDigest(value: unknown) {
-  return createHash("sha256").update(JSON.stringify(value, (_key, item) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) : item)).digest("hex");
-}
 async function previousCall(db: Db, origin: CallOrigin, target: RoutedTarget, key: string) {
   const identity = typeof target === "string" ? await resolveTarget(db, origin.workspaceId, target) : null;
   return db.moduleInvocation.findFirst({ where: { workspaceId: origin.workspaceId, caller: callerKey(origin.caller), key, ...(typeof target === "string" ? { targetIdentity: identity && !(identity instanceof CallError) ? identity.module.id : splitTarget(target).module, tool: splitTarget(target).tool } : { targetModuleId: target.moduleId, tool: target.tool }) } });
 }
-const retainedAgentResults = new Set(["context", "run", "write", "respond", "interrupt", "complete", "cleanup"]);
-const retainsAgentResult = (tool: string) => retainedAgentResults.has(tool.replace(/^work-/, ""));
+const retainedAgentResults = new Set(["register", "run", "write", "stop"]);
+const retainsAgentResult = (tool: string) => retainedAgentResults.has(tool);
 function privateResult(row: Pick<Row, "target" | "targetIdentity" | "tool">) {
   if (row.target === "agent") return !retainsAgentResult(row.tool);
   if (row.target === "secrets") return ["get", "token", "authorize"].includes(row.tool);
@@ -65,10 +61,14 @@ function privateResult(row: Pick<Row, "target" | "targetIdentity" | "tool">) {
   return row.targetIdentity.startsWith("local:");
 }
 const hasStoredOutput = (row: Row) => row.output !== null || row.status === "succeeded" && !privateResult(row);
-function duplicateReply(row: Row, origin: CallOrigin, digest: string, expected?: ExpectedModuleTarget) {
+function checkDuplicateCall(row: Row, origin: CallOrigin, digest: string, expected?: ExpectedModuleTarget) {
   if (origin.caller.kind === "module" && row.callerHash !== origin.caller.hash) throw new CallError("forbidden", "Call belongs to another application version");
   if (row.requestDigest !== digest) throw new CallError("conflict", "Call key was already used with different arguments");
   checkDuplicateTarget(row, expected);
+}
+function duplicateReply(row: Row, origin: CallOrigin, digest: string, expected?: ExpectedModuleTarget, privateTransport = false) {
+  checkDuplicateCall(row, origin, digest, expected);
+  if (privateTransport) throw new CallError("unknown", "Private Provider call was already offered; reconcile the original operation");
   if (row.status === "succeeded" && hasStoredOutput(row)) return { callId: row.id, output: row.output as Json };
   throw new CallError(row.status === "failed" ? publicCallError(row.errorCode ?? "failed") : "unknown", row.error ?? "Original call has not produced a confirmed result", publicCallReason(row.errorReason ?? ""));
 }
@@ -93,7 +93,7 @@ function waitsOn(graph: Map<string, string[]>, from: string, to: string, seen = 
  * Synchronous routed call: waits for the target's reply. Refused when the target is already waiting on this path
  * (the target's events are serial, so it could never answer). Unknown outcomes are reported, never retried.
  */
-type SyncInvocation = { ports: StewardPorts; origin: CallOrigin; resolved: Target; target: string; args: Record<string, unknown>; chain: string[]; path: string[]; now: Date; key?: string; activationId?: string | null };
+type SyncInvocation = { ports: StewardPorts; origin: CallOrigin; resolved: Target; target: string; args: Record<string, unknown>; chain: string[]; path: string[]; now: Date; key?: string; activationId?: string | null; privateTransport?: boolean };
 async function invokeSystemSync({ ports, origin, resolved, args, rowId, rowKey, finish, quiet }: SyncInvocation & { rowId: string; rowKey?: string; finish: (data: Prisma.ModuleInvocationUpdateInput) => Promise<unknown>; quiet: boolean }) {
   // In-process: no event queue to wait on, so no deadlock to guard against.
   try {
@@ -110,13 +110,13 @@ async function invokeSystemSync({ ports, origin, resolved, args, rowId, rowKey, 
     throw failure;
   }
 }
-async function deliverSyncModule({ ports, origin, resolved, target, args, chain, path, now, key, timeoutMs, activationId, rowId, finish }: SyncInvocation & { timeoutMs?: number; rowId: string; finish: (data: Prisma.ModuleInvocationUpdateInput) => Promise<unknown> }) {
+async function deliverSyncModule({ ports, origin, resolved, target, args, chain, path, now, key, timeoutMs, activationId, rowId, finish, privateTransport }: SyncInvocation & { timeoutMs?: number; rowId: string; finish: (data: Prisma.ModuleInvocationUpdateInput) => Promise<unknown> }) {
   try {
-    return await moduleSupervisor(ports).deliver(resolved.module.id, resolved.module.activeHash, toolEvent(resolved, args, now, origin.caller, { id: rowId, key: key ?? null, attempt: 1, chain: path }), { chain, path, beforeDelivery: targetFence(ports, origin.workspaceId, resolved, origin.caller), ...(activationId !== undefined ? { activationId } : {}), validateResult: output => moduleOutputError(target, resolved.tool, output), ...(timeoutMs ? { timeoutMs } : {}) });
+    return await moduleSupervisor(ports).deliver(resolved.module.id, resolved.module.activeHash, toolEvent(resolved, args, now, origin.caller, { id: rowId, key: key ?? null, attempt: 1, chain: path }), { chain, path, ...(privateTransport ? { private: true } : {}), beforeDelivery: targetFence(ports, origin.workspaceId, resolved, origin.caller), ...(activationId !== undefined ? { activationId } : {}), validateResult: output => moduleOutputError(target, resolved.tool, output), ...(timeoutMs ? { timeoutMs } : {}) });
   } catch (error) {
-    const code = deliveryErrorCode(error);
-    await finish({ status: code === "unknown" ? "unknown" : "failed", error: `${publicCallError(code)}: ${message(error)}`, errorCode: publicCallError(code), errorReason: publicCallReason((error as { reason?: string }).reason ?? code) ?? null });
-    throw new CallError(publicCallError(code), code === "unknown" ? `${target}: outcome unknown (${message(error)})` : `${target}: ${message(error)}`, publicCallReason((error as { reason?: string }).reason ?? code));
+    const code = deliveryErrorCode(error), detail = privateTransport ? "Private operation failed" : message(error);
+    await finish({ status: code === "unknown" ? "unknown" : "failed", error: `${publicCallError(code)}: ${detail}`, errorCode: publicCallError(code), errorReason: publicCallReason((error as { reason?: string }).reason ?? code) ?? null });
+    throw new CallError(publicCallError(code), code === "unknown" ? `${target}: outcome unknown (${detail})` : `${target}: ${detail}`, publicCallReason((error as { reason?: string }).reason ?? code));
   }
 }
 function removeWaitEdge(edges: Map<string, string[]>, name: string, target: string) {
@@ -132,14 +132,14 @@ async function addWaitEdge(edges: Map<string, string[]>, name: string | null, ta
   }
   edges.set(name, [...edges.get(name) ?? [], target]);
 }
-async function invokeModuleSync({ ports, origin, resolved, target, args, chain, path, now, key, timeoutMs, activationId, rowId, finish }: SyncInvocation & { timeoutMs?: number; rowId: string; finish: (data: Prisma.ModuleInvocationUpdateInput) => Promise<unknown> }) {
+async function invokeModuleSync({ ports, origin, resolved, target, args, chain, path, now, key, timeoutMs, activationId, rowId, finish, privateTransport }: SyncInvocation & { timeoutMs?: number; rowId: string; finish: (data: Prisma.ModuleInvocationUpdateInput) => Promise<unknown> }) {
   let graph = waiting.get(ports.db);
   if (!graph) { graph = new Map(); waiting.set(ports.db, graph); }
   // A detached Agent entry has an identity, but no originating module event waiting on it.
   const name = isAgentContextEntry(ports, origin) ? null : callerName(origin.caller), edges = graph;
   await addWaitEdge(edges, name, resolved.module.name, target, finish);
   let reply;
-  try { reply = await deliverSyncModule({ ports, origin, resolved, target, args, chain, path, now, key, timeoutMs, activationId, rowId, finish }); }
+  try { reply = await deliverSyncModule({ ports, origin, resolved, target, args, chain, path, now, key, timeoutMs, activationId, rowId, finish, privateTransport }); }
   finally { if (name) removeWaitEdge(edges, name, resolved.module.name); }
   const output = "result" in reply ? reply.result.result ?? null : null;
   try { checkModuleOutput(target, resolved.tool, output); }
@@ -162,26 +162,15 @@ async function validateSyncRoute(ports: StewardPorts, origin: CallOrigin, target
   if (route.path.length >= MAX_CALL_DEPTH) throw new CallError("cycle", `Call path too deep (${route.path.join(" → ")})`);
   return { resolved, route };
 }
-function privateInvocationFinish(ports: StewardPorts, id: string, resolved: Target) {
+function privateInvocationFinish(ports: StewardPorts, id: string, resolved: Target, privateTransport = false) {
   return (data: Prisma.ModuleInvocationUpdateInput) => ports.db.$transaction(async tx => {
     const at = ports.now();
-    const row = await tx.moduleInvocation.update({ where: { id }, data: { ...data, ...(unrecorded(resolved) && privateResult({ target: resolved.module.name, targetIdentity: resolved.module.id, tool: resolved.tool.name }) ? { output: Prisma.DbNull, ...(data.error ? { error: "Private operation failed" } : {}) } : {}), finishedAt: at } });
-    await appendRunToolResultIn(tx, row, at, unrecorded(resolved) || resolved.module.name === "secrets");
+    const row = await tx.moduleInvocation.update({ where: { id }, data: { ...data, ...((privateTransport || unrecorded(resolved) && privateResult({ target: resolved.module.name, targetIdentity: resolved.module.id, tool: resolved.tool.name })) ? { output: Prisma.DbNull, ...(data.error ? { error: "Private operation failed" } : {}) } : {}), finishedAt: at } });
+    await appendRunToolResultIn(tx, row, at, privateTransport || unrecorded(resolved) || resolved.module.name === "secrets");
     return row;
   }).catch(() => { throw new CallError("unknown", `Tool receipt could not be committed; reconcile call ${id}`); });
 }
-function unrecorded(resolved: Target) { return resolved.agent || resolved.system?.unrecorded?.includes(resolved.tool.name) || false; }
-function prepareAgentArgs(resolved: Target, origin: CallOrigin, args: Record<string, unknown>, key?: string) {
-  if (resolved.agent && origin.caller.kind === "module") {
-    const operation = resolved.tool.name.replace(/^work-/, "");
-    if (retainedAgentResults.has(operation)) {
-      if (!key) throw new CallError("invalid", "Agent writes require a call key");
-      args[operation === "complete" || operation === "cleanup" ? "commandKey" : "requestKey"] = key;
-    }
-    if (operation === "lookup") { args.requestKey = args.key; delete args.key; }
-    if (operation === "respond" && typeof args.answer !== "string") args.answer = JSON.stringify(args.answer);
-  }
-}
+function unrecorded(resolved: Target) { return resolved.system?.unrecorded?.includes(resolved.tool.name) || false; }
 function createSyncInvocation({ ports, origin, resolved, args, path, now, key }: SyncInvocation, { requestedTarget, digest, quiet }: { requestedTarget: RoutedTarget; digest: string; quiet: boolean }) {
   return ports.db.$transaction(async tx => {
     await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${origin.workspaceId}`;
@@ -191,31 +180,49 @@ function createSyncInvocation({ ports, origin, resolved, args, path, now, key }:
     target: resolved.module.name, targetIdentity: resolved.module.id, tool: resolved.tool.name, args: (quiet ? {} : args) as Prisma.InputJsonValue, key: key ?? randomUUID(), requestDigest: digest, targetBound: true, targetModuleId: resolved.module.id, targetHash: resolved.module.activeHash, targetContractHash: resolved.module.id.startsWith("local:") ? null : moduleCallbackContractHash(resolved.tool as Tool | SystemTool), chain: path, mode: "sync", idempotent: resolved.tool.idempotent, status: "running", attempts: 1, createdAt: now } }) };
   });
 }
-async function executeSyncInvocation({ ports, origin, resolved, target, args, chain, path, now, key, rowId, quiet, timeoutMs }: SyncInvocation & { rowId: string; quiet: boolean; timeoutMs?: number }) {
-  const finish = privateInvocationFinish(ports, rowId, resolved);
+async function executeSyncInvocation({ ports, origin, resolved, target, args, chain, path, now, key, rowId, quiet, timeoutMs, privateTransport }: SyncInvocation & { rowId: string; quiet: boolean; timeoutMs?: number }) {
+  const finish = privateInvocationFinish(ports, rowId, resolved, privateTransport);
   const activationId = resolved.system ? undefined : (await currentModuleEvolution(ports.db, origin.workspaceId, resolved.module.id, resolved.module.activeHash))?.activationId ?? null;
-  const invocation = { ports, origin, resolved, target, args, chain, path, now, key, ...(activationId !== undefined ? { activationId } : {}) };
+  const invocation = { ports, origin, resolved, target, args, chain, path, now, key, privateTransport, ...(activationId !== undefined ? { activationId } : {}) };
   if (resolved.system) return invokeSystemSync({ ...invocation, rowId, rowKey: key, finish, quiet });
-  const releaseCaller = resolved.agent ? retainAgentCaller(ports, rowId, origin, resolved.tool.name.replace(/^work-/, ""), args) : () => {};
-  try { return await invokeModuleSync({ ...invocation, timeoutMs, rowId, finish }); }
-  finally { releaseCaller(); }
+  return invokeModuleSync({ ...invocation, timeoutMs, rowId, finish });
 }
-export async function callSync(ports: StewardPorts, origin: CallOrigin, requestedTarget: RoutedTarget, raw: unknown, { timeoutMs, expectedTarget, key }: { timeoutMs?: number; expectedTarget?: ExpectedModuleTarget; key?: string } = {}) {
+function assertPrivateTransport(origin: CallOrigin, privateTransport: boolean, expectedHash?: string) {
+  if ((privateTransport || expectedHash !== undefined) && origin.caller.kind !== "kernel") throw new CallError("forbidden", "Private Provider transport requires the kernel caller");
+}
+function assertProviderHash(actual: string | null, expectedHash?: string) {
+  if (expectedHash !== undefined && actual !== expectedHash) throw new CallError("conflict", "Provider source version changed before delivery");
+}
+function assertExpectedRequest(requested: RoutedTarget, expected?: ExpectedModuleTarget) {
+  if (typeof requested !== "string" && expected && requested.moduleId !== expected.moduleId) throw new CallError("conflict", "Target and expected identity differ");
+}
+/** Private transport and exact version fences are internal kernel options, absent from the SDK wire. */
+export async function callSync(ports: StewardPorts, origin: CallOrigin, requestedTarget: RoutedTarget, raw: unknown, { timeoutMs, expectedTarget, key, private: privateTransport = false, expectedHash }: { timeoutMs?: number; expectedTarget?: ExpectedModuleTarget; key?: string; private?: boolean; expectedHash?: string } = {}) {
+  assertPrivateTransport(origin, privateTransport, expectedHash);
   const digest = requestDigest({ args: raw, mode: "sync" });
   if (key) {
     const previous = await previousCall(ports.db, origin, requestedTarget, key);
-    if (previous) return duplicateReply(previous, origin, digest, expectedTarget);
+    if (previous) {
+      assertProviderHash(previous.targetHash, expectedHash);
+      if (previous.target !== "agent") return duplicateReply(previous, origin, digest, expectedTarget, privateTransport);
+      // Agent commands reconcile their own durable receipts; reads and stop views remain live.
+      checkDuplicateCall(previous, origin, digest, expectedTarget);
+    }
   }
   const target = await routedTargetName(ports.db, origin.workspaceId, requestedTarget);
-  if (typeof requestedTarget !== "string" && expectedTarget && requestedTarget.moduleId !== expectedTarget.moduleId) throw new CallError("conflict", "Target and expected identity differ");
+  assertExpectedRequest(requestedTarget, expectedTarget);
   const { resolved, route: { chain, path } } = await validateSyncRoute(ports, origin, target, expectedTarget);
   assertRoutedIdentity(requestedTarget, resolved);
-  const args = validArgs(resolved.tool, raw), now = ports.now(), quiet = unrecorded(resolved);
-  prepareAgentArgs(resolved, origin, args, key);
-  if (resolved.agent) await authorizeAgentRequest(ports, origin.workspaceId, resolved.tool.name, args, origin.caller);
+  assertProviderHash(resolved.module.activeHash, expectedHash);
+  const args = validArgs(resolved.tool, raw), now = ports.now(), quiet = privateTransport || unrecorded(resolved);
   const row = await createSyncInvocation({ ports, origin, resolved, target, args, chain, path, now, key }, { requestedTarget, digest, quiet });
-  if ("existing" in row) return duplicateReply(row.existing!, origin, digest, expectedTarget);
-  return executeSyncInvocation({ ports, origin, resolved, target, args, chain, path, now, key, rowId: row.created.id, quiet, timeoutMs });
+  if ("existing" in row) {
+    const existing = row.existing!;
+    if (resolved.module.name !== "agent") return duplicateReply(existing, origin, digest, expectedTarget, privateTransport);
+    checkDuplicateCall(existing, origin, digest, expectedTarget);
+    return executeSyncInvocation({ ports, origin, resolved, target, args, chain, path, now, key, rowId: existing.id, quiet, timeoutMs, privateTransport });
+  }
+  return executeSyncInvocation({ ports, origin, resolved, target, args, chain, path, now, key, rowId: row.created.id, quiet, timeoutMs, privateTransport });
 }
 
 /**
@@ -228,7 +235,7 @@ async function resolveEnqueueTarget(tx: Db, origin: CallOrigin, target: string) 
   if (resolved instanceof CallError) {
     if (origin.caller.kind !== "kernel" && origin.caller.kind !== "system") throw resolved;
   } else if (!await admitted(tx, origin.caller, resolved.tool, origin.workspaceId)) throw new CallError("forbidden", `${target} does not accept calls from this caller`);
-  else if (resolved.agent || resolved.system?.unrecorded?.includes(resolved.tool.name)) throw new CallError("invalid", `${target} is called synchronously (its arguments are never stored)`);
+  else if (resolved.system?.unrecorded?.includes(resolved.tool.name)) throw new CallError("invalid", `${target} is called synchronously (its arguments are never stored)`);
   return resolved;
 }
 type EnqueueInput = { tx: Db; ports: StewardPorts; origin: CallOrigin; target: RoutedTarget; raw: unknown };

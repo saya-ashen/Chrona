@@ -110,17 +110,15 @@ describe("Pi RPC provider", () => {
     const { args, executionToolBudget } = JSON.parse(await readFile(join(f.cwd, "launch.json"), "utf8"));
     expect(executionToolBudget).toBe("2");
     expect(args[args.indexOf("--append-system-prompt") + 1]).toBe("Perform a bounded document task.");
-    const tools = args[args.indexOf("--tools") + 1].split(",");
-    expect(tools).toContain("bash");
-    expect(tools).not.toContain("chrona_reply");
-    expect(tools).not.toContain("web_search");
-    expect(args).not.toContain(join(f.cwd, "web.ts"));
+    expect(args).not.toContain("--tools");
+    expect(args).not.toContain("--no-skills");
+    expect(args).toContain(join(f.cwd, "web.ts"));
     expect((await provider.start({ ...f.input, sessionId: null, execution: { workId: "work", sessionId: "session", runId: f.input.runId, attemptId: "attempt" } }).done).outcome).toBe("finished");
     const configured = JSON.parse(await readFile(join(f.cwd, "launch.json"), "utf8")).args;
-    expect(configured[configured.indexOf("--tools") + 1].split(",")).toContain("chrona_reply");
+    expect(configured).not.toContain("--tools");
     expect(configured).toContain(join(f.cwd, "web.ts"));
   });
-  test("an exact build model overrides defaults and is verified before prompting; finite retries are enabled", async () => {
+  test("an exact build model overrides defaults without rewriting the selected user profile", async () => {
     const f = await fixture();
     await writeFile(join(f.agentDir, "settings.json"), '{"retry":{"enabled":true}}');
     const provider = createPiProvider({ ...f.options, model: "other/default" });
@@ -128,13 +126,11 @@ describe("Pi RPC provider", () => {
     const launch = JSON.parse(await readFile(join(f.cwd, "launch.json"), "utf8"));
     const args = launch.args;
     expect(args[args.indexOf("--model") + 1]).toBe("openai/gpt-6.1-sol");
-    expect(launch.profile.startsWith(join(f.agentDir, "build-"))).toBe(true);
-    expect(existsSync(launch.profile)).toBe(false);
+    expect(launch.profile).toBe(f.agentDir);
+    expect(existsSync(launch.profile)).toBe(true);
     expect(await readFile(join(f.agentDir, "settings.json"), "utf8")).toBe('{"retry":{"enabled":true}}');
     const commands = await f.commands();
-    expect(commands.find(c => c.type === "set_auto_retry")).toMatchObject({ enabled: true });
-    expect(commands.find(c => c.type === "set_auto_compaction")).toMatchObject({ enabled: false });
-    expect(commands.findIndex(c => c.type === "set_auto_retry")).toBeLessThan(commands.findIndex(c => c.type === "prompt"));
+    expect(commands.some(c => ["set_auto_retry", "set_auto_compaction"].includes(c.type))).toBe(false);
   });
   test("a model mismatch fails closed without sending any prompt or falling back", async () => {
     const f = await fixture("wrong-model");
@@ -159,7 +155,7 @@ describe("Pi RPC provider", () => {
     const before = process.env.CHRONA_DATABASE_SECRET;
     process.env.CHRONA_DATABASE_SECRET = "must-not-leak";
     try {
-      // Module tools must survive Pi's --tools allowlist; malformed names never reach the argument list.
+      // The scoped bridge supplies module tools without restricting ambient native tools.
       const handle = f.provider.start({ ...f.input, images: [{ mime: "image/png", base64: "YWJj" }], extraTools: ["m_ledger_add_expense", "read,bash", "m_Bad"] });
       expect(await handle.done).toEqual({ outcome: "finished", sessionId: "retained-session", error: null });
       const launch = JSON.parse(await readFile(join(f.cwd, "launch.json"), "utf8"));
@@ -168,10 +164,9 @@ describe("Pi RPC provider", () => {
       expect(launch.executionToolBudget).toBeUndefined();
       expect(launch.tokenMatches).toBe(true);
       expect(launch.args[launch.args.indexOf("--session-id") + 1]).toBe("previous-id");
-      const tools = launch.args[launch.args.indexOf("--tools") + 1].split(",");
-      expect(tools).toContain("read"); expect(tools).toContain("chrona_reply"); expect(tools).toContain("bash"); expect(tools).not.toContain("web_search");
-      expect(tools).toContain("m_ledger_add_expense"); expect(tools).not.toContain("m_Bad");
-      expect(tools).not.toContain("tool_search"); expect(launch.args).not.toContain("builtin:tool-search");
+      expect(launch.args).not.toContain("--tools");
+      expect(launch.args).not.toContain("builtin:tool-search");
+      expect(launch.args).not.toContain("m_Bad");
       expect((await f.commands()).find(c => c.type === "prompt").images).toEqual([{ type: "image", mimeType: "image/png", data: "YWJj" }]);
       expect(await f.provider.health()).toEqual({ available: true, sandboxed: false, error: null });
     } finally { if (before === undefined) delete process.env.CHRONA_DATABASE_SECRET; else process.env.CHRONA_DATABASE_SECRET = before; }
@@ -182,7 +177,7 @@ describe("Pi RPC provider", () => {
     await handle.done;
     const args: string[] = JSON.parse(await readFile(join(f.cwd, "launch.json"), "utf8")).args;
     expect(args[args.indexOf("builtin:tool-search") - 1]).toBe("-e");
-    expect(args[args.indexOf("--tools") + 1].split(",")).toEqual(expect.arrayContaining(["m_ledger_add_expense", "tool_search", "m_*"]));
+    expect(args).not.toContain("--tools");
   });
   test("injection queues steering during streaming and waits across agent_end", async () => {
     const f = await fixture(), handle = f.provider.start(f.input);
@@ -270,7 +265,7 @@ test("execution details are bounded/redacted, recover final after saturation and
   const launch = JSON.parse(await readFile(join(f.cwd, "launch.json"), "utf8"));
   const prompt = launch.args[launch.args.indexOf("--append-system-prompt") + 1];
   expect(prompt).toBe("Fixture execution instructions");
-  expect(launch.args[launch.args.indexOf("--tools") + 1]).not.toContain("chrona_remember");
+  expect(launch.args).not.toContain("--tools");
   expect(launch.executionToolBudget).toBe("5");
   expect(existsSync(join(f.cwd, "content"))).toBe(false);
 });

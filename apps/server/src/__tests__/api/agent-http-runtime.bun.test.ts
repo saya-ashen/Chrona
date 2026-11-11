@@ -12,11 +12,11 @@ import { createStewardRuntime } from "../../steward-runtime";
 // Generic server/Agent acceptance uses the real SDK host and a local fake Pi process.
 async function fixture() {
   const f = await agentFixture();
-  // Reuse only the Agent launcher; discard the engine fixture's unrelated placeholder rows.
+  // Reuse only the Pi provider host; discard the engine fixture's unrelated placeholder rows.
   await f.ports.db.module.deleteMany({ where: { name: { in: ["web", "mcp", "files", "notify", "events"] } } });
   const runtime = createStewardRuntime(f.ports.db, { dataDir: f.ports.dataDir, provider: null, sandbox: f.ports.sandbox });
-  runtime.ports.agentApplication = f.ports.agentApplication;
-  runtime.ports.moduleBuiltinResources = f.ports.moduleBuiltinResources;
+  runtime.ports.providerModules = f.ports.providerModules;
+  runtime.ports.moduleExternalResources = f.ports.moduleExternalResources;
   runtime.ports.moduleSdk = f.ports.moduleSdk;
   const db = f.ports.db;
   const entry = await db.module.create({ data: { workspaceId: f.workspaceId, name: "execution-test-entry", activeHash: "v1" } });
@@ -41,7 +41,7 @@ async function waitForPid(cwd: string) {
   throw new Error("Fake Pi did not start");
 }
 
-test("generic server authenticates the real Agent capability while actual SDK/fake Pi callbacks and abort stay private", async () => {
+test("generic server authenticates the real Pi capability while actual SDK/fake Pi callbacks and abort stay private", async () => {
   const f = await fixture();
   let handle: Awaited<ReturnType<typeof startLocalProvider>> | undefined;
   try {
@@ -53,7 +53,7 @@ test("generic server authenticates the real Agent capability while actual SDK/fa
     expect((await catalog.json()).tools.map((tool: { name: string }) => tool.name)).toEqual(["m_modules_list"]);
     const list = await f.request("/tools/m_modules_list", { method: "POST", headers: f.headers, body: "{}" });
     expect(list.status).toBe(200); expect(await list.json()).toMatchObject({ ok: true });
-    const privateTool = await f.request("/tools/m_agent_start", { method: "POST", headers: f.headers, body: "{}" });
+    const privateTool = await f.request("/tools/m_pi_start", { method: "POST", headers: f.headers, body: "{}" });
     expect(privateTool.status).toBe(409); expect(await privateTool.json()).toMatchObject({ error: { code: "forbidden" } });
     const details: ExecutionEvent[] = [], progress: unknown[] = [];
     const execution = { workId: "generic-pi", sessionId: "generic-session", runId: f.input.runId, attemptId: "generic-attempt" };
@@ -85,7 +85,7 @@ test("generic server authenticates the real Agent capability while actual SDK/fa
   } finally { if (handle) { await handle.abort().catch(() => {}); await handle.done.catch(() => {}); } await f.close(); }
 }, 20_000);
 
-test.skipIf(process.platform !== "linux")("losing the actual Agent SDK host stops fake Pi without inventing a successful completion", async () => {
+test.skipIf(process.platform !== "linux")("losing the actual Pi SDK host stops fake Pi without inventing a successful completion", async () => {
   const f = await fixture();
   try {
     const handle = await startLocalProvider(f.runtime.ports, f.workspaceId, f.input);

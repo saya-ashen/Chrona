@@ -40,15 +40,13 @@ const admissions = new Map<string, { digest: string; runId: string; status: stri
 const module = await startModule("index.ts", { stubs: Object.fromEntries([
   stub("activity.runtime", () => ({ at: "2026-10-27T04:00:00Z", provider: { name: "fixture", available: false, sandboxed: false, lastError: null }, moduleSandbox: false, queuedRuns: 0, runningRuns: 0, failedRunsToday: 0, dueSchedules: 0, lastTickAt: null })),
   stub("approvals.list", () => ({ items: [], nextCursor: null })), stub("modules.health", () => ({ items: [], nextCursor: null })), stub("notify.list", () => ({ items: [] })), stub("notify.status", () => ({ queued: 0, failed: 0 })),
-  stub("agent.context", () => ({ contextId: "context-author" })),
   stub("agent.run", (args, options) => {
     const key = String(options.key), digest = JSON.stringify(args);
     if (admissions.has(key)) assert.equal(admissions.get(key)!.digest, digest);
     else admissions.set(key, { digest, runId: `run-author-${admissions.size + 1}`, status: "queued", active: true });
-    const { digest: _digest, ...run } = admissions.get(key)!; return run;
+    const { digest: _digest, ...run } = admissions.get(key)!; return { ...run, contextId: "context-author" };
   }),
-  stub("agent.get", () => execution),
-  stub("agent.stream", () => ({ transcript: earlyText ? [{ at: "2026-11-09T00:00:00Z", kind: "text", text: "已开始检查，尚未完成。" }] : [], interactions: [], items: phase ? [{ sequence: 1, payload: { type: "progress", value: { phase } } }] : [], after: phase ? 1 : 0, ended: !execution.active })),
+  stub("agent.read", args => ({ run: { ...execution, runId: args.runId, contextId: "context-author" }, transcript: earlyText ? [{ at: "2026-11-09T00:00:00Z", kind: "text", text: "已开始检查，尚未完成。" }] : [], interactions: [], items: phase ? [{ sequence: 1, payload: { type: "progress", value: { phase } } }] : [], nextCursor: phase ? "opaque:1" : null, ended: !execution.active })),
   stub("approvals.resolve", args => ({ id: args.approval })),
   stub("modules.disable", () => ({ status: "paused" })),
   stub("modules.enable", () => ({ status: "active" })),
@@ -61,9 +59,10 @@ const module = await startModule("index.ts", { stubs: Object.fromEntries([
         { target: "files.read-image", description: "Read image", inputSchema: { type: "object", properties: { ref: { type: "string" } }, required: ["ref"] }, idempotent: true },
         { target: "files.delete", description: "Delete", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"] }, idempotent: false }]
         .map(tool => ({ ...tool, moduleId: "m-files", hash: "h", contractHash: filesContract })),
+      { target: "chat.list", moduleId: "m-chat", hash: "h", contractHash: "e".repeat(64), inputSchema: { type: "object", properties: { path: { type: "string" } }, required: [] }, idempotent: true },
       { target: "planning.get", moduleId: "m-p", hash: "h", contractHash: "b".repeat(64), inputSchema: { type: "object", properties: {}, required: [] }, idempotent: true },
       { target: "modules.list", inputSchema: { type: "object", properties: {} } },
-      ...["notify.list", "notify.status", "notify.settings", "notify.activity", "agent.configure"].map(target => ({ target, moduleId: target.split(".")[0], contractHash: "d".repeat(64) })),
+      ...["notify.list", "notify.status", "notify.settings", "notify.activity", "pi.settings"].map(target => ({ target, moduleId: target.split(".")[0], contractHash: "d".repeat(64) })),
       ...(args.audience === "user" ? [] : [{ target: "agent.run", moduleId: "agent" }]),
     ];
     // Search may return a related contract; forwarding must still require the exact target.
@@ -73,9 +72,11 @@ const module = await startModule("index.ts", { stubs: Object.fromEntries([
   stub("modules.list", () => ({ items: inventoryFailure ? null : inventory, nextCursor: null })),
   stub("modules.rollback", () => ({ status: "pending_approval", approvalId: "rollback-1" })),
   stub("planning.get", () => ({ plan: 1 })),
+  stub("chat.list", () => ({ sessions: [] })),
+
   stub("activity.usage", () => ({ items: [], nextCursor: null })), stub("settings.get", () => ({ timezone: "UTC", runTimeoutMinutes: null, moduleModel: null, wake: { minIntervalMs: 60000, dailyLimit: 1000, moduleDailyLimit: 100 } })), stub("notify.settings", () => ({ settings: {} })),
   stub("secrets.list", () => ({ items: [{ name: "okx_demo", configured: false, updatedAt: null, modules: ["okx-ai-trader"] }], nextCursor: null })), stub("secrets.set", args => ({ name: args.name, configured: true })), stub("secrets.remove", args => ({ name: args.name, configured: false })), stub("secrets.authorize", () => ({ url: "https://accounts.example/auth", redirectUri: "https://chrona.example/oauth/callback", expiresAt: "2026-11-02T04:00:00Z" })),
-  stub("settings.update", args => args), stub("agent.configure", () => ({ config: null, ready: false })),
+  stub("settings.update", args => args), stub("pi.settings", () => ({ config: null, ready: false })),
   stub("files.read-image", args => {
     if (args.ref === "files/missing.png") return null;
     if (args.ref === "files/bad.png") return { base64: "<script>", mime: "image/png" };
@@ -172,7 +173,8 @@ try {
   assert.equal(runRequests.length, 2);
   const wireRuns = module.calls.filter((call: {params: Args}) => targetName(call.params.target) === "agent.run");
   assert.notEqual(wireRuns[0].params.key, wireRuns[1].params.key);
-  assert.equal(runRequests[0]![1]["context-id"], runRequests.at(-1)![1]["context-id"]);
+  assert.equal(runRequests[0]![1].contextId, undefined);
+  assert.equal(runRequests.at(-1)![1].contextId, "context-author");
   assert.match(String(runRequests.at(-1)![1].prompt), /Inspect the current state and prior tool outcomes/);
   execution = { status: "queued", active: true };
   assert.equal((await (await get(`${sessionPath}/execution`)).json()).canContinue, false);
@@ -198,7 +200,7 @@ try {
   await get("/api/web/tools?query=planning");
   assert.deepEqual(calls.at(-1), ["modules.describe", { query: "planning", audience: "user" }]);
   const userTools = await (await get("/api/web/tools?audience=caller")).json() as { target: string }[];
-  assert.ok(userTools.some(tool => tool.target === "agent.configure"));
+  assert.ok(userTools.some(tool => tool.target === "pi.settings"));
   assert.ok(!userTools.some(tool => tool.target === "agent.run"));
   assert.deepEqual(calls.at(-1), ["modules.describe", { audience: "user" }]);
   for (const target of ["agent.run", "planning.missing", "planning.private", "runtime-callback.agent-admit"]) {
@@ -212,7 +214,7 @@ try {
   for (const body of [{ memory: { provider: "memory-local", autoRecall: false, autoRetain: false } }, { agent: { clear: true } }, { notifications: { dailyCap: 3 } }]) {
     assert.equal((await post("/api/web/settings", body)).status, 400);
   }
-  assert.equal(calls.slice(beforeOwnSettings).some(([target]) => ["settings.update", "notify.settings", "agent.configure"].includes(target)), false);
+  assert.equal(calls.slice(beforeOwnSettings).some(([target]) => ["settings.update", "notify.settings", "pi.settings"].includes(target)), false);
   // Credentials (v2-16): written through, never echoed; not reachable through the generic call route.
   assert.deepEqual(await (await post("/api/web/secrets/okx_demo", { value: { apiKey: "k" } })).json(), { name: "okx_demo", configured: true });
   // The page merges: fields it leaves out keep their saved values.
@@ -237,7 +239,7 @@ try {
   assert.ok(!calls.some(([target]) => target.startsWith("history.")));
   const beforeForeignAnswer = calls.length;
   assert.equal((await post("/api/web/interactions/i1/answer", { decision: "submit", value: true })).status, 404);
-  assert.equal(calls.slice(beforeForeignAnswer).some(([target]) => target === "chat.answer" || target === "agent.respond"), false);
+  assert.equal(calls.slice(beforeForeignAnswer).some(([target]) => target === "chat.answer" || target === "agent.write"), false);
   assert.equal((await post("/api/web/call", { target: "settings.update", args: {} })).status, 404);
   await checkAttachments(get, post, calls);
 
@@ -326,6 +328,12 @@ try {
   assert.equal((await get("/api/web/pages/planning/main")).status, 404);
   assert.ok(!(await (await get("/api/web/pages")).json()).some((item: { module: string }) => item.module === "planning"));
   await checkExecutableComponents(tool, get, post, files, inventory[0]!);
+  // Chat is an ordinary app: its executable callbacks follow the same page and contract guards.
+  const chatState = { id: "m-chat", name: "chat", status: "active", activeHash: "h" };
+  inventory.push(chatState);
+  const chat = { ...files, module: "chat", moduleId: "m-chat" };
+  await checkExecutableComponents(tool, get, post, chat, chatState);
+  assert.ok(calls.some(([target]) => target === "chat.list"), "Chat callback reaches its own tool");
   await tool("page-remove", { id: "images" }, files);
   assert.match(JSON.stringify(await tool("pages", {}, files)), /"id":"main"/);
   assert.match(JSON.stringify(await tool("page-remove", { id: "main" }, files)), /"removed":true/);
@@ -336,6 +344,6 @@ try {
 function targetName(raw: unknown): string {
   if (typeof raw === "string") return raw;
   const target = raw as { moduleId: string; tool: string };
-  const names: Record<string, string> = {"m-p":"planning","m-files":"files","agent":"agent"};
+  const names: Record<string, string> = {"m-p":"planning","m-files":"files","m-chat":"chat","agent":"agent"};
   return `${names[target.moduleId] ?? target.moduleId.replace(/-id$/, "")}.${target.tool}`;
 }

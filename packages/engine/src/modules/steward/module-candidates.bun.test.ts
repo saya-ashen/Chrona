@@ -12,6 +12,8 @@ import { buildPending } from "./module-build";
 import { testModuleSandbox } from "./module-test-process";
 import { findCandidateSet, assertCandidateSetIn } from "./module-candidate-records";
 import { commitModuleSource } from "./module-git";
+import { propose } from "./module-proposal";
+import { seedTestModuleRelease } from "./module-release-test-fixture";
 import { testDb } from "./test-db";
 
 const closes: (() => Promise<unknown>)[] = [];
@@ -69,7 +71,7 @@ test("lost reply replay returns original immutable receipt without rereading cha
   expect(await f.db.moduleVersion.count({ where: { source: "candidate", status: "building" } })).toBe(0);
 });
 
-test("admission is owner-only, exact, idempotent and forbids Agent", async () => {
+test("admission is owner-only, exact, idempotent and rejects the reserved Agent target", async () => {
   const f = await fixture(["alpha"]);
   expect(await admitCandidates(f.ports, f.workspace.id, owner, f.input)).toEqual(f.admission);
   await expect(admitCandidates(f.ports, f.workspace.id, owner, { ...f.input, targets: [{ name: "beta", moduleId: null, expectedActiveHash: null }] })).rejects.toMatchObject({ code: "conflict" });
@@ -77,10 +79,27 @@ test("admission is owner-only, exact, idempotent and forbids Agent", async () =>
   await expect(admitCandidates(f.ports, f.workspace.id, owner, { ...f.input, requestKey: "agent", targets: [{ name: "agent", moduleId: null, expectedActiveHash: null }] })).rejects.toMatchObject({ code: "forbidden" });
   await expect(admitCandidates(f.ports, f.workspace.id, { ...f.caller, hash: "b".repeat(40) } as Caller, { ...f.input, requestKey: "stale-owner" })).rejects.toMatchObject({ code: "forbidden" });
   await expect(admitCandidates(f.ports, "missing-workspace", owner, f.input)).rejects.toMatchObject({ code: "forbidden" });
-  const agent = await f.db.module.create({ data: { workspaceId: f.workspace.id, name: "agent", builtin: true, activeHash: hash } });
-  await f.db.moduleVersion.create({ data: { moduleId: agent.id, hash, manifest: manifest("agent", ["*"]), intent: {}, report: {}, source: "user", status: "approved" } });
-  await expect(admitCandidates(f.ports, f.workspace.id, { kind: "module", module: "agent", moduleId: agent.id, hash }, { ...f.input, requestKey: "agent-issuer" })).rejects.toMatchObject({ code: "forbidden" });
-  await expect(admitCandidates(f.ports, f.workspace.id, owner, { ...f.input, requestKey: "agent-submitter", submitter: { moduleId: agent.id, hash } })).rejects.toMatchObject({ code: "forbidden" });
+  const resources = join(f.dataDir, "external"), code = join(resources, "pi");
+  await mkdir(code, { recursive: true });
+  const piManifest = moduleManifestSchema.parse({ name: "pi", entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: ["*"] });
+  await writeFile(join(code, "module.json"), JSON.stringify(piManifest));
+  await writeFile(join(code, "index.ts"), "export {};\n");
+  await writeFile(join(code, "test.ts"), "export {};\n");
+  const git = await seedTestModuleRelease(resources, "pi");
+  const proposal = await propose(f.context, { root: resources, dir: "pi", sourceCommit: git.commit, gitBundle: git, intent: { changes: ["Offline Pi fixture"] } }, "user");
+  const moduleId = proposal.moduleId!, piHash = proposal.hash;
+  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId, hash: piHash } }, data: { status: "approved" } });
+  await f.db.module.update({ where: { id: moduleId }, data: { activeHash: piHash } });
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: moduleId } })).toMatchObject({ name: "pi", builtin: false, activeHash: git.commit });
+  const pi: Caller = { kind: "module", module: "pi", moduleId, hash: piHash };
+  await expect(admitCandidates(f.ports, f.workspace.id, pi, { ...f.input, requestKey: "pi-issuer" })).rejects.toMatchObject({ code: "forbidden" });
+  const input = { ...f.input, requestKey: "pi-submitter", submitter: { moduleId, hash: piHash } };
+  const admission = await admitCandidates(f.ports, f.workspace.id, owner, input);
+  expect(admission).toMatchObject({ submitter: input.submitter, targets: input.targets });
+  expect(await admitCandidates(f.ports, f.workspace.id, owner, input)).toEqual(admission);
+  await expect(admitCandidates(f.ports, f.workspace.id, owner, { ...input, requestKey: "stale-pi", submitter: { moduleId, hash } })).rejects.toMatchObject({ code: "forbidden" });
+  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId, hash: piHash } }, data: { status: "pending_review" } });
+  await expect(admitCandidates(f.ports, f.workspace.id, owner, { ...input, requestKey: "unapproved-pi" })).rejects.toMatchObject({ code: "forbidden" });
 });
 
 test("forged, stale and cross-workspace submitters cannot submit or read a fixed receipt", async () => {

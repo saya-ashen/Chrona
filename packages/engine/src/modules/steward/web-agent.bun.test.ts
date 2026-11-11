@@ -38,9 +38,8 @@ test("Web owns persisted conversations while actual Agent SDK admits scoped and 
     const web = await f.ports.db.module.findUniqueOrThrow({ where: { workspaceId_name: { workspaceId: f.workspaceId, name: "web" } } });
     const caller = { kind: "module" as const, module: "web", moduleId: web.id, hash: web.activeHash! };
     let loseRunResponse = false;
-    const call = async (target: string, args: Record<string, unknown> = {}) => {
-      const { ["request-key"]: key, ["command-key"]: commandKey, ...input } = args;
-      const output = (await callSync(f.ports, { ...kernelOrigin(f.workspaceId), caller }, target, target.startsWith("agent.") ? input : args, { key: target.startsWith("agent.") ? (key ?? commandKey) as string | undefined : undefined })).output;
+    const call = async (target: string, args: Record<string, unknown> = {}, options: { key?: string } = {}) => {
+      const output = (await callSync(f.ports, { ...kernelOrigin(f.workspaceId), caller }, target, args, options)).output;
       if (target === "agent.run" && loseRunResponse) { loseRunResponse = false; throw new Error("admission response lost"); }
       return output;
     };
@@ -55,7 +54,7 @@ test("Web owns persisted conversations while actual Agent SDK admits scoped and 
     expect(await f.ports.db.run.count()).toBe(1);
     expect((await conversations.list()).map(session => session.id)).toContain(sent.sessionId);
     await expect(conversations.send({ session: sent.sessionId, text: "排队时不重复启动", requestKey: "second" })).rejects.toMatchObject({ code: "conflict" });
-    await conversations.interrupt(sent.runId!);
+    await expect(conversations.interrupt(sent.runId!)).resolves.toMatchObject({ runId: sent.runId, status: "cancelled", active: false, stopConfirmed: true });
     await conversations.poll();
     expect(replies).toHaveLength(1);
     expect((await conversations.messages(sent.sessionId)).at(-1)?.text).toContain("停止");

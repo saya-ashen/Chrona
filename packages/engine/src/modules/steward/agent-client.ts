@@ -1,20 +1,33 @@
 import type { ProviderAdapter } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
-import { runtimeCall, startLocalProvider } from "./local-runtime";
+import { startLocalProvider } from "./local-runtime";
+import { listAgentProviders } from "./agent-provider";
 
-/** Provider-facing metadata and compatibility calls route to the application; no Pi adapter lives in the kernel. */
-export function createAgentClient(ports: () => StewardPorts, name: string): ProviderAdapter {
+/** Generic host seam. Every start uses the Run's previously admitted provider binding. */
+export function createRegisteredProviderClient(getPorts: () => StewardPorts): ProviderAdapter {
   return {
-    name, supportsRunModel: true,
-    health: () => runtimeCall(ports(), "ws_default", "agent.health", {}),
-    complete: input => runtimeCall(ports(), "ws_default", "agent.complete", input),
-    transcript: input => runtimeCall(ports(), "ws_default", "agent.transcript", input),
+    name: "registered", supportsRunModel: true,
+    async health() {
+      const ports = getPorts(), workspaces = await ports.db.workspace.findMany({ select: { id: true } });
+      let available = false;
+      for (const workspace of workspaces) {
+        const page = await listAgentProviders(ports, workspace.id, { limit: 100 });
+        available ||= page.items.some(provider => provider.available);
+      }
+      return { available, sandboxed: ports.sandbox?.isolated ?? false, error: available ? null : "No available registered provider" };
+    },
     start(input) {
+      const ports = getPorts();
       const pending = (async () => {
-        const run = await ports().db.run.findUniqueOrThrow({ where: { id: input.runId }, select: { workspaceId: true } });
-        return startLocalProvider(ports(), run.workspaceId, input);
+        const run = await ports.db.run.findUniqueOrThrow({ where: { id: input.runId }, select: { workspaceId: true } });
+        return { handle: await startLocalProvider(ports, run.workspaceId, input), workspaceId: run.workspaceId };
       })();
-      return { done: pending.then(handle => handle.done), async inject(message, images) { await (await pending).inject(message, images); }, async abort() { await (await pending).abort(); } };
+      return {
+        done: pending.then(({ handle }) => handle.done),
+        async inject(message, images) { await (await pending).handle.inject(message, images); },
+        async abort() { await (await pending).handle.abort(); },
+
+      };
     },
   };
 }

@@ -1,8 +1,10 @@
-import { afterEach, expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
+import { chmod, link, mkdir, mkdtemp, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { BUILTIN_MODULE_NAMES, KERNEL_MODULE_NAMES, MODULE_OPERATIONS, PREINSTALLED_MODULE_NAMES, moduleManifestSchema, moduleInstallRequestSchema, moduleInstallResultSchema } from "@chrona/contracts/steward";
+import { delimiter, join } from "node:path";
+import { type ProviderAdapter, BUILTIN_MODULE_NAMES, KERNEL_MODULE_NAMES, MODULE_OPERATIONS, PREINSTALLED_MODULE_NAMES, runtimeStartSchema, moduleManifestSchema, moduleInstallRequestSchema } from "@chrona/contracts/steward";
 import { assertExternalName, assertExternalModule, assertModuleOperation, moduleIdentity } from "./module-identity";
 import { seedTestModuleRelease } from "./module-release-test-fixture";
 import { resolveBuiltinRelease, resolveExternalRelease } from "./module-release";
@@ -21,23 +23,22 @@ import { moduleInterfaces } from "./system-apps";
 import { createSecrets } from "./secrets";
 import { callSync, enqueueCall, kernelOrigin, moduleCallbackContractHash, runDueCalls } from "./module-calls";
 
-// Keep these private lifecycle fixtures valid under the current manifest contract.
-const manifest = (name: string) => moduleManifestSchema.parse({ name, description: `Fixture ${name}`, entry: "index.ts", keepAlive: true, effects: [], tests: ["test.ts"], tools: [] });
-const fixtures = {
-  builtin: { row: { id: "fixture-agent", name: "agent", builtin: true, status: "active", activeHash: "a".repeat(64) }, manifest: manifest("agent") },
-  external: { row: { id: "fixture-alpha", name: "alpha", builtin: false, status: "active", activeHash: "b".repeat(64) }, manifest: manifest("alpha") },
-  forgedRow: { id: "fixture-forged", name: "agent", builtin: false, status: "active", activeHash: "e".repeat(64) },
-  forgedManifest: { ...manifest("alpha"), builtin: true, origin: "builtin" },
-  install: moduleInstallRequestSchema.parse({ package: "qq", mode: "install", requestKey: "fixture-install-qq" }),
-  failedInstall: moduleInstallResultSchema.parse({ package: "qq", requestKey: "fixture-install-qq", status: "failed", moduleId: null, hash: null, approvalId: null, error: { code: "failed", reason: "dependency_unavailable", message: "Synthetic missing dependency" } }),
-  unknownInstall: moduleInstallResultSchema.parse({ package: "qq", requestKey: "fixture-unknown", status: "pending", moduleId: null, hash: null, approvalId: null, error: null }),
-};
+import { moduleLifecycleFixtures as fixtures } from "./module-lifecycle.fixtures";
+import { registerAgentProvider } from "./agent-provider";
+import { createRegisteredProviderClient } from "./agent-client";
+import { registerLocalRuntime } from "./local-runtime";
+import { moduleSupervisor } from "./module-supervisor";
+import { testModuleProcess } from "./module-test-process";
+import { REGISTRATION } from "./external/pi/registration";
+import { createPiOperations } from "./external/pi/operations";
+import { createBrowsers } from "./external/pi/browser";
+import { currentHostGeneration, hostStopped } from "./external/pi/host-recovery";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 async function fixture() {
-  const dataDir = await mkdtemp(join(tmpdir(), "chrona-p0-")), db = testDb();
-  cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
+  const dataDir = await mkdtemp(join(tmpdir(), "chrona-p0-")), db = testDb({ injectedAgent: false });
+  cleanups.push(async () => { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "p0" } });
   const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-11-05T00:00:00Z"), publicUrl: null, moduleBuiltinResources: join(dataDir, "builtin"), moduleExternalResources: join(dataDir, "external") };
   for (const [root, names] of [[ports.moduleBuiltinResources!, BUILTIN_MODULE_NAMES], [ports.moduleExternalResources!, [...PREINSTALLED_MODULE_NAMES, "memory-local"]]] as const) {
@@ -52,15 +53,13 @@ async function fixture() {
   return { ports, db, workspaceId: workspace.id, dataDir };
 }
 
-test("identity is a database fact; Agent and forged identities stay protected", async () => {
+test("kernel Agent rejects persisted impostors; Pi retains ordinary lifecycle rights", async () => {
   const f = await fixture();
   for (const operation of MODULE_OPERATIONS) {
-    for (const name of BUILTIN_MODULE_NAMES) {
-      const builtin = { ...fixtures.builtin.row, name };
-      if (["remove", "install"].includes(operation) || name === "agent" && ["build", "propose", "group", "activate", "update", "rollback"].includes(operation)) expect(() => assertModuleOperation(builtin, operation)).toThrow("Built-in");
-      else expect(() => assertModuleOperation(builtin, operation)).not.toThrow();
+    for (const name of [...KERNEL_MODULE_NAMES, "rescue"]) {
+      for (const builtin of [false, true]) expect(() => assertModuleOperation({ name, builtin }, operation)).toThrow("reserved identity");
     }
-    for (const name of [...KERNEL_MODULE_NAMES, "rescue"]) expect(() => assertModuleOperation({ name, builtin: true }, operation)).toThrow("reserved identity");
+    expect(() => assertModuleOperation(fixtures.pi.row, operation)).not.toThrow();
     expect(() => assertModuleOperation(fixtures.external.row, operation)).not.toThrow();
     expect(() => assertModuleOperation(fixtures.forgedRow, operation)).toThrow("reserved identity");
   }
@@ -75,17 +74,18 @@ test("identity is a database fact; Agent and forged identities stay protected", 
 });
 
 test("trusted release binds manifest and exact code hash; missing, drift, mismatches and symlinks fail closed", async () => {
-  const f = await fixture(), release = await resolveBuiltinRelease(f.ports, "agent");
-  expect(release).toMatchObject({ name: "agent", origin: "builtin", codeDir: join(f.ports.moduleBuiltinResources!, "agent") });
+  const f = await fixture(), release = await resolveExternalRelease(f.ports, "pi");
+  expect(release).toMatchObject({ name: "pi", origin: "external", codeDir: join(f.ports.moduleExternalResources!, "pi") });
+  await expect(resolveBuiltinRelease(f.ports, "agent")).rejects.toMatchObject({ reason: "release_not_found" });
   expect(release.hash).toMatch(/^[a-f0-9]{40}$/);
   expect(release.git?.commit).toBe(release.hash);
   expect((await resolveExternalRelease(f.ports, "qq")).origin).toBe("external");
-  await expect(resolveBuiltinRelease(f.ports, "../qq")).rejects.toMatchObject({ reason: "release_not_found" });
-  await expect(resolveBuiltinRelease({}, "agent")).rejects.toMatchObject({ reason: "release_not_found" });
+  await expect(resolveExternalRelease(f.ports, "../pi")).rejects.toMatchObject({ reason: "release_not_found" });
+  await expect(resolveExternalRelease({ moduleExternalResources: join(f.dataDir, "missing") }, "pi")).rejects.toMatchObject({ reason: "release_not_found" });
   await writeFile(join(release.codeDir, "index.ts"), "changed\n");
-  await expect(resolveBuiltinRelease(f.ports, "agent", release.hash)).rejects.toMatchObject({ reason: "release_drift" });
+  await expect(resolveExternalRelease(f.ports, "pi", release.hash)).rejects.toMatchObject({ reason: "release_drift" });
   await symlink(join(release.codeDir, "index.ts"), join(release.codeDir, "leak.ts"));
-  await expect(resolveBuiltinRelease(f.ports, "agent")).rejects.toMatchObject({ code: "forbidden" });
+  await expect(resolveExternalRelease(f.ports, "pi")).rejects.toMatchObject({ code: "forbidden" });
   await writeFile(join(f.ports.moduleExternalResources!, "qq/module.json"), JSON.stringify(fixtures.external.manifest));
   await expect(resolveExternalRelease(f.ports, "qq")).rejects.toMatchObject({ reason: "invalid_release" });
 });
@@ -106,9 +106,9 @@ test("install is bounded, idempotent and explicit; uncertain receipts do not exe
   expect(calls).toBe(1);
   expect(moduleInstallRequestSchema.safeParse({ ...fixtures.install, dir: "/private" }).success).toBe(false);
   expect(moduleInstallRequestSchema.safeParse({ ...fixtures.install, package: "web" }).success).toBe(true);
-  expect((await externalPackageCatalog(f.ports, f.workspaceId)).map(item => item.name)).toEqual(["web", "notify", "qq", "author", "memory-local", "coding", "coding-web", "mcp", "files", "events", "remind", "mind", "remote-execution"]);
+  expect((await externalPackageCatalog(f.ports, f.workspaceId)).map(item => item.name)).toEqual(["pi", "web", "notify", "qq", "author", "memory-local", "coding", "coding-web", "mcp", "files", "events", "remind", "mind", "remote-execution"]);
   // Other packages' history cannot push this package out of a global latest-N window.
-  for (let i = 0; i < 205; i++) await f.db.moduleInstallation.create({ data: { id: `noise-${i}`, workspaceId: f.workspaceId, package: "mind", mode: "install", requestKey: `noise-${i}`, status: "failed" } });
+  await f.db.moduleInstallation.createMany({ data: Array.from({ length: 205 }, (_, i) => ({ id: `noise-${i}`, workspaceId: f.workspaceId, package: "mind", mode: "install", requestKey: `noise-${i}`, status: "failed" })) });
   expect((await externalPackageCatalog(f.ports, f.workspaceId)).find(item => item.name === "qq")?.installation).toMatchObject({ requestKey: fixtures.install.requestKey, status: "failed" });
   const unavailable = await installExternal({ ...f.ports, moduleExternalInstaller: undefined }, f.workspaceId, { package: "notify", mode: "install", requestKey: "no-adapter" });
   expect(unavailable).toMatchObject({ status: "unavailable", error: { reason: "installer_unavailable" } });
@@ -123,10 +123,10 @@ test("initialization persists once, serializes concurrent starts and never resur
   };
   const [a, b] = await Promise.all([ensureWorkspaceInitialized(f.ports, f.workspaceId), ensureWorkspaceInitialized(f.ports, f.workspaceId)]);
   expect(a).toEqual(b); expect(a.status).toBe("complete"); expect(calls).toBe(PREINSTALLED_MODULE_NAMES.length);
-  await f.db.module.deleteMany({ where: { workspaceId: f.workspaceId, name: "qq" } });
+  await f.db.module.deleteMany({ where: { workspaceId: f.workspaceId, name: "pi" } });
   expect((await ensureWorkspaceInitialized({ ...f.ports }, f.workspaceId)).status).toBe("complete");
   expect(calls).toBe(PREINSTALLED_MODULE_NAMES.length);
-  expect(await f.db.module.count({ where: { workspaceId: f.workspaceId, name: "qq" } })).toBe(0);
+  expect(await f.db.module.count({ where: { workspaceId: f.workspaceId, name: "pi" } })).toBe(0);
   expect(await f.db.module.count({ where: { workspaceId: f.workspaceId, name: "memory-local" } })).toBe(0);
 });
 
@@ -185,11 +185,29 @@ test("credential readiness projects generic adapter and saved metadata without t
 });
 
 test("build claim refuses changed identities and continues to a valid queued build before Provider start", async () => {
+  registerLocalRuntime();
   const f = await fixture(), starts: string[] = [];
-  f.ports.provider = { name: "fake", async health() { return { available: true, sandboxed: false, error: null }; }, start(input) {
-    starts.push(input.runId);
-    return { async inject() {}, async abort() {}, done: Promise.resolve({ outcome: "finished" as const, sessionId: null, error: null }) };
-  } };
+  const peer = testModuleProcess(async (event, call) => {
+    if (event.trigger.kind !== "tool") return {};
+    const { id, args } = event.trigger;
+    if (id === "health") return { result: { name: "Pi fixture", supportsRunModel: true, complete: true, available: true, sandboxed: false, error: null } };
+    if (id === "start") {
+      const input = runtimeStartSchema.parse(args);
+      if (!input.callbacks) throw new Error("Expected a Run callback binding");
+      starts.push(input.runId);
+      const settled = await call("call", { target: "runtime-callback.event", mode: "sync", reply: false, args: { callbackId: input.callbacks, event: { kind: "settled", operationId: input.operationId, outcome: { outcome: "finished", sessionId: null, error: null } } } });
+      expect(settled).not.toHaveProperty("error");
+      return { result: { operationId: input.operationId } };
+    }
+    if (id === "release") return { result: { released: true } };
+    return { result: {} };
+  });
+  f.ports.sandbox = { available: true, isolated: false, startModule: peer.startModule };
+  f.ports.provider = createRegisteredProviderClient(() => f.ports);
+  const pi = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "pi", status: "active", activeHash: "pi-v1" } });
+  const manifest = moduleManifestSchema.parse(await Bun.file(join(import.meta.dir, "external/pi/module.json")).json());
+  await f.db.moduleVersion.create({ data: { moduleId: pi.id, hash: pi.activeHash!, status: "approved", source: "user", manifest, intent: {}, report: {} } });
+  await registerAgentProvider(f.ports, f.workspaceId, { kind: "module", module: pi.name, moduleId: pi.id, hash: pi.activeHash! }, REGISTRATION);
   const module = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "alpha", builtin: false } });
   const runs = createRuns(f.ports, f.workspaceId), queued: string[] = [];
   for (const name of ["alpha", "beta"]) {
@@ -206,36 +224,31 @@ test("build claim refuses changed identities and continues to a valid queued bui
   expect(starts).toEqual([queued[1]!]);
 });
 
-test("approval creation refuses Agent updates, removal and forged identities without records", async () => {
-  const f = await fixture();
-  const approvals = createApprovals({ ...f.ports, workspaceId: f.workspaceId });
-  const builtin = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "agent", builtin: true, activeHash: "a".repeat(64) } });
-  const external = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "alpha", activeHash: "b".repeat(64) } });
-  for (const module of [builtin, external]) await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: module.activeHash!, source: "user", status: "approved", manifest: module.builtin ? fixtures.builtin.manifest : fixtures.external.manifest, intent: {}, report: {} } });
+test("approval creation refuses reserved kernel identities without records and permits ordinary Pi", async () => {
+  const f = await fixture(), approvals = createApprovals({ ...f.ports, workspaceId: f.workspaceId });
+  const pi = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "pi", activeHash: fixtures.pi.row.activeHash } });
+  await f.db.moduleVersion.create({ data: { moduleId: pi.id, hash: pi.activeHash!, source: "user", status: "approved", manifest: fixtures.pi.manifest, intent: {}, report: {} } });
   const common = { title: "Fixture", detail: "", preview: "" };
-  await expect(approvals.create({ ...common, action: "delete_data", payload: { kind: "module_remove", moduleId: builtin.id, name: builtin.name, hash: builtin.activeHash } })).rejects.toMatchObject({ reason: "immutable_module" });
-  for (const identity of [{ name: "agent", builtin: false }, { name: "modules", builtin: true }]) {
-    const invalid = identity.name === "agent"
-      ? await f.db.module.update({ where: { id: builtin.id }, data: { builtin: false, activeHash: "c".repeat(64) } })
-      : await f.db.module.create({ data: { workspaceId: f.workspaceId, ...identity, activeHash: "c".repeat(64) } });
-    await f.db.moduleVersion.create({ data: { moduleId: invalid.id, hash: invalid.activeHash!, source: "user", status: "approved", manifest: fixtures.builtin.manifest, intent: {}, report: {} } });
-    for (const request of [
-      { ...common, action: "activate_module", moduleId: invalid.id, payload: { kind: "activate_module", moduleId: invalid.id, hash: invalid.activeHash } },
-      { ...common, action: "activate_module", payload: { kind: "activate_modules", versions: [{ moduleId: external.id, hash: external.activeHash }, { moduleId: invalid.id, hash: invalid.activeHash }] } },
-    ]) await expect(approvals.create(request)).rejects.toMatchObject({ reason: "module_identity_conflict" });
-    if (identity.name === "agent") await f.db.module.update({ where: { id: builtin.id }, data: { builtin: true, activeHash: builtin.activeHash } });
+  for (const name of ["agent", "modules"]) {
+    const invalid = await f.db.module.create({ data: { workspaceId: f.workspaceId, name, activeHash: "c".repeat(64) } });
+    await f.db.moduleVersion.create({ data: { moduleId: invalid.id, hash: invalid.activeHash!, source: "user", status: "approved", manifest: { ...fixtures.external.manifest, name }, intent: {}, report: {} } });
+    for (const builtin of [false, true]) {
+      await f.db.module.update({ where: { id: invalid.id }, data: { builtin } });
+      for (const request of [
+        { ...common, action: "delete_data", payload: { kind: "module_remove", moduleId: invalid.id, name, hash: invalid.activeHash } },
+        { ...common, action: "activate_module", moduleId: invalid.id, payload: { kind: "activate_module", moduleId: invalid.id, hash: invalid.activeHash } },
+        { ...common, action: "activate_module", payload: { kind: "activate_modules", versions: [{ moduleId: pi.id, hash: pi.activeHash }, { moduleId: invalid.id, hash: invalid.activeHash }] } },
+      ]) await expect(approvals.create(request)).rejects.toMatchObject({ reason: "module_identity_conflict" });
+    }
   }
   expect(await f.db.approval.count()).toBe(0);
   expect(await f.db.audit.count({ where: { kind: "approval_created" } })).toBe(0);
-  for (const request of [
-    { ...common, action: "activate_module", moduleId: builtin.id, payload: { kind: "activate_module", moduleId: builtin.id, hash: builtin.activeHash } },
-    { ...common, action: "activate_module", payload: { kind: "activate_modules", versions: [{ moduleId: external.id, hash: external.activeHash }, { moduleId: builtin.id, hash: builtin.activeHash }] } },
-  ]) await expect(approvals.create(request)).rejects.toMatchObject({ reason: "immutable_module" });
-  const allowed = await approvals.create({ ...common, action: "activate_module", moduleId: external.id, payload: { kind: "activate_module", moduleId: external.id, hash: external.activeHash } });
+  const allowed = await approvals.create({ ...common, action: "activate_module", moduleId: pi.id, payload: { kind: "activate_module", moduleId: pi.id, hash: pi.activeHash } });
   expect(allowed.status).toBe("open");
+  expect((await approvals.create({ ...common, action: "delete_data", payload: { kind: "module_remove", moduleId: pi.id, name: pi.name, hash: pi.activeHash } })).status).toBe("open");
 });
 
-test.each(["web", "notify", "other-entry"])("list and interface projections expose ordinary entry %s removal without overwriting permission descriptions", async name => {
+test.each(["pi", "web", "notify", "other-entry"])("list and interface projections expose ordinary entry %s removal without overwriting permission descriptions", async name => {
   const f = await fixture(); createStewardService(f.ports);
   const row = await f.db.module.create({ data: { workspaceId: f.workspaceId, name, builtin: false, activeHash: "a".repeat(64) } });
   const manifest = moduleManifestSchema.parse({ ...fixtures.external.manifest, name, uses: ["*"],
@@ -250,5 +263,180 @@ test.each(["web", "notify", "other-entry"])("list and interface projections expo
   expect(await moduleInterfaces(f.ports, f.workspaceId, "modules")).toMatchObject({ origin: "kernel", capabilities: { build: false } });
   await expect(callSync(f.ports, { workspaceId: f.workspaceId, caller: { kind: "owner", via: null }, chain: [], path: [] }, "modules.catalog", {})).rejects.toMatchObject({ code: "not_found" });
   const catalog = await externalPackageCatalog(f.ports, f.workspaceId);
-  expect(catalog.map(item => item.name)).toEqual(["web", "notify", "qq", "author", "memory-local", "coding", "coding-web", "mcp", "files", "events", "remind", "mind", "remote-execution"]);
+  expect(catalog.map(item => item.name)).toEqual(["pi", "web", "notify", "qq", "author", "memory-local", "coding", "coding-web", "mcp", "files", "events", "remind", "mind", "remote-execution"]);
+});
+
+describe("ordinary Pi browser discovery", () => {
+  const cleanups: string[] = [];
+  afterEach(async () => { for (const dir of cleanups.splice(0)) await rm(dir, { recursive: true, force: true }); });
+  async function temp() { const dir = await mkdtemp(join(tmpdir(), "chrona-browser-")); cleanups.push(dir); return dir; }
+  const program = (name: string) => process.platform === "win32" ? `${name}.exe` : name;
+  async function executable(path: string) { await writeFile(path, "browser fixture", { mode: 0o755 }); return realpathSync(path); }
+
+  test("an explicit browser comes first, then host PATH with its native delimiter", async () => {
+    const root = await temp(), bin = join(root, "bin"), empty = join(root, "empty");
+    await mkdir(bin); await mkdir(empty);
+    const onPath = await executable(join(bin, program("google-chrome"))), configured = await executable(join(root, program("my-chrome")));
+    const path = [empty, bin].join(delimiter);
+    const which = spyOn(Bun, "which");
+    try {
+      expect(createBrowsers({ configured, path }).find()).toBe(configured);
+      expect(which).not.toHaveBeenCalled();
+      expect(createBrowsers({ configured: join(root, "missing"), path }).find()).toBe(onPath);
+      expect(createBrowsers({ path: empty }).find()).toBeNull();
+    } finally { which.mockRestore(); }
+  });
+
+  test("missing browsers stay unavailable without acquisition, and an owner installation is found later", async () => {
+    const root = await temp(), browsers = createBrowsers({ path: root });
+    // Installed acquisition tools must not be invoked when no browser is present.
+    await executable(join(root, program("nix")));
+    await executable(join(root, program("unzip")));
+    const fetcher = spyOn(globalThis, "fetch").mockImplementation((async () => { throw new Error("Unexpected browser download"); }) as unknown as typeof fetch);
+    try {
+      const before = await readdir(root);
+      expect(browsers.ensure()).toBeNull();
+      expect(browsers.ensure()).toBeNull();
+      await Promise.resolve();
+      expect(await readdir(root)).toEqual(before);
+      expect(fetcher).not.toHaveBeenCalled();
+      const browser = await executable(join(root, program("chromium")));
+      expect(browsers.ensure()).toBe(browser);
+    } finally { fetcher.mockRestore(); }
+  });
+
+  test("directories and non-executables are not browsers", async () => {
+    const root = await temp(), bin = join(root, "bin");
+    await mkdir(bin);
+    expect(createBrowsers({ configured: root, path: bin }).ensure()).toBeNull();
+    if (process.platform !== "win32") {
+      const file = join(root, "plain-file");
+      await writeFile(file, "", { mode: 0o600 });
+      expect(createBrowsers({ configured: file, path: bin }).ensure()).toBeNull();
+    }
+  });
+});
+
+describe("ordinary Pi host stop evidence", () => {
+  const generation = "a".repeat(64);
+  const receipt = { version: 1, generation, state: "stopped", scope: "descendants", treeClean: true };
+  async function fixture() {
+    const root = await mkdtemp(join(tmpdir(), "chrona-pi-host-receipt-"));
+    await mkdir(join(root, ".host-stops"), { mode: 0o700 });
+    return { root, path: join(root, ".host-stops", generation + ".json") };
+  }
+
+  test.skipIf(process.platform !== "linux")("Pi accepts only exact descendant stop evidence for the original generation", async () => {
+    const { root, path } = await fixture();
+    try {
+      expect(await hostStopped(root, generation)).toBe(false);
+      await writeFile(path, JSON.stringify(receipt), { mode: 0o600 });
+      expect(await hostStopped(root, generation)).toBe(true);
+      for (const invalid of [
+        { ...receipt, version: 2 }, { ...receipt, generation: "b".repeat(64) },
+        { ...receipt, state: "unknown" }, { ...receipt, scope: "process-group" },
+        { ...receipt, treeClean: false }, { ...receipt, treeClean: "true" },
+        { version: 1, generation }, null, "malformed JSON",
+      ]) {
+        await writeFile(path, invalid === "malformed JSON" ? "{" : JSON.stringify(invalid));
+        expect(await hostStopped(root, generation)).toBe(false);
+      }
+      for (const invalid of ["", "../" + generation, "A".repeat(64), "a".repeat(63)]) {
+        expect(await hostStopped(root, invalid)).toBe(false);
+      }
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
+  test.skipIf(process.platform !== "linux")("Pi rejects receipts with untrusted storage", async () => {
+    const { root, path } = await fixture();
+    try {
+      await writeFile(path, JSON.stringify(receipt), { mode: 0o600 });
+      await chmod(path, 0o644);
+      expect(await hostStopped(root, generation)).toBe(false);
+      await chmod(path, 0o600);
+      const getuid = spyOn(process, "getuid").mockReturnValue(process.getuid!() + 1);
+      try { expect(await hostStopped(root, generation)).toBe(false); } finally { getuid.mockRestore(); }
+      await link(path, join(root, "hardlink"));
+      expect(await hostStopped(root, generation)).toBe(false);
+      await rm(join(root, "hardlink"));
+      await writeFile(path, JSON.stringify(receipt) + " ".repeat(512));
+      expect(await hostStopped(root, generation)).toBe(false);
+      await rm(path);
+      await writeFile(join(root, "target"), JSON.stringify(receipt), { mode: 0o600 });
+      await symlink(join(root, "target"), path);
+      expect(await hostStopped(root, generation)).toBe(false);
+      await rm(path);
+      await mkdir(path, { mode: 0o700 });
+      expect(await hostStopped(root, generation)).toBe(false);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
+  test.skipIf(process.platform !== "linux")("a receipt cannot confirm termination of the current Pi host", async () => {
+    const { root, path } = await fixture(), previous = process.env.CHRONA_HOST_GENERATION;
+    try {
+      await writeFile(path, JSON.stringify(receipt), { mode: 0o600 });
+      process.env.CHRONA_HOST_GENERATION = generation;
+      expect(currentHostGeneration()).toBe(generation);
+      expect(await hostStopped(root, generation)).toBe(false);
+      process.env.CHRONA_HOST_GENERATION = "invalid";
+      expect(currentHostGeneration()).toBeUndefined();
+      expect(await hostStopped(root, generation)).toBe(true);
+    } finally {
+      if (previous === undefined) delete process.env.CHRONA_HOST_GENERATION;
+      else process.env.CHRONA_HOST_GENERATION = previous;
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("ordinary Pi completion durability", () => {
+  const args = { commandKey: "completion", prompt: "private prompt", maxOutputTokens: 200, timeoutMs: 5000 };
+  async function setup(complete: NonNullable<ProviderAdapter["complete"]>) {
+    const data = await mkdtemp(join(tmpdir(), "chrona-p0-pi-completion-"));
+    cleanups.push(() => rm(data, { recursive: true, force: true }));
+    const provider: ProviderAdapter = { name: "pi", async health() { return { available: true, sandboxed: false, error: null }; },
+      start() { throw new Error("Unexpected conversational start"); }, complete };
+    const prepare = async () => ({ provider, input: { ...args, model: "fixture/model" } });
+    const operations = () => createPiOperations(data, async () => { throw new Error("Unexpected conversation preparation"); }, undefined, 64, prepare);
+    return { data, operations };
+  }
+  async function settled(operations: ReturnType<typeof createPiOperations>) {
+    const until = Date.now() + 2000;
+    for (;;) {
+      const status = await operations.control("status", { operationId: args.commandKey }) as { operationId: string; outcome: unknown; failure: boolean; completion?: unknown };
+      if (status.outcome || status.failure) return status;
+      if (Date.now() >= until) throw new Error("Completion receipt did not settle");
+      await new Promise(resolve => setTimeout(resolve, 1));
+    }
+  }
+
+  test("a bounded long completion is delivered whole and replayed after restart", async () => {
+    const text = "ordinary result ".repeat(10_000); let launches = 0;
+    const f = await setup(async () => { launches++; return { text, inputTokens: 2, outputTokens: 180 }; });
+    const expected = { text, inputTokens: 2, outputTokens: 180 };
+    const first = f.operations();
+    expect(await first.complete(args)).toEqual({ operationId: args.commandKey });
+    expect(await settled(first)).toMatchObject({ outcome: { outcome: "finished" }, completion: expected });
+    const restarted = f.operations();
+    expect(await restarted.complete(args)).toEqual({ operationId: args.commandKey });
+    expect(await settled(restarted)).toMatchObject({ outcome: { outcome: "finished" }, completion: expected });
+    expect(launches).toBe(1);
+  });
+
+  test("failed outcome persistence never acknowledges a result or repeats the effect after restart", async () => {
+    let launches = 0;
+    const f = await setup(async () => {
+      launches++;
+      // The durable claim exists before execution; obstruct only the outcome commit.
+      const key = createHash("sha256").update(JSON.stringify(args.commandKey)).digest("hex");
+      await mkdir(join(f.data, "operations", key + ".json.pending"));
+      return { text: "uncommitted result", inputTokens: 2, outputTokens: 3 };
+    });
+    const first = f.operations();
+    expect(await first.complete(args)).toEqual({ operationId: args.commandKey });
+    expect(await settled(first)).toEqual({ operationId: args.commandKey, outcome: null, failure: true });
+    await expect(first.complete(args)).rejects.toMatchObject({ code: "unknown" });
+    await expect(f.operations().complete(args)).rejects.toMatchObject({ code: "unknown" });
+    expect(launches).toBe(1);
+  });
 });

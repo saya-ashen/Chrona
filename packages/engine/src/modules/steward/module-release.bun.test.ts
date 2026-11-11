@@ -19,7 +19,7 @@ async function fixture(name = "files") {
   const git = await seedTestModuleRelease(resources, name);
   return { root, resources, codeDir, git, ports: { moduleExternalResources: resources } };
 }
-test.each(["files", "author", "coding", "coding-web", "mind"])("offline %s release identity is its real commit with no invented upstream", async name => {
+test.each(["pi", "files", "author", "coding", "coding-web", "mind"])("offline %s release identity is its real commit with no invented upstream", async name => {
   const f = await fixture(name), release = await resolveExternalRelease(f.ports, name);
   expect(release.hash).toBe(f.git.commit);
   expect(release.git).toEqual({ repository: null, branch: "main", commit: f.git.commit, bundlePath: f.git.bundlePath });
@@ -32,7 +32,7 @@ test.each(["files", "events", "web", "notify"])("extracted official %s still ver
   await writeFile(join(f.codeDir, "index.ts"), "// changed after approval\n");
   await expect(resolveExternalRelease(f.ports, name, hash)).rejects.toMatchObject({ reason: "release_drift" });
 });
-test.each(["files", "author", "coding", "coding-web", "mind"])("%s bundle integrity and source commit drift both fail closed", async name => {
+test.each(["pi", "files", "author", "coding", "coding-web", "mind"])("%s bundle integrity and source commit drift both fail closed", async name => {
   const f = await fixture(name);
   await writeFile(join(f.codeDir, "index.ts"), "// drift\n");
   await expect(resolveExternalRelease(f.ports, name)).rejects.toMatchObject({ reason: "release_drift" });
@@ -40,7 +40,7 @@ test.each(["files", "author", "coding", "coding-web", "mind"])("%s bundle integr
   await appendFile(f.git.bundlePath, "tampered");
   await expect(resolveExternalRelease(f.ports, name)).rejects.toMatchObject({ reason: "release_drift" });
 });
-test.each(["files", "author", "coding", "coding-web", "mind"])("new %s release has no snapshot fallback when lock is missing or ambiguous", async name => {
+test.each(["pi", "files", "author", "coding", "coding-web", "mind"])("new %s release has no snapshot fallback when lock is missing or ambiguous", async name => {
   const f = await fixture(name), lockPath = join(f.root, "module-git", "lock.json");
   const lock = JSON.parse(await readFile(lockPath, "utf8"));
   lock.modules.push(lock.modules[0]); await writeFile(lockPath, JSON.stringify(lock));
@@ -48,16 +48,9 @@ test.each(["files", "author", "coding", "coding-web", "mind"])("new %s release h
   await rm(lockPath);
   await expect(resolveExternalRelease(f.ports, name)).rejects.toMatchObject({ reason: "release_not_found" });
 });
-test("bundle symlink rejected and legacy reader keeps original approval hash", async () => {
+test("bundle symlink and former builtin Agent identity are rejected", async () => {
   const f = await fixture(), backup = join(f.root, "bundle-copy");
   await writeFile(backup, await readFile(f.git.bundlePath)); await rm(f.git.bundlePath); await symlink(backup, f.git.bundlePath);
   await expect(resolveExternalRelease(f.ports, "files")).rejects.toMatchObject({ reason: "invalid_release" });
-  const dir = join(f.root, "builtin", "agent"); await mkdir(dir, { recursive: true });
-  await writeFile(join(dir, "module.json"), JSON.stringify(moduleManifestSchema.parse({ name: "agent", entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [] })));
-  await writeFile(join(dir, "index.ts"), "// legacy\n");
-  await writeFile(join(dir, "test.ts"), "// legacy test\n");
-  const digest = createHash("sha256");
-  for (const file of (await readModuleFiles(dir, "Unsafe legacy fixture")).sort((a, b) => a.path.localeCompare(b.path))) digest.update(file.path).update("\0").update(file.bytes).update("\0");
-  const hash = digest.digest("hex");
-  expect(await resolveBuiltinRelease({ moduleBuiltinResources: join(f.root, "builtin") }, "agent", hash)).toMatchObject({ hash, git: null });
+  await expect(resolveBuiltinRelease({ moduleBuiltinResources: join(f.root, "builtin") }, "agent")).rejects.toMatchObject({ reason: "release_not_found" });
 });

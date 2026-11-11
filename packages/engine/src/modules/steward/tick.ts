@@ -98,7 +98,7 @@ export function createTick(ports: StewardPorts) {
             const ordinary = execution ? null : await runInput(run);
             const sessionDir = execution?.sessionDir ?? join(run.cwd, ".chrona", "sessions");
             await mkdir(sessionDir, { recursive: true });
-            if (!ports.provider) { gate.fail(); await runs.finish(run.id, { outcome: "unavailable", sessionId: null, error: "Provider unconfigured" }, { stopEvidence: "never_started" }); return; }
+            if (!ports.provider && !await ports.db.agentRunProvider.findUnique({ where: { runId: run.id } })) { gate.fail(); await runs.finish(run.id, { outcome: "unavailable", sessionId: null, error: "Provider unconfigured" }, { stopEvidence: "never_started" }); return; }
             const channel = createProviderChannel(ports, run, execution?.onInteraction);
             let handle;
             try {
@@ -114,7 +114,8 @@ export function createTick(ports: StewardPorts) {
             if (gate.stopped()) await handle.abort();
           } catch (error) {
             gate.fail();
-            await runs.finish(run.id, { outcome: "unavailable", sessionId: null, error: `Provider could not start: ${String(error).slice(0, 300)}` });
+            const launched = await ports.db.providerLaunch.findUnique({ where: { runId: run.id } });
+            await runs.finish(run.id, { outcome: "unavailable", sessionId: null, error: `Provider could not start: ${String(error).slice(0, 300)}` }, launched ? {} : { stopEvidence: "never_started" });
           }
       }
       async function launch() {
@@ -122,7 +123,7 @@ export function createTick(ports: StewardPorts) {
           const run = await runs.claimNext(lane, now, { kind: "ordinary" });
           if (run) await launchLocal(run, lane);
         }
-        if (ports.provider) for (let index = 0; index < KERNEL_EXECUTION_LIMITS.codingEnvironment; index++) {
+        for (let index = 0; index < KERNEL_EXECUTION_LIMITS.codingEnvironment; index++) {
           const run = await runs.claimNext("background", now, { kind: "execution", executorId: "server" });
           if (!run) break;
           await launchLocal(run, "background");
@@ -165,5 +166,5 @@ export function createTick(ports: StewardPorts) {
 
 async function genericInput(ports: StewardPorts, run: ClaimedRun, sessionId: string | null) {
   if (!run.sessionId || !await ports.db.agentContext.findUnique({ where: { sessionId: run.sessionId } })) return null;
-  return { images: await contextRunImages(ports, run), prompt: run.prompt, inbound: null, extraTools: (await contextRunTools(ports, run))!.catalog.map(tool => tool.name), searchTools: false, sessionId, hostPaths: [], content: [], systemPrompt: "", resources: "minimal" as const };
+  return { images: await contextRunImages(ports, run), prompt: run.prompt, inbound: null, extraTools: (await contextRunTools(ports, run))!.catalog.map(tool => tool.name), searchTools: false, sessionId, hostPaths: [], content: [], systemPrompt: "", resources: "configured" as const };
 }

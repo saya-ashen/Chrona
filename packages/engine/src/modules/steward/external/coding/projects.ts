@@ -1,28 +1,31 @@
+import { basename, join, resolve } from "node:path";
 import { codingError, type CodingContext } from "./storage";
-import { record, validId } from "./commands";
+import { digest } from "./mutations";
+import { saveSessionFile } from "./sessions";
+import { codingProjectDirectory, createManagedProjectDirectory, readProjectRegistry, verifyCodingProject, verifyManagedProject, type CodingProject } from "./project-registry";
 
-type Project = { projectRef: string; path: string; label: string };
-const keys = (raw: Record<string, unknown>, expected: string[]) => Object.keys(raw).length === expected.length && expected.every(key => Object.hasOwn(raw, key));
-const identity = (value: unknown) => typeof value === "string" && value.length >= 1 && value.length <= 256;
-function principal(raw: unknown) {
-  return record(raw) && keys(raw, ["workspaceId", "ownerId", "caller"]) && identity(raw.workspaceId) && raw.ownerId === "owner"
-    && record(raw.caller) && keys(raw.caller, ["kind", "moduleId", "hash"]) && raw.caller.kind === "module" && identity(raw.caller.moduleId) && identity(raw.caller.hash);
+export { resolveProjectRow as resolveProject } from "./project-registry";
+
+const view = ({ projectRef, path, label }: CodingProject): CodingProject => ({ projectRef, path, label });
+/** Project selection is Coding data. It does not change the kernel's cwd or grant filesystem authority. */
+export async function listProjects(context: CodingContext): Promise<CodingProject[]> {
+  return (await readProjectRegistry(context)).map(view);
 }
-function project(raw: unknown): Project {
-  if (!record(raw) || !keys(raw, ["projectRef", "path", "label"]) || !validId(raw.projectRef) || typeof raw.path !== "string" || !raw.path.startsWith("/") || raw.path.length > 8192 || typeof raw.label !== "string" || !raw.label.length || raw.label.length > 8192) throw codingError("conflict", "Invalid project response from Agent");
-  return { projectRef: raw.projectRef, path: raw.path, label: raw.label };
-}
-function response(raw: unknown, action: string): Record<string, unknown> {
-  if (!record(raw) || !keys(raw, ["action", "principal", action === "list" ? "projects" : "project"]) || raw.action !== action || !principal(raw.principal)) throw codingError("conflict", "Invalid tagged project response from Agent");
-  return raw;
-}
-export async function listProjects(context: CodingContext) {
-  const raw = response(await context.call<unknown>("agent.work-projects", { action: "list" }), "list");
-  if (!Array.isArray(raw.projects) || raw.projects.length > 100) throw codingError("conflict", "Invalid project list from Agent");
-  const items = raw.projects.map(project);
-  if (new Set(items.map(item => item.projectRef)).size !== items.length) throw codingError("conflict", "Duplicate project identity from Agent");
-  return items;
-}
-export async function mutateProject(context: CodingContext, input: { action: "create"; name: string } | { action: "register"; path: string }) {
-  return project(response(await context.call<unknown>("agent.work-projects", input), input.action).project);
+/** The command service serializes registry updates together with durable mutation receipts. */
+export async function mutateProject(context: CodingContext, input: { action: "create"; name: string } | { action: "register"; path: string }): Promise<CodingProject> {
+  if (input.action === "create" && !/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(input.name)) throw codingError("invalid", "Invalid project name");
+  const projects = await readProjectRegistry(context);
+  const path = input.action === "create" ? join(resolve(context.dir), "managed-projects", input.name) : (await codingProjectDirectory(input.path)).path;
+  const previous = projects.find(item => item.path === path);
+  if (previous) {
+    if (input.action === "create") await verifyManagedProject(context, previous);
+    else await verifyCodingProject(previous);
+    return view(previous);
+  }
+  if (projects.length >= 100) throw codingError("capacity", "Coding project registry is full");
+  const directory = input.action === "create" ? await createManagedProjectDirectory(context, input.name) : await codingProjectDirectory(path);
+  const project = { projectRef: `project-${digest(path)}`, ...directory, label: basename(path) || path };
+  await verifyCodingProject(project);
+  projects.push(project); await saveSessionFile(context, "projects.json", projects);
+  return view(project);
 }

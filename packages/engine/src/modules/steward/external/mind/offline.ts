@@ -38,29 +38,26 @@ async function candidate(f: Awaited<ReturnType<typeof fixture>>, patch: Partial<
 function agent(f: Awaited<ReturnType<typeof fixture>>) {
   let status = "running", active = true, interactions: unknown[] = [];
   const items: { sequence: number; kind: string; payload: unknown }[] = [];
-  let loseContext = false, loseRun = false, loseNotify = false;
+  let loseRun = false, loseNotify = false;
   const calls: { target: string; args: Record<string, unknown> }[] = [];
-  const contexts = new Map<string, string>(), runs = new Map<string, string>();
+  const runs = new Map<string, string>();
   // eslint-disable-next-line complexity -- Offline Agent fixture keeps each injected lost-response boundary explicit.
-  const call: Call = async (target, args) => {
+  const call: Call = async (target, args, options) => {
     calls.push({ target, args });
     const state = await f.store.read(), current = state.decisions.find(d => d.id === state.runtime.currentDecisionId);
-    if (target === "agent.context") {
-      assert.equal(args["request-key"], current?.contextKey, "context key must already be durable");
-      const key = String(args["request-key"]); if (!contexts.has(key)) contexts.set(key, "context-1");
-      if (loseContext) { loseContext = false; throw new Error("context reply lost"); }
-      return { contextId: contexts.get(key) };
-    }
     if (target === "agent.run") {
-      assert.equal(args["request-key"], current?.runKey, "run key must already be durable");
+      assert.equal(options?.key, current?.runKey, "run key must already be durable");
       assert.deepEqual(args.tools, REASONING_TOOLS);
       assert.equal(args.prompt, current?.prompt);
-      const key = String(args["request-key"]); if (!runs.has(key)) runs.set(key, "run-1");
+      const key = String(options?.key); if (!runs.has(key)) runs.set(key, "run-1");
       if (loseRun) { loseRun = false; throw new Error("run reply lost"); }
       return { contextId: "context-1", runId: runs.get(key), status, active };
     }
-    if (target === "agent.get") return { contextId: "context-1", runId: "run-1", status, active };
-    if (target === "agent.stream") return { items: items.filter(item => item.sequence > Number(args.after ?? 0)), after: Math.max(Number(args.after ?? 0), ...items.map(item => item.sequence)), interactions };
+    if (target === "agent.read") {
+      assert.equal(args.runId, current?.runId);
+      const offset = args.cursor ? Number(String(args.cursor).slice("events:".length)) : 0;
+      return { run: { contextId: "context-1", runId: "run-1", status, active }, items: items.filter(item => item.sequence > offset), nextCursor: items.length ? `events:${items.at(-1)!.sequence}` : null, ended: !active, interactions };
+    }
     if (target === "notify.send") {
       assert.ok(state.decisions.some(d => d.notification !== null && d.notification.key === args.key && d.notification.status === "unknown"), "notification uncertainty must be durable before effect");
       if (loseNotify) throw new Error("notify reply lost");
@@ -69,8 +66,8 @@ function agent(f: Awaited<ReturnType<typeof fixture>>) {
     throw new Error(`Unexpected effect: ${target}`);
   };
   return {
-    call, calls, contexts, runs,
-    loseContext: () => { loseContext = true; }, loseRun: () => { loseRun = true; }, loseNotify: () => { loseNotify = true; },
+    call, calls, runs,
+    loseRun: () => { loseRun = true; }, loseNotify: () => { loseNotify = true; },
     finish: (value = "finished") => { status = value; active = false; }, unknown: () => { status = "unknown"; active = true; },
     text: (text: string) => { items.push({ sequence: (items.at(-1)?.sequence ?? 0) + 1, kind: "progress", payload: { text } }); },
     verify: (receipt: unknown, error = false) => { items.push({ sequence: (items.at(-1)?.sequence ?? 0) + 1, kind: "tool-result", payload: { type: "tool-result", value: { runId: "run-1", callId: "call-1", target: "mind.report", moduleId: "mind-test", hash: "mind-test-hash", contractHash: "a".repeat(64), status: error ? "failed" : "succeeded", outputState: "complete", output: receipt } } }); },
@@ -206,7 +203,7 @@ check("Unicode agenda and decision pages bound the complete encoded result and e
       cursor = page.nextCursor ?? undefined;
     } while (cursor);
     assert.deepEqual(ids, state.concerns.map(c => c.id));
-    const decision: Decision = { id: "d-0", at: now, kind: "manual", concernIds: [], signalIds: [], revisions: {}, sourceKinds: [], phase: "failed", contextKey: "d-0:context", runKey: "d-0:run", contextId: null, runId: null, prompt: "private launch material", tools: [...REASONING_TOOLS], report: null, finishedAt: now, error: null, interactions: [{ id: "q-1", title: "Input", message: "问".repeat(2000), expiresAt: later(60_000) }], notification: null };
+    const decision: Decision = { id: "d-0", at: now, kind: "manual", concernIds: [], signalIds: [], revisions: {}, sourceKinds: [], phase: "failed", runKey: "d-0:run", contextId: null, runId: null, prompt: "private launch material", tools: [...REASONING_TOOLS], report: null, finishedAt: now, error: null, interactions: [{ id: "q-1", title: "Input", message: "问".repeat(2000), expiresAt: later(60_000) }], notification: null };
     state.decisions = Array.from({ length: 100 }, (_, n) => ({ ...decision, id: `d-${n}` }));
     const historyIds: string[] = [];
     do {
@@ -222,27 +219,25 @@ check("Unicode agenda and decision pages bound the complete encoded result and e
     assert.throws(() => decisionsPage(state, { cursor: "agenda:0:1" }), /Invalid page cursor/);
   } finally { await f.close(); }
 });
-check("lost context/run replies recover by same keys; unknown and waiting occupy one slot", async () => {
+check("lost run replies recover by the same key; unknown and waiting occupy one slot", async () => {
   const f = await fixture();
   try {
-    await f.note(); const a = agent(f); a.loseContext();
+    await f.note(); const a = agent(f); a.loseRun();
     await new MindRuntime(f.store, a.call).tick(now); assert.equal(a.calls.length, 0, "disabled background cannot start work");
     await new MindRuntime(f.store, a.call).tick(now, true);
     assert.equal((await f.store.read()).decisions[0]!.phase, "unknown");
-    a.loseRun(); await new MindRuntime(f.store, a.call).tick(later(1000), true);
-    assert.equal((await f.store.read()).decisions[0]!.runId, null);
     a.unknown(); await new MindRuntime(f.store, a.call).tick(later(2000), true);
-    assert.equal((await f.store.read()).decisions.length, 1); assert.equal(a.contexts.size, 1); assert.equal(a.runs.size, 1);
+    assert.equal((await f.store.read()).decisions.length, 1); assert.equal(a.runs.size, 1);
     const starts = a.calls.filter(c => c.target === "agent.run");
     assert.equal(starts.length, 2); assert.deepEqual(starts[0]!.args, starts[1]!.args);
     assert.equal(starts[0]!.args.lane, "foreground");
     await new MindRuntime(f.store, a.call).tick(later(DAY), true);
     assert.equal(a.calls.filter(c => c.target === "agent.run").length, 2);
     // A known active run can expose an interaction without being restarted or answered.
-    const waitingCall: Call = async (target, args, opts) => target === "agent.get" ? { contextId: "context-1", runId: "run-1", active: true, status: "running" } : a.call(target, args, opts);
+    const waitingCall: Call = async (target, args, opts) => target === "agent.read" ? { ...(await a.call(target, args, opts) as Record<string, unknown>), run: { contextId: "context-1", runId: "run-1", active: true, status: "running" }, ended: false } : a.call(target, args, opts);
     a.wait(); const view = await new MindRuntime(f.store, waitingCall).tick(later(DAY + 1000));
     assert.equal(view.runtime.phase, "waiting"); assert.equal(view.runtime.interactions[0]!.title, "Please sign in");
-    assert.ok(!a.calls.some(c => c.target === "agent.respond"));
+    assert.ok(!a.calls.some(c => c.target === "agent.write"));
   } finally { await f.close(); }
 });
 check("model text, owner spoofing and failed tool results cannot establish a trustworthy report", async () => {
@@ -291,7 +286,7 @@ check("overlapping final polls finalize once and never rearm an uncertain notifi
     let arrivals = 0, release!: () => void;
     const barrier = new Promise<void>(resolve => { release = resolve; });
     const interleaved: Call = async (target, args, options) => {
-      if (target === "agent.stream") { arrivals++; if (arrivals === 2) release(); await barrier; }
+      if (target === "agent.read") { arrivals++; if (arrivals === 2) release(); await barrier; }
       return a.call(target, args, options);
     };
     await Promise.all([new MindRuntime(f.store, interleaved).tick(later(1000)), new MindRuntime(f.store, interleaved).tick(later(2000))]);

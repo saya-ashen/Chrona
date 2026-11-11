@@ -1,13 +1,15 @@
 import { afterEach, expect, test } from "bun:test";
-import { z } from "zod";
 import { mkdtemp, rm } from "node:fs/promises";
-import { runtimeOperationSchema, runtimeOutcomeSchema } from "@chrona/contracts/steward";
 import { admitContextPrimitive } from "./agent-context";
 import { reconcileAgentStops } from "./agent-recovery";
+import { registerAgentProvider } from "./agent-provider";
 import { createRuns } from "./runs";
-import { registerLocalModule } from "./module-registry";
-import { tool } from "./system/shared";
+import { moduleSupervisor } from "./module-supervisor";
+import { testModuleProcess } from "./module-test-process";
+import { testProviderManifest } from "./test-provider-process";
 import { testDb } from "./test-db";
+import type { StewardPorts } from "./ports";
+import "./module-effects";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -18,20 +20,29 @@ test.each([false, true])("restart reconciles only a persisted stop receipt (conf
   const workspace = await db.workspace.create({ data: { name: "recovery" } });
   const application = await db.module.create({ data: { workspaceId: workspace.id, name: "entry", activeHash: "version" } });
   const principal = { workspaceId: workspace.id, ownerId: "owner", caller: { kind: "module" as const, moduleId: application.id, hash: "version" } };
-  const ports = { db, dataDir, publicUrl: null, now: () => new Date() };
+  const calls: string[] = [];
+  const peer = testModuleProcess(async event => {
+    if (event.trigger.kind !== "tool") return {};
+    const { id, args } = event.trigger; calls.push(id);
+    return { result: { operationId: String(args.operationId), outcome: confirmed ? { outcome: "finished", sessionId: "continued", error: null } : null, failure: !confirmed } };
+  });
+  const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => new Date(), sandbox: { available: true, isolated: false, startModule: peer.startModule } };
+  cleanups.push(() => moduleSupervisor(ports).stop());
+  const backend = await db.module.create({ data: { workspaceId: workspace.id, name: "test-provider", activeHash: "backend-version", status: "active" } });
+  await db.moduleVersion.create({ data: { moduleId: backend.id, hash: "backend-version", status: "approved", source: "user", manifest: testProviderManifest, intent: {}, report: {} } });
+  const binding = await registerAgentProvider(ports, workspace.id, { kind: "module", module: backend.name, moduleId: backend.id, hash: backend.activeHash! }, {
+    id: "receipt-provider", name: "Receipt Provider", protocolVersion: 1,
+    capabilities: { conversation: true, completion: false, native: false, images: false, interactions: false, resume: true },
+    endpoints: { health: "health", start: "start", status: "status", inject: "inject", abort: "abort", release: "release" },
+  });
   const context = await admitContextPrimitive(ports, principal, "context", { requestKey: "context" }) as { contextId: string };
   await admitContextPrimitive(ports, principal, "run", { contextId: context.contextId, requestKey: "run", prompt: "offline", lane: "foreground", tools: [], content: [] });
   const runs = createRuns(ports, workspace.id), run = (await runs.claimNext("foreground"))!;
+  // Admission already froze the selected Provider before this host died.
+  expect(await db.agentRunProvider.findUniqueOrThrow({ where: { runId: run.id } })).toMatchObject({ providerId: binding.id, moduleId: backend.id, hash: backend.activeHash });
   await db.providerLaunch.create({ data: { runId: run.id, digest: "fixed" } });
   await runs.finish(run.id, { outcome: "failed", sessionId: null, error: "disconnected" });
   await db.audit.deleteMany();
-  const calls: string[] = [];
-  registerLocalModule({ name: "agent", description: "receipt-only fixture", unrecorded: ["status"], tools: [tool("status", "Persisted stop receipt", {}, [], { input: runtimeOperationSchema, output: runtimeOperationSchema.extend({ outcome: runtimeOutcomeSchema.nullable(), failure: z.boolean() }), visibility: ["kernel"] })],
-    async handle(_context, name, input) {
-      calls.push(name);
-      return { operationId: String(input.operationId), outcome: confirmed ? { outcome: "finished", sessionId: "continued", error: null } : null, failure: !confirmed };
-    },
-  }, db);
   await reconcileAgentStops(ports, workspace.id);
   expect(calls).toEqual(["status"]);
   expect(await db.run.count()).toBe(1);

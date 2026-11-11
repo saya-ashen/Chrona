@@ -1,6 +1,6 @@
 # Chrona 当前架构
 
-本文概述当前源码边界。公开 API 按[目标规范](kernel-api-design.md)调整为六命名空间、显式 authority 与统一回执；验证状态见[API 实施记录](kernel-api-implementation.md)，尚未冻结。旧[边界盘点](kernel-permanent-boundary-contract.md)描述上一阶段。
+本文概述当前源码边界。公开 API 按[目标规范](kernel-api-design.md)调整为七命名空间、显式 authority 与统一回执；验证状态见[API 实施记录](kernel-api-implementation.md)，尚未冻结。旧[边界盘点](kernel-permanent-boundary-contract.md)描述上一阶段。
 
 ## 1. 用途与信任模型
 
@@ -13,13 +13,13 @@ Chrona 是单一 owner 的个人工具：用户自然交流，Agent 选择方法
 | 所有者 | 职责 |
 | --- | --- |
 | kernel | 真实身份、路由、精确授权、生命周期、审批、凭据、硬预算、唯一 Run 队列、租约、取消、实际停止证据和持久回执 |
-| Agent | 唯一不可动态替换内置应用，独立 SDK 进程；持有 Pi 适配器、私有模型政策与操作回执 |
+| Provider 应用 | 登记自己的执行端点，持有后端适配器、进程、配置、原生协议与操作回执；Pi 是默认预装普通应用 |
 | 普通应用 | 业务策略、会话、提示词、记忆、内容、配置、页面、通知和交付；预装不授予权力 |
 | 私有宿主 | `runtime-callback`、`workspace-local` 是内部执行边界，不是第三类应用或公开发现目标 |
 
-当前只公开 `modules / approvals / settings / secrets / activity / timers`。Agent 工具属于应用；不存在公开 schedules、projects、history、chat、provider、executions、content 或 memory。完整工具清单在[API 规范](kernel-api-design.md)维护；源码和生成合同确定实际可调用面。
+当前公开目标为 `modules / approvals / settings / secrets / activity / timers / agent`。通用 Agent 七工具归 kernel，具体执行委托给绑定的已登记 Provider；不存在公开 schedules、projects、history、chat、provider、executions、content 或 memory。完整工具清单在[API 规范](kernel-api-design.md)维护；源码和生成合同确定实际可调用面。
 
-Web、Notify、QQ、Author 是普通默认预装应用；可选应用通过受控生命周期安装。初始化不覆盖已有选择、不自动补装删除应用。Remind 仍暂停并保留材料；Mind 是普通可选应用，Editor 已退役。具体适配和验收见[普通应用迁移](application-migration.md)，Mind 的本地部署及版本限制见[实施记录](mind-implementation.md)。
+Web、Notify、QQ、Author、Pi 是普通默认预装应用；可选应用通过受控生命周期安装。初始化不覆盖已有选择、不自动补装删除应用。Remind 仍暂停并保留材料；Mind 是普通可选应用，Editor 已退役。具体适配和验收见[普通应用迁移](application-migration.md)，Mind 的本地部署及版本限制见[实施记录](mind-implementation.md)。
 
 ## 3. 调用、执行与恢复
 
@@ -39,7 +39,7 @@ Web、Notify、QQ、Author 是普通默认预装应用；可选应用通过受�
 | `apps/server` | Bun/Hono HTTP、运行时 tick、Provider 桥、鉴权代理及救援入口 |
 | `packages/contracts/src/steward` | zod、工具与 wire 合同 |
 | `packages/domain/src/steward` | 无 I/O 的纯策略 |
-| `packages/engine/src/modules/steward` | kernel、builtin Agent 与 external 应用 |
+| `packages/engine/src/modules/steward` | kernel Agent API、Provider 登记与 external 应用 |
 | `packages/integrations/src/steward`、`packages/pi` | 宿主、SDK、进程监管与 Pi Provider |
 | `packages/db`、`packages/cli` | SQLite/Prisma、迁移与备份恢复、启动和诊断 |
 

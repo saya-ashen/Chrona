@@ -41,13 +41,13 @@ for (let i = 0; i < 4; i++) await passive(incoming, "reply").catch(() => {});
 assert.equal(await passive(incoming, "reply"), false); assert.equal(reservations, 4);
 
 const calls: any[] = [], notices: any[] = [];
-const routedCall = async (target: string, args: Record<string, unknown>) => { calls.push({ target, args }); if (target === "agent.get") return { runId: "qq-run", status: "running", active: true }; if (target === "agent.stream") return { items: [], after: 0, ended: false, transcript: [], interactions: [] }; if (target === "agent.context") return { contextId: "qq-context" }; if (target === "agent.run") return { runId: "qq-run", status: "queued", active: true }; if (target === "modules.describe" || target === "modules.list") return { items: [], nextCursor: null }; if (target === "qq.settings") return { provider: null, autoRecall: true, autoRetain: true }; if (target === "approvals.list") return { items: [{ id: "abcdef12-0000", title: "approval" }], nextCursor: null }; return {}; };
+const routedCall = async (target: string, args: Record<string, unknown>) => { calls.push({ target, args }); if (target === "agent.read") return { run: { runId: "qq-run", contextId: "qq-context", status: "running", active: true }, items: [], nextCursor: null, ended: false, transcript: [], interactions: [] }; if (target === "agent.run") return { contextId: "qq-context", runId: "qq-run", status: "queued", active: true }; if (target === "modules.describe" || target === "modules.list") return { items: [], nextCursor: null }; if (target === "qq.settings") return { provider: null, autoRecall: true, autoRetain: true }; if (target === "approvals.list") return { items: [{ id: "abcdef12-0000", title: "approval" }], nextCursor: null }; return {}; };
 const conversations = createQqConversations({ dataDir: paths.data, contentDir: paths.content, call: routedCall, binding: async () => binding, deliver: async () => {} });
 const relay = createRelay({ conversations, publicUrl: null, download: async a => ({ name: a.name, mime: "image/png", bytes: new Uint8Array([1]) }), notify: async args => { notices.push(args); }, call: routedCall });
 const parsed = parseC2cEvent({ id: "picture", author: { user_openid: "owner" }, content: "", timestamp: now.toISOString(), attachments: [{ url: "https://gchat.qpic.cn/image", filename: "image.png", content_type: "image/png" }] })!;
 assert.equal(parsed.attachments?.length, 1);
 await relay.send({ workspaceId: binding.workspaceId, key: "qq:dm", channel: "chrona_qqbot", text: "", externalId: parsed.id, attachments: parsed.attachments });
-assert.deepEqual(calls.map(c => c.target), ["agent.context", "modules.list", "modules.describe", "qq.settings", "agent.run"]);
+assert.deepEqual(calls.map(c => c.target), ["modules.list", "modules.describe", "qq.settings", "agent.run"]);
 assert.match(calls.find(c => c.target === "agent.run").args.prompt, /qq\/attachments\//);
 const session = (await conversations.app.list())[0]!;
 const message = (await conversations.app.messages(session.id))[0]!;

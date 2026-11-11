@@ -2,8 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { contextStreamOutput, runtimeTranscriptSchema } from "@chrona/contracts/steward";
-import { createAgentPrimitives } from "../builtin/agent/primitives";
+import { agentReadOutput, runtimeTranscriptSchema } from "@chrona/contracts/steward";
 import { createPages } from "../external/web/pages";
 import { createAgentConversations } from "./conversations";
 import { captureApplicationDelivery, deliveryReceiptSchema, readDeliveryPages, reconcileApplicationDelivery, type ApplicationDelivery } from "./delivery";
@@ -15,13 +14,12 @@ afterEach(async () => { await Promise.all(directories.splice(0).map(path => rm(p
 async function directory() {
   const path = await mkdtemp(join(tmpdir(), "chrona-delivery-integration-")); directories.push(path); return path;
 }
-// Exercise the actual Agent admission/validation/redaction boundary with offline Provider records.
-function agentStream(items: () => unknown[], events: () => unknown[] = () => []) {
-  const primitive = createAgentPrimitives(async () => ({ items: events(), after: events().length, ended: true, interactions: [], transcript: { sessionDir: "/offline-fixture", limit: 100 } }), async () => { throw new Error("Unexpected control"); }, async () => runtimeTranscriptSchema.parse(items()));
-  return async (runId = "run-1") => contextStreamOutput.parse(await primitive("stream", { runId, after: 0, limit: 100 }, "offline-stream"));
+// Explicit offline read envelopes exercise the consumer's structured receipt boundary.
+function agentRead(items: () => unknown[], events: () => unknown[] = () => []) {
+  return async (runId = "run-1") => agentReadOutput.parse({ run: { runId, contextId: "context-1", status: "finished", active: false }, items: events(), nextCursor: events().length ? `opaque:${events().length}` : null, ended: true, interactions: [], transcript: runtimeTranscriptSchema.parse(items()) });
 }
 
-for (const size of [2000, 2001]) test(`actual Agent stream receipt envelope at ${size} characters`, async () => {
+for (const size of [2000, 2001]) test(`consumer Agent read receipt envelope at ${size} characters`, async () => {
   const receipt = receiptFixture();
   receipt.members = Array.from({ length: 4 }, (_, i) => ({ ...receipt.members[0]!, name: `music-${i}${"x".repeat(50)}`, moduleId: `music-${i}`, versionId: "v".repeat(128) }));
   const base = JSON.stringify({ result: receipt }).length;
@@ -30,32 +28,30 @@ for (const size of [2000, 2001]) test(`actual Agent stream receipt envelope at $
   const item = { ...receiptItem(), text: JSON.stringify({ result: receipt }) };
   expect(item.text).toHaveLength(size);
   const event = receiptEvent(); event.payload.value.output = receipt;
-  const stream = await agentStream(() => [item], () => [event])();
+  const stream = await agentRead(() => [item], () => [event])();
   const turn = { runId: "run-1", at: "2026-11-09T00:00:02.000Z", baseline: [], runRequest: { tools: [{ moduleId: "author-id", tool: "submit" }] }, applicationDelivery: [] as ApplicationDelivery[] };
   captureApplicationDelivery(turn, stream.items);
   expect(turn.applicationDelivery[0]?.receipt).toEqual(receipt);
-  if (size > 2000) expect(stream.transcript[0]).toMatchObject({ text: `${item.text.slice(0, 2000)}…（已截断）` });
+  expect(stream.transcript?.[0]).toMatchObject({ kind: "result", text: item.text });
 });
 
 async function conversationFixture() {
   const dataDir = await directory(), calls: { target: string; args: Args }[] = [], replies: Args[] = [];
-  const runs = new Map<string, { runId: string; status: string; active: boolean }>();
+  const runs = new Map<string, { contextId: string; runId: string; status: string; active: boolean }>();
   const state = { items: [] as unknown[], events: [] as ReturnType<typeof receiptEvent>[], streamUnavailable: false, loseRunResponse: false, health: [] as ReturnType<typeof healthFixture>[], pages: [] as { module: string; moduleId: string; hash: string; id: string; title: string }[] };
-  const stream = agentStream(() => state.items, () => state.events);
+  const stream = agentRead(() => state.items, () => state.events);
   let clock = Date.parse("2026-11-09T00:00:02.000Z");
   const call = async (target: string, args: Args = {}): Promise<unknown> => {
     calls.push({ target, args });
     if (target === "web.settings") return { provider: null, autoRecall: false, autoRetain: false };
-    if (target === "agent.context") return { contextId: "context-1" };
     if (target === "agent.run") {
-      const run = { runId: `run-${runs.size + 1}`, status: "running", active: true }; runs.set(run.runId, run);
+      const run = { contextId: "context-1", runId: `run-${runs.size + 1}`, status: "running", active: true }; runs.set(run.runId, run);
       if (state.loseRunResponse) throw new Error("response lost");
       return run;
     }
-    if (target === "agent.get") return runs.get(String(args["run-id"]));
-    if (target === "agent.stream") {
-      if (state.streamUnavailable) throw new Error("stream offline");
-      return stream(String(args["run-id"]));
+    if (target === "agent.read") {
+      const page = await stream(String(args.runId));
+      return { ...page, run: runs.get(String(args.runId)), ...(state.streamUnavailable ? { transcript: undefined } : {}) };
     }
     if (target === "modules.health") return { items: state.health, nextCursor: null };
     if (target === "modules.receipt") {
@@ -89,7 +85,7 @@ for (const pendingAdmission of [false, true]) test(`old timeout delivery reconci
   const messages = await f.restart().messages(first.sessionId);
   const corrected = messages.find(message => message.id === saved.id)!;
   expect(corrected.execution).toMatchObject({ runId: first.runId, status: "timed_out", active: false, canContinue: true, applicationDelivery: [{ receipt: receiptFixture(), targets: [{ activation: "active", health: "observed", pages: [{ href: "/p/music/home" }] }], browser: "unknown" }] });
-  expect(f.calls.slice(before).every(call => ["agent.get", "agent.stream", "modules.health", "modules.receipt"].includes(call.target))).toBe(true);
+  expect(f.calls.slice(before).every(call => ["agent.read", "modules.health", "modules.receipt"].includes(call.target))).toBe(true);
   expect(f.calls.filter(call => call.target === "agent.run")).toHaveLength(2);
   expect((await f.journal()).sessions[0].turns[0].applicationDelivery[0].receipt).toEqual(receiptFixture());
   expect(f.replies.some(event => event.message === saved.id && JSON.stringify(event.execution).includes('"activation":"active"'))).toBe(true);

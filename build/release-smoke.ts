@@ -218,7 +218,7 @@ export async function smokeRelease(target: BuildTargetName, options: SmokeReleas
 
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "pi/chrona-tools.ts"), "Pi steward extension");
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "pi/browser-tools.ts"), "Pi browser extension");
-  await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "builtin"), "Built-in module resources");
+  await assertPiReleaseResources(resolve(releaseDir, buildArtifacts.resourcesRoot));
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "module-sdk/sdk.ts"), "Module SDK");
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "module-sdk/package.json"), "Module SDK package");
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "rescue.html"), "Immutable rescue console");
@@ -237,6 +237,17 @@ export async function smokeRelease(target: BuildTargetName, options: SmokeReleas
   }
 
   console.log(`✓ Release smoke passed for ${target}`);
+}
+
+/** The default Provider ships as an ordinary external application with a pinned source bundle. */
+export async function assertPiReleaseResources(resourcesRoot: string) {
+  const moduleDir = join(resourcesRoot, "external/pi");
+  for (const file of ["module.json", "package.json", "bun.lock", "runtime.js", "test.js", "vendor"]) {
+    await assertExists(join(moduleDir, file), "Pi external module resource");
+  }
+  const manifest = JSON.parse(await readFile(join(moduleDir, "module.json"), "utf8"));
+  if (manifest.name !== "pi") throw new Error("Pi external module manifest mismatch");
+  await assertExists(join(resourcesRoot, "module-git/pi.bundle"), "Pi module Git bundle");
 }
 
 /** Check Files against packaged Web contracts in a writable SDK, as ordinary builds do. */

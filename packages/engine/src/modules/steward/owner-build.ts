@@ -37,7 +37,7 @@ export async function startOwnerBuildAsCaller(ports: StewardPorts, workspaceId: 
 
 export async function startOwnerBuild(ports: StewardPorts, workspaceId: string, raw: unknown) {
   const input = ownerBuildSchema.parse(raw);
-  assertBuildProvider(ports, input.execution);
+  await assertBuildProvider(ports, workspaceId, input.execution);
   const limits = buildSettings((await ports.db.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings);
   if (input.execution.timeoutMinutes > limits.timeoutMinutes || input.execution.maxSubmissions > limits.maxSubmissions) throw new StewardError("conflict", "Build limits cannot exceed the owner's configured caps");
   const key = `owner-build:${createHash("sha256").update(JSON.stringify([workspaceId, input.requestKey])).digest("hex")}`;

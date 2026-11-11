@@ -1,6 +1,9 @@
 import { afterEach, expect, test } from "bun:test";
 import { generateKeyPairSync, sign } from "node:crypto";
-import type { ExecutionPrincipal, ExecutionReceiver, KernelExecutionStart, ExecutionDeliveryFinal, ExecutionSignedStop } from "@chrona/contracts/steward";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import type { ExecutionPrincipal, ExecutionReceiver, KernelExecutionStart, ExecutionDeliveryFinal, ExecutionSignedStop, ProviderAdapter } from "@chrona/contracts/steward";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
 import { createExecutionDelivery } from "./execution-delivery";
@@ -12,12 +15,21 @@ import { pauseFailedModule } from "./module-effects";
 import { moduleContext } from "./module-context";
 import { recordModuleActivation } from "./module-evolution";
 import { recordModuleExecution } from "./module-failure-policy";
-import { moduleManifestSchema } from "@chrona/contracts/steward";
+import { executionLaunchSchema, runtimeOutcomeSchema, moduleManifestSchema } from "@chrona/contracts/steward";
 import { verifyExecutionStop } from "./execution-delivery-stop";
 import { enqueueCall } from "./module-calls";
+import { testProviderManifest } from "./test-provider-process";
+import { testModuleProcess } from "./module-test-process";
+import { registerAgentProvider } from "./agent-provider";
+import { CallError } from "./module-call-error";
+import { moduleSupervisor } from "./module-supervisor";
 
 const databases: ReturnType<typeof testDb>[] = [];
-afterEach(async () => { for (const db of databases.splice(0)) await db.$disconnect(); });
+const modelCleanups: (() => Promise<void>)[] = [];
+afterEach(async () => {
+  for (const close of modelCleanups.splice(0).reverse()) await close();
+  for (const db of databases.splice(0)) await db.$disconnect();
+});
 async function fixture() {
   const db = testDb(); databases.push(db);
   const workspace = await db.workspace.create({ data: { name: "kernel delivery" } });
@@ -238,18 +250,72 @@ test("unknown stop occupies the same capacity across authority epochs and indepe
   expect((await createRuns(f.ports, f.principal.workspaceId).claimNext("background", undefined, { kind: "application" }))?.runId).toBe(third.execution.runId);
 });
 
-async function modelFixture(handler: (args: Record<string, unknown>) => Promise<{ text: string; inputTokens: number; outputTokens: number }>) {
+type ModelRequest = Parameters<NonNullable<ProviderAdapter["complete"]>>[0];
+type ModelResult = Awaited<ReturnType<NonNullable<ProviderAdapter["complete"]>>>;
+type ModelOperation = { outcome: ReturnType<typeof runtimeOutcomeSchema.parse> | null; failure: boolean; completion?: ModelResult };
+async function modelFixture(handler: NonNullable<ProviderAdapter["complete"]>, options: { async?: boolean; lostReceipt?: boolean; accepted?: boolean; status?: () => Promise<void>; abort?: () => Promise<void> } = {}) {
   const f = await fixture();
-  const { moduleManifestSchema } = await import("@chrona/contracts/steward"), { z } = await import("zod");
-  const { registerLocalModule } = await import("./module-registry");
+  f.ports.dataDir = await mkdtemp(join(tmpdir(), "chrona-delivery-model-"));
+  modelCleanups.push(async () => {
+    await moduleSupervisor(f.ports).stop();
+    await rm(f.ports.dataDir, { recursive: true, force: true });
+  });
+  const requests: { name: string; args: Record<string, unknown> }[] = [], operations = new Map<string, ModelOperation>();
+  const peer = testModuleProcess(async event => {
+    if (event.trigger.kind !== "tool") return {};
+    const { id: name, args } = event.trigger;
+    requests.push({ name, args });
+    if (name === "health") return { result: { available: true, sandboxed: false, error: null } };
+    if (name === "complete") {
+      const { commandKey, configurationRevision, ...request } = args;
+      expect(configurationRevision).toBe("configured-model-v1");
+      // Model selection belongs to this configured Provider, including omitted request models.
+      const complete = () => handler({ ...request, model: "fake-model" } as ModelRequest);
+      if (!options.async) return { result: await complete() };
+      const operationId = String(commandKey), row: ModelOperation = { outcome: null, failure: false };
+      expect(operations.has(operationId)).toBe(false);
+      operations.set(operationId, row);
+      void complete().then(completion => {
+        row.completion = completion;
+        row.outcome = { outcome: "finished", sessionId: null, error: null };
+      }, error => {
+        if (error instanceof CallError && error.code === "failed") row.outcome = { outcome: "failed", sessionId: null, error: error.message };
+        else row.failure = true;
+      });
+      if (options.lostReceipt) throw new CallError("unknown", "Acceptance response lost");
+      return { result: { operationId } };
+    }
+    const operationId = String(args.operationId), row = operations.get(operationId);
+    if (!row) throw new CallError("not_found", "Operation not found");
+    if (name === "status") { await options.status?.(); return { result: { operationId, ...row } }; }
+    if (name === "abort") { await options.abort?.(); return { result: { requested: true } }; }
+    if (name === "release") {
+      if (!row.outcome) throw new CallError("conflict", "Closure unconfirmed");
+      return { result: { released: true } };
+    }
+    throw new Error(`Unexpected Provider operation: ${name}`);
+  });
+  f.ports.sandbox = { available: true, isolated: false, startModule: peer.startModule };
+  const backend = await f.db.module.create({ data: { workspaceId: f.principal.workspaceId, name: "delivery-model-provider", activeHash: "provider-v1" } });
+  const completionOutput = testProviderManifest.tools.find(tool => tool.name === "complete")!.output;
+  const statusOutput = testProviderManifest.tools.find(tool => tool.name === "status")!.output, statusProperties = statusOutput.properties;
+  if (!statusProperties || typeof statusProperties !== "object") throw new Error("Missing Provider status schema");
+  const tools = testProviderManifest.tools.map(tool => ({ ...tool, ...(tool.name === "complete" && options.async ? { output: { type: "object", properties: { operationId: { type: "string" } }, required: ["operationId"] } } : tool.name === "status" ? { output: { ...statusOutput, properties: { ...statusProperties, completion: completionOutput } } } : {}) }));
+  const providerManifest = moduleManifestSchema.parse({ ...testProviderManifest, name: backend.name, tools: [...tools, { name: "configure", description: "Provider configuration", visibility: ["owner"], parameters: { type: "object", properties: {} }, output: {} }] });
+  await f.db.moduleVersion.create({ data: { moduleId: backend.id, hash: backend.activeHash!, manifest: providerManifest, status: "approved", report: {}, intent: {}, source: "user" } });
+  await registerAgentProvider(f.ports, f.principal.workspaceId, { kind: "module", module: backend.name, moduleId: backend.id, hash: backend.activeHash! }, {
+    id: "delivery-model-fixture", name: "Configured completion fixture", protocolVersion: 1,
+    capabilities: { conversation: true, completion: true, native: false, images: false, interactions: false, resume: false },
+    endpoints: { health: "health", start: "start", status: "status", inject: "inject", abort: "abort", release: "release", complete: "complete" },
+    configuration: { tool: "configure", revision: "configured-model-v1" },
+  });
   await f.db.workspace.update({ where: { id: f.principal.workspaceId }, data: { settings: { timezone: "UTC", moduleModel: { maxCallsPerEvent: 2, maxOutputTokens: 100, dailyCalls: 2, eventTimeoutMs: 5000 } } } });
-  const manifest = moduleManifestSchema.parse({ name: f.caller.name, entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], uses: ["agent.complete"], model: { tier: "fake", maxCalls: 2, maxOutputTokens: 100 } });
+  const manifest = moduleManifestSchema.parse({ name: f.caller.name, entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], uses: ["agent.run"], model: { tier: "fake", maxCalls: 2, maxOutputTokens: 100 } });
   await f.db.moduleVersion.create({ data: { moduleId: f.caller.id, hash: f.caller.activeHash!, manifest, status: "approved", report: {}, intent: {}, source: "user" } });
-  registerLocalModule({ name: "agent", description: "Fake gateway without provider or network", unrecorded: ["complete"], tools: [{ name: "complete", description: "Fake completion", idempotent: false, visibility: ["kernel"], input: z.object({ prompt: z.string(), system: z.string().optional(), maxOutputTokens: z.number(), declaredTier: z.string(), effectiveHardLimits: z.any(), timeoutMs: z.number() }), output: z.object({ text: z.string(), inputTokens: z.number(), outputTokens: z.number() }), parameters: { type: "object", properties: {}, required: [] } }], handle: (_context, _tool, args) => handler(args) }, f.db);
   await f.service.admit(f.principal, f.input);
   const d = (await f.service.poll(f.receiver)).deliveries[0]!;
-  await f.service.accept(f.receiver, d.target, "accept");
-  return { ...f, d, manifest };
+  if (options.accepted !== false) await f.service.accept(f.receiver, d.target, "accept");
+  return { ...f, d, manifest, requests, operations };
 }
 test("model reservation survives unknown gateway outcome and same-key replay never reissues", async () => {
   let calls = 0;
@@ -264,21 +330,133 @@ test("model reservation survives unknown gateway outcome and same-key replay nev
   expect(calls).toBe(1);
 });
 test("model gateway shares ordinary module accounting and receives minimum execution limits", async () => {
-  let calls = 0, observed: Record<string, unknown> = {};
-  const f = await modelFixture(async args => { calls++; observed = args; return { text: "fake", inputTokens: 3, outputTokens: 4 }; });
   const { reserveCompletion } = await import("./module-model-budget");
-  const ordinary = await reserveCompletion(f.ports, { workspaceId: f.principal.workspaceId, moduleId: f.caller.id, hash: f.caller.activeHash!, manifest: f.manifest, eventKey: "execution:other" }, { prompt: "ordinary", maxOutputTokens: 80 }, f.ports.now());
-  expect(ordinary.error).toBeNull();
-  const input = { prompt: "fake", maxOutputTokens: 80 };
-  const result = await f.service.model(f.receiver, f.d.target, "model", input);
-  expect(result).toMatchObject({ status: "completed", result: { text: "fake" } });
-  expect(observed).toMatchObject({ declaredTier: "fake", effectiveHardLimits: { maxCallsPerEvent: 2, maxOutputTokens: 100, eventTimeoutMs: 5000 }, timeoutMs: 5000 });
-  expect(await f.service.model(f.receiver, f.d.target, "model", input)).toEqual(result);
-  const denied = await f.service.model(f.receiver, f.d.target, "second", input);
-  expect(denied).toMatchObject({ status: "rejected", error: "budget_exceeded" });
-  expect(await f.service.model(f.receiver, f.d.target, "second", input)).toEqual(denied);
+  for (const remainingMs of [60_000, 1000]) {
+    let calls = 0, observed: ModelRequest | undefined;
+    const f = await modelFixture(async args => { calls++; observed = args; return { text: "fake", inputTokens: 3, outputTokens: 4 }; });
+    const ordinary = await reserveCompletion(f.ports, { workspaceId: f.principal.workspaceId, moduleId: f.caller.id, hash: f.caller.activeHash!, manifest: f.manifest, eventKey: "execution:other" }, { prompt: "ordinary", maxOutputTokens: 80 }, f.ports.now());
+    expect(ordinary).toMatchObject({ error: null, declaredTier: "fake", effectiveHardLimits: { maxCallsPerEvent: 2, maxOutputTokens: 100, eventTimeoutMs: 5000 } });
+    expect(executionLaunchSchema.parse(f.d.launch).budget).toMatchObject({ timeoutMs: 60_000, maxToolCalls: 2, maxModelCalls: 2, maxOutputTokens: 100 });
+    const run = await f.db.run.findUniqueOrThrow({ where: { id: f.d.target.runId } });
+    f.setNow(new Date(run.deadlineAt!.getTime() - remainingMs));
+    const input = { prompt: "fake", maxOutputTokens: 80 };
+    expect(await f.service.model(f.receiver, f.d.target, "over-output-budget", { ...input, maxOutputTokens: 101 })).toMatchObject({ status: "rejected", error: "budget_exceeded" });
+    expect(calls).toBe(0);
+    const result = await f.service.model(f.receiver, f.d.target, "model", input);
+    expect(result).toMatchObject({ status: "completed", result: { text: "fake" } });
+    expect(observed).toMatchObject({ ...input, timeoutMs: Math.min(5000, remainingMs) });
+    expect(await f.service.model(f.receiver, f.d.target, "model", input)).toEqual(result);
+    const denied = await f.service.model(f.receiver, f.d.target, "second", input);
+    expect(denied).toMatchObject({ status: "rejected", error: "budget_exceeded" });
+    expect(await f.service.model(f.receiver, f.d.target, "second", input)).toEqual(denied);
+    expect(calls).toBe(1);
+    expect(await f.db.moduleCall.count({ where: { method: "model", status: "executed" } })).toBe(1);
+  }
+});
+
+function completionGate() {
+  let resolve!: (result: ModelResult) => void, reject!: (error: Error) => void;
+  const promise = new Promise<ModelResult>((accept, fail) => { resolve = accept; reject = fail; });
+  return { promise, resolve, reject };
+}
+async function waitForModel(check: () => boolean) {
+  for (let count = 0; count < 400; count++) { if (check()) return; await Bun.sleep(5); }
+  throw new Error("Provider lifecycle observation did not arrive");
+}
+
+test.each([false, true])("registered completion polls its receipt and settles once after actual closure (lost acceptance: %s)", async lostReceipt => {
+  const gate = completionGate(); let calls = 0;
+  const f = await modelFixture(async args => { calls++; expect(args.model).toBe("fake-model"); return gate.promise; }, { async: true, lostReceipt });
+  const input = { prompt: "async completion", maxOutputTokens: 80 };
+  const pending = f.service.model(f.receiver, f.d.target, "async", input);
+  let settled = false; void pending.finally(() => { settled = true; }).catch(() => {});
+  await waitForModel(() => f.requests.some(row => row.name === "status"));
+  const reservation = await f.db.moduleCall.findFirstOrThrow({ where: { method: "model" } });
+  expect(reservation).toMatchObject({ status: "pending", outputTokens: null });
+  expect(settled).toBe(false);
+  expect(await createExecutionDelivery(f.ports).model(f.receiver, f.d.target, "async", input)).toMatchObject({ status: "pending", reservationId: reservation.id });
+  expect(f.requests.some(row => row.name === "release")).toBe(false);
+  gate.resolve({ text: "async result", inputTokens: 3, outputTokens: 4 });
+  const completed = await pending;
+  expect(completed).toMatchObject({ status: "completed", reservationId: reservation.id, result: { text: "async result", inputTokens: 3, outputTokens: 4 } });
+  expect(await createExecutionDelivery(f.ports).model(f.receiver, f.d.target, "async", input)).toEqual(completed);
+  expect(await f.db.moduleCall.findUniqueOrThrow({ where: { id: reservation.id } })).toMatchObject({ status: "executed", inputTokens: 3, outputTokens: 4 });
+  expect(f.requests.filter(row => row.name === "complete")).toHaveLength(1); expect(calls).toBe(1);
+  expect(f.requests.filter(row => row.name === "release")).toHaveLength(1);
+  expect(f.requests.filter(row => ["status", "release"].includes(row.name)).every(row => row.args.operationId === reservation.id)).toBe(true);
+  await expect(f.service.model(f.receiver, f.d.target, "async", { ...input, prompt: "changed" })).rejects.toMatchObject({ code: "conflict" });
+});
+
+test.each(["unknown closure", "missing result"] as const)("registered completion retains pending budget and identity on %s", async mode => {
+  const gate = completionGate(); let calls = 0;
+  const f = await modelFixture(async () => { calls++; return gate.promise; }, { async: true });
+  const input = { prompt: "unknown completion", maxOutputTokens: 80 };
+  const pending = f.service.model(f.receiver, f.d.target, "unknown", input).then(result => ({ result }), error => ({ error }));
+  await waitForModel(() => f.operations.size === 1);
+  if (mode === "unknown closure") gate.reject(new Error("Closure is unknown"));
+  else f.operations.values().next().value!.outcome = { outcome: "finished", sessionId: null, error: null };
+  expect(await pending).toMatchObject({ error: { code: "failed" } });
+  expect(await createExecutionDelivery(f.ports).model(f.receiver, f.d.target, "unknown", input)).toMatchObject({ status: "pending" });
+  expect(await f.db.moduleCall.findFirstOrThrow({ where: { method: "model" } })).toMatchObject({ status: "pending", outputTokens: null });
+  expect(f.requests.some(row => row.name === "release")).toBe(false);
+  const { reserveCompletion } = await import("./module-model-budget");
+  await reserveCompletion(f.ports, { workspaceId: f.principal.workspaceId, moduleId: f.caller.id, hash: f.caller.activeHash!, manifest: f.manifest, eventKey: "execution:ordinary" }, input, f.ports.now());
+  expect(await f.service.model(f.receiver, f.d.target, "another-key", input)).toMatchObject({ status: "rejected", error: "budget_exceeded" });
   expect(calls).toBe(1);
-  expect(await f.db.moduleCall.count({ where: { method: "model", status: "executed" } })).toBe(1);
+});
+
+test("completion deadline requests abort but settles timeout only after actual closure", async () => {
+  const gate = completionGate(), f = await modelFixture(async () => gate.promise, { async: true });
+  const run = await f.db.run.findUniqueOrThrow({ where: { id: f.d.target.runId } }); f.setNow(new Date(run.deadlineAt!.getTime() - 150));
+  const input = { prompt: "timeout completion", maxOutputTokens: 80 };
+  const pending = f.service.model(f.receiver, f.d.target, "timeout", input).then(result => ({ result }), error => ({ error }));
+  await waitForModel(() => f.requests.some(row => row.name === "abort"));
+  expect(await f.db.moduleCall.findFirstOrThrow({ where: { method: "model" } })).toMatchObject({ status: "pending" });
+  expect(f.requests.some(row => row.name === "release")).toBe(false);
+  await Bun.sleep(120);
+  expect(await createExecutionDelivery(f.ports).model(f.receiver, f.d.target, "timeout", input)).toMatchObject({ status: "pending" });
+  gate.reject(new CallError("failed", "Actual closure confirmed"));
+  expect(await pending).toMatchObject({ error: { code: "failed", message: "timeout: module model call" } });
+  const receipt = await createExecutionDelivery(f.ports).model(f.receiver, f.d.target, "timeout", input);
+  expect(receipt).toMatchObject({ status: "failed", error: "timeout" });
+  expect(await f.db.moduleCall.findFirstOrThrow({ where: { method: "model" } })).toMatchObject({ status: "failed", error: "timeout" });
+  expect(f.requests.filter(row => row.name === "complete")).toHaveLength(1);
+  expect(f.requests.filter(row => row.name === "abort")).toHaveLength(1);
+  expect(f.requests.filter(row => row.name === "release")).toHaveLength(1);
+  expect(f.requests.filter(row => ["status", "abort", "release"].includes(row.name)).every(row => row.args.operationId === (receipt as { reservationId: string }).reservationId)).toBe(true);
+});
+
+test("hung status and abort remain bounded and retain pending completion without replay", async () => {
+  const never = new Promise<never>(() => {}), f = await modelFixture(async () => never, { async: true, status: () => never, abort: () => never });
+  const run = await f.db.run.findUniqueOrThrow({ where: { id: f.d.target.runId } }); f.setNow(new Date(run.deadlineAt!.getTime() - 100));
+  const input = { prompt: "hung completion", maxOutputTokens: 80 }, started = Date.now();
+  await expect(f.service.model(f.receiver, f.d.target, "hung", input)).rejects.toMatchObject({ code: "failed" });
+  expect(Date.now() - started).toBeLessThan(7000);
+  expect(await createExecutionDelivery(f.ports).model(f.receiver, f.d.target, "hung", input)).toMatchObject({ status: "pending" });
+  expect(await f.db.moduleCall.findFirstOrThrow({ where: { method: "model" } })).toMatchObject({ status: "pending" });
+  expect(f.requests.filter(row => row.name === "complete")).toHaveLength(1);
+  expect(f.requests.some(row => row.name === "release")).toBe(false);
+}, 10000);
+
+test("closed completion exceeding output budget settles failed once and never reissues", async () => {
+  const f = await modelFixture(async () => ({ text: "too many tokens", inputTokens: 1, outputTokens: 81 }), { async: true });
+  const input = { prompt: "bounded", maxOutputTokens: 80 };
+  await expect(f.service.model(f.receiver, f.d.target, "overrun", input)).rejects.toMatchObject({ code: "failed" });
+  expect(await createExecutionDelivery(f.ports).model(f.receiver, f.d.target, "overrun", input)).toMatchObject({ status: "failed", error: "provider_error" });
+  expect(await f.db.moduleCall.findFirstOrThrow({ where: { method: "model" } })).toMatchObject({ status: "failed", error: "provider_error" });
+  expect(f.requests.filter(row => row.name === "complete")).toHaveLength(1);
+  expect(f.requests.filter(row => row.name === "release")).toHaveLength(1);
+});
+
+test("model delegation requires the accepted delivery and exact receiver before reservation or Provider I/O", async () => {
+  const f = await modelFixture(async () => ({ text: "bounded", inputTokens: 1, outputTokens: 1 }), { accepted: false });
+  const input = { prompt: "private", maxOutputTokens: 80 };
+  await expect(f.service.model(f.receiver, f.d.target, "before-accept", input)).rejects.toMatchObject({ code: "forbidden" });
+  await f.service.accept(f.receiver, f.d.target, "accept");
+  await expect(f.service.model({ ...f.receiver, activationId: "other" }, f.d.target, "wrong-activation", input)).rejects.toMatchObject({ code: "forbidden" });
+  await expect(f.service.model(f.receiver, { ...f.d.target, launchDigest: "b".repeat(64) }, "wrong-target", input)).rejects.toMatchObject({ code: "conflict" });
+  expect(await f.db.moduleCall.count({ where: { method: "model" } })).toBe(0);
+  expect(f.requests.filter(row => row.name === "complete")).toHaveLength(0);
 });
 
 test("public pause fences caller and receiver before idle conflict, then exact drain permits pause and a new activation", async () => {

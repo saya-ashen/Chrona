@@ -51,7 +51,6 @@ export function createModuleRuntimePorts(db: PrismaClient, options: { dataDir?: 
     secrets: configuredSecret, secretConfigured: async name => name === "qq_bot" && !!process.env.CHRONA_QQ_APP_ID?.trim() && !!process.env.CHRONA_QQ_SECRET_FILE?.trim() && existsSync(process.env.CHRONA_QQ_SECRET_FILE.trim()),
     packages: createModulePackages({ processHelper }), moduleSdk,
     moduleTypecheck, processHelper, moduleRuntimes: runtimeDeclarations,
-    moduleBuiltinResources: resourcePath("builtin", "packages/engine/src/modules/steward/builtin"),
     moduleExternalResources: resourcePath("external", "packages/engine/src/modules/steward/external"),
     sandbox: options.sandbox ?? { ...scriptSandbox.health, executionMode: executionMode(), runModule: input => scriptSandbox.runModule(input), startModule: input => scriptSandbox.startModule(input) },
   };

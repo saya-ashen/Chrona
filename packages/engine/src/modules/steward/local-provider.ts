@@ -4,11 +4,10 @@ import { runtimeEventSchema, providerAnswerSchema, type ProviderRunInput, type R
 import type { StewardPorts } from "./ports";
 import { CallError, registerLocalModule, type Json } from "./module-calls";
 import { tool, json } from "./system/shared";
-import { isAgentApplication } from "./agent-application";
-import { agentDelegationTools, dispatchAgentDelegation } from "./agent-delegation-port";
+import { assertExecutionPrincipal } from "./execution-principal";
 
-type CallbackTarget = Pick<ProviderRunInput, "events" | "detail"> & { operationId?: string; settled?: (outcome: import("@chrona/contracts/steward").RuntimeEvent & { kind: "settled" }) => void };
-type Callback = { target: Pick<ProviderRunInput, "events" | "detail">; settle(value: RuntimeEvent & { kind: "settled" }): void; workspaceId: string; controllers: Map<string, AbortController>; interrupted: Set<string> };
+type CallbackTarget = Pick<ProviderRunInput, "events" | "detail"> & { provider?: { moduleId: string; hash: string }; operationId?: string; settled?: (outcome: import("@chrona/contracts/steward").RuntimeEvent & { kind: "settled" }) => void };
+type Callback = { target: Pick<ProviderRunInput, "events" | "detail">; settle(value: RuntimeEvent & { kind: "settled" }): void; workspaceId: string; provider?: { moduleId: string; hash: string }; controllers: Map<string, AbortController>; interrupted: Set<string> };
 // Match moduleSupervisor's scope: service-derived ports share its original ports' callbacks.
 const callbacks = new WeakMap<StewardPorts["db"], Map<string, Map<string, Callback>>>();
 
@@ -20,7 +19,7 @@ export function retainProviderCallbacks(ports: StewardPorts, workspaceId: string
   if (!map) { map = new Map(); scopes.set(ports.dataDir, map); }
   const id = randomUUID(), controllers = new Map<string, AbortController>(), interrupted = new Set<string>();
   const { operationId, settled } = input;
-  map.set(id, { target: input, workspaceId, controllers, interrupted, settle(value) {
+  map.set(id, { target: input, workspaceId, provider: input.provider, controllers, interrupted, settle(value) {
     if (value.operationId !== operationId || !settled) throw new CallError("forbidden", "Completion belongs to another Run");
     settled(value);
   } });
@@ -45,17 +44,18 @@ async function dispatchCallback(target: Pick<ProviderRunInput, "events" | "detai
     finally { owner.controllers.delete(value.requestId); }
   }
   if (value.kind === "detail") await target.detail?.append(value.value);
-  else await target.events?.[value.kind](value.value as never);
+  else await target.events?.[value.kind]?.(value.value as never);
   return null;
 }
 export function registerProviderCallbacks() {
-  registerLocalModule({ name: "runtime-callback", description: "Run-bound event delivery", unrecorded: ["event", "agent-admit", "agent-settle"],
-    tools: [...agentDelegationTools, tool("event", "Run-bound Provider event", {}, [], { input: z.object({ callbackId: z.string().uuid(), event: runtimeEventSchema }).strict(), output: providerAnswerSchema.nullable(), visibility: ["kernel", "modules"] })],
+  registerLocalModule({ name: "runtime-callback", description: "Run-bound event delivery", unrecorded: ["event"],
+    tools: [tool("event", "Run-bound Provider event", {}, [], { input: z.object({ callbackId: z.string().uuid(), event: runtimeEventSchema }).strict(), output: providerAnswerSchema.nullable(), visibility: ["kernel", "modules"] })],
     async handle({ ports, workspaceId, caller }, name, args): Promise<Json> {
-      if (name !== "event") return dispatchAgentDelegation(ports, workspaceId, caller, name, args);
-      if (caller.kind !== "kernel" && (caller.kind !== "module" || !await isAgentApplication(ports, caller, workspaceId))) throw new CallError("forbidden", "Runtime callbacks require the builtin Agent");
+      if (name !== "event") throw new CallError("not_found", "Unknown provider callback");
       const callback = callbacks.get(ports.db)?.get(ports.dataDir)?.get(String(args.callbackId));
       if (!callback || callback.workspaceId !== workspaceId) throw new CallError("not_found", "Run callback ended");
+      if (caller.kind !== "module" || caller.moduleId !== callback.provider?.moduleId || caller.hash !== callback.provider.hash) throw new CallError("forbidden", "Callback requires the Run's admitted provider module");
+      await assertExecutionPrincipal(ports.db, { workspaceId, ownerId: "owner", caller });
       return dispatchCallback(callback.target, callback, runtimeEventSchema.parse(args.event));
     },
   });

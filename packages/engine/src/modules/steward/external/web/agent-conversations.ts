@@ -7,12 +7,12 @@ import { captureApplicationDelivery, reconcileApplicationDelivery, validApplicat
 
 type Target = string | { moduleId: string; tool: string };
 type Args = Record<string, unknown>;
-type Call = (target: string, args?: Args) => Promise<unknown>;
+type Call = (target: string, args?: Args, options?: { key?: string }) => Promise<unknown>;
 type Transcript = { at: string; kind: string; text?: string; tool?: string; error?: boolean }[];
 type Execution = { runId: string; status: string; active: boolean; phase?: string; reason?: string; canContinue: boolean; replyPending?: boolean; pendingAdmission?: { requestKey: string }; pendingContinuation?: { runId: string; requestKey: string }; applicationDelivery?: ApplicationDelivery[] };
 type Message = { id: string; direction: "in" | "out"; text: string; createdAt: string; attachments: unknown[]; externalId?: string; inReplyTo?: string; input?: string; requestKey?: string; runId?: string; delivery?: "pending" | "accepted"; execution?: Execution; progress?: string };
 type RunRequest = { prompt: string; tools: Target[]; content: string[] };
-type Turn = { pendingToolResults?: string[]; applicationDelivery?: ApplicationDelivery[]; deliveryCheckedAt?: string; id: string; key: string; text: string; prompt?: string; memoryContext?: string; input?: string; content?: string[]; at: string; runId?: string; status: string; active: boolean; phase?: string; reason?: string; after?: number; streamPending?: boolean; continuationOf?: string; runRequest?: RunRequest; baseline: Transcript; transcript: Transcript; interactions: { id: string; status: string }[] };
+type Turn = { pendingToolResults?: string[]; applicationDelivery?: ApplicationDelivery[]; deliveryCheckedAt?: string; id: string; key: string; text: string; prompt?: string; memoryContext?: string; input?: string; content?: string[]; at: string; runId?: string; status: string; active: boolean; phase?: string; reason?: string; cursor?: string; streamPending?: boolean; continuationOf?: string; runRequest?: RunRequest; baseline: Transcript; transcript: Transcript; interactions: { id: string; status: string }[] };
 type Conversation = { id: string; memory?: MemoryJournal; contextId?: string; key: string; title: string; status: "active" | "ended"; source: "web" | "mcp" | "qq"; createdAt: string; lastActivityAt: string; messages: Message[]; turns: Turn[] };
 type State = { version: 1; sessions: Conversation[] };
 type Options = { dataDir: string; call: Call; reply: (event: Args) => void; now?: () => Date; source?: "web" | "mcp" | "qq"; guidance?: string; tools?: Target[]; deliveryPages?: DeliveryPages };
@@ -83,7 +83,7 @@ async function conversationTools({ tools, call }: Runtime) {
     for (const item of page.items) {
       const target = typeof item.target === "string" && item.moduleId ? { moduleId: item.moduleId, tool: item.target.slice(item.target.indexOf(".") + 1) } : item.target;
       const identity = JSON.stringify(target);
-      if ((typeof target === "string" || !excluded.has(target.moduleId)) && !seen.has(identity)) { selected.push(target); seen.add(identity); }
+      if ((typeof target === "string" ? !target.startsWith("agent.") : !excluded.has(target.moduleId)) && !seen.has(identity)) { selected.push(target); seen.add(identity); }
     }
     cursor = page.nextCursor;
   } while (cursor && selected.length < 100);
@@ -91,10 +91,6 @@ async function conversationTools({ tools, call }: Runtime) {
 }
 async function start(options: Runtime, state: State, session: Conversation, turn: Turn) {
   const { call, source } = options;
-  if (!session.contextId) {
-    const context = await call("agent.context", { "request-key": `${source}-context:${session.id}` }) as { contextId: string };
-    session.contextId = context.contextId; await save(options.dataDir, state);
-  }
   if (!turn.runRequest) {
     const tools = await conversationTools(options);
     if (tools.length > 100) throw failure("conflict", "Web conversation tool selection exceeds 100 interfaces");
@@ -103,7 +99,8 @@ async function start(options: Runtime, state: State, session: Conversation, turn
     // Freeze the complete admission payload before crossing the Agent boundary.
     await save(options.dataDir, state);
   }
-  const run = await call("agent.run", { "context-id": session.contextId, "request-key": `${source}-run:${turn.id}`, ...turn.runRequest, lane: "foreground" }) as { runId: string; status: string; active: boolean };
+  const run = await call("agent.run", { ...(session.contextId ? { contextId: session.contextId } : {}), ...turn.runRequest, lane: "foreground" }, { key: `${source}-run:${turn.id}` }) as { runId: string; contextId: string; status: string; active: boolean };
+  session.contextId = run.contextId;
   turn.runId = run.runId; turn.status = run.status; turn.active = run.active; await save(options.dataDir, state);
 }
 const resumable = new Set(["failed", "timed_out", "provider_unavailable", "cancelled"]);
@@ -116,27 +113,35 @@ function terminalReason(status: string) {
   if (status === "timed_out") return "本次处理超时，尚未完成。";
   if (status === "provider_unavailable") return "执行服务不可用，本次处理未完成。";
   if (status === "unknown") return "执行是否停止尚未确认，请等待状态更新。";
-  // Agent context get exposes status, but does not expose the stored Run error.
+  // The public Run view does not expose its stored internal error.
   return "本次执行失败，处理未完成；执行接口未提供详细原因。";
+}
+type AgentReadPage = { run: { runId: string; status: string; active: boolean }; transcript?: Transcript; interactions: Turn["interactions"]; items: { sequence: number; payload: unknown }[]; nextCursor: string | null; ended: boolean };
+function applyReadPage(turn: Turn, page: AgentReadPage, before?: string) {
+  if (page.run.runId !== turn.runId) throw failure("conflict", "Agent read returned another Run");
+  turn.status = page.run.status; turn.active = page.run.active || ["queued", "running", "unknown"].includes(page.run.status);
+  turn.reason = terminalReason(page.run.status);
+  for (const item of page.items) {
+    const payload = item.payload as { type?: string; value?: { phase?: unknown } } | null;
+    if (payload?.type === "progress" && typeof payload.value?.phase === "string") turn.phase = payload.value.phase;
+  }
+  // Provider transcripts may span successive Runs; preserve the next turn's boundary.
+  if (page.transcript) turn.transcript = before === undefined ? page.transcript : page.transcript.filter(item => Date.parse(item.at) < Date.parse(before));
+  turn.interactions = page.interactions;
+  captureApplicationDelivery(turn, page.items);
 }
 async function readTranscript(call: Call, turn: Turn, before?: string) {
   try {
-    let stream: { transcript: Transcript; interactions: Turn["interactions"]; items: { sequence: number; payload: unknown }[]; after: number };
+    let page: AgentReadPage;
+    let more: boolean;
     do {
-      stream = await call("agent.stream", { "run-id": turn.runId, after: turn.after ?? 0, limit: 100 }) as typeof stream;
-      for (const item of stream.items) {
-        const payload = item.payload as { type?: string; value?: { phase?: unknown } } | null;
-        if (payload?.type === "progress" && typeof payload.value?.phase === "string") turn.phase = payload.value.phase;
-      }
-      turn.after = stream.after;
-      // Context transcripts are shared by successive Runs. A delayed terminal read must
-      // not attach the next turn's results or prose to this turn.
-      turn.transcript = before === undefined ? stream.transcript : stream.transcript.filter(item => Date.parse(item.at) < Date.parse(before));
-      turn.interactions = stream.interactions;
-      captureApplicationDelivery(turn, stream.items);
-    } while (stream.items.length === 100);
-    return true;
-  } catch { /* The known execution status remains authoritative; reads can reconcile the transcript later. */
+      page = await call("agent.read", { runId: turn.runId, ...(turn.cursor ? { cursor: turn.cursor } : {}), limit: 100 }) as typeof page;
+      applyReadPage(turn, page, before);
+      more = page.items.length === 100 && !!page.nextCursor && page.nextCursor !== turn.cursor;
+      if (page.nextCursor) turn.cursor = page.nextCursor;
+    } while (more);
+    return page.transcript !== undefined;
+  } catch { // Preserve the last observed execution evidence until a later read succeeds.
     return false;
   }
 }
@@ -150,11 +155,6 @@ function terminalReply(now: Runtime["now"], turn: Turn, previous?: Message): Mes
 async function refresh(options: Runtime, state: State, session: Conversation, turn: Turn) {
   const { call, now, reply } = options;
   if (!turn.runId) return;
-  const run = await call("agent.get", { "run-id": turn.runId }) as { status: string; active: boolean };
-  turn.status = run.status; turn.active = run.active || ["queued", "running", "unknown"].includes(run.status);
-  turn.reason = terminalReason(run.status);
-  // Save execution evidence even if reading the provider transcript subsequently fails.
-  turn.streamPending = true; await save(options.dataDir, state);
   turn.streamPending = !await readTranscript(call, turn, session.turns[session.turns.indexOf(turn) + 1]?.at);
   // A finished Run is not evidence that its final reply has been retrieved.
   if (turn.active || (turn.status === "finished" && turn.streamPending)) { await save(options.dataDir, state); return; }
@@ -247,7 +247,7 @@ async function continueActiveTurn(options: Runtime, state: State, session: Conve
   if (!active.runId || active.status !== "running") throw failure("conflict", "会话仍在排队或停止尚未确认，请等待状态更新。");
   const message: Message = { id: randomUUID(), direction: "in", text: input.text, createdAt: now().toISOString(), attachments: input.attachments ?? [], input: identity, requestKey: key, runId: active.runId, delivery: "pending" };
   session.messages.push(message); session.lastActivityAt = message.createdAt; await save(options.dataDir, state);
-  await call("agent.write", { "run-id": active.runId, "request-key": `${options.source}-write:${message.id}`, text: prompt });
+  await call("agent.write", { runId: active.runId, input: { kind: "message", text: prompt } }, { key: `${options.source}-write:${message.id}` });
   message.delivery = "accepted"; await save(options.dataDir, state);
   return { sessionId: session.id, messageId: message.id, runId: active.runId, queued: false };
 }
@@ -392,12 +392,12 @@ export function createAgentConversations(inputOptions: Options) {
     interrupt: (runId: string) => serial(async () => {
       const state = await load(dataDir);
       if (!state.sessions.some(session => session.turns.some(turn => turn.runId === runId))) throw failure("not_found", "Web run not found");
-      return call("agent.interrupt", { "run-id": runId, "request-key": `${source}-stop:${runId}` });
+      return call("agent.stop", { runId }, { key: `${source}-stop:${runId}` });
     }),
     answer: (questionId: string, answer: unknown) => serial(async () => {
       const state = await load(dataDir), turn = state.sessions.flatMap(session => session.turns).find(turn => turn.interactions.some(question => question.id === questionId));
       if (!turn?.runId) throw failure("not_found", "Web interaction not found");
-      return call("agent.respond", { "run-id": turn.runId, "request-key": `${source}-answer:${questionId}`, "question-id": questionId, answer: JSON.stringify(answer) });
+      return call("agent.write", { runId: turn.runId, input: { kind: "answer", questionId, answer } }, { key: `${source}-answer:${questionId}` });
     }),
   };
 }
