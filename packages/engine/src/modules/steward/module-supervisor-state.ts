@@ -1,3 +1,5 @@
+import { moduleRuntimeParams, RUN_LIMITS } from "@chrona/contracts/steward";
+import { moduleModelSettings } from "./settings";
 import type { ModuleCall, moduleCallReplySchema, ModuleEvent, ModuleManifest, moduleEventReplySchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import type { createModuleChannel } from "./module-channel";
@@ -21,7 +23,7 @@ export function isHandlerRejection(error: unknown) {
 export type Process = ReturnType<NonNullable<NonNullable<StewardPorts["sandbox"]>["startModule"]>>;
 export type Timers = Pick<typeof globalThis, "setTimeout" | "clearTimeout">;
 export type Options = { timers?: Timers; idleMs?: number; backoffMs?: number };
-export type DeliveryOptions = { chain?: string[]; path?: string[]; timeoutMs?: number; activationId?: string | null; beforeDelivery?: () => Promise<void>; validateResult?: (result: unknown) => string | null };
+export type DeliveryOptions = { chain?: string[]; path?: string[]; timeoutMs?: number; activationId?: string | null; beforeDelivery?: () => Promise<void>; dispatch?: (send: () => void) => Promise<void>; validateResult?: (result: unknown) => string | null };
 export type Instance = {
   moduleId: string; hash: string; activationId: string | null; manifest: ModuleManifest; scope: CallScope;
   queue: Promise<unknown>; start?: Promise<void>; httpReady?: ReturnType<typeof moduleHttpReady>;
@@ -31,7 +33,14 @@ export type Instance = {
   failureEvidence?: ModuleFailureEvidence; failureRecorded?: boolean;
   stopUnknown?: Error; closePromise?: Promise<void>; retirement?: Promise<void>;
 };
-export const triggerKey = (event: ModuleEvent) => event.trigger.kind === "tool" ? `tool:${event.trigger.id}` : event.trigger.kind === "call_result" ? `call_result:${event.trigger.callId}` : event.trigger.id;
+export function triggerKey({ trigger }: ModuleEvent) {
+  switch (trigger.kind) {
+    case "tool": return `tool:${trigger.id}`;
+    case "call_result": return `call_result:${trigger.callId}`;
+    case "timer": return trigger.eventId;
+    default: return trigger.id;
+  }
+}
 export const keyOf = (moduleId: string, hash: string, activationId: string | null) => `${moduleId}:${hash}:${activationId ?? "untracked"}`;
 function failurePhase(event: ModuleEvent | undefined, connected: boolean | undefined) { return event ? "event" : connected ? "process" : "start"; }
 function processEvidence(instance: Partial<Pick<Instance, "process" | "exit">>) {
@@ -73,4 +82,11 @@ export function registerModuleEffects(value: ModuleEffects) { effects = value; }
 export function moduleEffects() {
   if (!effects) throw new Error("Module effects are not registered: import ./module-effects");
   return effects;
+}
+
+/** Kernel ceilings bound requested event timeouts. */
+export async function eventLimits(ports: StewardPorts, manifest: ModuleManifest, workspaceId: string, requested?: number) {
+  const workspace = manifest.model ? await ports.db.workspace.findUniqueOrThrow({ where: { id: workspaceId } }) : null;
+  const ceiling = workspace && manifest.model ? moduleModelSettings(workspace.settings)?.eventTimeoutMs ?? RUN_LIMITS.jobTimeoutMs : RUN_LIMITS.jobTimeoutMs;
+  return { timeoutMs: Math.min(requested ?? ceiling, ceiling), params: moduleRuntimeParams(manifest) };
 }

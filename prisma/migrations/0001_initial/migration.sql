@@ -99,6 +99,8 @@ CREATE TABLE "ModuleCall" (
     "key" TEXT NOT NULL,
     "status" TEXT NOT NULL,
     "error" TEXT,
+    "inputTokens" INTEGER,
+    "outputTokens" INTEGER,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "ModuleCall_moduleId_fkey" FOREIGN KEY ("moduleId") REFERENCES "Module" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
@@ -112,6 +114,7 @@ CREATE TABLE "ModuleInvocation" (
     "callerHash" TEXT,
     "runId" TEXT,
     "target" TEXT NOT NULL,
+    "targetIdentity" TEXT NOT NULL DEFAULT '',
     "targetBound" BOOLEAN NOT NULL DEFAULT false,
     "targetModuleId" TEXT,
     "targetHash" TEXT,
@@ -119,6 +122,7 @@ CREATE TABLE "ModuleInvocation" (
     "tool" TEXT NOT NULL,
     "args" JSONB NOT NULL,
     "key" TEXT NOT NULL,
+    "requestDigest" TEXT,
     "chain" JSONB NOT NULL DEFAULT '[]',
     "mode" TEXT NOT NULL,
     "idempotent" BOOLEAN NOT NULL DEFAULT false,
@@ -128,7 +132,10 @@ CREATE TABLE "ModuleInvocation" (
     "leaseToken" TEXT,
     "leaseUntil" DATETIME,
     "output" JSONB,
+    "operationOutput" JSONB,
     "error" TEXT,
+    "errorCode" TEXT,
+    "errorReason" TEXT,
     "reply" BOOLEAN NOT NULL DEFAULT false,
     "replyAttempts" INTEGER NOT NULL DEFAULT 0,
     "repliedAt" DATETIME,
@@ -751,13 +758,16 @@ CREATE INDEX "ModuleCall_moduleRunId_idx" ON "ModuleCall"("moduleRunId");
 CREATE INDEX "ModuleInvocation_workspaceId_status_nextAttemptAt_idx" ON "ModuleInvocation"("workspaceId", "status", "nextAttemptAt");
 
 -- CreateIndex
+CREATE INDEX "ModuleInvocation_workspaceId_mode_createdAt_idx" ON "ModuleInvocation"("workspaceId", "mode", "createdAt");
+
+-- CreateIndex
 CREATE INDEX "ModuleInvocation_workspaceId_reply_repliedAt_idx" ON "ModuleInvocation"("workspaceId", "reply", "repliedAt");
 
 -- CreateIndex
 CREATE INDEX "ModuleInvocation_runId_status_idx" ON "ModuleInvocation"("runId", "status");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "ModuleInvocation_workspaceId_caller_target_tool_key_key" ON "ModuleInvocation"("workspaceId", "caller", "target", "tool", "key");
+CREATE UNIQUE INDEX "ModuleInvocation_workspaceId_caller_targetIdentity_tool_key_key" ON "ModuleInvocation"("workspaceId", "caller", "targetIdentity", "tool", "key");
 
 -- CreateIndex
 CREATE INDEX "Schedule_workspaceId_status_nextAt_idx" ON "Schedule"("workspaceId", "status", "nextAt");

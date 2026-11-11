@@ -10,10 +10,10 @@ const emits = JSON.stringify([{ name: "updated", description: "A plan changed", 
 let startupUnavailable = true;
 const module = await startModule("index.ts", { stubs: {
   "modules.list": () => {
-    if (startupUnavailable) { startupUnavailable = false; return null; }
-    return ["planning", "beta"].map(name => ({ id: `${name}-id`, name, status: "active", activeHash: "h" }));
+    if (startupUnavailable) { startupUnavailable = false; return { items: null, nextCursor: null }; }
+    return { items: ["planning", "beta"].map(name => ({ id: `${name}-id`, name, status: "active", activeHash: "h" })), nextCursor: null };
   },
-  "modules.tools": () => [{ target: "beta.on-plan", moduleId: "beta-id", hash: "h", contractHash: "callback-v1", inputSchema: { type: "object", properties: { event: { type: "string" }, from: { type: "string" }, payload: { type: "string" } }, required: ["event", "from", "payload"] } }],
+  "modules.describe": () => ({ items: [{ target: "beta.on-plan", moduleId: "beta-id", hash: "h", contractHash: "callback-v1", inputSchema: { type: "object", properties: { event: { type: "string" }, from: { type: "string" }, payload: { type: "string" } }, required: ["event", "from", "payload"] } }], nextCursor: null }),
 } });
 const caller = (name: string) => ({ kind: "module", module: name, moduleId: `${name}-id`, hash: "h" });
 let clock = Date.parse("2026-10-25T04:00:00.000Z");
@@ -28,7 +28,7 @@ const refused = async (id: string, args: Record<string, unknown>, from: unknown,
   const reply = await tool(id, args, from);
   assert.ok("error" in reply && pattern.test(String(reply.error)), JSON.stringify(reply));
 };
-const deliveries = () => (module.calls as Call[]).filter(call => call.method === "call" && call.params.target === "beta.on-plan");
+const deliveries = () => (module.calls as Call[]).filter(call => call.method === "call" && targetName(call.params.target) === "beta.on-plan");
 try {
   // Publishers register with their real SDK identity; no manifest contribution lookup.
   await refused("register", { emits }, { kind: "owner", via: null }, /forbidden/);
@@ -74,7 +74,14 @@ try {
   assert.deepEqual(await ok("register", { emits: "[]" }, caller("planning")), { registered: true });
   await refused("subscribe", { event: "planning.updated", tool: "on-plan" }, caller("beta"), /not_found/);
   await refused("emit", { event: "updated", payload: '{}', key: "withdrawn" }, caller("planning"), /not_found/);
-  assert.ok(!(module.calls as Call[]).some(call => call.params.target === "modules.contributions"));
+  assert.ok(!(module.calls as Call[]).some(call => targetName(call.params.target) === "modules.contributions"));
 } finally {
   await module.stop();
+}
+
+function targetName(raw: unknown): string {
+  if (typeof raw === "string") return raw;
+  const target = raw as { moduleId: string; tool: string };
+  const names: Record<string, string> = {"beta-id":"beta"};
+  return `${names[target.moduleId] ?? target.moduleId.replace(/-id$/, "")}.${target.tool}`;
 }

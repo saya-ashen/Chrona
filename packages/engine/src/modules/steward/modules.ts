@@ -48,7 +48,9 @@ async function currentContractFailures(db: StewardPorts["db"], workspaceId: stri
 
 function runtimeOf(ports: StewardPorts, row: { id: string; activeHash: string | null; status: string }, version: { manifest: unknown } | null) {
   const manifest = moduleManifestSchema.safeParse(version?.manifest).data, supervisor = moduleSupervisor(ports);
-  return { runtime: row.status !== "active" ? { state: "paused", pid: null } : supervisor.status(row.id, row.activeHash, manifest?.keepAlive ?? false) };
+  const runtime = supervisor.status(row.id, row.activeHash, manifest?.keepAlive ?? false);
+  const observedOwner = ["running", "starting", "stopping", "unknown"].includes(runtime.state);
+  return { runtime: row.status !== "active" && !observedOwner ? { state: "paused", pid: null } : runtime };
 }
 
 function incidentSummary(current: ModuleIncident | undefined) {

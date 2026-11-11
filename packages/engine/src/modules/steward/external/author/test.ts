@@ -143,9 +143,9 @@ const runtime = await startModule("index.ts", { stubs: {
     await files.write("sources/imported/index.ts", "export const imported = true;\n");
     return sourceResult;
   },
-  "modules.submit": (args: Record<string, unknown>) => { assert.deepEqual(args, submission); return receipt; },
-  "modules.candidate-check": (args: Record<string, unknown>) => {
-    assert.ok(JSON.stringify(args) === JSON.stringify({ receiptId: receipt.receiptId }) || JSON.stringify(args) === JSON.stringify({ admissionId: submission.admissionId, requestKey: submission.requestKey }));
+  "modules.submit": (args: Record<string, unknown>) => { const { requestKey: _key, ...submitted } = submission; assert.deepEqual(args, submitted); return receipt; },
+  "modules.receipt": (args: Record<string, unknown>) => {
+    assert.ok(JSON.stringify(args) === JSON.stringify({ receiptId: receipt.receiptId }) || JSON.stringify(args) === JSON.stringify({ admissionId: submission.admissionId, key: submission.requestKey }));
     return receipt;
   },
 } });
@@ -207,9 +207,16 @@ try {
   assert.deepEqual(await result("receipt", input({ admissionId: submission.admissionId, requestKey: submission.requestKey })), receipt);
   await result("write", { path: "sources/from-agent/note.txt", content: "current Agent material" }, entry);
   assert.equal((await result("read", { path: "sources/from-agent/note.txt" }, entry) as { content: string }).content, "current Agent material", "current Agent-selected file tools accept the originating owner-entry module identity");
-  const targets = runtime.calls.map((call: { params: { target?: string } }) => call.params.target);
-  assert.deepEqual(targets, ["modules.source", "modules.submit", "modules.submit", "modules.candidate-check", "modules.candidate-check"]);
+  const targets = runtime.calls.map((call: { params: { target?: string } }) => targetName(call.params.target));
+  assert.deepEqual(targets, ["modules.source", "modules.submit", "modules.submit", "modules.receipt", "modules.receipt"]);
   assert.ok(!targets.some((target: string) => target.startsWith("agent.") || target.includes("admit") || target.startsWith("secrets.")));
   await writeFile(join(paths.data, "output-examples.json"), JSON.stringify(outputExamples));
   console.log("author: bounded files, distribution, exact forwarding, caller visibility and unknown receipts passed");
 } finally { await runtime.stop(); }
+
+function targetName(raw: unknown): string {
+  if (typeof raw === "string") return raw;
+  const target = raw as { moduleId: string; tool: string };
+  const names: Record<string, string> = {};
+  return `${names[target.moduleId] ?? target.moduleId.replace(/-id$/, "")}.${target.tool}`;
+}

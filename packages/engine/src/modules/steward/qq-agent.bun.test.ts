@@ -23,7 +23,7 @@ test("QQ owns attachment references, scoped contexts, quotes and delivery uncert
     f.ports.onQueued = () => new Promise(() => {});
     const qq = await f.ports.db.module.findUniqueOrThrow({ where: { workspaceId_name: { workspaceId: f.workspaceId, name: "qq" } } });
     const caller = { kind: "module" as const, module: "qq", moduleId: qq.id, hash: qq.activeHash! };
-    const call = async (target: string, args: Record<string, unknown> = {}) => (await callSync(f.ports, { ...kernelOrigin(f.workspaceId), caller }, target, args)).output;
+    const call = async (target: string, args: Record<string, unknown> = {}) => { const { ["request-key"]: key, ["command-key"]: commandKey, ...input } = args; return (await callSync(f.ports, { ...kernelOrigin(f.workspaceId), caller }, target, target.startsWith("agent.") ? input : args, { key: target.startsWith("agent.") ? (key ?? commandKey) as string | undefined : undefined })).output; };
     let owner = "original-owner", uncertain = false;
     const sent: QqReplyItem[] = [];
     const options = { dataDir: join(f.root, "qq-private"), contentDir: join(f.ports.dataDir, "platform/content", qq.id), call,

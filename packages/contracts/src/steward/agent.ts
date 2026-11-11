@@ -1,6 +1,7 @@
+import { routedTargetSchema } from "./kernel-api";
 import { z } from "zod";
 import { runtimeStartSchema, runtimeOperationSchema, runtimeOutcomeSchema, runtimeHealthSchema, runtimeCompletionSchema, runtimeTranscriptSchema } from "./local-runtime";
-import { providerInteractionSchema } from "./provider";
+import { providerInteractionSchema, providerAnswerSchema } from "./provider";
 import { executionIdSchema, executionStartSchema, executionViewSchema, executionInputSchemas, executionResultSourceSchema } from "./execution";
 import { localExecutionStartSchema, applicationExecutionStartSchema, kernelPlacementViewSchema, kernelLocationSchema, kernelCleanupInputSchema, kernelCleanupReceiptSchema } from "./kernel-execution";
 import { executionResponseDataSchemas } from "./execution-events";
@@ -27,7 +28,7 @@ export function agentInput(name: string, raw: unknown): Record<string, unknown> 
 const id = executionIdSchema;
 const requestKey = z.string().min(1).max(200);
 export const contextInput = z.object({ requestKey }).strict();
-export const contextRunInput = z.object({ contextId: id, requestKey, prompt: z.string().trim().min(1).max(200_000), content: z.array(z.string().min(1).max(1000)).max(10).default([]), lane: z.enum(["foreground", "background"]).default("background"), tools: z.array(z.string().regex(/^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*$/)).max(100).default([]) }).strict();
+export const contextRunInput = z.object({ contextId: id, requestKey, prompt: z.string().trim().min(1).max(200_000), content: z.array(z.string().min(1).max(1000)).max(10).default([]), lane: z.enum(["foreground", "background"]).default("background"), tools: z.array(routedTargetSchema).max(100).default([]) }).strict();
 export const contextRunTarget = z.object({ runId: id }).strict();
 export const contextWriteInput = contextRunTarget.extend({ requestKey, text: z.string().trim().min(1).max(20_000) });
 export const contextInterruptInput = contextRunTarget.extend({ requestKey });
@@ -36,7 +37,7 @@ export const contextStreamInput = contextRunTarget.extend({ after: z.number().in
 export const contextOutput = z.object({ contextId: id }).strict();
 export const contextRunOutput = z.object({ runId: id, contextId: id, status: z.string(), active: z.boolean() }).strict();
 export const runToolResultSchema = z.object({
-  runId: id, callId: id, target: z.string().min(1), moduleId: id, hash: z.string().min(1), contractHash: z.string().regex(/^[a-f0-9]{64}$/),
+  runId: id, callId: id, target: routedTargetSchema, moduleId: id, hash: z.string().min(1), contractHash: z.string().regex(/^[a-f0-9]{64}$/),
   status: z.enum(["succeeded", "failed", "unknown"]), outputState: z.enum(["complete", "filtered", "omitted"]), output: z.json().nullable(),
 }).strict();
 export const contextStreamOutput = z.object({ items: z.array(z.object({ sequence: z.number().int(), at: z.string(), kind: z.string(), payload: z.unknown() }).strict()), after: z.number().int(), ended: z.boolean(), transcript: runtimeTranscriptSchema, interactions: z.array(providerInteractionSchema).max(12) }).strict();
@@ -135,3 +136,27 @@ export function primitiveInput(name: AgentPrimitive, raw: unknown) {
   // Use the same argument normalization as the other SDK entry points.
   return primitiveInputs[name].parse(camelArguments(raw));
 }
+
+/** Public app inputs exclude idempotency keys, which arrive as authenticated call metadata. */
+export const publicContextInputs = {
+  context: contextInput.omit({ requestKey: true }),
+  run: contextRunInput.omit({ requestKey: true }),
+  get: contextRunTarget,
+  stream: contextStreamInput,
+  write: contextWriteInput.omit({ requestKey: true }),
+  interrupt: contextInterruptInput.omit({ requestKey: true }),
+  respond: contextRespondInput.omit({ requestKey: true }).extend({ answer: providerAnswerSchema }),
+};
+export const publicWorkInputs = {
+  run: z.union([primitiveInputs.run.options[1].omit({ requestKey: true }), primitiveInputs.run.options[2].omit({ requestKey: true }), primitiveInputs.run.options[3].omit({ requestKey: true })]),
+  get: primitiveInputs.get.options[1],
+  stream: primitiveInputs.stream.options[1],
+  write: primitiveInputs.write.options[1].omit({ requestKey: true }),
+  interrupt: primitiveInputs.interrupt.options[1].omit({ requestKey: true }),
+  respond: primitiveInputs.respond.options[1].omit({ requestKey: true }).extend({ answer: providerAnswerSchema }),
+  lookup: z.object({ key: id }).strict(),
+  inspect: primitiveInputs.inspect,
+  placement: primitiveInputs.placement,
+  locations: primitiveInputs.locations,
+  cleanup: z.union([kernelCleanupInputSchema.options[0].omit({ commandKey: true }), kernelCleanupInputSchema.options[1].omit({ commandKey: true })]),
+};

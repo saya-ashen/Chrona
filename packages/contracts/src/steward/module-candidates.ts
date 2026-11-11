@@ -2,7 +2,7 @@ import { z } from "zod";
 import { moduleVersionHashSchema } from "./module-lifecycle";
 
 const id = z.string().min(1).max(128);
-const requestKey = z.string().trim().min(1).max(120);
+const requestKey = z.string().min(1).max(200);
 const name = z.string().regex(/^[a-z][a-z0-9-]*$/).max(64);
 const relativeDir = z.string().min(1).max(500).refine(value => !value.startsWith("/") && !value.includes("\\") && !value.includes("\0") && value.split("/").every(part => part && part !== "." && part !== ".." && part !== ".git"), "Expected a relative content directory");
 export const candidateSubmitterSchema = z.object({ moduleId: id, hash: moduleVersionHashSchema }).strict();

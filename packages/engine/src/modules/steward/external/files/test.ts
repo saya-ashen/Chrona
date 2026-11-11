@@ -46,7 +46,7 @@ try {
   assert.deepEqual(module.calls, []);
   // On activation the documents page is registered with web.
   assert.equal((await module.send({ trigger: { kind: "activated", id: "activated", firedAt: now }, now, params: {} })).error, undefined);
-  const registered = module.calls.find((call: { method: string; params: { target: string } }) => call.params.target === "web.page-set");
+  const registered = module.calls.find((call: { method: string; params: { target: string } }) => targetName(call.params.target) === "web.page-set");
   assert.equal(registered.params.args.id, "main"); assert.equal(registered.params.args.data.doc.tool, "read");
   const activate = () => module.send({ trigger: { kind: "activated", id: "activated", firedAt: now }, now, params: {} });
   assert.equal((await activate()).error, undefined);
@@ -54,7 +54,14 @@ try {
   assert.ok((await activate()).error, "Failed registration must reach the existing activated retry mechanism");
   failRegistration = false;
   assert.equal((await activate()).error, undefined);
-  const registrations = module.calls.filter((call: { params: { target?: string } }) => call.params.target === "web.page-set");
+  const registrations = module.calls.filter((call: { params: { target?: string } }) => targetName(call.params.target) === "web.page-set");
   assert.equal(registrations.length, 4);
   assert.ok(registrations.every((call: { params: { args: { id: string } } }) => call.params.args.id === "main"));
 } finally { await module.stop(); }
+
+function targetName(raw: unknown): string {
+  if (typeof raw === "string") return raw;
+  const target = raw as { moduleId: string; tool: string };
+  const names: Record<string, string> = {};
+  return `${names[target.moduleId] ?? target.moduleId.replace(/-id$/, "")}.${target.tool}`;
+}

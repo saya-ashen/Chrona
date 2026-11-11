@@ -26,15 +26,17 @@ async function fixture() {
 }
 test("actual private runtime host is absent from public tools and rejects ordinary callback or admission callers", async () => {
   registerSystemModules(); registerProviderCallbacks();
-  const f = await fixture(), ordinary = await f.app("ordinary", { uses: ["*"] });
+  const f = await fixture(), ordinary = await f.app("ordinary", { uses: ["*"],
+      authority: "owner"
+});
   const host = listLocalModules().find(module => module.name === "runtime-callback");
   expect(host?.tools.map(tool => tool.name).sort()).toEqual(["agent-admit", "agent-settle", "event"]);
   for (const audience of ["owner", "provider", "modules"] as const) {
     expect((await moduleTools(f.ports, { workspaceId: f.workspaceId, audience })).some(tool => tool.module.name === "runtime-callback")).toBe(false);
   }
   for (const caller of [ordinary, { kind: "owner" as const, via: null }, { kind: "provider" as const, runId: "run" }]) {
-    const reply = await callSync(f.ports, { workspaceId: f.workspaceId, caller, chain: [], path: [] }, "modules.tools", {});
-    expect((reply.output as { target: string }[]).some(tool => tool.target.startsWith("runtime-callback."))).toBe(false);
+    const reply = await callSync(f.ports, { workspaceId: f.workspaceId, caller, chain: [], path: [] }, "modules.describe", {});
+    expect((reply.output as { items: { target: unknown }[] }).items.some(tool => typeof tool.target === "string" && tool.target.startsWith("runtime-callback."))).toBe(false);
   }
   const origin = { workspaceId: f.workspaceId, caller: ordinary, chain: [], path: [] };
   await expect(callSync(f.ports, origin, "runtime-callback.agent-admit", { callId: "forged", operation: "run" })).rejects.toMatchObject({ code: "forbidden" });
@@ -62,31 +64,33 @@ test("retired contribution declarations are rejected instead of granting a kerne
     expect(parsed.success).toBe(false);
     if (!parsed.success) expect(parsed.error.issues).toContainEqual(expect.objectContaining({ code: "unrecognized_keys", keys: ["contributes"] }));
   }
-  const f = await fixture(), entry = await f.app("entry-test", { uses: ["*"] });
+  const f = await fixture(), entry = await f.app("entry-test", { uses: ["*"],
+      authority: "owner"
+});
   await expect(callSync(f.ports, { workspaceId: f.workspaceId, caller: entry, chain: [], path: [] }, "modules.contributions", { section: "memory" })).rejects.toMatchObject({ code: "not_found" });
 });
 test("app-owned memory selection discovers only the actual current approved memory tool contracts", async () => {
   registerSystemModules();
-  const f = await fixture(), entry = await f.app("entry-test", { uses: ["modules.tools"] });
+  const f = await fixture(), entry = await f.app("entry-test", { uses: ["modules.describe"] });
   const memory = await f.app("memory-local", memoryManifest);
   const origin = { workspaceId: f.workspaceId, caller: entry, chain: [], path: [] };
-  const read = () => callSync(f.ports, origin, "modules.tools", { query: "memory-local" });
+  const read = () => callSync(f.ports, origin, "modules.describe", { query: "memory-local" });
   const config = { provider: "memory-local", autoRecall: true, autoRetain: false };
-  const selected = () => selectedMemory(async (target, args) => target === "entry-test.settings" ? config : (await callSync(f.ports, origin, target, args ?? {})).output, "entry-test");
-  const tools = (await read()).output as { target: string; moduleId: string; hash: string; contractHash: string }[];
+  const selected = () => selectedMemory(async (target, args) => { if (target === "entry-test.settings") return config; const output = (await callSync(f.ports, origin, target, args ?? {})).output as { items: { target: { tool: string } }[] }; return { ...output, items: output.items.map(tool => ({ ...tool, target: `memory-local.${tool.target.tool}` })) }; }, "entry-test");
+  const tools = ((await read()).output as { items: { target: { moduleId: string; tool: string }; moduleId: string; hash: string; contractHash: string }[] }).items;
   const declared = moduleManifestSchema.parse(memoryManifest).tools;
-  expect(tools.map(tool => tool.target).sort()).toEqual(declared.filter(tool => tool.visibility.includes("modules")).map(tool => `memory-local.${tool.name}`).sort());
-  for (const tool of tools) expect(tool).toMatchObject({ moduleId: memory.moduleId, hash: memory.hash, contractHash: moduleCallbackContractHash(declared.find(candidate => tool.target === `memory-local.${candidate.name}`)!) });
+  expect(tools.map(tool => `memory-local.${tool.target.tool}`).sort()).toEqual(declared.filter(tool => tool.visibility.includes("modules")).map(tool => `memory-local.${tool.name}`).sort());
+  for (const tool of tools) expect(tool).toMatchObject({ moduleId: memory.moduleId, hash: memory.hash, contractHash: moduleCallbackContractHash(declared.find(candidate => tool.target.tool === candidate.name)!) });
   expect(await selected()).toMatchObject({ ...config, module: "memory-local", available: true });
   expect([...(await selected()).tools].sort()).toEqual(["conversation-context", "conversation-retain", "forget", "preferences", "recall"]);
   await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: memory.moduleId, hash: memory.hash } }, data: { status: "rejected" } });
-  expect((await read()).output).toEqual([]);
+  expect((await read()).output).toEqual({ items: [], nextCursor: null });
   expect(await selected()).toMatchObject({ available: false, tools: new Set() });
   await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: memory.moduleId, hash: memory.hash } }, data: { status: "approved" } });
   await f.db.module.update({ where: { id: memory.moduleId }, data: { activeHash: "unapproved" } });
-  expect((await read()).output).toEqual([]);
+  expect((await read()).output).toEqual({ items: [], nextCursor: null });
   await f.db.module.update({ where: { id: memory.moduleId }, data: { activeHash: memory.hash, status: "paused" } });
-  expect((await read()).output).toEqual([]);
+  expect((await read()).output).toEqual({ items: [], nextCursor: null });
   await f.db.module.update({ where: { id: memory.moduleId }, data: { status: "active" } });
   expect((await selected()).available).toBe(true);
 });

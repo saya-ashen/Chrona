@@ -28,17 +28,17 @@ test("MCP app overview limits contracts and preserves discovered read failures",
   const calls: string[] = [];
   const call = async (target: string) => {
     calls.push(target);
-    if (target === "modules.list") return [{ id: "app-id", name: "example" }];
-    if (target === "modules.tools") return [...Array.from({ length: 51 }, (_, index) => ({ target: `example.tool-${index}`, moduleId: "app-id" })), { target: "example.foreign", moduleId: "foreign-id" }];
-    if (target === "modules.diagnostics") return [{ moduleId: "app-id", open: true }];
+    if (target === "modules.list") return { items: [{ id: "app-id", name: "example" }], nextCursor: null };
+    if (target === "modules.describe") return { items: [...Array.from({ length: 51 }, (_, index) => ({ target: `example.tool-${index}`, moduleId: "app-id" })), { target: "example.foreign", moduleId: "foreign-id" }], nextCursor: null };
+    if (target === "modules.health") return { items: [{ moduleId: "app-id", open: true }], nextCursor: null };
     throw new Error(`Unexpected ${target}`);
   };
   const overview = await appOverview(call, "example");
   expect(overview.tools).toHaveLength(50);
   expect(overview).toMatchObject({ kind: "app", truncated: true, diagnostics: { moduleId: "app-id", open: true } });
-  expect(calls.sort()).toEqual(["modules.diagnostics", "modules.list", "modules.tools"]);
+  expect(calls.sort()).toEqual(["modules.describe", "modules.health", "modules.list"]);
   await expect(appOverview(async target => {
-    if (target === "modules.diagnostics") throw new Error("diagnostics failed");
+    if (target === "modules.health") throw new Error("diagnostics failed");
     return call(target);
   }, "example")).rejects.toThrow("diagnostics failed");
 });

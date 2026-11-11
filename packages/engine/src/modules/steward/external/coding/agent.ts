@@ -20,7 +20,7 @@ function getTarget(input: Record<string, unknown>) {
 /** Coding's work protocol is assembled here; Agent knows only executions and event streams. */
 export async function callAgent<T>(context: CodingContext, operation: string, input: Record<string, unknown>): Promise<T> {
   const target = executionTarget(input);
-  const call = <R>(name: string, args: Record<string, unknown>) => context.call<R>(`agent.${name}`, kebab(args) as Record<string, unknown>);
+  const call = <R>(name: string, args: Record<string, unknown>) => context.call<R>(`agent.work-${name}`, kebab(args) as Record<string, unknown>);
   const alias = aliases[operation];
   if (alias) return call(alias, target);
   switch (operation) {

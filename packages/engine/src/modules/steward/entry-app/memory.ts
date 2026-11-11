@@ -35,7 +35,7 @@ export async function selectedMemory(call: Call, source: string) {
   const config = preferences(await call(`${source}.settings`));
   const tools = new Set<string>();
   if (config.provider) {
-    const found = await call("modules.tools", { query: config.provider }) as Tool[];
+    const found = await call("modules.describe", { query: config.provider }).then(page => (page as { items: unknown }).items) as Tool[];
     for (const [name, argument] of [["conversation-context", "snapshot"], ["conversation-retain", "snapshot"], ["recall", "query"], ["forget", "id"], ["preferences", undefined]] as const) {
       const tool = found.find(item => item.target === `${config.provider}.${name}`);
       if (tool && typeof tool.moduleId === "string" && !!tool.moduleId && typeof tool.hash === "string" && !!tool.hash && accepts(tool, argument)) tools.add(name);

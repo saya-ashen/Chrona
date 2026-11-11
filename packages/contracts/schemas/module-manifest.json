@@ -49,6 +49,7 @@
       ]
     },
     "tools": {
+      "default": [],
       "maxItems": 30,
       "type": "array",
       "items": {
@@ -196,6 +197,7 @@
         "required": [
           "name",
           "description",
+          "output",
           "parameters"
         ],
         "additionalProperties": false
@@ -262,6 +264,10 @@
           }
         ]
       }
+    },
+    "authority": {
+      "type": "string",
+      "const": "owner"
     },
     "packages": {
       "default": [],

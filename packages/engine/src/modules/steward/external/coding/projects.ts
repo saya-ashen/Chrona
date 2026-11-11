@@ -17,12 +17,12 @@ function response(raw: unknown, action: string): Record<string, unknown> {
   return raw;
 }
 export async function listProjects(context: CodingContext) {
-  const raw = response(await context.call<unknown>("agent.projects", { action: "list" }), "list");
+  const raw = response(await context.call<unknown>("agent.work-projects", { action: "list" }), "list");
   if (!Array.isArray(raw.projects) || raw.projects.length > 100) throw codingError("conflict", "Invalid project list from Agent");
   const items = raw.projects.map(project);
   if (new Set(items.map(item => item.projectRef)).size !== items.length) throw codingError("conflict", "Duplicate project identity from Agent");
   return items;
 }
 export async function mutateProject(context: CodingContext, input: { action: "create"; name: string } | { action: "register"; path: string }) {
-  return project(response(await context.call<unknown>("agent.projects", input), input.action).project);
+  return project(response(await context.call<unknown>("agent.work-projects", input), input.action).project);
 }

@@ -5,7 +5,7 @@ async function problems(call: Call) {
   const facts: Health[] = [];
   let cursor: string | null = null;
   do {
-    const page = await call("modules.health", { open: "true", ...(cursor ? { cursor } : {}) }) as { items: Health[]; nextCursor: string | null };
+    const page = await call("modules.health", { limit: 100, ...(cursor ? { cursor } : {}) }) as { items: Health[]; nextCursor: string | null };
     facts.push(...page.items);
     cursor = page.nextCursor;
   } while (cursor);
@@ -24,8 +24,8 @@ async function optionalNotify(call: Call, target: string, args?: Record<string, 
 /** Web owns ordering and presentation; upcoming is an empty private page field without a schedule source. */
 export async function todayView(call: Call, sessionsView: () => Promise<unknown[]>) {
   const [runtime, approvals, notifications, sessions, apps, issues, notificationStatus] = await Promise.all([
-    call("activity.runtime"), call("approvals.list"), optionalNotify(call, "notify.list", { limit: 20 }),
-    sessionsView().then(items => items.slice(0, 20)), call("modules.list"), problems(call), optionalNotify(call, "notify.status"),
+    call("activity.runtime"), call("approvals.list").then(page => (page as { items: unknown }).items), optionalNotify(call, "notify.list", { limit: 20 }),
+    sessionsView().then(items => items.slice(0, 20)), call("modules.list").then(page => (page as { items: unknown }).items), problems(call), optionalNotify(call, "notify.status"),
   ]) as [{ at: string; [key: string]: unknown }, unknown[], { items: { format?: string; [key: string]: unknown }[] } | null, unknown[], App[], Awaited<ReturnType<typeof problems>>, { queued: number; failed: number } | null];
   const { at, ...health } = runtime;
   return { generatedAt: at, approvals, upcoming: [], updates: (notifications?.items ?? []).map(({ format: _format, ...item }) => item),

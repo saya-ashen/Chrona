@@ -9,8 +9,8 @@ const runtime = { at, provider: { name: "fixture", available: true, sandboxed: f
   queuedRuns: 0, runningRuns: 0, failedRunsToday: 0, dueSchedules: 0, lastTickAt: null };
 function fixture(overrides: Record<string, unknown> = {}) {
   const calls: [string, Record<string, unknown> | undefined][] = [];
-  const answers: Record<string, unknown> = { "activity.runtime": runtime, "approvals.list": [], "notify.list": { items: [] },
-    "notify.status": { queued: 2, failed: 1 }, "modules.list": [], "modules.health": { items: [], nextCursor: null }, ...overrides };
+  const answers: Record<string, unknown> = { "activity.runtime": runtime, "approvals.list": { items: [], nextCursor: null }, "notify.list": { items: [] },
+    "notify.status": { queued: 2, failed: 1 }, "modules.list": { items: [], nextCursor: null }, "modules.health": { items: [], nextCursor: null }, ...overrides };
   return { calls, call: async (target: string, args?: Record<string, unknown>) => { calls.push([target, args]); const result = answers[target]; if (result instanceof Error) throw result; return result; } };
 }
 test("web retains runtime health with empty upcoming and no calendar source", async () => {
@@ -80,10 +80,10 @@ test("owner builds recognize entry manifests without application-name lists", as
   const db = testDb(), workspaceId = (await db.workspace.create({ data: { name: "entries" } })).id;
   const ports: StewardPorts = { db, dataDir: "/unused", now: () => new Date(at), publicUrl: null };
   try {
-    for (const [name, uses, entry] of [["new-entry", ["approvals.grants"], true], ["agent-entry", ["*"], true],
-      ["approval-entry", ["approvals.revoke-grant"], true], ["web", ["approvals.request"], false]] as const) {
+    for (const [name, uses, entry] of [["new-entry", ["approvals.grants"], false], ["agent-entry", ["*"], true],
+      ["approval-entry", ["approvals.revoke-grant"], false], ["web", ["approvals.request"], false]] as const) {
       const module = await db.module.create({ data: { workspaceId, name, activeHash: "h" } });
-      await db.moduleVersion.create({ data: { moduleId: module.id, hash: "h", manifest: { name, entry: "index.ts", keepAlive: true, effects: [], uses: [...uses], tests: ["test.ts"] }, status: "approved", source: "builtin", intent: {}, report: {} } });
+      await db.moduleVersion.create({ data: { moduleId: module.id, hash: "h", manifest: { name, entry: "index.ts", keepAlive: true, effects: [], authority: entry ? "owner" : undefined, ...(entry ? {listen:"/"} : {}), uses: [...uses], tests: ["test.ts"] }, status: "approved", source: "builtin", intent: {}, report: {} } });
       const caller = { kind: "module" as const, module: name, moduleId: module.id, hash: "h" };
       await expect(startOwnerBuildAsCaller(ports, workspaceId, caller, {})).rejects.toMatchObject(entry ? { name: "ZodError" } : { code: "forbidden" });
     }

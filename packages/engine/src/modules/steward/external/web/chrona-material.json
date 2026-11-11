@@ -23,6 +23,7 @@
     "index.html",
     "index.ts",
     "inline-settings.bun.test.ts",
+    "kernel-client.ts",
     "LICENSE",
     "lifecycle.bun.test.ts",
     "memory.ts",
@@ -101,7 +102,7 @@
   "artifacts": [
     {
       "path": "pages.js",
-      "sha256": "8a85f5b9393e4fb8004b52e0cff81d6ae469bc695c001bb5a84e4f03488120dc",
+      "sha256": "64aa96358b9e6aad6816bd3b80ecf2c7bf419341c7000d121830b1b0e233c632",
       "executable": false
     },
     {

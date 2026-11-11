@@ -34,7 +34,7 @@ test("listen needs keepAlive and a path Chrona does not reserve", () => {
   expect(moduleManifestSchema.safeParse({ ...base, listen: ["/", "/api/web"] }).success).toBe(true);
   for (const listen of [["/", "/api/steward"], ["/api/web", "/api/web"], []]) expect(moduleManifestSchema.safeParse({ ...base, listen }).success).toBe(false);
   expect(isEntryModule({ listen: ["/api/x", "/"] })).toBe(true);
-  expect(isEntryModule({ listen: ["/api/x"] })).toBe(false);
+  expect(isEntryModule({ listen: ["/api/x"] })).toBe(true);
 });
 
 test("authenticated generic listener routes calls and strips credentials (trusted-local)", async () => {
@@ -48,7 +48,7 @@ test("authenticated generic listener routes calls and strips credentials (truste
   await writeFile(join(code, "index.ts"), `import { chrona } from "chrona";
 chrona.serve(async request => {
   const apps = await chrona.call("modules.list");
-  return Response.json({ path: new URL(request.url).pathname, query: new URL(request.url).search, auth: request.headers.get("authorization"), cookie: request.headers.get("cookie"), transportToken: request.headers.get("x-chrona-module-token"), body: await request.text(), apps: Array.isArray(apps) }, { headers: { "set-cookie": "module=must-not-escape" } });
+  return Response.json({ path: new URL(request.url).pathname, query: new URL(request.url).search, auth: request.headers.get("authorization"), cookie: request.headers.get("cookie"), transportToken: request.headers.get("x-chrona-module-token"), body: await request.text(), apps: Array.isArray(apps.items) }, { headers: { "set-cookie": "module=must-not-escape" } });
 });`);
   const steward = createStewardRuntime(db, { provider: null, dataDir, sandbox: { ...selected.health, startModule: selected.startModule } });
   stop = () => steward.stop();

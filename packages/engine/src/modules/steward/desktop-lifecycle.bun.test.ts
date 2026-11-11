@@ -117,19 +117,19 @@ localTest("ordinary desktop candidate activation, update and disable stop actual
     // Only the known Author fixture is seeded approved. Both application versions go through real checks.
     const authorFiles = await snapshotModule(import.meta.dir, "external/author");
     const authorManifest = moduleManifestSchema.parse(JSON.parse(Buffer.from(authorFiles.find(file => file.path === "module.json")!.bytes).toString("utf8")));
-    expect(authorManifest.uses).toEqual(["modules.source", "modules.submit", "modules.candidate-check"]);
+    expect(authorManifest.uses).toEqual(["modules.source", "modules.submit", "modules.receipt"]);
     expect(authorManifest.model).toBeUndefined();
     const author = await db.module.create({ data: { workspaceId, name: "author", builtin: false, status: "active", dataSchema: authorManifest.data.schema } });
     const revision = await commitModuleSource({ platform, moduleId: author.id, versionId: `fixture-${author.id}`, files: authorFiles, message: "Approved isolated Author fixture" });
     await checkoutModule(platform, `store/${revision.commit}`, authorFiles);
     await db.moduleVersion.create({ data: { moduleId: author.id, hash: revision.commit, manifest: authorManifest, source: "user", status: "approved", intent: {}, report: { git: revision } } });
     await db.module.update({ where: { id: author.id }, data: { activeHash: revision.commit } });
-    const call = async (target: string, args: Record<string, unknown>) => (await callSync(ports, { workspaceId, caller: { kind: "owner", via: null }, chain: [], path: [] }, target, args)).output;
-    const directory = await call("modules.list", {}) as { id: string; name: string; activeHash: string }[];
+    const call = async (target: string, raw: Record<string, unknown>) => { const { requestKey, ...args } = raw; return (await callSync(ports, { workspaceId, caller: { kind: "owner", via: null }, chain: [], path: [] }, target, args, { key: requestKey as string | undefined ?? crypto.randomUUID() })).output; };
+    const directory = (await call("modules.list", {}) as { items: { id: string; name: string; activeHash: string }[] }).items;
     const discovered = directory.find(item => item.name === "author")!;
     expect(discovered).toMatchObject({ id: author.id, activeHash: revision.commit, builtin: false, status: "active" });
     const submitter = { moduleId: discovered.id, hash: discovered.activeHash };
-    const admit = async (requestKey: string, moduleId: string | null, expectedActiveHash: string | null) => await call("modules.admit-candidates", { requestKey, submitter, targets: [{ name: "desktop-lifecycle", moduleId, expectedActiveHash }] }) as { admissionId: string };
+    const admit = async (requestKey: string, moduleId: string | null, expectedActiveHash: string | null) => await call("modules.admit", { requestKey, submitter, targets: [{ name: "desktop-lifecycle", moduleId, expectedActiveHash }] }) as { admissionId: string };
     const submit = async (admissionId: string, requestKey: string, dir: string) => {
       const receipt = candidateReceiptSchema.parse(await call("author.submit", input({ admissionId, requestKey, items: [{ name: "desktop-lifecycle", dir, intent }] })));
       expect(receipt).toMatchObject({ submitter, state: "submitted", approvalId: null, members: [{ status: "building", selected: false }] });
@@ -182,7 +182,7 @@ localTest("ordinary desktop candidate activation, update and disable stop actual
     process.kill(reopened.childPid!, 0);
     const secondProcess = runtimeHandle(second.hash);
 
-    expect(await call("modules.disable", { module: "desktop-lifecycle", reason: "Close ordinary desktop app" })).toMatchObject({ status: "paused" });
+    expect(await call("modules.disable", { moduleId: first.moduleId, reason: "Close ordinary desktop app" })).toMatchObject({ status: "done", result: { status: "paused" } });
     await bounded(secondProcess.exited, "disable retirement");
     expect(await secondProcess.stopEvidence).toMatchObject({ state: "stopped", scope: "descendants", treeClean: true });
     expect(() => process.kill(reopened.pid, 0)).toThrow();

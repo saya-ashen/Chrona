@@ -7,7 +7,7 @@
   "effects": [],
   "uses": [
     "modules.list",
-    "modules.tools"
+    "modules.describe"
   ],
   "tools": [
     {

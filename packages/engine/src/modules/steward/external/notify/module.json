@@ -7,7 +7,7 @@
   "effects": [],
   "uses": [
     "modules.list",
-    "modules.tools",
+    "modules.describe",
     "activity.records",
     "activity.facts",
     "activity.ack",
@@ -248,50 +248,6 @@
       }
     },
     {
-      "name": "lifecycle",
-      "description": "Present a committed kernel runtime fact as a notification; no runtime actions.",
-      "visibility": [
-        "kernel"
-      ],
-      "idempotent": true,
-      "parameters": {
-        "type": "object",
-        "required": [
-          "kind",
-          "facts",
-          "key"
-        ],
-        "properties": {
-          "kind": {
-            "type": "string",
-            "enum": [
-              "module-paused",
-              "module-activated",
-              "module-build-failed",
-              "module-migration-failed",
-              "schedule-failed",
-              "build-paused"
-            ]
-          },
-          "facts": {
-            "type": "string"
-          },
-          "key": {
-            "type": "string"
-          },
-          "module": {
-            "type": "string"
-          },
-          "app": {
-            "type": "string"
-          },
-          "session": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    {
       "name": "activity",
       "description": "User-facing activity history from governed audit facts; owns wording, grouping and scan policy.",
       "visibility": [
@@ -382,44 +338,6 @@
           "before"
         ],
         "additionalProperties": false
-      }
-    },
-    {
-      "name": "approval",
-      "description": "Present a kernel-owned approval as a notification; decisions remain in approvals.",
-      "visibility": [
-        "kernel"
-      ],
-      "idempotent": true,
-      "parameters": {
-        "type": "object",
-        "required": [
-          "approval",
-          "title",
-          "action",
-          "detail",
-          "preview"
-        ],
-        "properties": {
-          "approval": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "action": {
-            "type": "string"
-          },
-          "module": {
-            "type": "string"
-          },
-          "detail": {
-            "type": "string"
-          },
-          "preview": {
-            "type": "string"
-          }
-        }
       }
     },
     {
@@ -534,25 +452,6 @@
           "recipient": {
             "type": "string",
             "description": "Channel recipient to pin the message to"
-          }
-        }
-      }
-    },
-    {
-      "name": "withdraw",
-      "description": "Drop a queued notification that is no longer relevant.",
-      "visibility": [
-        "kernel"
-      ],
-      "idempotent": true,
-      "parameters": {
-        "type": "object",
-        "required": [
-          "key"
-        ],
-        "properties": {
-          "key": {
-            "type": "string"
           }
         }
       }
@@ -1089,62 +988,6 @@
         ],
         "properties": {
           "id": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    {
-      "name": "configure",
-      "description": "The user's notification settings.",
-      "visibility": [
-        "kernel"
-      ],
-      "idempotent": true,
-      "parameters": {
-        "type": "object",
-        "required": [
-          "daily-cap",
-          "timezone",
-          "digest-at",
-          "at"
-        ],
-        "properties": {
-          "daily-cap": {
-            "type": "number"
-          },
-          "quiet-start": {
-            "type": "string"
-          },
-          "quiet-end": {
-            "type": "string"
-          },
-          "timezone": {
-            "type": "string"
-          },
-          "digest-at": {
-            "type": "string"
-          },
-          "at": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    {
-      "name": "import",
-      "description": "Chrona only: notifications recorded before this module existed (JSON array).",
-      "visibility": [
-        "kernel"
-      ],
-      "idempotent": true,
-      "parameters": {
-        "type": "object",
-        "required": [
-          "rows"
-        ],
-        "properties": {
-          "rows": {
             "type": "string"
           }
         }

@@ -35,19 +35,18 @@ export async function buildUsage(db: Pick<StewardPorts["db"], "session">, worksp
 function validateTimezone(timezone: string, now: Date) {
   try { new Intl.DateTimeFormat("en", { timeZone: timezone }).format(now); } catch { throw new StewardError("invalid", "Invalid timezone"); }
 }
-/** v2-17: today's module model calls and tokens (the owner's local day), from the call records and their audits. */
+/** v2-17: today's module model calls and tokens (the owner's local day), from durable budget reservations and reported token counters. */
 export async function modelUsage(db: StewardPorts["db"], workspaceId: string, settings: unknown, at: Date) {
   const timezone = budgetTimezone(settings), day = localDayKey(at, timezone), since = new Date(at.getTime() - 48 * 3600_000);
   const today = (row: { createdAt: Date }) => localDayKey(row.createdAt, timezone) === day;
-  const calls = (await db.moduleCall.findMany({ where: { OR: [{ workspaceId }, { module: { workspaceId } }], method: "model", status: { not: "rejected" }, createdAt: { gte: since, lte: at } }, select: { id: true, createdAt: true, moduleName: true, module: { select: { name: true } } } })).filter(today);
-  const audits = await db.audit.findMany({ where: { workspaceId, kind: "module_model_call", createdAt: { gte: since } }, select: { details: true } });
-  const tokens = new Map(audits.map(row => row.details as { callId?: string; inputTokens?: number | null; outputTokens?: number | null }).filter(details => details.callId).map(details => [details.callId!, details]));
-  const usage = new Map<string, { module: string; calls: number; inputTokens: number; outputTokens: number }>();
+  const calls = (await db.moduleCall.findMany({ where: { OR: [{ workspaceId }, { module: { workspaceId } }], method: "model", status: { not: "rejected" }, createdAt: { gte: since, lte: at } }, select: { id: true, createdAt: true, moduleName: true, inputTokens: true, outputTokens: true, accountingModuleId: true, moduleId: true, module: { select: { name: true } } } })).filter(today);
+  const usage = new Map<string, { module: string; moduleId: string | null; calls: number; inputTokens: number; outputTokens: number }>();
   for (const call of calls) {
     const moduleName = call.moduleName ?? call.module?.name ?? "removed";
-    const row = usage.get(moduleName) ?? { module: moduleName, calls: 0, inputTokens: 0, outputTokens: 0 }, spent = tokens.get(call.id);
-    row.calls++; row.inputTokens += spent?.inputTokens ?? 0; row.outputTokens += spent?.outputTokens ?? 0;
-    usage.set(moduleName, row);
+    const moduleId = call.accountingModuleId ?? call.moduleId, identity = moduleId ?? `removed:${moduleName}`;
+    const row = usage.get(identity) ?? { module: moduleName, moduleId, calls: 0, inputTokens: 0, outputTokens: 0 };
+    row.calls++; row.inputTokens += call.inputTokens ?? 0; row.outputTokens += call.outputTokens ?? 0;
+    usage.set(identity, row);
   }
   return [...usage.values()].sort((a, b) => a.module.localeCompare(b.module));
 }
@@ -56,7 +55,7 @@ export function createSettings({ db, workspaceId, now }: RecordContext) {
   async function get() {
     const row = await db.workspace.findUnique({ where: { id: workspaceId } });
     if (!row) throw new StewardError("not_found", "Workspace not found");
-    return { timezone: budgetTimezone(row.settings), runTimeoutMinutes: runTimeoutMinutes(row.settings), modelUsage: await modelUsage(db, workspaceId, row.settings, now()), moduleModel: moduleModelSettings(row.settings) };
+    return { wake: kernelSettingsSchema.shape.wake.parse((row.settings as { wake?: unknown } | null)?.wake), timezone: budgetTimezone(row.settings), runTimeoutMinutes: runTimeoutMinutes(row.settings), moduleModel: moduleModelSettings(row.settings) };
   }
   return { get, update: async (raw: unknown) => {
     const input = parseInput(kernelUpdateSettingsSchema, raw);
@@ -66,7 +65,7 @@ export function createSettings({ db, workspaceId, now }: RecordContext) {
       const timezone = input.timezone ?? budgetTimezone(row.settings);
       validateTimezone(timezone, now());
       const previous = row.settings && typeof row.settings === "object" && !Array.isArray(row.settings) ? row.settings : {};
-      await tx.workspace.update({ where: { id: workspaceId }, data: { settings: { ...previous, timezone, runTimeoutMinutes: input.runTimeoutMinutes === undefined ? runTimeoutMinutes(row.settings) : input.runTimeoutMinutes, moduleModel: input.moduleModel === undefined ? moduleModelSettings(row.settings) : input.moduleModel } } });
+      await tx.workspace.update({ where: { id: workspaceId }, data: { settings: { ...previous, timezone, ...(input.wake ? { wake: input.wake } : {}), runTimeoutMinutes: input.runTimeoutMinutes === undefined ? runTimeoutMinutes(row.settings) : input.runTimeoutMinutes, moduleModel: input.moduleModel === undefined ? moduleModelSettings(row.settings) : input.moduleModel } } });
       await audit(tx, { workspaceId, kind: "settings_updated", actor: "user", subjectId: workspaceId, details: input });
     });
     return get();

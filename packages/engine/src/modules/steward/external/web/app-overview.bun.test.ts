@@ -14,16 +14,16 @@ function fixture() {
   const appTool = contract("files.read", { moduleId: app.id, hash: "hash", contractHash: "contract-hash" });
   const diagnostic = { module: app.name, moduleId: app.id, runtime: { state: "unobserved", pid: null }, incidents: [], truncated: true };
   const state = {
-    fail: "", apps: [app], tools: [contract("modules.list"), contract("modules.tools"), appTool, contract("notify.activity", { moduleId: "notify-id" })],
+    fail: "", apps: [app], tools: [contract("modules.list"), contract("modules.describe"), appTool, contract("notify.activity", { moduleId: "notify-id" })],
     diagnostics: [diagnostic], activity: [{ id: "activity", text: "模块记录" }],
   };
   const call = async (target: string, args: Row = {}): Promise<unknown> => {
     calls.push([target, args]);
     if (state.fail === target) throw new Error(`${target} unavailable`);
     switch (target) {
-      case "modules.tools": return state.tools;
-      case "modules.list": return state.apps;
-      case "modules.diagnostics": return state.diagnostics;
+      case "modules.describe": return { items: state.tools, nextCursor: null };
+      case "modules.list": return { items: state.apps, nextCursor: null };
+      case "modules.health": return { items: state.diagnostics, nextCursor: null };
       case "notify.activity": return { items: state.activity };
       default: throw new Error(`Unexpected call ${target}`);
     }
@@ -38,24 +38,24 @@ test("app details resolve names and ids and preserve lifecycle, Git and discover
     f.state.tools.push(contract("files-extra.read", { moduleId: "other-id", description: "files" }), contract("other.read", { moduleId: f.app.id }), contract("files.old", { moduleId: "old-id" }));
     expect(await appOverview(f.call, module)).toEqual({ kind: "app", app: f.app, tools: [f.appTool], diagnostics: f.diagnostic, activity: f.state.activity });
     expect(f.calls).toEqual([
-      ["modules.tools", {}], ["modules.list", {}], ["modules.diagnostics", { module: "files" }], ["notify.activity", { module: "files", limit: 30 }],
+      ["modules.describe", {}], ["modules.list", {}], ["modules.health", { moduleId: "app-id", detail: true }], ["notify.activity", { module: "files", limit: 30 }],
     ]);
   }
 });
 
 test("kernel directory groups only the five known namespaces from actual reachable contracts", async () => {
   const f = fixture();
-  const names = ["approvals", "modules", "settings", "secrets", "activity"];
+  const names = ["approvals", "modules", "settings", "secrets", "activity", "timers"];
   const kernelTools = names.map(name => contract(`${name}.read`));
   f.state.tools = [...kernelTools, f.appTool, ...["agent", "notify", "author", "web", "events", "workspace-local", "content-local", "runtime-callback", "modules-extra"].map(name => contract(`${name}.read`)), contract("settings.app-tool", { moduleId: "ordinary-id" })];
   const directory = await systemApps(f.call);
   expect(directory).toEqual(names.map((name, index) => ({ name, origin: "kernel", description: expect.any(String), tools: [kernelTools[index]] })));
-  expect(f.calls).toEqual([["modules.tools", {}]]);
+  expect(f.calls).toEqual([["modules.describe", {}]]);
   if (!Array.isArray(directory)) throw new Error("Expected a kernel directory");
   expect(await systemApps(f.call, "modules")).toEqual(directory[1]!);
   const overview = await appOverview(f.call, "modules");
   expect(overview).toEqual({ kind: "system", ...directory[1]!, activity: null });
-  expect(f.calls.every(([target]) => target === "modules.tools")).toBe(true);
+  expect(f.calls.every(([target]) => target === "modules.describe")).toBe(true);
 });
 
 test("kernel metadata cannot be inferred from ordinary apps or absent contracts", async () => {
@@ -91,7 +91,7 @@ test("undiscovered activity is null; successful empty reads preserve empty state
 test("kernel activity is read only when its exact tool is discovered", async () => {
   const f = fixture();
   expect(await appOverview(f.call, "modules")).toMatchObject({ kind: "system", name: "modules", activity: f.state.activity });
-  expect(f.calls).toEqual([["modules.tools", {}], ["notify.activity", { module: "modules", limit: 30 }]]);
+  expect(f.calls).toEqual([["modules.describe", {}], ["notify.activity", { module: "modules", limit: 30 }]]);
 });
 
 test("unrelated diagnostic rows are never attributed to the requested app", async () => {
@@ -103,21 +103,21 @@ test("unrelated diagnostic rows are never attributed to the requested app", asyn
 test("unknown apps are not_found without diagnostics or activity reads", async () => {
   const f = fixture();
   await expect(appOverview(f.call, "missing")).rejects.toMatchObject({ code: "not_found" });
-  expect(f.calls).toEqual([["modules.tools", {}], ["modules.list", {}]]);
+  expect(f.calls).toEqual([["modules.describe", {}], ["modules.list", {}]]);
 });
 
 test("failed discovery and discovered reads reject instead of reporting empty or missing data", async () => {
-  for (const target of ["modules.tools", "modules.list", "modules.diagnostics", "notify.activity"]) {
+  for (const target of ["modules.describe", "modules.list", "modules.health", "notify.activity"]) {
     const f = fixture();
     f.state.fail = target;
     await expect(appOverview(f.call, "files")).rejects.toThrow(`${target} unavailable`);
   }
-  for (const target of ["modules.tools", "notify.activity"]) {
+  for (const target of ["modules.describe", "notify.activity"]) {
     const f = fixture();
     f.state.fail = target;
     await expect(appOverview(f.call, "modules")).rejects.toThrow(`${target} unavailable`);
   }
   const f = fixture();
-  f.state.fail = "modules.tools";
-  await expect(systemApps(f.call)).rejects.toThrow("modules.tools unavailable");
+  f.state.fail = "modules.describe";
+  await expect(systemApps(f.call)).rejects.toThrow("modules.describe unavailable");
 });

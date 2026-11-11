@@ -8,6 +8,7 @@
   "secrets": [
     "qq_bot"
   ],
+  "authority": "owner",
   "uses": [
     "*",
     "agent.context",
@@ -17,7 +18,7 @@
     "agent.write",
     "agent.interrupt",
     "agent.respond",
-    "modules.tools",
+    "modules.describe",
     "approvals.list",
     "approvals.resolve",
     "notify.channel",

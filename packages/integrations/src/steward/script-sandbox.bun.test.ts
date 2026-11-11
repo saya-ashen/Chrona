@@ -108,7 +108,7 @@ on("tool", async () => {
   writeFileSync(chrona.paths.data + "/result", process.cwd() + "|" + chrona.paths.module + "|" + (process.env.API_KEY ?? "none"));
   const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
   writeFileSync(chrona.paths.data + "/child", String(child.pid));
-  return { result: (await chrona.call('notify.send', { key: "k", level: "now", title: "t", body: "b" }, { mode: 'async', key: 'k' })).status };
+  return { result: (await chrona.call({ moduleId: 'notify-id', tool: 'send' }, { key: "k", level: "now", title: "t", body: "b" }, { mode: 'async', key: 'k' })).status };
 });`);
     process.env.API_KEY = "must-not-leak";
     handle = plain.startModule({ codeDir, dataDir, entry: "index.ts", ipcEndpoint: channel.endpoint, ipcToken: channel.token });

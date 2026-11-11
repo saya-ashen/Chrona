@@ -1149,9 +1149,9 @@ test("proposals omit local Git metadata from the committed source", async () => 
 test("registered module routes retain fixed materials and reject removed upstream authority", async () => {
   const f = await fixture(false), proposal = await f.propose();
   const system = listSystemModules().find(module => module.name === "modules")!;
-  expect(system.tools.map(tool => tool.name)).toEqual(["list", "tools", "reference", "diagnostics", "health", "admit-candidates", "source", "submit", "candidate-check", "rollback", "disable", "enable", "remove"]);
+  expect(system.tools.map(tool => tool.name)).toEqual(["list", "describe", "health", "admit", "source", "submit", "receipt", "enable", "disable", "rollback", "remove", "operation"]);
   const scope = { workspaceId: f.workspace.id, caller: { kind: "owner" as const, via: null }, chain: [], path: [] };
-  const list = modulesListOutput.parse((await callSync(f.ports, scope, "modules.list", {})).output);
+  const list = modulesListOutput.parse(((await callSync(f.ports, scope, "modules.list", {})).output as {items: unknown}).items);
   expect(list.find(item => item.id === proposal.moduleId)?.versions[0]?.git?.commit).toBe(proposal.hash);
   for (const caller of [scope.caller, { kind: "provider" as const, runId: "untrusted-provider" }]) {
     await expect(callSync(f.ports, { ...scope, caller }, "modules.upstream", { action: "status", moduleId: proposal.moduleId! })).rejects.toMatchObject({ code: "not_found" });

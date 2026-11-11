@@ -31,6 +31,7 @@ export function moduleCallbackContractHash(tool: Tool | SystemTool) {
   return createHash("sha256").update(canonicalContractJson(moduleToolContract(tool))).digest("hex");
 }
 function parameterValidator(parameter: import("@chrona/contracts/steward").ModuleToolParameter): z.ZodType {
+  if ("anyOf" in parameter) return z.union(parameter.anyOf.map(parameterValidator));
   let schema: z.ZodType;
   switch (parameter.type) {
     case "string": schema = parameter.enum ? z.enum(parameter.enum as [string, ...string[]]) : z.string(); break;
@@ -38,6 +39,7 @@ function parameterValidator(parameter: import("@chrona/contracts/steward").Modul
     case "boolean": schema = z.boolean(); break;
     case "array": schema = z.array(parameterValidator(parameter.items)); break;
     case "object": schema = objectValidator(parameter); break;
+    default: schema = z.union(parameter.type.map(type => type === "string" ? z.string() : type === "number" ? z.number() : z.boolean()));
   }
   return parameter.description ? schema.describe(parameter.description) : schema;
 }
@@ -70,7 +72,6 @@ export function moduleToolExampleError(tool: Tool): string | null {
     try { validateToolArgs(tool, example.args); }
     catch (cause) { return `Tool ${tool.name} example ${index + 1} arguments are invalid: ${cause instanceof Error ? cause.message : "check its input schema"}`; }
     if (Object.hasOwn(example, "result")) {
-      if (!tool.output) return `Tool ${tool.name} example ${index + 1} declares a result but the tool has no output schema`;
       const parsed = compileModuleOutput(tool.output).safeParse(example.result);
       if (!parsed.success) {
         const issue = parsed.error.issues[0];

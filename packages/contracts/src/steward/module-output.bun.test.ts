@@ -27,10 +27,14 @@ test.each([
   expect(moduleOutputSchema.safeParse(schema).success).toBe(false);
 });
 
-test("tool output stays optional in strict manifests", () => {
+test("tool output is mandatory in strict manifests", () => {
   const manifest = { name: "fixture", entry: "index.ts", effects: [], tests: ["test.ts"], tools: [
-    { name: "get", description: "Read", parameters: { type: "object" } },
+    { name: "get", description: "Read", parameters: { type: "object" },
+        output: {}
+    },
   ] };
-  expect(moduleManifestSchema.parse(manifest).tools[0]!.output).toBeUndefined();
+  const { output: _output, ...undeclared } = manifest.tools[0]!;
+  expect(moduleManifestSchema.safeParse({ ...manifest, tools: [undeclared] }).success).toBe(false);
+  expect(moduleManifestSchema.parse(manifest).tools[0]!.output).toEqual({});
   expect(moduleManifestSchema.parse({ ...manifest, tools: [{ ...manifest.tools[0], output: { type: "string" } }] }).tools[0]!.output).toEqual({ type: "string" });
 });

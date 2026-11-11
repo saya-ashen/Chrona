@@ -7,6 +7,7 @@ import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { createServerApp } from "../../../../../apps/server/src/app";
 import { createStewardRuntime } from "../../../../../apps/server/src/steward-runtime";
 import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";
+import { moduleCallbackContractHash } from "./module-tool-contract";
 import { testDb } from "./test-db";
 
 /** Real Hono/native-tool auth, router, supervisor, SDK and private content; only the Run is fake. */
@@ -43,7 +44,7 @@ async function fixture() {
     await db.agentContext.create({ data: { sessionId: session.id, workspaceId, moduleId: entry.id, hash: "v1" } });
     const token = "author-offline-run", expires = new Date(Date.now() + 120_000);
     const run = await db.run.create({ data: { workspaceId, sessionId: session.id, lane: "foreground", trigger: "message", status: "running", provider: "offline-fixture", tokenHash: createHash("sha256").update(token).digest("hex"), cwd: root, prompt: "No model execution", deadlineAt: expires, leaseUntil: expires } });
-    await db.agentRunAdmission.create({ data: { runId: run.id, moduleId: entry.id, hash: (await db.agentContext.findUniqueOrThrow({ where: { sessionId: (await db.run.findUniqueOrThrow({ where: { id: run.id } })).sessionId! } })).hash, targets, content: [] } });
+    await db.agentRunAdmission.create({ data: { runId: run.id, moduleId: entry.id, hash: (await db.agentContext.findUniqueOrThrow({ where: { sessionId: (await db.run.findUniqueOrThrow({ where: { id: run.id } })).sessionId! } })).hash, targets: targets.map(target => ({ target, moduleId: author.id, contractHash: moduleCallbackContractHash(manifest.tools.find(tool => target === `author.${tool.name}`)!) })), content: [] } });
     const app = await createServerApp({ steward: runtime });
     const request = async (tool: string, args: unknown, capability = token) => {
       const started = performance.now();

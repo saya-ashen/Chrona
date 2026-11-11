@@ -58,7 +58,9 @@ test("Mind Agent context reads the actual app as its original module principal",
     expect(result).toMatchObject({ result: { concerns: [{ title: "Check the application response" }] } });
     expect(await tools.call(run!.token, "m_mind_propose", { "request-key": "context-proposal", title: "Review evidence", reason: "Context caller identity" })).toMatchObject({ result: { proposal: { source: "mind", moduleId: mind.id, status: "pending" } } });
     const unrelated = await db.module.create({ data: { workspaceId, name: "unrelated", status: "active", activeHash: "unrelated-v1" } });
-    const unrelatedManifest = moduleManifestSchema.parse({ name: unrelated.name, entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["mind.agenda"], tools: [{ name: "observe", description: "Fixture interface", visibility: ["modules"], parameters: { type: "object", properties: {} } }] });
+    const unrelatedManifest = moduleManifestSchema.parse({ name: unrelated.name, entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["mind.agenda"], tools: [{ name: "observe", description: "Fixture interface", visibility: ["modules"], parameters: { type: "object", properties: {} },
+        output: {}
+    }] });
     await db.moduleVersion.create({ data: { moduleId: unrelated.id, hash: unrelated.activeHash!, manifest: unrelatedManifest, source: "user", status: "approved", intent: {}, report: {} } });
     const unrelatedPrincipal = { workspaceId, ownerId: "owner", caller: { kind: "module" as const, moduleId: unrelated.id, hash: unrelated.activeHash! } };
     await expect(callSync(ports, { ...kernelOrigin(workspaceId), caller: { ...unrelatedPrincipal.caller, module: unrelated.name } }, "mind.agenda", {})).rejects.toMatchObject({ code: "forbidden" });
@@ -66,7 +68,7 @@ test("Mind Agent context reads the actual app as its original module principal",
     await admitContextPrimitive(ports, unrelatedPrincipal, "run", { requestKey: "other-run", contextId: otherContext.contextId, lane: "foreground", prompt: "Unrelated caller", tools: ["mind.agenda"], content: [] });
     const otherRun = (await createRuns(ports, workspaceId).claimNext("foreground"))!;
     await expect(tools.call(otherRun.token, "m_mind_agenda", {})).rejects.toMatchObject({ code: "forbidden" });
-    await expect(callContextTool(ports, context, "m_mind_note", { "request-key": "unselected", title: "Not selected" }, Date.now() + 15_000)).rejects.toMatchObject({ code: "forbidden" });
+    await expect(callContextTool(ports, context, "m_mind_note", { "request-key": "unselected", title: "Not selected" }, { deadline: Date.now() + 15_000 })).rejects.toMatchObject({ code: "forbidden" });
     // The originating module cannot acquire owner mutation rights through its context.
     await expect(callSync(ports, { ...kernelOrigin(workspaceId), caller: context.caller }, "mind.note", { "request-key": "module-note", title: "Not owner" })).rejects.toMatchObject({ code: "forbidden" });
     const invocation = await db.moduleInvocation.findFirstOrThrow({ where: { callerModuleId: mind.id, target: "mind", tool: "agenda" } });

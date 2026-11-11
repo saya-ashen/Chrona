@@ -1,3 +1,5 @@
+import { selectContextTools } from "../../../../../packages/engine/src/modules/steward/agent-context-tools";
+import { moduleCallbackContractHash } from "../../../../../packages/engine/src/modules/steward/module-tool-contract";
 import { expect, spyOn, test } from "bun:test";
 import { cp, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { createHash } from "node:crypto";
@@ -8,7 +10,7 @@ import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { createScriptSandbox } from "../../../../../packages/integrations/src/steward/script-sandbox";
 import { createStewardAgentRoutes } from "../../routes/steward-agent.routes";
 
-const moduleTools = ["list", "tools", "reference", "diagnostics", "health", "admit-candidates", "source", "submit", "candidate-check", "rollback", "disable", "enable", "remove"];
+const moduleTools = ["list", "describe", "health", "admit", "source", "submit", "receipt", "enable", "disable", "rollback", "remove", "operation"];
 async function fixture() {
   const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-agent-http-");
   const sandbox = createScriptSandbox({ dataDir, executionMode: "trusted-local" });
@@ -17,7 +19,9 @@ async function fixture() {
   const service = createStewardService(ports), api = service.forWorkspace(workspaceId), app = createStewardAgentRoutes(ports, service);
   const peer = { server: { requestIP: () => ({ address: "127.0.0.1" }) } };
   const entry = await db.module.create({ data: { workspaceId, name: "execution-test-entry", activeHash: "v1" } });
-  await db.moduleVersion.create({ data: { moduleId: entry.id, hash: "v1", manifest: moduleManifestSchema.parse({ name: entry.name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: ["*"] }), source: "user", status: "approved", intent: {}, report: {} } });
+  await db.moduleVersion.create({ data: { moduleId: entry.id, hash: "v1", manifest: moduleManifestSchema.parse({ name: entry.name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: ["*"],
+      authority: "owner"
+}), source: "user", status: "approved", intent: {}, report: {} } });
   const authorRoot = join(import.meta.dirname, "../../../../../packages/engine/src/modules/steward/external/author");
   const authorManifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(authorRoot, "module.json"), "utf8")));
   const author = await db.module.create({ data: { workspaceId, name: "author", activeHash: "c".repeat(64) } });
@@ -28,7 +32,8 @@ async function fixture() {
   await db.agentContext.create({ data: { sessionId: session.id, workspaceId, moduleId: entry.id, hash: "v1" } });
   await api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Fixture; never launch a model" });
   const run = (await api.runs.claimNext("foreground"))!;
-  await db.agentRunAdmission.create({ data: { runId: run.id, moduleId: entry.id, hash: (await db.agentContext.findUniqueOrThrow({ where: { sessionId: (await db.run.findUniqueOrThrow({ where: { id: run.id } })).sessionId! } })).hash, targets: [...moduleTools.map(tool => `modules.${tool}`), "author.prepare"], content: [] } });
+  const selected = await selectContextTools(ports, { workspaceId, ownerId: "owner", caller: { kind: "module", moduleId: entry.id, hash: "v1" } }, [...moduleTools.map(tool => `modules.${tool}` as const), { moduleId: author.id, tool: "prepare" }]);
+  await db.agentRunAdmission.create({ data: { runId: run.id, moduleId: entry.id, hash: (await db.agentContext.findUniqueOrThrow({ where: { sessionId: (await db.run.findUniqueOrThrow({ where: { id: run.id } })).sessionId! } })).hash, targets: selected.entries.map(entry => ({ target: `${entry.module.name}.${entry.tool.name}`, moduleId: entry.module.id, contractHash: moduleCallbackContractHash(entry.tool) })), content: [] } });
   const headers = { authorization: `Bearer ${run.token}`, "content-type": "application/json" };
   const request = (path: string, init?: RequestInit) => app.request(path, init, peer);
   const post = (name: string, body: unknown) => request(`/tools/${name}`, { method: "POST", headers, body: JSON.stringify(body) });
@@ -36,7 +41,7 @@ async function fixture() {
     async close() { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); } };
 }
 
-test("live Agent capability exposes the modern 13 module tools and pure Author material preparation through actual HTTP dispatch", async () => {
+test("live Agent capability exposes the modern 12 module tools and pure Author material preparation through actual HTTP dispatch", async () => {
   const f = await fixture();
   try {
     expect((await f.request("/catalog")).status).toBe(401);
@@ -48,10 +53,10 @@ test("live Agent capability exposes the modern 13 module tools and pure Author m
     const names: string[] = (await catalog.json()).tools.map((tool: { name: string }) => tool.name);
     expect(names.filter(name => name.startsWith("m_modules_")).sort()).toEqual(moduleTools.map(tool => `m_modules_${tool.replaceAll("-", "_")}`).sort());
     expect(names).toContain("m_author_prepare");
-    const reference = await f.post("m_modules_reference", {});
+    const reference = await f.post("m_modules_describe", {});
     expect(reference.status).toBe(200);
-    const index: { target: string }[] = (await reference.json()).data.result;
-    expect(index.filter(tool => tool.target.startsWith("modules.")).map(tool => tool.target).sort()).toEqual(moduleTools.map(tool => `modules.${tool}`).sort());
+    const index: { target: string | { moduleId: string; tool: string } }[] = (await reference.json()).data.result.items;
+    expect(index.filter(tool => typeof tool.target === "string" && tool.target.startsWith("modules.")).map(tool => tool.target).sort()).toEqual(moduleTools.map(tool => `modules.${tool}`).sort());
     const input = { requestKey: "draft", submitter: { moduleId: f.author.id, hash: "c".repeat(64) }, targets: [{ name: "ordinary", moduleId: null, expectedActiveHash: null }], goal: "Prepare supplied material", intent: { changes: ["Fixture"], preserves: [] } };
     const prepare = await f.post("m_author_prepare", { input: JSON.stringify(input) });
     expect(prepare.status).toBe(200);
@@ -69,7 +74,7 @@ test("live Agent capability exposes the modern 13 module tools and pure Author m
     expect(await f.db.run.count()).toBe(1);
     expect(await f.db.run.count({ where: { lane: "build" } })).toBe(0);
     expect(await f.db.candidateAdmission.count()).toBe(0);
-    expect((await f.request("/tools/m_modules_tools", { method: "POST", headers: f.headers, body: "{" })).status).toBe(400);
+    expect((await f.request("/tools/m_modules_describe", { method: "POST", headers: f.headers, body: "{" })).status).toBe(400);
     const outside = await f.post("m_activity_runtime", {});
     expect(outside.status).toBe(409);
     expect(await outside.json()).toMatchObject({ error: { code: "forbidden" } });

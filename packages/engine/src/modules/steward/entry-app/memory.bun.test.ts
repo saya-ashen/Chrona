@@ -19,7 +19,7 @@ function fixture() {
   const call = async (target: string, args: Args = {}): Promise<unknown> => {
     calls.push({ target, args });
     if (target === "web.settings" || target === "qq.settings") return config;
-    if (target === "modules.tools") return tools;
+    if (target === "modules.describe") return { items: tools, nextCursor: null };
     if (target === "memory-local.conversation-context") return { text: "local context", recalled: true };
     if (target === "memory-local.conversation-retain") return { retained: true, through: JSON.parse(String(args.snapshot)).messages.at(-1)?.at, chars: 3 };
     if (target === "memory-local.recall") return { items: ["memory"] };
@@ -37,7 +37,7 @@ const session = () => ({ id: "web-agent:test", source: "web", memory: undefined 
 test("selection uses own settings and current exact tool schemas, without contributions", async () => {
   const f = fixture();
   expect(await selectedMemory(f.call, "qq")).toMatchObject({ module: "memory-local", autoRecall: true, autoRetain: true, available: true });
-  expect(f.calls).toEqual([{ target: "qq.settings", args: {} }, { target: "modules.tools", args: { query: "memory-local" } }]);
+  expect(f.calls).toEqual([{ target: "qq.settings", args: {} }, { target: "modules.describe", args: { query: "memory-local" } }]);
   for (const modify of [
     () => f.setTools(contracts("other")),
     () => f.setTools(contracts("memory-local-extra")),

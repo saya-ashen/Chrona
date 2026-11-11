@@ -161,7 +161,7 @@ on('tool', async () => {
   const count = await file.exists() ? Number(await file.text()) + 1 : 1;
   await Bun.write(file, String(count));
   const key = 'counter-' + count;
-  await chrona.call('notify.send', { key, level: 'now', title: 'Counter', body: String(count) }, { mode: 'async', key });
+  await chrona.call({moduleId:chrona.dependencies.notify,tool:'send'}, { key, level: 'now', title: 'Counter', body: String(count) }, { mode: 'async', key });
 });
 `);
   const runtime = createScriptSandbox({ dataDir: f.dataDir });

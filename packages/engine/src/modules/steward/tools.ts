@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { committedToolContract } from "./module-tool-contract";
 import { chronaToolInputSchemas as schemas, RUN_LIMITS } from "@chrona/contracts/steward";
 import type { Prisma } from "@chrona/db";
@@ -28,7 +29,7 @@ async function reply(ports: StewardPorts, { run, workspaceId, session }: Claim, 
 export function createTools(ports: StewardPorts) {
   const { db, now } = ports;
   /** `timeoutSeconds` (v2-13): how long the caller waits; tools that wait stop by then, and never past the run's deadline. */
-  async function call(token: string, name: string, raw: unknown, { timeoutSeconds = 60 }: { timeoutSeconds?: number } = {}) {
+  async function call(token: string, name: string, raw: unknown, { timeoutSeconds = 60, key }: { timeoutSeconds?: number; key?: string } = {}) {
     const claim = await db.$transaction(async tx => {
       const auth = await authenticateRun(tx, token, now(), name);
       const calls = Array.isArray(auth.run.toolCalls) ? auth.run.toolCalls as Prisma.InputJsonObject[] : [];
@@ -50,12 +51,12 @@ export function createTools(ports: StewardPorts) {
     try {
       const context = await contextRunTools(ports, run);
       if (context) {
-        const result = await callContextTool(ports, context, name, raw, deadline);
+        const result = await callContextTool(ports, context, name, raw, { deadline, key: `provider:${run.id}:${createHash("sha256").update(String(key ?? index)).digest("hex")}` });
         ok = true; return result;
       }
       if (claim.session?.source !== "build") throw new StewardError("forbidden", "Provider tools require an application Agent context or build");
       if (name.startsWith("m_")) {
-        const result = await callModuleTool(ports, { workspaceId, sessionId: run.sessionId, runId: run.id, deadline }, name, raw);
+        const result = await callModuleTool(ports, { workspaceId, sessionId: run.sessionId, runId: run.id, deadline, key: `provider:${run.id}:${createHash("sha256").update(String(key ?? index)).digest("hex")}` }, name, raw);
         ok = true; return result;
       }
       if (name !== "chrona_reply") throw new StewardError("invalid", "Unknown Chrona tool");

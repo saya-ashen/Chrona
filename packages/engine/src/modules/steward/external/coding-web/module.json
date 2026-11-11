@@ -3,6 +3,7 @@
   "description": "Optional owner Coding workbench. Browser state owns navigation and drafts; bounded tools translate to the headless Coding command protocol. Removing this client leaves Coding running.",
   "entry": "index.ts",
   "activated": true,
+  "authority": "owner",
   "uses": [
     "*",
     "coding.command",

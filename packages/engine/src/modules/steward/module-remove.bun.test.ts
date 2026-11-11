@@ -17,7 +17,9 @@ async function fixture(name = "example", entry = false) {
   const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => new Date("2026-11-05T12:00:00Z") };
   closes.push(async () => { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name, activeHash: "version" } });
-  const manifest = moduleManifestSchema.parse({ name: module.name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [], ...(entry ? { uses: ["*"] } : {}) });
+  const manifest = moduleManifestSchema.parse({ name: module.name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [], ...(entry ? { uses: ["*"],
+      authority: "owner"
+} : {}) });
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "version", manifest, source: "user", status: "approved", intent: {}, report: {} } });
   const context = moduleContext(ports, workspace.id);
   const data = join(context.platform, "data", module.id);

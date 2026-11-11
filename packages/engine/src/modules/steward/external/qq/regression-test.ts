@@ -41,13 +41,13 @@ for (let i = 0; i < 4; i++) await passive(incoming, "reply").catch(() => {});
 assert.equal(await passive(incoming, "reply"), false); assert.equal(reservations, 4);
 
 const calls: any[] = [], notices: any[] = [];
-const routedCall = async (target: string, args: Record<string, unknown>) => { calls.push({ target, args }); if (target === "agent.get") return { runId: "qq-run", status: "running", active: true }; if (target === "agent.stream") return { items: [], after: 0, ended: false, transcript: [], interactions: [] }; if (target === "agent.context") return { contextId: "qq-context" }; if (target === "agent.run") return { runId: "qq-run", status: "queued", active: true }; if (target === "modules.tools") return []; if (target === "qq.settings") return { provider: null, autoRecall: true, autoRetain: true }; if (target === "approvals.list") return [{ id: "abcdef12-0000", title: "approval" }]; return {}; };
+const routedCall = async (target: string, args: Record<string, unknown>) => { calls.push({ target, args }); if (target === "agent.get") return { runId: "qq-run", status: "running", active: true }; if (target === "agent.stream") return { items: [], after: 0, ended: false, transcript: [], interactions: [] }; if (target === "agent.context") return { contextId: "qq-context" }; if (target === "agent.run") return { runId: "qq-run", status: "queued", active: true }; if (target === "modules.describe" || target === "modules.list") return { items: [], nextCursor: null }; if (target === "qq.settings") return { provider: null, autoRecall: true, autoRetain: true }; if (target === "approvals.list") return { items: [{ id: "abcdef12-0000", title: "approval" }], nextCursor: null }; return {}; };
 const conversations = createQqConversations({ dataDir: paths.data, contentDir: paths.content, call: routedCall, binding: async () => binding, deliver: async () => {} });
 const relay = createRelay({ conversations, publicUrl: null, download: async a => ({ name: a.name, mime: "image/png", bytes: new Uint8Array([1]) }), notify: async args => { notices.push(args); }, call: routedCall });
 const parsed = parseC2cEvent({ id: "picture", author: { user_openid: "owner" }, content: "", timestamp: now.toISOString(), attachments: [{ url: "https://gchat.qpic.cn/image", filename: "image.png", content_type: "image/png" }] })!;
 assert.equal(parsed.attachments?.length, 1);
 await relay.send({ workspaceId: binding.workspaceId, key: "qq:dm", channel: "chrona_qqbot", text: "", externalId: parsed.id, attachments: parsed.attachments });
-assert.deepEqual(calls.map(c => c.target), ["agent.context", "modules.tools", "qq.settings", "agent.run"]);
+assert.deepEqual(calls.map(c => c.target), ["agent.context", "modules.list", "modules.describe", "qq.settings", "agent.run"]);
 assert.match(calls.find(c => c.target === "agent.run").args.prompt, /qq\/attachments\//);
 const session = (await conversations.app.list())[0]!;
 const message = (await conversations.app.messages(session.id))[0]!;
@@ -94,7 +94,7 @@ await assert.rejects(downloadQqAttachment({ url: "https://evil.invalid/image", n
 await mkdir(paths.data, { recursive: true });
 const mod = await startModule("offline-harness.ts", { stubs: { secret: () => ({ value: { appId, clientSecret: "fake-test-secret" } }) } });
 try {
-  for (let i = 0; i < 200 && !mod.calls.some((c: { params: { target?: unknown } }) => c.params.target === "notify.channel"); i++) await new Promise(r => setTimeout(r, 10));
+  for (let i = 0; i < 200 && !mod.calls.some((c: { params: { target?: unknown } }) => targetName(c.params.target) === "notify.channel"); i++) await new Promise(r => setTimeout(r, 10));
   const deliver = async (key: string, extra: Record<string, unknown> = {}) => mod.send({ trigger: { kind: "tool", id: "deliver", firedAt: now.toISOString(), args: { key, title: "Title", body: "**markdown**", ...extra } }, now: now.toISOString(), params: {} });
   assert.equal((await deliver("explicit", { format: "markdown" })).result?.result.outcome, "accepted");
   assert.equal((await deliver("default")).result?.result.outcome, "accepted");
@@ -105,6 +105,13 @@ try {
   const payloads = (await readFile(join(paths.data, "offline-payloads.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line));
   assert.equal(payloads.length, 2); assert.equal(payloads[0].msg_type, 2); assert.equal(payloads[0].markdown.content, "Title\n\n**markdown**"); assert.equal(payloads[1].msg_type, 0);
   const records = JSON.parse(await readFile(join(paths.data, "conversations/state.json"), "utf8")).sessions.flatMap((session: { messages: { direction: string }[] }) => session.messages).filter((message: { direction: string }) => message.direction === "out"); assert.equal(records.length, 2);
-  assert.equal(mod.calls.filter((c: { params: { target?: unknown } }) => String(c.params.target).startsWith("chat.")).length, 0);
+  assert.equal(mod.calls.filter((c: { params: { target?: unknown } }) => String(targetName(c.params.target)).startsWith("chat.")).length, 0);
 } finally { await mod.stop(); }
 console.log("binding, authorization, replay, approval, images, relay and entry integration passed");
+
+function targetName(raw: unknown): string {
+  if (typeof raw === "string") return raw;
+  const target = raw as { moduleId: string; tool: string };
+  const names: Record<string, string> = {};
+  return `${names[target.moduleId] ?? target.moduleId.replace(/-id$/, "")}.${target.tool}`;
+}

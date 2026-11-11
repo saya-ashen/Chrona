@@ -23,7 +23,7 @@ async function fixture(kind: "local" | "application" = "local") {
   const workspaceId = (await db.workspace.create({ data: { name: "router-test" } })).id;
   async function module(name: string, uses: string[] = ["agent.run", "agent.placement", "agent.locations", "agent.cleanup", "agent.get"]) {
     const row = await db.module.create({ data: { workspaceId, name, activeHash: "hash", status: "active" } });
-    await db.moduleVersion.create({ data: { moduleId: row.id, hash: "hash", manifest: moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], uses }), source: "user", intent: {}, report: {}, status: "approved" } });
+    await db.moduleVersion.create({ data: { moduleId: row.id, hash: "hash", manifest: moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], uses, authority: uses.includes("*") ? "owner" : undefined }), source: "user", intent: {}, report: {}, status: "approved" } });
     return { kind: "module" as const, moduleId: row.id, module: name, hash: "hash" };
   }
   const caller = await module("execution-test"), other = await module("other"), application = await module("execution-application", []);
@@ -146,7 +146,9 @@ test("local cleanup retains scoped principal and exact preview/confirm arguments
   f.ports.executionWorkspaces.cleanup = async () => ({ ...receipt, workspaceRef: "foreign" });
   await expect(f.call("cleanup", preview)).rejects.toMatchObject({ code: "conflict" });
   for (const row of await f.db.moduleInvocation.findMany({ where: { target: "agent", tool: "cleanup" } })) {
-    expect(row.args).toEqual({}); expect(row.output).toEqual(row.status === "succeeded" ? {} : null);
+    expect(row.args).toEqual({});
+    if (row.status === "succeeded") expect(row.output).toMatchObject({ state: "blocked", reason: "retained" });
+    else expect(row.output).toBeNull();
   }
 });
 test("router validates Agent inputs/outputs, denies non-module callers and prevents async run/cleanup persistence", async () => {
@@ -161,7 +163,7 @@ test("router validates Agent inputs/outputs, denies non-module callers and preve
   const agent = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "agent", activeHash: "release", status: "active", builtin: true } });
   await f.db.moduleVersion.create({ data: { moduleId: agent.id, hash: "release", manifest: moduleManifestSchema.parse(agentManifest), source: "builtin", intent: {}, report: {}, status: "approved" } });
   for (const [tool, raw] of [["run", f.input], ["cleanup", { workId: "work", commandKey: "preview", op: "preview" }]] as const) {
-    await expect(f.db.$transaction(tx => enqueueCall({ tx, ports: f.ports, origin: f.origin(), target: `agent.${tool}`, raw }, { key: `async-${tool}` }))).rejects.toMatchObject({ code: "invalid" });
+    await expect(f.db.$transaction(tx => enqueueCall({ tx, ports: f.ports, origin: f.origin(), target: `agent.work-${tool}`, raw }, { key: `async-${tool}` }))).rejects.toMatchObject({ code: "invalid" });
   }
   f.ports.executions = { ...f.ports.executions!, get: async () => ({}) as never };
   await expect(f.call("get", { executionId: "work" })).rejects.toThrow("Local capability output contract mismatch");

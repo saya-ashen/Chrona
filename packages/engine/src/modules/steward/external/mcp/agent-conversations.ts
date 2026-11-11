@@ -5,16 +5,17 @@ import { randomUUID } from "node:crypto";
 import { conversationMemory, type MemoryJournal } from "./memory";
 import { captureApplicationDelivery, reconcileApplicationDelivery, validApplicationDelivery, type ApplicationDelivery, type DeliveryPages } from "./delivery";
 
+type Target = string | { moduleId: string; tool: string };
 type Args = Record<string, unknown>;
 type Call = (target: string, args?: Args) => Promise<unknown>;
 type Transcript = { at: string; kind: string; text?: string; tool?: string; error?: boolean }[];
 type Execution = { runId: string; status: string; active: boolean; phase?: string; reason?: string; canContinue: boolean; replyPending?: boolean; pendingAdmission?: { requestKey: string }; pendingContinuation?: { runId: string; requestKey: string }; applicationDelivery?: ApplicationDelivery[] };
 type Message = { id: string; direction: "in" | "out"; text: string; createdAt: string; attachments: unknown[]; externalId?: string; inReplyTo?: string; input?: string; requestKey?: string; runId?: string; delivery?: "pending" | "accepted"; execution?: Execution; progress?: string };
-type RunRequest = { prompt: string; tools: string[]; content: string[] };
+type RunRequest = { prompt: string; tools: Target[]; content: string[] };
 type Turn = { pendingToolResults?: string[]; applicationDelivery?: ApplicationDelivery[]; deliveryCheckedAt?: string; id: string; key: string; text: string; prompt?: string; memoryContext?: string; input?: string; content?: string[]; at: string; runId?: string; status: string; active: boolean; phase?: string; reason?: string; after?: number; streamPending?: boolean; continuationOf?: string; runRequest?: RunRequest; baseline: Transcript; transcript: Transcript; interactions: { id: string; status: string }[] };
 type Conversation = { id: string; memory?: MemoryJournal; contextId?: string; key: string; title: string; status: "active" | "ended"; source: "web" | "mcp" | "qq"; createdAt: string; lastActivityAt: string; messages: Message[]; turns: Turn[] };
 type State = { version: 1; sessions: Conversation[] };
-type Options = { dataDir: string; call: Call; reply: (event: Args) => void; now?: () => Date; source?: "web" | "mcp" | "qq"; guidance?: string; tools?: string[]; deliveryPages?: DeliveryPages };
+type Options = { dataDir: string; call: Call; reply: (event: Args) => void; now?: () => Date; source?: "web" | "mcp" | "qq"; guidance?: string; tools?: Target[]; deliveryPages?: DeliveryPages };
 type Runtime = Options & { now: () => Date; source: "web" | "mcp" | "qq" };
 type SendInput = { session?: string; key?: string; text: unknown; requestKey?: string; attachments?: unknown[]; quotedExternalId?: string };
 type TextInput = SendInput & { text: string };
@@ -35,7 +36,7 @@ function isRunRequest(input: unknown): input is RunRequest {
   if (!input || typeof input !== "object") return false;
   const value = input as Record<string, unknown>;
   return typeof value.prompt === "string" && value.prompt.length <= 200_000
-    && Array.isArray(value.tools) && value.tools.length <= 100 && value.tools.every(tool => typeof tool === "string")
+    && Array.isArray(value.tools) && value.tools.length <= 100 && value.tools.every(tool => typeof tool === "string" || !!tool && typeof tool === "object" && typeof (tool as { moduleId?: unknown }).moduleId === "string" && typeof (tool as { tool?: unknown }).tool === "string")
     && Array.isArray(value.content) && value.content.length <= 10 && value.content.every(ref => typeof ref === "string");
 }
 function isMemoryJournal(value: unknown): value is MemoryJournal {
@@ -73,8 +74,20 @@ const result = (session: Conversation, turn: Turn, message: Message) => ({ sessi
 async function conversationTools({ tools, call }: Runtime) {
   if (tools) return [...new Set(tools)];
   // App tool discovery never grants more than Web itself may call. No identity or host paths in arguments.
-  const available = await call("modules.tools", { audience: "user" }) as { target: string }[];
-  return [...new Set(available.map(t => t.target).filter(target => !/^(agent|web|chat|qq|mcp)\./.test(target)))];
+  const apps = await call("modules.list", { limit: 100 }) as { items: { id: string; name: string }[] };
+  const excluded = new Set(apps.items.filter(app => ["agent", "web", "qq", "mcp"].includes(app.name)).map(app => app.id));
+  const selected: Target[] = [], seen = new Set<string>();
+  let cursor: string | null = null;
+  do {
+    const page = await call("modules.describe", { audience: "user", limit: 100, ...(cursor ? { cursor } : {}) }) as { items: { target: Target; moduleId?: string }[]; nextCursor: string | null };
+    for (const item of page.items) {
+      const target = typeof item.target === "string" && item.moduleId ? { moduleId: item.moduleId, tool: item.target.slice(item.target.indexOf(".") + 1) } : item.target;
+      const identity = JSON.stringify(target);
+      if ((typeof target === "string" || !excluded.has(target.moduleId)) && !seen.has(identity)) { selected.push(target); seen.add(identity); }
+    }
+    cursor = page.nextCursor;
+  } while (cursor && selected.length < 100);
+  return selected.slice(0, 100);
 }
 async function start(options: Runtime, state: State, session: Conversation, turn: Turn) {
   const { call, source } = options;

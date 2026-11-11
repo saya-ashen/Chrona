@@ -18,7 +18,7 @@ const closes: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const close of closes.splice(0).reverse()) await close(); });
 const owner: Caller = { kind: "owner", via: null };
 const hash = "a".repeat(40);
-const manifest = (name: string, uses: string[] = []) => moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], keepAlive: true, uses, effects: [] });
+const manifest = (name: string, uses: string[] = []) => moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], keepAlive: true, uses, authority: uses.includes("*") ? "owner" : undefined, effects: [] });
 async function fixture(names = ["alpha", "beta"]) {
   const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-candidates-"));
   closes.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
@@ -138,7 +138,7 @@ test("source exports only admitted exact baseline into caller content and refuse
   await expect(candidateSource(f.ports, f.workspace.id, f.caller, { ...f.source, to: "drift" })).rejects.toMatchObject({ code: "conflict" });
 });
 
-test("an owner module grant is fenced again after its wildcard authority is revoked", async () => {
+test("an owner module grant is fenced again after its owner authority is revoked", async () => {
   const f = await fixture(["alpha"]);
   const admission = await admitCandidates(f.ports, f.workspace.id, f.caller, { ...f.input, requestKey: "module-owner-grant" });
   await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: f.author.id, hash } }, data: { manifest: manifest("author") } });

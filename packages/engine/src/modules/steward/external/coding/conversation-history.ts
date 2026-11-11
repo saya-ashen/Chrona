@@ -73,7 +73,8 @@ function applyPage(history: ConversationHistory, page: ExecutionEventPage) {
 async function readPage(context: CodingContext, target: Record<string, unknown>, history: ConversationHistory) {
   try { return await callAgent<ExecutionEventPage>(context, "events", { ...target, ...(history.cursor ? { cursor: history.cursor } : {}), limit: 100, waitMs: 0 }); }
   catch (error) {
-    const code = (error as { code?: string }).code;
+    const failure = error as { code?: string; reason?: string };
+    const code = failure.reason ?? failure.code;
     if (!["cursor_expired", "not_found", "unavailable"].includes(code ?? "")) throw error;
     history.limited = true;
     if (code === "cursor_expired") return callAgent<ExecutionEventPage>(context, "events", { ...target, limit: 100, waitMs: 0 });

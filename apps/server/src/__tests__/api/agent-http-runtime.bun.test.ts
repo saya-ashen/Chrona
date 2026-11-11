@@ -1,3 +1,5 @@
+import { selectContextTools } from "../../../../../packages/engine/src/modules/steward/agent-context-tools";
+import { moduleCallbackContractHash } from "../../../../../packages/engine/src/modules/steward/module-tool-contract";
 import { expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -23,7 +25,8 @@ async function fixture() {
   const session = await db.session.create({ data: { workspaceId: f.workspaceId, source: "module", moduleId: entry.id, key: "fake-pi-http" } });
   await db.agentContext.create({ data: { sessionId: session.id, workspaceId: f.workspaceId, moduleId: entry.id, hash: "v1" } });
   await db.run.update({ where: { id: f.input.runId }, data: { sessionId: session.id } });
-  await db.agentRunAdmission.create({ data: { runId: f.input.runId, moduleId: entry.id, hash: (await db.agentContext.findUniqueOrThrow({ where: { sessionId: (await db.run.findUniqueOrThrow({ where: { id: f.input.runId } })).sessionId! } })).hash, targets: ["modules.list"], content: [] } });
+  const selected = await selectContextTools(runtime.ports, { workspaceId: f.workspaceId, ownerId: "owner", caller: { kind: "module", moduleId: entry.id, hash: "v1" } }, ["modules.list"]);
+  await db.agentRunAdmission.create({ data: { runId: f.input.runId, moduleId: entry.id, hash: (await db.agentContext.findUniqueOrThrow({ where: { sessionId: (await db.run.findUniqueOrThrow({ where: { id: f.input.runId } })).sessionId! } })).hash, targets: selected.entries.map(entry => ({ target: `${entry.module.name}.${entry.tool.name}`, moduleId: entry.module.id, contractHash: moduleCallbackContractHash(entry.tool) })), content: [] } });
   const app = await createServerApp({ steward: runtime });
   const headers = { authorization: `Bearer ${f.input.token}`, "content-type": "application/json" };
   const peer = { server: { requestIP: () => ({ address: "127.0.0.1" }) } };

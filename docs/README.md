@@ -1,34 +1,39 @@
-# Documentation
+# 文档入口
 
-## Users and operators
+按任务阅读，不要求通读全部专题或历史。目标、当前代码、验收及部署分别记录；旧记录中的“当前”“已完成”和优先级不自动适用于本次开发。
 
-- [English README](../README.md) / [中文 README](../README.zh.md): purpose, pages, setup, configuration and limits.
-- [运维说明](zh/operations.md): data directories, backups, recovery, health and QQ diagnostics (Chinese).
-- [Editor 退役记录](zh/editor-retirement.md): removed legacy application, current Coding protocol, scope and pending cleanup validation; existing 3112 deployment unchanged.
-- [连续编码工作台](zh/coding-web-workbench.md): add local directories, edit directly, continue conversations, answer questions and stop; development status and current limits.
+## 核心文档
 
-## Product and development
+| 文档 | 解决的问题 |
+| --- | --- |
+| [产品目标](zh/steward-goals.md) | 为什么做、用户价值与真实使用验收；最高产品依据 |
+| [内核 API 目标规范](zh/kernel-api-design.md) | 公开合同设计及相对原实现的变化；未冻结 |
+| [内核 API 实施记录](zh/kernel-api-implementation.md) | 当前实现、自动检查及未覆盖范围 |
+| [当前架构](zh/architecture.md) | 当前源码边界、所有权和代码地图 |
+| [现有边界盘点](zh/kernel-permanent-boundary-contract.md) | 前一阶段工具与边界盘点；新版接口见 API 规范与实施记录 |
+| [开发路线](zh/development-roadmap.md) | 待推进工作及证据入口，不重复阶段流水账 |
+| [开发指引](../AGENTS.md) | 必守规则、最小实现和检查方式 |
 
-- [设计目标](zh/steward-goals.md): product authority; goals are not a shipped-feature checklist.
-- [开发目标与统一路线](zh/development-roadmap.md): current backlog, priorities, dependencies and documentation status; prioritizes the usable coding Web workbench, records the five-builtin customization decision and tracks release gaps.
-- [编码工作台实现评估](zh/coding-workbench-implementation-assessment.md): approved scope and retained pre-implementation analysis; [开发验证记录](zh/coding-workbench-validation.md) covers the integrated implementation, regression checks and browser evidence.
-- [编码工作台参考项目调研](zh/workbench-reference-research.md): primary sources and interaction comparisons behind the approved lightweight conversation page.
-- [Web 外壳与应用组合组件](zh/web-components-and-shell.md): uniform whole-Web theme/navigation, app-private declarative props/events/slots, ownership and validation evidence.
-- [内核与 Agent 重构实施](zh/kernel-agent-migration.md): isolated worktree, explicit runtime state, structured results, stop recovery and remaining gates; not a release acceptance.
-- [当前架构](zh/architecture.md): implementation map, trust model and module lifecycle.
-- [调用上下文、Run 与产出](zh/call-context-run-artifact-roadmap.md): later architecture work after the usable workbench; freeze the minimum delegation contract when starting that architecture change.
-- [Agent 原语与应用编排](zh/agent-module-orchestration.md) / [基础编码工作台](zh/coding-web-workbench.md): current application ownership, interfaces and product limits.
-- [统一模块协议与本地／远端宿主](zh/unified-module-runtime-plan.md): completed local V1 implementation, routed Provider/workspace/content contracts and U0–U4 roadmap; [本机 V1 最终验收](zh/unified-module-v1-acceptance.md) records review fixes, real-model coding/cancellation/crash recovery and final verification; general remote hosts are deferred. [模块安装与就绪报告](zh/module-installation-readiness.md) records removal of fabricated business probes, module-owned diagnostics and the local preview follow-up. [Agent 内置应用](zh/agent-builtin-application.md) records the subsequent extraction into a real SDK process, short execution/control requests, callback identity and restart receipts.
-- [模块 Git 工作流](zh/module-git.md): per-app source history, checked customization, explicit upstream updates and legacy limits; [发行种子与发布](zh/module-git-release.md) covers offline bundles and public-release gates.
-- [普通应用的本地桌面窗口](zh/desktop-applications.md): host desktop session, application-owned windows, Author materials and lifecycle acceptance; [桌面会话启动](zh/desktop-session.md) explains direct and user-service startup.
-- [内核可移植、可信本地运行与远程执行应用化实施方案](zh/kernel-portability-plan.md): S0–S3 implemented; Linux trusted-local execution and remote-device delivery validated locally. S4/S5 remain partial: macOS full descendant supervision is missing, Windows native validation and safe archival remain pending. [Verification and release evidence](zh/kernel-portability-verification.md) records actual results and remaining gates. [Archived original cross-platform plan](zh/history/cross-platform-runtime-and-remote-execution-plan.md).
-- [安全机制简化](zh/security-simplification.md) / [模块依赖方向](zh/module-dependency-direction.md): current rules and registration patterns.
-- [当前 Coding 客户端协议](zh/coding-peer-clients-protocol.md) / [实施与原部署记录](zh/coding-peer-clients-implementation.md): shared headless Coding service and peer clients. [旧服务器编码工作](zh/server-coding.md) retains historical server/device placement and recovery evidence; its Editor installation instructions are obsolete.
-- [统一开发方案](zh/chrona-workbench-unified-development-plan.md) / [M3 开发验收](zh/chrona-workbench-m3-acceptance.md): completed M1–M3 development integration, exact evidence and unverified environments; not a public release or deployment.
-- [Provider 运行](zh/provider-runtime.md) / [模块恢复](zh/module-recovery.md) / [Owner 单次受控构建](zh/owner-bounded-builds.md): focused runtime references.
-- [任务总时限](zh/task-timeout.md): ordinary tasks default to unlimited; optional global Settings timeout, new-task scope and explicit execution budgets.
-- [历史设计索引](zh/history/README.md): superseded staged specifications, not current instructions.
-- [Contributing](../CONTRIBUTING.md) and [repository rules](../AGENTS.md): implementation and checks.
-- [Domain agent notes](agents/domain.md) / [issue-tracker agent notes](agents/issue-tracker.md): contributor guidance, not operator instructions.
+## 使用与运维
 
-The README and operations guide describe the current rebuilt code. Historical examples in design or agent notes do not establish current commands or shipped capabilities.
+- [中文 README](../README.zh.md) / [English README](../README.md)：安装与运行范围。
+- [运维](zh/operations.md)：启动、数据目录、完整备份、恢复与诊断。
+- [Coding 工作台](zh/coding-web-workbench.md) / [客户端协议](zh/coding-peer-clients-protocol.md)：使用及应用接口。
+- [本地桌面应用](zh/desktop-applications.md) / [桌面会话](zh/desktop-session.md)：窗口与宿主环境。
+
+## 按任务阅读
+
+| 任务 | 专题入口 |
+| --- | --- |
+| 运行与恢复 | [Agent](zh/agent-builtin-application.md)、[Provider](zh/provider-runtime.md)、[应用恢复](zh/module-recovery.md)、[任务时限](zh/task-timeout.md) |
+| 应用开发与材料 | [依赖方向](zh/module-dependency-direction.md)、[版本材料](zh/author-version-materials.md)、[当前对话创作](zh/author-current-conversation.md)、[Git 发行](zh/module-git-release.md) |
+| Web 与设置 | [外壳与组合](zh/web-components-and-shell.md)、[可执行组件](zh/web-executable-components.md)、[应用设置](zh/application-settings.md) |
+| 通知与自动化 | [有限内核事实](zh/kernel-notification-facts.md)、[Mind](zh/mind-implementation.md)、[应用迁移](zh/application-migration.md) |
+| 源码验收证据 | [内核/Agent 迁移](zh/kernel-agent-migration.md)、[普通应用迁移](zh/application-migration.md)、[边界实施](zh/kernel-permanent-boundary-implementation.md) |
+| Coding 证据 | [实施记录](zh/coding-peer-clients-implementation.md)、[工作台验证](zh/coding-workbench-validation.md)、[Editor 退役](zh/editor-retirement.md) |
+| 可选代理工具 | [context-mode / CodeGraph](agents/tooling.md)：仅在当前会话提供对应工具时按需读取 |
+| 历史背景 | 已归档的早期方案从 Git 历史查阅，不作为当前开发规则 |
+
+安全简化的历史依据见[安全机制简化](zh/security-simplification.md)，跨平台范围及证据见[可移植方案](zh/kernel-portability-plan.md)和[验证记录](zh/kernel-portability-verification.md)；两者都按各自版本和验收范围阅读。贡献说明见[Contributing](../CONTRIBUTING.md)。
+
+早期归档已从工作树删除，可用 `git log --all -- docs/zh/history/` 定位，再用 `git show <revision>:<path>` 查阅。清理前的架构及路线正文分别查其原文件历史。

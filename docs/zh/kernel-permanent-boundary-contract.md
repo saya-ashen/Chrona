@@ -1,5 +1,10 @@
 # 内核永久边界合同（冻结候选）
 
+> 2026-11-10：此为前一阶段记录。新版公开 API 正在按[目标规范](kernel-api-design.md)改造，现状与验证见[API 实施记录](kernel-api-implementation.md)。旧接口和旧验收不证明新版能力。
+
+
+本文维护现有五命名空间的源码合同；后续设计见[API 目标规范](kernel-api-design.md)，新目标尚未实现或冻结。2026-11-09 的门禁是阶段证据，后续内核及应用变更分别见[内核迁移](kernel-agent-migration.md)、[应用迁移](application-migration.md)，不能沿用旧计数证明当前整树通过。
+
 状态：2026-11-09 本轮代码收缩及工程验收完成，**UNFROZEN（冻结候选，未宣布永久只增不删）**。具体命令、基线、结果与限制见[验收记录](kernel-permanent-boundary-validation.md)。本文依据本地主要源码，不把历史报告、旧类型导出、已存在的测试文件或此前检查次数视为本轮通过证据。[实施记录](kernel-permanent-boundary-implementation.md)记录实现与门禁。公开合同、应用所有权、仓库调用方及发布入口已经在本轮同步收缩。
 
 ## 1. 所有权与适用范围
@@ -225,7 +230,7 @@ Web 当前普通应用工具包含 `today/reply/component-set/component-remove/p
 
 ## 8. 暂停、残留与冻结门禁
 
-`module-availability.ts` 的整应用暂停名单精确为 `mind,remind`。Editor 已退役并移除，不再列入暂停或可安装应用，见[退役记录](editor-retirement.md)。Coding 已迁为普通无界面应用，coding-web 为独立可选客户端，验收见 `coding-peer-clients-implementation.md`。暂停的这些应用**全部保留源码及依赖材料**，当前暂停安装和运行接入；路由返回 `unavailable`、reason `module_paused`。初始化对相关项记录 skipped；不能把保留源码写成可安装运行，也不能自动删除。恢复须先迁到普通应用合同并重新验收。
+`module-availability.ts` 的整应用暂停名单精确为 `remind`，保留源码及依赖材料，拒绝安装和运行接入；路由返回 `unavailable`、reason `module_paused`。初始化对其记录 skipped，不能自动删除或从源码验收推断恢复授权。Mind 已恢复为普通可选应用，部署及自动化限制见[Mind 记录](mind-implementation.md)。Editor 已退役移除，见[退役记录](editor-retirement.md)。Coding 与 coding-web 的普通应用接入见[客户端实施记录](coding-peer-clients-implementation.md)。
 
 2026-11-09 后续迁移恢复 MCP 为普通可选应用，使用现有内核工具与应用私有配置；没有新增内核 API。安装后提供鉴权的 `/api/mcp`，不恢复旧自动构建、调度或集中应用配置接口。验收见 [MCP 迁移记录](mcp-minimal-boundary-migration.md)。
 
@@ -240,7 +245,7 @@ Notify 应用专属 lenient 分支已删除。普通应用调用缺失或不可�
 | 路由与残留 | 五命名空间、modules 13 工具及 approvals 四工具；删除旧入口和 scope 参数的真实拒绝；reference 暂停过滤与已注册输出；调用方/发布资源无旧入口依赖；异步 notify.send 缺失目标须在入队前拒绝；内部保留类型、私有 schedule drain 与旧文案须按实际用途核对 | 通过 |
 | 材料与集合 | 真实 caller/issuer/submitter、精确完整集合、变更基线、恶意路径/symlink、并发重放、lost reply 后文件变化/删除、固定 receipt、审批后重查、无部分激活 | 通过 |
 | 治理与敏感交付 | owner 授权、HTTP health/API 鉴权、waiting/error wire、contract hash/pinning、Agent 旧六分支拒绝、预算/租约/unknown/停止证据、OAuth 与 secret 不记录 | 通过 |
-| 普通应用与暂停 | Web/Notify 真正普通身份、暂停替换删除、不补装、单消费者 facts/ack/withdrawals；原收缩验收中的暂停入口和源码保留已检查；当前仅 Mind/Remind 整应用暂停，Editor 退役清理另行验收；memory-local 定时整理暂停 | 通过 |
+| 普通应用与暂停 | Web/Notify 普通身份、暂停替换删除、不补装、单消费者 facts/ack/withdrawals；当轮暂停入口和源码保留已检查，后续恢复及退役见各应用记录，不将旧名单当作当前状态 | 当轮通过 |
 | 文档与构建 | 仓库调用方和资源打包无恢复旧公共面的依赖；临时全新环境的定向/全量检查由主负责人记录具体命令、revision、结果和环境限制 | 通过，见验收记录 |
 | 最终冻结 | 逐工具、字段、权限和兼容添加规则审议；上述出口全部满足，再由主负责人确认冻结版本 | **尚未冻结** |
 

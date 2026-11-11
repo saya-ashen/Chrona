@@ -116,7 +116,9 @@ test("candidate receipts freeze complete materials, replay after deletion and ex
   const f = await fixture(), db = testDb(); closes.push(() => db.$disconnect());
   const workspace = await db.workspace.create({ data: { name: "material test" } });
   const authorHash = "a".repeat(40), author = await db.module.create({ data: { workspaceId: workspace.id, name: "author", activeHash: authorHash } });
-  await db.moduleVersion.create({ data: { moduleId: author.id, hash: authorHash, manifest: { ...f.manifest, name: "author", uses: ["*"] }, intent: {}, report: {}, source: "user", status: "approved" } });
+  await db.moduleVersion.create({ data: { moduleId: author.id, hash: authorHash, manifest: { ...f.manifest, name: "author", uses: ["*"],
+      authority: "owner"
+}, intent: {}, report: {}, source: "user", status: "approved" } });
   const ports = { db, dataDir: f.root, publicUrl: null, now: () => new Date() }, owner = { kind: "owner" as const, via: null };
   const caller = { kind: "module" as const, module: "author", moduleId: author.id, hash: authorHash };
   const content = join(f.root, "platform/content", author.id); await mkdir(content, { recursive: true });
@@ -240,7 +242,9 @@ test.each(["mixed", "mode", "replacement", "ancestor", "artifact", "root"] as co
     if (!changed && path === (change === "mixed" ? "module.json" : "bin/program")) {
       changed = true;
       if (change === "mixed") {
-        await writeFile(join(f.dir, "module.json"), JSON.stringify({ ...f.manifest, uses: ["*"] }));
+        await writeFile(join(f.dir, "module.json"), JSON.stringify({ ...f.manifest, uses: ["*"],
+            authority: "owner"
+        }));
         await writeFile(join(f.dir, "index.ts"), "export const newCode = true;");
       } else if (change === "artifact") await writeFile(join(f.dir, "bin/program"), "changed after read");
       else if (change === "root") {

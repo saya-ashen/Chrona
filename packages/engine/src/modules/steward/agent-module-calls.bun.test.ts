@@ -35,8 +35,10 @@ test("ordinary SDK module calls Agent with real caller ownership and original mo
     const name = "agent-consumer", callerHash = "consumer-v1";
     const source = join(f.ports.dataDir, "platform/store", callerHash);
     await mkdir(source);
-    await writeFile(join(source, "index.ts"), `import {chrona,on} from 'chrona';on('tool',async t=>{try{return {result:await chrona.call('agent.'+t.args.tool,JSON.parse(t.args.args))}}catch(e){return {result:{error:e.code}}}});`);
-    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", effects: [], uses: ["agent.start", "agent.status", "agent.abort", "agent.inject", "agent.release", "agent.transcript", "agent.complete", "agent.completion", "agent.health"], model: { tier: "fast", maxCalls: 1, maxOutputTokens: 100 }, tests: ["test.ts"], tools: [{ name: "relay", description: "fixture", visibility: ["owner"], parameters: { type: "object", properties: { tool: { type: "string" }, args: { type: "string" } }, required: ["tool", "args"] } }] });
+    await writeFile(join(source, "index.ts"), `import {chrona,on} from 'chrona';on('tool',async t=>{try{return {result:await (()=>{const {'request-key':rk,'command-key':ck,...args}=JSON.parse(t.args.args);let tool=t.args.tool;if(args.kind==='execution'||args['execution-id']||['lookup','inspect','placement','locations','cleanup'].includes(tool))tool='work-'+tool;if(tool==='work-lookup')args.key=rk;if(typeof args.answer==='string'){try{args.answer=JSON.parse(args.answer)}catch{}}if(Array.isArray(args.tools))args.tools=args.tools.map(target=>{const i=target.indexOf('.');return {moduleId:chrona.dependencies[target.slice(0,i)],tool:target.slice(i+1)}});return chrona.call({moduleId:chrona.dependencies.agent,tool},args,{key:rk??ck})})()}}catch(e){return {result:{error:e.code,message:e.message}}}});`);
+    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", effects: [], uses: ["agent.start", "agent.status", "agent.abort", "agent.inject", "agent.release", "agent.transcript", "agent.complete", "agent.completion", "agent.health"], model: { tier: "fast", maxCalls: 1, maxOutputTokens: 100 }, tests: ["test.ts"], tools: [{ name: "relay", description: "fixture", visibility: ["owner"], parameters: { type: "object", properties: { tool: { type: "string" }, args: { type: "string" } }, required: ["tool", "args"] },
+        output: {}
+    }] });
     const consumer = await f.ports.db.module.create({ data: { workspaceId: f.workspaceId, name, status: "active", activeHash: callerHash } });
     await f.ports.db.moduleVersion.create({ data: { moduleId: consumer.id, hash: callerHash, source: "user", manifest, status: "approved", intent: {}, report: {} } });
     const relay = async (tool: string, args: Record<string, unknown>) => (await callSync(f.ports, { ...kernelOrigin(f.workspaceId), caller: { kind: "owner", via: null } }, name + ".relay", { tool, args: JSON.stringify(args) })).output;
@@ -90,8 +92,10 @@ test("Agent execution primitives preserve SDK caller, scoped streams and confirm
     const name = "agent-consumer", callerHash = "consumer-v1";
     const source = join(f.ports.dataDir, "platform/store", callerHash);
     await mkdir(source);
-    await writeFile(join(source, "index.ts"), `import {chrona,on} from 'chrona';on('tool',async t=>{try{return {result:await chrona.call('agent.'+t.args.tool,JSON.parse(t.args.args))}}catch(e){return {result:{error:e.code}}}});`);
-    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", effects: [], uses: ["agent.run", "agent.get", "agent.stream", "agent.write", "agent.interrupt", "agent.inspect", "agent.lookup", "agent.locations", "agent.start", "agent.status", "agent.abort", "agent.inject", "agent.release", "agent.transcript", "agent.complete", "agent.completion", "agent.health"], model: { tier: "fast", maxCalls: 1, maxOutputTokens: 100 }, tests: ["test.ts"], tools: [{ name: "relay", description: "fixture", visibility: ["owner"], parameters: { type: "object", properties: { tool: { type: "string" }, args: { type: "string" } }, required: ["tool", "args"] } }] });
+    await writeFile(join(source, "index.ts"), `import {chrona,on} from 'chrona';on('tool',async t=>{try{return {result:await (()=>{const {'request-key':rk,'command-key':ck,...args}=JSON.parse(t.args.args);let tool=t.args.tool;if(args.kind==='execution'||args['execution-id']||['lookup','inspect','placement','locations','cleanup'].includes(tool))tool='work-'+tool;if(tool==='work-lookup')args.key=rk;if(typeof args.answer==='string'){try{args.answer=JSON.parse(args.answer)}catch{}}if(Array.isArray(args.tools))args.tools=args.tools.map(target=>{const i=target.indexOf('.');return {moduleId:chrona.dependencies[target.slice(0,i)],tool:target.slice(i+1)}});return chrona.call({moduleId:chrona.dependencies.agent,tool},args,{key:rk??ck})})()}}catch(e){return {result:{error:e.code,message:e.message}}}});`);
+    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", effects: [], uses: ["agent.work-run", "agent.work-get", "agent.work-stream", "agent.work-write", "agent.work-interrupt", "agent.work-respond", "agent.work-lookup", "agent.work-inspect", "agent.work-placement", "agent.work-locations", "agent.work-cleanup", "agent.run", "agent.get", "agent.stream", "agent.write", "agent.interrupt", "agent.inspect", "agent.lookup", "agent.locations", "agent.start", "agent.status", "agent.abort", "agent.inject", "agent.release", "agent.transcript", "agent.complete", "agent.completion", "agent.health"], model: { tier: "fast", maxCalls: 1, maxOutputTokens: 100 }, tests: ["test.ts"], tools: [{ name: "relay", description: "fixture", visibility: ["owner"], parameters: { type: "object", properties: { tool: { type: "string" }, args: { type: "string" } }, required: ["tool", "args"] },
+        output: {}
+    }] });
     const consumer = await f.ports.db.module.create({ data: { workspaceId: f.workspaceId, name, status: "active", activeHash: callerHash } });
     await f.ports.db.moduleVersion.create({ data: { moduleId: consumer.id, hash: callerHash, source: "user", manifest, status: "approved", intent: {}, report: {} } });
     const relay = async (tool: string, args: Record<string, unknown>) => (await callSync(f.ports, { ...kernelOrigin(f.workspaceId), caller: { kind: "owner", via: null } }, name + ".relay", { tool, args: JSON.stringify(args) })).output;
@@ -109,11 +113,11 @@ test("Agent execution primitives preserve SDK caller, scoped streams and confirm
     expect(await relay("get", {...target, "run-id":"stale-run"})).toMatchObject({error:"conflict"});
     expect(await relay("stream", {...target,limit:20})).toMatchObject({events:[]});
     expect(await relay("run", {...start, prompt:"changed"})).toMatchObject({error:"conflict"});
-    expect(await relay("run", {...start, cwd:"/host"})).toMatchObject({error:"invalid"});
+    expect(await relay("run", {...start, "request-key":"forged-path", cwd:"/host"})).toMatchObject({error:"invalid"});
     const foreign = await f.ports.db.module.create({data:{workspaceId:f.workspaceId,name:"foreign",status:"active",activeHash:"v1"}});
     await f.ports.db.moduleVersion.create({data:{moduleId:foreign.id,hash:"v1",source:"user",manifest:{...manifest,name:"foreign"},status:"approved",intent:{},report:{}}});
     const foreignOrigin = {...kernelOrigin(f.workspaceId),caller:{kind:"module" as const,module:"foreign",moduleId:foreign.id,hash:"v1"}};
-    for(const [tool,args] of [["get",{"execution-id":view.workId}],["stream",{...target,limit:20}],["interrupt",{...target,"request-key":"steal"}]] as const) await expect(callSync(f.ports,foreignOrigin,"agent."+tool,args)).rejects.toMatchObject({code:"not_found"});
+    for(const [tool,args] of [["get",{"execution-id":view.workId}],["stream",{...target,limit:20}],["interrupt",{...target,"request-key":"steal"}]] as const) { const { ["request-key"]: key, ...input } = args as Record<string, unknown>; await expect(callSync(f.ports,foreignOrigin,"agent.work-"+tool,input, key ? { key: String(key) } : {})).rejects.toMatchObject({code:"not_found"}); }
     const runs=createRuns(f.ports,f.workspaceId),claimed=await runs.claimNext("background");
     const handle=await startLocalProvider(f.ports,f.workspaceId,{...f.input,runId:claimed!.id,token:claimed!.token,cwd:claimed!.cwd,lane:"background",deadline:claimed!.deadlineAt});
     liveRuns.set(claimed!.id,handle);
@@ -131,8 +135,10 @@ test("Agent contexts keep durable identity, scoped reads and interrupt evidence"
     const name = "context-consumer", callerHash = "context-v1";
     const source = join(f.ports.dataDir, "platform/store", callerHash);
     await mkdir(source);
-    await writeFile(join(source, "index.ts"), `import {chrona,on} from 'chrona';on('tool',async t=>{try{return {result:await chrona.call('agent.'+t.args.tool,JSON.parse(t.args.args))}}catch(e){return {result:{error:e.code}}}});`);
-    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", effects: [], uses: ["agent.context", "agent.run", "agent.get", "agent.stream", "agent.write", "agent.interrupt", "agent.respond"], tests: ["test.ts"], tools: [{ name: "relay", description: "fixture", visibility: ["owner"], parameters: { type: "object", properties: { tool: { type: "string" }, args: { type: "string" } }, required: ["tool", "args"] } }] });
+    await writeFile(join(source, "index.ts"), `import {chrona,on} from 'chrona';on('tool',async t=>{try{return {result:await (()=>{const {'request-key':rk,'command-key':ck,...args}=JSON.parse(t.args.args);let tool=t.args.tool;if(args.kind==='execution'||args['execution-id']||['lookup','inspect','placement','locations','cleanup'].includes(tool))tool='work-'+tool;if(tool==='work-lookup')args.key=rk;if(typeof args.answer==='string'){try{args.answer=JSON.parse(args.answer)}catch{}}if(Array.isArray(args.tools))args.tools=args.tools.map(target=>{const i=target.indexOf('.');return {moduleId:chrona.dependencies[target.slice(0,i)],tool:target.slice(i+1)}});return chrona.call({moduleId:chrona.dependencies.agent,tool},args,{key:rk??ck})})()}}catch(e){return {result:{error:e.code,message:e.message}}}});`);
+    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", effects: [], uses: ["agent.context", "agent.run", "agent.get", "agent.stream", "agent.write", "agent.interrupt", "agent.respond"], tests: ["test.ts"], tools: [{ name: "relay", description: "fixture", visibility: ["owner"], parameters: { type: "object", properties: { tool: { type: "string" }, args: { type: "string" } }, required: ["tool", "args"] },
+        output: {}
+    }] });
     const consumer = await f.ports.db.module.create({ data: { workspaceId: f.workspaceId, name, status: "active", activeHash: callerHash } });
     await f.ports.db.moduleVersion.create({ data: { moduleId: consumer.id, hash: callerHash, source: "user", manifest, status: "approved", intent: {}, report: {} } });
     const relay = async (tool: string, args: Record<string, unknown>) => (await callSync(f.ports, { ...kernelOrigin(f.workspaceId), caller: { kind: "owner", via: null } }, name + ".relay", { tool, args: JSON.stringify(args) })).output;
@@ -153,7 +159,8 @@ test("Agent contexts keep durable identity, scoped reads and interrupt evidence"
     await f.ports.db.moduleVersion.create({ data: { moduleId: foreign.id, hash: "foreign-v1", source: "user", manifest: { ...manifest, name: "foreign-context" }, status: "approved", intent: {}, report: {} } });
     const foreignOrigin = { ...kernelOrigin(f.workspaceId), caller: { kind: "module" as const, module: foreign.name, moduleId: foreign.id, hash: "foreign-v1" } };
     for (const [tool, args] of [["get", target], ["stream", target], ["interrupt", { ...target, "request-key": "steal" }], ["run", { ...input, "request-key": "foreign" }]] as const) {
-      await expect(callSync(f.ports, foreignOrigin, "agent." + tool, args)).rejects.toMatchObject({ code: "not_found" });
+      const { ["request-key"]: key, ...input } = args as Record<string, unknown>;
+      await expect(callSync(f.ports, foreignOrigin, "agent." + tool, input, key ? { key: String(key) } : {})).rejects.toMatchObject({ code: "not_found" });
     }
     expect(await relay("write", { ...target, "request-key": "queued-write", text: "input" })).toMatchObject({ error: "conflict" });
     expect(await relay("respond", { ...target, "request-key": "bad-answer", "question-id": "missing", answer: "{" })).toMatchObject({ error: "invalid" });
@@ -166,7 +173,9 @@ test("Agent contexts keep durable identity, scoped reads and interrupt evidence"
     const sinkHash = "context-sink-v1", sinkSource = join(f.ports.dataDir, "platform/store", sinkHash);
     await mkdir(sinkSource);
     await writeFile(join(sinkSource, "index.ts"), `import {on} from 'chrona';on('tool',async t=>({result:{caller:t.caller}}));`);
-    const sinkManifest = moduleManifestSchema.parse({ name: "context-sink", entry: "index.ts", effects: [], tests: ["test.ts"], tools: [{ name: "observe", description: "fixture", visibility: ["modules"], parameters: { type: "object", properties: {} } }] });
+    const sinkManifest = moduleManifestSchema.parse({ name: "context-sink", entry: "index.ts", effects: [], tests: ["test.ts"], tools: [{ name: "observe", description: "fixture", visibility: ["modules"], parameters: { type: "object", properties: {} },
+        output: {}
+    }] });
     const sink = await f.ports.db.module.create({ data: { workspaceId: f.workspaceId, name: "context-sink", status: "active", activeHash: sinkHash } });
     await f.ports.db.moduleVersion.create({ data: { moduleId: sink.id, hash: sinkHash, source: "user", manifest: sinkManifest, status: "approved", intent: {}, report: {} } });
     expect(await relay("run", { ...input, "request-key": "owner-escalation", tools: ["context-consumer.relay"] })).toMatchObject({ error: "forbidden" });
@@ -223,7 +232,7 @@ test("Agent contexts keep durable identity, scoped reads and interrupt evidence"
     liveRuns.delete(claimed!.id);
     expect(await relay("get", activeTarget)).toMatchObject({ status: "cancelled", active: false });
     expect(await f.ports.db.run.count({ where: { sessionId: context.contextId } })).toBe(2);
-    const next = await relay("run", { ...input, "request-key": "concurrent" }) as { runId: string };
+    const next = await relay("run", { ...input, "request-key": "after-stop" }) as { runId: string };
     const nextClaim = await runs.claimNext("background");
     expect(nextClaim!.id).toBe(next.runId);
     await runs.finish(next.runId, { outcome: "finished", sessionId: "continued-model-context", error: null }, { stopEvidence: "provider_exited" });
@@ -255,24 +264,26 @@ test("SDK routed completion polls Agent under the original event budget without 
     await mkdir(source);
     await writeFile(join(source, "index.ts"), `import {chrona,on} from 'chrona';
 on('tool',async event=>{
-  const args = {'command-key': event.id + ':' + event.firedAt, prompt:'private SDK prompt','max-output-tokens':100};
-  const started = await chrona.call('agent.complete', args);
-  const replay = await chrona.call('agent.complete', args);
+  const key = event.id + ':' + event.firedAt; const args = {prompt:'private SDK prompt','max-output-tokens':100};
+  const started = await chrona.call({moduleId:chrona.dependencies.agent,tool:'complete'}, args, {key});
+  const replay = await chrona.call({moduleId:chrona.dependencies.agent,tool:'complete'}, args, {key});
   if (replay.operationId !== started.operationId) throw new Error('completion receipt changed');
   let completion;
   const deadline = Date.now() + 5000;
   do {
-    completion = await chrona.call('agent.completion', {'operation-id':started.operationId});
+    completion = await chrona.call({moduleId:chrona.dependencies.agent,tool:'completion'}, {'operation-id':started.operationId});
     if (completion.failure) throw new Error('completion failed');
     if (!completion.result) await Bun.sleep(10);
   } while (!completion.result && Date.now() < deadline);
   if (!completion.result) throw new Error('completion remains unconfirmed');
   let second;
-  try { await chrona.call('agent.complete', {'command-key': args['command-key'] + ':second', prompt:'second private SDK prompt','max-output-tokens':100}); }
+  try { await chrona.call({moduleId:chrona.dependencies.agent,tool:'complete'}, {prompt:'second private SDK prompt','max-output-tokens':100}, {key:key+':second'}); }
   catch(e) { second={code:e.code,message:e.message}; }
   return {result:{first:completion.result,second}};
 });`);
-    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", effects: [], uses: ["agent.complete", "agent.completion"], model: { tier: "fast", maxCalls: 1, maxOutputTokens: 100 }, tests: ["test.ts"], tools: [{ name: "exercise", description: "fixture", visibility: ["owner"], parameters: { type: "object", properties: {} } }] });
+    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", effects: [], uses: ["agent.complete", "agent.completion"], model: { tier: "fast", maxCalls: 1, maxOutputTokens: 100 }, tests: ["test.ts"], tools: [{ name: "exercise", description: "fixture", visibility: ["owner"], parameters: { type: "object", properties: {} },
+        output: {}
+    }] });
     const consumer = await f.ports.db.module.create({ data: { workspaceId: f.workspaceId, name, status: "active", activeHash: hash } });
     await f.ports.db.moduleVersion.create({ data: { moduleId: consumer.id, hash, source: "user", manifest, status: "approved", intent: {}, report: {} } });
     const result = await callSync(f.ports, { ...kernelOrigin(f.workspaceId), caller: { kind: "owner", via: null } }, name + ".exercise", {});

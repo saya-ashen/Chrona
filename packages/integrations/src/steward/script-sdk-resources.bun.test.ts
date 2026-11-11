@@ -16,14 +16,14 @@ async function releaseResources(root: string) {
 
 for (const inherited of [undefined, "/synthetic/untrusted-node-path"]) test(`trusted release SDK resolves with inherited NODE_PATH=${inherited}`, async () => {
   const root = await mkdtemp("/tmp/chrona-sdk-release-"), original = process.env.NODE_PATH;
-  const channel = await createModuleChannel({ onCall: async call => ({ id: call.id, error: { code: call.method === "call" && call.params.target === "executions.snapshot" ? "cursor_expired" : "capacity", message: "bounded fixture error" } }) });
+  const channel = await createModuleChannel({ onCall: async call => ({ id: call.id, error: { code: call.method === "call" && call.params.target === "modules.describe" ? "unavailable" : "conflict", message: "bounded fixture error" } }) });
   let child: ReturnType<ReturnType<typeof createScriptSandbox>["startModule"]> | undefined;
   try {
     if (inherited === undefined) delete process.env.NODE_PATH; else process.env.NODE_PATH = inherited;
     const codeDir = join(root, "release/resources/builtin/probe"), dataDir = join(root, "data");
     await mkdir(codeDir, { recursive: true }); await mkdir(dataDir);
     await writeFile(join(codeDir, "package.json"), JSON.stringify({ name: "probe", type: "module", dependencies: {} }));
-    await writeFile(join(codeDir, "module.json"), JSON.stringify({ effects: [], uses: ["executions.start", "executions.snapshot"] }));
+    await writeFile(join(codeDir, "module.json"), JSON.stringify({ effects: [], uses: ["modules.list", "modules.describe"] }));
     await writeFile(join(codeDir, "tsconfig.json"), JSON.stringify({ compilerOptions: { module: "esnext", moduleResolution: "bundler" } }));
     await writeFile(join(codeDir, "test.ts"), `import assert from "node:assert/strict";
 import { startModule } from "chrona/testing";
@@ -35,7 +35,7 @@ try {
   console.log(typeof startModule);
 } finally { await module.stop(); }
 `);
-    await writeFile(join(codeDir, "index.ts"), 'import { on, chrona } from "chrona"; on("tool", async () => { const codes = []; for (const target of ["executions.start", "executions.snapshot"]) { try { await chrona.call(target, {}); } catch (error) { codes.push((error as {code:string}).code); } } return { result: { sdk: true, inherited: process.env.NODE_PATH ?? null, codes } }; });');
+    await writeFile(join(codeDir, "index.ts"), 'import { on, chrona } from "chrona"; on("tool", async () => { const codes = []; for (const target of ["modules.list", "modules.describe"]) { try { await chrona.call(target, {}); } catch (error) { codes.push((error as {code:string}).code); } } return { result: { sdk: true, inherited: process.env.NODE_PATH ?? null, codes } }; });');
     const before = await readFile(join(codeDir, "index.ts"), "utf8");
     const { sdk, typecheck } = await releaseResources(root);
     const sandbox = createScriptSandbox({ executionMode: "trusted-local", dataDir, moduleSdk: sdk, moduleTypecheck: typecheck });
@@ -43,7 +43,7 @@ try {
     child = sandbox.startModule({ codeDir, dataDir, entry: "index.ts", ipcEndpoint: channel.endpoint, ipcToken: channel.token });
     await channel.ready;
     const now = new Date().toISOString();
-    expect(await channel.send({ trigger: { kind: "tool", id: "probe", args: {}, firedAt: now }, now, params: {} }, 2000)).toMatchObject({ result: { result: { sdk: true, inherited: null, codes: ["capacity", "cursor_expired"] } } });
+    expect(await channel.send({ trigger: { kind: "tool", id: "probe", args: {}, firedAt: now }, now, params: {} }, 2000)).toMatchObject({ result: { result: { sdk: true, inherited: null, codes: ["conflict", "unavailable"] } } });
     expect(await readFile(join(codeDir, "index.ts"), "utf8")).toBe(before);
   } finally {
     child?.kill(); await child?.exited; await channel.close();

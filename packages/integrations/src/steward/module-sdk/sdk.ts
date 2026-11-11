@@ -5,13 +5,15 @@ import { join } from "node:path";
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { connectLoopbackChannel } from "./transport";
 import type { ChronaCalls } from "./calls";
+export type { ChronaCalls } from "./calls";
 
 /** Who called a tool, as Chrona recorded it. */
 export type Caller = { kind: "module"; module: string; moduleId: string; hash: string } | { kind: "provider"; runId: string } | { kind: "owner"; via: string | null } | { kind: "kernel" };
 /** Private wire shape used to settle retained timer receipts. */
-type WireTrigger = { kind: "schedule"; id: string; firedAt: string; scheduleId?: string; payload?: Record<string, unknown> }
+type WireTrigger = { kind: "timer"; id: string; eventId: string; timerId: string; timerRevision: string; scheduledAt: string; firedAt: string; payload: unknown }
+  | { kind: "schedule"; id: string; firedAt: string; scheduleId?: string; payload?: Record<string, unknown> }
   | { kind: "tool"; id: string; firedAt: string; args: Record<string, unknown>; caller?: Caller; call?: { id: string; key: string | null; attempt: number; chain: string[] } }
-  | { kind: "call_result"; id: "call"; firedAt: string; callId: string; target: string; key: string; status: "succeeded" | "failed" | "unknown"; output?: unknown; error?: string }
+  | { kind: "call_result"; id: "call"; firedAt: string; callId: string; target: CallTarget; key: string; status: "succeeded" | "failed" | "unknown"; output?: unknown; error?: string }
   /** Once per active version, and again when a module this one `uses` changes version: register with it here (e.g. web.page-set). */
   | { kind: "activated"; id: "activated"; firedAt: string };
 export type Trigger = Exclude<WireTrigger, { kind: "schedule" }>;
@@ -19,20 +21,26 @@ type EventResult = { result?: unknown };
 export type CallState = { callId: string; status: "queued" | "running" | "waiting" | "succeeded" | "failed" | "unknown"; duplicate?: boolean; output?: unknown; error?: string };
 export type CallOptions = { mode?: "sync" | "async"; key?: string; reply?: boolean; timeoutMs?: number; expectedTarget?: { moduleId: string; contractHash: string } };
 // v2-25: targets with a declared contract (calls.d.ts, generated per build) take typed arguments and give a typed result.
-type Contract = keyof ChronaCalls & string;
+export type KernelTarget = `${"modules" | "approvals" | "settings" | "secrets" | "activity" | "timers" | "runtime-callback" | "workspace-local"}.${string}`;
+export type CallTarget = KernelTarget | { moduleId: string; tool: string };
+const initialBindings: unknown = JSON.parse(process.env.CHRONA_MODULE_BINDINGS ?? "{}");
+if (!initialBindings || typeof initialBindings !== "object" || Array.isArray(initialBindings) || Object.values(initialBindings).some(id => typeof id !== "string" || !id.length || id.length > 128)) throw new Error("Invalid module bindings");
+const dependencies: Record<string, string> = Object.assign(Object.create(null), initialBindings);
+type Contract = keyof ChronaCalls & KernelTarget;
 type ArgsOf<K extends Contract> = ChronaCalls[K] extends { args: infer A } ? A : never;
 type OutputOf<K extends Contract> = ChronaCalls[K] extends { output: infer O } ? O : never;
 type SyncOptions = CallOptions & { mode?: "sync" };
 type Call = {
   <K extends Contract>(target: K, ...rest: object extends ArgsOf<K> ? [args?: ArgsOf<K>, options?: SyncOptions] : [args: ArgsOf<K>, options?: SyncOptions]): Promise<OutputOf<K>>;
   <K extends Contract>(target: K, args: ArgsOf<K>, options: CallOptions & { mode: "async" }): Promise<CallState>;
+  <S extends CallTarget>(target: S & (S extends Contract ? never : unknown), args: Record<string, unknown>, options: CallOptions & { mode: "async" }): Promise<CallState>;
   /** A target without a declared contract: the result is unknown unless the caller states what it expects. */
-  <T = unknown, S extends string = string>(target: S & (S extends Contract ? never : unknown), args?: Record<string, unknown>, options?: CallOptions): Promise<T>;
+  <T = unknown, S extends CallTarget = CallTarget>(target: S & (S extends Contract ? never : unknown), args?: Record<string, unknown>, options?: CallOptions): Promise<T>;
 };
 type Handler = (event: WireTrigger & { now: string; params: Record<string, string | number | boolean> }) => EventResult | void | Promise<EventResult | void>;
 const handlers = new Map<WireTrigger["kind"], Handler>();
 export class ModelError extends Error {
-  constructor(public readonly code: string, message: string) { super(message); this.name = "ModelError"; }
+  constructor(public readonly code: string, message: string, public readonly reason?: string) { super(message); this.name = "ModelError"; }
 }
 const pending = new Map<string, { resolve(result: unknown): void; reject(error: Error): void }>();
 let stopped = false, queue = Promise.resolve();
@@ -50,32 +58,28 @@ const endpoint = process.env.CHRONA_IPC_ENDPOINT, token = process.env.CHRONA_IPC
 if (!endpoint || !token) throw new Error("CHRONA_IPC_ENDPOINT and CHRONA_IPC_TOKEN are required");
 const channel = connectLoopbackChannel({ endpoint, token, onMessage: receive, onDisconnect: fail });
 function send(message: unknown) { channel.send(message); }
-// Events run one at a time; emit scopes its key to the current event so redelivery repeats it.
-// Routed calls keep the caller's key as given.
-let current: string | null = null;
-const scoped = (key: string) => (current ? `${current}:${key}` : key);
-async function event(message: { id: string; event: { trigger: WireTrigger; now: string; params: Record<string, string | number | boolean> } }) {
+async function event(message: { id: string; event: { trigger: WireTrigger; now: string; bindings?: Record<string, string>; params: Record<string, string | number | boolean> } }) {
   try {
+    for (const key of Object.keys(dependencies)) delete dependencies[key];
+    Object.assign(dependencies, message.event.bindings ?? {});
     const handler = handlers.get(message.event.trigger.kind);
     // Results of async calls are optional to handle (callStatus reads them too), and so is `activated`.
     if (!handler && (message.event.trigger.kind === "call_result" || message.event.trigger.kind === "activated")) { send({ id: message.id, result: {} }); return; }
     if (!handler) throw new Error("No handler for " + message.event.trigger.kind);
-    current = `${message.event.trigger.id}:${message.event.trigger.firedAt}`;
     const result = await handler({ ...message.event.trigger, now: message.event.now, params: message.event.params });
     send({ id: message.id, result: result ?? {} });
-  } catch (error) { send({ id: message.id, error: (error instanceof Error ? error.message : String(error)).slice(0, 2000), ...(error instanceof ModelError ? { errorCode: error.code } : {}) }); }
-  finally { current = null; }
+  } catch (error) { send({ id: message.id, error: (error instanceof Error ? error.message : String(error)).slice(0, 2000), ...(error instanceof ModelError ? { errorCode: error.code, ...(error.reason ? { errorReason: error.reason } : {}) } : {}) }); }
 }
 function receive(value: unknown) {
   if (typeof value !== "object" || value === null || !("id" in value) || typeof value.id !== "string") throw new Error("Invalid Chrona message");
-  const message = value as { id: string; ping?: boolean; event?: Parameters<typeof event>[0]["event"]; error?: { code: string; message?: string }; result?: unknown };
+  const message = value as { id: string; ping?: boolean; event?: Parameters<typeof event>[0]["event"]; error?: { code: string; reason?: string; message?: string }; result?: unknown };
   if (message.ping === true) send({ id: message.id, result: {} });
   else if (message.event) queue = queue.then(() => event({ id: message.id, event: message.event! })).catch(() => { void channel.close(); });
   else {
     const call = pending.get(message.id);
     if (!call) return;
     pending.delete(message.id);
-    if (message.error) call.reject(new ModelError(message.error.code, message.error.message ?? message.error.code));
+    if (message.error) call.reject(new ModelError(message.error.code, message.error.message ?? message.error.code, message.error.reason));
     else call.resolve(message.result);
   }
 }
@@ -99,17 +103,19 @@ export const paths = {
 };
 export const chrona = {
   paths,
+  /** Symbolic build dependencies bind to actual application IDs supplied with each event. */
+  dependencies,
   /**
-   * Calls another module's tool through Chrona (`target` = "<module>.<tool>"); `uses` declares its contract, not runtime admission.
+   * Calls an application tool through Chrona (`target` = {moduleId, tool}); `uses` declares its contract, not runtime admission.
    * sync (default): resolves to the tool's result; a timeout or crash after delivery rejects with code "unknown".
    * async: needs a `key` (a repeat returns the same call) and resolves at once to { callId, status };
    * `reply: true` delivers a `call_result` event later. Rejections are ModelError with a code
    * (forbidden, not_found, cycle, unknown, failed, unavailable, invalid).
    */
-  call: ((target: string, args: Record<string, unknown> = {}, { mode = "sync", ...options }: CallOptions = {}) =>
+  call: ((target: CallTarget, args: Record<string, unknown> = {}, { mode = "sync", ...options }: CallOptions = {}) =>
     call<{ output?: unknown } & CallState>("call", { target, args, mode, ...options }).then(result => (mode === "sync" ? result.output : result))) as Call,
   /** State of an async call this module made. */
-  callStatus: (callId: string) => call<CallState>("callStatus", { callId }),
+  callStatus: (selector: string | { callId: string } | { target: CallTarget; key: string }) => call<CallState>("callStatus", typeof selector === "string" ? { callId: selector } : selector),
   /**
    * A credential listed in the manifest's `secrets` (v2-16: any module; the user saves it in Settings): a routed call to
    * `secrets.get`, `unavailable` until saved. Never log, store or return it.
@@ -212,10 +218,4 @@ export const chrona = {
     send({ type: "http-ready", endpoint: `http://127.0.0.1:${server.port}` });
     return server;
   },
-  /**
-   * Emit an event after registering its definition with the ordinary `events.register` tool; this calls `events.emit`.
-   * `name` is the event's own name (the module name is added); `key` is the idempotency key, derived from the triggering event.
-   */
-  emit: (name: string, payload: Record<string, unknown>, options: { key: string }) =>
-    chrona.call<{ delivered: number }>("events.emit", { event: name, payload: JSON.stringify(payload), key: scoped(options.key) }),
 };

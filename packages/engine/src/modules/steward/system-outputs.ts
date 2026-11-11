@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { moduleHealthSummarySchema } from "./module-diagnostics";
-import { appSchema, approvalSchema, providerRunViewSchema, healthSchema, APPROVAL_STATUSES } from "@chrona/contracts/steward";
+import { appSchema, approvalSchema, providerRunViewSchema, healthSchema, APPROVAL_STATUSES, routedTargetSchema } from "@chrona/contracts/steward";
 
 export const runtimeOutput = healthSchema.extend({ at: z.string().datetime() });
 export const runsOutput = z.array(providerRunViewSchema);
@@ -16,7 +16,7 @@ export const modulesListOutput = z.array(appSchema.extend({
 }));
 const toolExampleOutput = z.object({ description: z.string().optional(), args: z.record(z.string(), z.json()), result: z.json().optional() });
 const toolErrorOutput = z.object({ code: z.string(), description: z.string(), recovery: z.string() });
-export const modulesToolsOutput = z.array(z.object({ moduleId: z.string().optional(), hash: z.string().optional(), contractHash: z.string().optional(), target: z.string(), description: z.string(), inputSchema: z.record(z.string(), z.json()), outputSchema: z.json().nullable(), examples: z.array(toolExampleOutput).nullable(), sideEffects: z.array(z.string()).nullable(), errors: z.array(toolErrorOutput).nullable(), retry: z.string(), idempotent: z.boolean() }));
+export const modulesToolsOutput = z.array(z.object({ moduleId: z.string().optional(), hash: z.string().optional(), contractHash: z.string().optional(), target: routedTargetSchema, description: z.string(), inputSchema: z.record(z.string(), z.json()), outputSchema: z.json().nullable(), examples: z.array(toolExampleOutput).nullable(), sideEffects: z.array(z.string()).nullable(), errors: z.array(toolErrorOutput).nullable(), retry: z.string(), idempotent: z.boolean() }));
 export const modulesRollbackOutput = z.discriminatedUnion("status", [
   z.object({ status: z.literal("pending_approval"), approvalId: z.string() }),
   z.object({ status: z.literal("active"), moduleId: z.string(), activeHash: z.string() }),
@@ -33,7 +33,7 @@ export const secretTokenOutput = z.object({ accessToken: z.string(), expiresAt: 
 export const secretsListOutput = z.array(z.object({ name: z.string(), configured: z.boolean(), updatedAt: z.string().nullable(), modules: z.array(z.string()) }));
 
 const referenceSource = z.object({ kind: z.enum(["system", "module"]), hash: z.string().nullable() });
-const referenceIndex = z.object({ target: z.string(), source: referenceSource, description: z.string() });
+const referenceIndex = z.object({ target: routedTargetSchema, source: referenceSource, description: z.string() });
 export const modulesReferenceOutput = z.union([z.array(referenceIndex), referenceIndex.extend({
   inputSchema: z.record(z.string(), z.json()), outputSchema: z.json().nullable(),
   documentation: z.string().nullable(), examples: z.json().nullable(), sideEffects: z.array(z.string()).nullable(), errors: z.json().nullable(),

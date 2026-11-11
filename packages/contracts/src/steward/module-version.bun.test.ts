@@ -4,7 +4,7 @@ import { expectedModuleTargetSchema, modulesToolInputSchemas, moduleInstallResul
 test.each([40, 64])("module source versions accept %i hex characters throughout lifecycle inputs", length => {
   const hash = "a".repeat(length);
   expect(moduleVersionHashSchema.parse(hash)).toBe(hash);
-  expect(modulesToolInputSchemas.rollback.parse({ module: "example", hash })).toMatchObject({ hash });
+  expect(modulesToolInputSchemas.rollback.parse({ moduleId: "example-id", hash, reason: "user selected version" })).toMatchObject({ hash });
   expect(moduleInstallResultSchema.parse({ package: "qq", requestKey: "install", status: "building", moduleId: "module", hash, approvalId: null, error: null }).hash).toBe(hash);
   expect(moduleUpstreamRequestSchema.parse({ action: "merge", moduleId: "module", commit: "b".repeat(40), baseHash: hash, requestKey: "merge" })).toMatchObject({ baseHash: hash });
 });

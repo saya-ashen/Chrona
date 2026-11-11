@@ -8,7 +8,9 @@ test("startup check connects without invoking tools that need configuration", as
   let invoked = false;
   const peer = testModuleProcess(async () => { invoked = true; throw new Error("Configuration and caller required"); });
   const context = { ports: { sandbox: { available: true, startModule: peer.startModule } } } as unknown as ModuleContext;
-  const manifest = moduleManifestSchema.parse({ name: "configured", entry: "index.ts", tests: ["test.ts"], effects: [], tools: [{ name: "send", description: "Requires credentials", parameters: { type: "object", properties: { input: { type: "string" } }, required: ["input"] } }] });
+  const manifest = moduleManifestSchema.parse({ name: "configured", entry: "index.ts", tests: ["test.ts"], effects: [], tools: [{ name: "send", description: "Requires credentials", parameters: { type: "object", properties: { input: { type: "string" } }, required: ["input"] },
+      output: {}
+}] });
   expect(await smokeRun(context, "/staging", manifest)).toEqual([]);
   expect(invoked).toBe(false);
   expect(peer.processes).toHaveLength(1);

@@ -10,6 +10,8 @@ import { testDb } from "./test-db";
 import { createExternalModuleInstaller, installExternal, refreshInstallationReceipts } from "./module-install";
 import { resolveBuiltinRelease, resolveExternalRelease } from "./module-release";
 import { seedTestModuleRelease, testReleasePackages, testReleaseRuntimeChecks } from "./module-release-test-fixture";
+import { createApprovals } from "./approvals";
+import { createModules } from "./modules";
 import { buildPending } from "./module-build";
 import { moduleSupervisor } from "./module-supervisor";
 import { createStewardService } from "./service";
@@ -36,6 +38,10 @@ test("MCP installs from its pinned ordinary release, passes SDK checks and activ
     expect(queued).toMatchObject({ status: "building", hash: seed.commit, approvalId: null });
     await buildPending(moduleContext(ports, workspace.id));
     await refreshInstallationReceipts(ports, workspace.id);
+    const pending = await installExternal(ports, workspace.id, request);
+    expect(pending.status).toBe("pending_approval");
+    await createApprovals({ db, workspaceId: workspace.id, now: ports.now }, action => createModules(ports, workspace.id).onApproved(action)).resolve(pending.approvalId!, { decision: "approve" });
+    await refreshInstallationReceipts(ports, workspace.id);
     const installed = await installExternal(ports, workspace.id, request);
     expect(installed, JSON.stringify(installed)).toMatchObject({ status: "installed", moduleId: queued.moduleId, hash: seed.commit, error: null });
     const module = await db.module.findUniqueOrThrow({ where: { id: installed.moduleId! } });
@@ -43,7 +49,7 @@ test("MCP installs from its pinned ordinary release, passes SDK checks and activ
     const version = await db.moduleVersion.findFirstOrThrow({ where: { moduleId: module.id } });
     expect(version).toMatchObject({ status: "approved", report: { typecheck: { status: "passed" }, tests: [{ exitCode: 0 }] } });
     expect(await db.moduleVersion.count({ where: { moduleId: module.id } })).toBe(1);
-    expect(await db.approval.count()).toBe(0);
+    expect(await db.approval.count({ where: { status: "approved" } })).toBe(1);
     const api = createStewardService(ports).forWorkspace(workspace.id);
     expect((await api.modules.tools()).tools.map(tool => tool.name)).toContain("m_mcp_settings");
     const settings = release.manifest.tools.find(tool => tool.name === "settings")!;

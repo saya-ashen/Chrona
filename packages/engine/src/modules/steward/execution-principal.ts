@@ -1,4 +1,4 @@
-import { grantedUses, type ExecutionPrincipal } from "@chrona/contracts/steward";
+import { type ExecutionPrincipal } from "@chrona/contracts/steward";
 import { CallError } from "./module-call-error";
 import type { Caller } from "./module-call-types";
 import { callerManifest } from "./system/shared";
@@ -21,5 +21,5 @@ export async function resolveExecutionPrincipal(ports: StewardPorts, workspaceId
   const manifest = row ? await callerManifest(ports.db, caller) : null;
   if (!manifest) throw new CallError("forbidden", "Execution caller is no longer active");
   // Same owner authority as admitted(): an approved uses:["*"] entry, never a name-based exception.
-  return grantedUses(manifest).includes("*") ? owner : { workspaceId, ownerId: "owner", caller: { kind: "module", moduleId: caller.moduleId, hash: caller.hash } };
+  return manifest.authority === "owner" ? owner : { workspaceId, ownerId: "owner", caller: { kind: "module", moduleId: caller.moduleId, hash: caller.hash } };
 }

@@ -5,7 +5,7 @@ import { join } from "node:path";
 let first = true;
 chrona.call = new Proxy(chrona.call, {
   apply(target, receiver, args) {
-    if (args[0] === "web.page-set" && first) { first = false; return Promise.reject(new Error("Web unavailable")); }
+    if (args[0]?.tool === "page-set" && first) { first = false; return Promise.reject(new Error("Web unavailable")); }
     return Reflect.apply(target, receiver, args);
   },
 });

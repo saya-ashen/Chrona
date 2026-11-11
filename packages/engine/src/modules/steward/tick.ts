@@ -1,3 +1,4 @@
+import { drainTimers, timersSettled } from "./timers";
 import { join } from "node:path";
 import { mkdir } from "node:fs/promises";
 import type { StewardPorts } from "./ports";
@@ -133,6 +134,7 @@ export function createTick(ports: StewardPorts) {
         // Keep unrelated startup stages running even if one shipped app fails registration.
         ["initialization", async () => { await refreshInstallationReceipts(ports, workspaceId); await ensureWorkspaceInitialized(ports, workspaceId); }],
         ["modules", async () => { await createModules(ports, workspaceId).recoverMigrations(now); startBuild(ports, builds, buildFailures, workspaceId, now); }],
+        ["timers", async () => { void drainTimers(ports, workspaceId, now).catch(error => { buildFailures.set(workspaceId, error); }); }],
         ["schedules", async () => {
           void drainSchedules(ports, workspaceId, now).catch(error => { buildFailures.set(workspaceId, error); });
         }],
@@ -156,7 +158,7 @@ export function createTick(ports: StewardPorts) {
     return { failures };
   }
   return Object.assign(tick, { settled: async ({ includeRuns = false } = {}) => {
-    await Promise.all([...builds.values(), ...(includeRuns ? finalizers : []), schedulesSettled(ports)]);
+    await Promise.all([...builds.values(), ...(includeRuns ? finalizers : []), schedulesSettled(ports), timersSettled(ports)]);
     await callsSettled(ports);
   } });
 }

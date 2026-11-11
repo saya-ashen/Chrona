@@ -106,7 +106,7 @@ test.each(["active", "paused", "migrating"])("application list owns lifecycle ac
   const nodes = Object.values(result.elements), control = nodes.find(node => node.type === "SystemAction");
   expect(nodes.some(node => node.type === "AppRemoval")).toBe(status !== "migrating");
   if (status === "migrating") expect(control).toBeUndefined();
-  else expect(control?.props).toMatchObject({ label: status === "active" ? "暂停" : "恢复", tool: status === "active" ? "module-disable" : "module-enable", args: { id: current.name } });
+  else expect(control?.props).toMatchObject({ label: status === "active" ? "暂停" : "恢复", tool: status === "active" ? "module-disable" : "module-enable", args: { id: current.id } });
   const missingActive = Object.values(appsSpec({ apps: [{ ...current, activeHash: null }], systemApps: [] }).elements);
   expect(missingActive.some(node => node.type === "AppRemoval" || node.type === "SystemAction")).toBe(false);
 });
@@ -183,4 +183,12 @@ test("contract and lifecycle adapters preserve arguments and real failures; remo
   const failing = systemCall({ web: async () => { throw new Error("需先处置活动会话"); }, tool: async () => ({}), login: async () => {} });
   await expect(failing("$web.module-remove", { id: "web" })).rejects.toThrow("活动会话");
   await expect(failing("$web.detail-activity", { module: "web" })).rejects.toThrow("活动会话");
+});
+
+
+test("lifecycle controls bind application IDs even when the display name is reused", () => {
+  const app = { id: "original-id", name: "reused-name", status: "active", activeHash: "old", builtin: false, origin: "external", capabilities: { disable: true, enable: true, remove: true, rollback: true }, health: { runtime: { state: "running" } } };
+  const nodes = Object.values(appsSpec({ apps: [app], systemApps: [] }).elements);
+  expect(nodes.find(node => node.type === "SystemAction")?.props.args).toEqual({ id: "original-id" });
+  expect(nodes.find(node => node.type === "AppRemoval")?.props).toEqual({ moduleId: "original-id", name: "reused-name" });
 });

@@ -10,4 +10,4 @@ export type { Caller } from "./module-call-types";
  * `call`: the async call being delivered (absent for sync calls). v2-20: `description` and `sessions` (the conversation
  * source a system module does its work in) show it to the user as a read-only app.
  */
-export type SystemModule = { name: string; description: string; sessions?: SessionSource; tools: SystemTool[]; unrecorded?: string[]; handle(context: { ports: StewardPorts; workspaceId: string; caller: Caller; run?: { moduleRunId?: string; eventKey?: string; executionRunId?: string }; deadline?: number; call?: { id: string } }, tool: string, args: Record<string, unknown>): Promise<Json> };
+export type SystemModule = { name: string; description: string; sessions?: SessionSource; tools: SystemTool[]; unrecorded?: string[]; handle(context: { ports: StewardPorts; workspaceId: string; caller: Caller; run?: { moduleRunId?: string; eventKey?: string; executionRunId?: string }; deadline?: number; call?: { id: string; key?: string; mode?: "sync" | "async" } }, tool: string, args: Record<string, unknown>): Promise<Json> };

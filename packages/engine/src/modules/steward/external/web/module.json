@@ -8,6 +8,7 @@
     "/api/web"
   ],
   "effects": [],
+  "authority": "owner",
   "uses": [
     "agent.context",
     "agent.run",
@@ -29,11 +30,9 @@
     "secrets.set",
     "secrets.remove",
     "modules.list",
-    "modules.tools",
-    "modules.diagnostics",
+    "modules.describe",
     "notify.activity",
-    "*",
-    "modules.reference"
+    "*"
   ],
   "tools": [
     {

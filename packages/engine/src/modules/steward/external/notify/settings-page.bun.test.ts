@@ -42,9 +42,11 @@ test("routed Web owner reads and saves Notify form, rejects invalid inputs, and 
     const web = await f.ports.db.module.findFirstOrThrow({ where: { workspaceId: f.workspaceId, name: "web" } });
     const webHash = "notify-settings-web", webSource = join(f.ports.dataDir, "platform/store", webHash);
     await mkdir(webSource);
-    await writeFile(join(webSource, "index.ts"), "import {chrona,on} from 'chrona'; on('tool', async t=>({result:await chrona.call('notify.ui-settings',t.args)}));");
+    await writeFile(join(webSource, "index.ts"), "import {chrona,on} from 'chrona'; on('tool', async t=>({result:await chrona.call({moduleId:chrona.dependencies.notify,tool:'ui-settings'},t.args)}));");
     const adapter = parsed.tools.find(tool => tool.name === "ui-settings")!;
-    const webManifest = moduleManifestSchema.parse({ name: "web", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["*"], tools: [{ ...adapter, name: "notify-settings" }] });
+    const webManifest = moduleManifestSchema.parse({ name: "web", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["*"], tools: [{ ...adapter, name: "notify-settings" }],
+        authority: "owner"
+    });
     await f.ports.db.module.update({ where: { id: web.id }, data: { builtin: false, activeHash: webHash } });
     await f.ports.db.moduleVersion.create({ data: { moduleId: web.id, hash: webHash, manifest: webManifest, source: "user", status: "approved", intent: {}, report: {} } });
     const view = (await callSync(f.ports, owner, "web.notify-settings", {})).output as SettingsView;
@@ -58,7 +60,7 @@ test("routed Web owner reads and saves Notify form, rejects invalid inputs, and 
     expect((await callSync(f.ports, owner, "notify.ui-settings", {})).output).toEqual(saved);
     expect((await callSync(f.ports, owner, "notify.settings", {})).output).toEqual({ settings: saved.settings });
     const origin = { ...kernelOrigin(f.workspaceId), caller: { kind: "module" as const, module: "web", moduleId: web.id, hash: webHash } };
-    await f.ports.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: web.id, hash: webHash } }, data: { manifest: { ...webManifest, uses: ["notify.ui-settings", "notify.settings"] } } });
+    await f.ports.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: web.id, hash: webHash } }, data: { manifest: { ...webManifest, authority: undefined, uses: ["notify.ui-settings", "notify.settings"] } } });
     for (const tool of ["ui-settings", "settings"]) await expect(callSync(f.ports, origin, `notify.${tool}`, {})).rejects.toMatchObject({ code: "forbidden" });
     expect(await f.ports.db.moduleCall.count({ where: { method: "model" } })).toBe(0);
   } finally { await f.close(); }

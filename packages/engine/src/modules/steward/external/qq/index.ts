@@ -1,3 +1,4 @@
+import { applicationCall } from "./kernel-client";
 import { chrona, on } from "chrona";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, rename, unlink, writeFile } from "node:fs/promises";
@@ -104,7 +105,7 @@ export function createPreferences(dataDir: string) {
   return { read, update, tool };
 }
 const preferences = createPreferences(chrona.paths.data);
-const appCall = (target: string, args: Record<string, unknown> = {}) => target === "qq.settings" ? preferences.tool(args) : chrona.call(target, args);
+const appCall = (target: string, args: Record<string, unknown> = {}) => target === "qq.settings" ? preferences.tool(args) : applicationCall(target, args);
 
 const log: QqLog = (event, fields = {}) => console.error(JSON.stringify({ component: "qq-bot", event, ...fields }));
 type Args = Record<string, string | boolean | undefined>;
@@ -139,7 +140,7 @@ let channelReady = false;
 on("activated", async () => {
   await reportReady(channelReady);
   try {
-    const registered = await chrona.call("web.page-set", SETTINGS_PAGE);
+    const registered = await chrona.call({ moduleId: chrona.dependencies["web"]!, tool: "page-set" }, SETTINGS_PAGE);
     if (registered && typeof registered === "object" && "error" in registered) throw new Error("Settings page registration rejected");
   }
   catch { log("qq.settings_page_registration_failed"); }
@@ -150,7 +151,7 @@ async function reportReady(ready: boolean) {
   channelReady = ready;
   const at = new Date().toISOString();
   try {
-    const reply = await chrona.call("notify.channel", { channel: "chrona_qqbot", tool: "deliver", ready, at });
+    const reply = await chrona.call({ moduleId: chrona.dependencies["notify"]!, tool: "channel" }, { channel: "chrona_qqbot", tool: "deliver", ready, at });
     if (reply && typeof reply === "object" && "error" in reply) throw new Error("Channel registration rejected");
     return true;
   } catch { log("qq.channel_report_failed"); return false; }
@@ -174,7 +175,7 @@ if (!appId) {
   const state = createQqBotState(chrona.paths.data, appId);
   conversationBinding = () => state.binding();
   pollConversations = async () => { await conversations.poll(); };
-  const relay = createRelay({ conversations, call: (target, args) => chrona.call(target, args), notify: args => chrona.call("notify.send", args, { mode: "async", key: `final:${String(args.key)}` }),
+  const relay = createRelay({ conversations, call: (target, args) => applicationCall(target, args), notify: args => chrona.call({ moduleId: chrona.dependencies["notify"]!, tool: "send" }, args, { mode: "async", key: `final:${String(args.key)}` }),
     publicUrl: process.env.CHRONA_PUBLIC_URL ?? null, download: downloadQqAttachment });
   let recipients = new Set<string>(), ready: boolean | null = null;
   const delivery = createChronaQqDelivery({ tokens, publicUrl: process.env.CHRONA_PUBLIC_URL ?? null, allowedRecipients: () => recipients });

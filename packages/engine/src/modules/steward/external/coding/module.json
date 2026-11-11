@@ -6,17 +6,18 @@
   "keepAlive": true,
   "content": true,
   "effects": [],
+  "authority": "owner",
   "uses": [
     "*",
-    "agent.projects",
-    "agent.run",
-    "agent.get",
-    "agent.lookup",
-    "agent.write",
-    "agent.respond",
-    "agent.interrupt",
-    "agent.stream",
-    "agent.inspect"
+    "agent.work-projects",
+    "agent.work-run",
+    "agent.work-get",
+    "agent.work-lookup",
+    "agent.work-write",
+    "agent.work-respond",
+    "agent.work-interrupt",
+    "agent.work-stream",
+    "agent.work-inspect"
   ],
   "tools": [
     {

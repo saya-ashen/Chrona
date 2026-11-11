@@ -22,7 +22,7 @@ function fixture(values: Args = { provider: "memory-local" }) {
   const call = async (target: string, args: Args = {}): Promise<unknown> => {
     calls.push({ target, args });
     if (["qq.settings", "web.settings", "mcp.settings"].includes(target)) return { provider: null, autoRecall: true, autoRetain: true, ...values };
-    if (target === "modules.tools") return args.query === "memory-local" ? memoryTools : [];
+    if (target === "modules.describe") return { items: args.query === "memory-local" ? memoryTools : [], nextCursor: null };
     if (target.endsWith(".conversation-context")) return { text: "Earlier choice: local files", recalled: true };
     if (target.endsWith(".conversation-retain")) return { retained: true, through: JSON.parse(String(args.snapshot)).messages.at(-1)?.at, chars: 10 };
     if (target.endsWith(".recall")) return { items: [{ id: "memory-id", content: "remembered" }] };
@@ -34,23 +34,23 @@ function fixture(values: Args = { provider: "memory-local" }) {
 test("entry selects its app-owned preference and discovers currently approved tool contracts", async () => {
   const f = fixture();
   expect(await selectedMemory(f.call, "qq")).toMatchObject({ module: "memory-local", available: true });
-  expect(f.calls).toEqual([{ target: "qq.settings", args: {} }, { target: "modules.tools", args: { query: "memory-local" } }]);
+  expect(f.calls).toEqual([{ target: "qq.settings", args: {} }, { target: "modules.describe", args: { query: "memory-local" } }]);
   const off = fixture({});
   expect(await selectedMemory(off.call, "web")).toMatchObject({ module: null, available: false });
   expect(off.calls.map(call => call.target)).toEqual(["web.settings"]);
   const missing = fixture({ provider: "not-installed" });
   expect(await selectedMemory(missing.call, "mcp")).toMatchObject({ module: "not-installed", available: false });
-  expect(missing.calls).toEqual([{ target: "mcp.settings", args: {} }, { target: "modules.tools", args: { query: "not-installed" } }]);
+  expect(missing.calls).toEqual([{ target: "mcp.settings", args: {} }, { target: "modules.describe", args: { query: "not-installed" } }]);
 });
 test.each([null, {}, { type: "object", properties: {}, required: [] }, { type: "object", properties: { snapshot: { type: "number" } }, required: ["snapshot"] }, { type: "object", properties: { snapshot: { type: "string", enum: ["fixed"] } }, required: ["snapshot"] }])("entry rejects incompatible memory tool contracts: %j", async inputSchema => {
   const f = fixture();
-  const call = (target: string, args?: Args) => target === "modules.tools" ? Promise.resolve(memoryTools.map(tool => ({ ...tool, inputSchema }))) : f.call(target, args);
+  const call = (target: string, args?: Args) => target === "modules.describe" ? Promise.resolve({ items: memoryTools.map(tool => ({ ...tool, inputSchema })), nextCursor: null }) : f.call(target, args);
   expect(await selectedMemory(call, "web")).toMatchObject({ module: "memory-local", available: false });
 });
 test.each(["context", "retain"] as const)("entry honors %s opt-out without sending conversation data", async operation => {
   const f = fixture({ provider: "memory-local", autoRecall: false, autoRetain: false });
   expect(await conversationMemory(f.call, "web", f.session, operation, at)).toBe("");
-  expect(f.calls.map(call => call.target)).toEqual(["web.settings", "modules.tools"]);
+  expect(f.calls.map(call => call.target)).toEqual(["web.settings", "modules.describe"]);
   expect(f.session.memory).toBeUndefined();
 });
 test("entry sanitizes before truncation, bounds snapshots, and advances only validated receipts", async () => {

@@ -1,6 +1,6 @@
 # 安全机制简化：保留可靠性，砍掉假隔离
 
-2026-11-08 阅读提示：M1/P1 状态和生产统计保留当时上下文；P1/P2 后续已实现，Agent 原语与应用会话边界见[应用编排](agent-module-orchestration.md)。用户于同日确认 web/mcp/files/notify/events 允许受检定制，Agent 保持不可动态替换；当前生命周期见[架构](architecture.md)。下节 M1 的全部内置不可变条款已在五项上被取代；受检流程、迁移及凭据确认继续有效。
+阅读边界：本文保留 2026-11-02 至 11-08 的安全简化决策及生产统计，不维护当前应用分类或接口清单。旧 M1 不可变内置、五应用定制、长期授权和公开构建条款均按当时上下文阅读；当前生命周期与精确权限以[边界盘点](kernel-permanent-boundary-contract.md)为准，后续设计以[API 目标规范](kernel-api-design.md)为准。trusted-local 不构成恶意代码隔离、凭据不进 prompt、必要数据与外部效果守卫继续保留。
 
 状态：2026-11-02 讨论、2026-11-03 用户确认方向与顺序（3 → 2 → 5）。§3.1–§3.3 均已实现（2026-11-03）。与 [module-dependency-direction.md](module-dependency-direction.md) 并列。
 

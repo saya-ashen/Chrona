@@ -84,7 +84,7 @@ describe("Coding common HTTP transport", () => {
       expect(dispatch).not.toHaveBeenCalled();
     });
   }
-  for (const path of ["/api/coding", "/api/coding/v1/commands/", "/api/coding/v1/events", "/api/coding/v2/commands", "/api/coding/v1/agent.run"]) {
+  for (const path of ["/api/coding", "/api/coding/v1/commands/", "/api/coding/v1/events", "/api/coding/v2/commands", "/api/coding/v1/agent.work-run"]) {
     test(`does not expose compatibility or arbitrary routes at ${path}`, async () => {
       const dispatch = mock(strictListDispatch);
       await expectFailure(await handleCodingHttp(new Request(origin + path), dispatch), 404, "not_found");
@@ -200,9 +200,9 @@ describe("Coding common HTTP transport", () => {
     { command: { op: "projects.list" } },
     { op: "projects.list", principal: "owner" },
     { op: "projects.list", moduleId: "agent" },
-    { op: "projects.list", target: "agent.run" },
+    { op: "projects.list", target: "agent.work-run" },
     { op: "projects.list", clientId: "owner" },
-    { op: "agent.run", input: {} },
+    { op: "agent.work-run", input: {} },
   ]) {
     test(`forwards ${JSON.stringify(raw)} intact for shared strict rejection`, async () => {
       const dispatch = mock(strictListDispatch);
@@ -212,7 +212,7 @@ describe("Coding common HTTP transport", () => {
   }
   test("headers and query fields never change the command or inject caller identity", async () => {
     const dispatch = mock(strictListDispatch);
-    const request = new Request(origin + CODING_HTTP_COMMANDS_PATH + "?target=agent.run&principal=owner", {
+    const request = new Request(origin + CODING_HTTP_COMMANDS_PATH + "?target=agent.work-run&principal=owner", {
       method: "POST", headers: { "content-type": "application/json", "x-principal": "owner", authorization: "Bearer transport-test" },
       body: '{"op":"projects.list"}',
     });

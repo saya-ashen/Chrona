@@ -70,13 +70,13 @@ function appPanel(b: Builder, app: App, state: Record<string, unknown>, tab: str
     return [page ? b.node("AppSettings", { ...page, activeHash: app.activeHash }) : b.text(settingsUnavailable(pages, app), "muted")];
   }
   if (tab === "tools") return contracts(b, state, app.name, false);
-  if (tab === "activity") return [state.recent ? b.activity(state.recent as ActivityItem[], app.name) : b.text("正在读取活动……", "muted"), b.heading("最近运行"), b.list((app.runs ?? []).map(run => b.stack([
+  if (tab === "activity") return [state.recent ? b.activity(state.recent as ActivityItem[], app.name) : b.text("正在读取活动……", "muted"), b.heading("最近运行"), b.list(app.runs.map(run => b.stack([
     b.time(run.createdAt), b.text(`${run.triggerId} · ${run.error || (run.exitCode === null ? "尚无退出结果" : run.exitCode === 0 ? "成功" : `退出码 ${run.exitCode}`)}`, run.error ? "error" : undefined),
   ])), "还没有运行记录。"), diagnosticNodes(b, state.diagnostics as Diagnostics | undefined, app.id, app.name)];
-  if (tab === "versions") return [b.list((app.versions ?? []).slice(0, 20).map(version => b.stack([
+  if (tab === "versions") return [b.list(app.versions.slice(0, 20).map(version => b.stack([
     b.time(version.createdAt), b.text(`${version.hash.slice(0, 8)} · ${version.hash === app.activeHash ? "当前" : version.status}`),
     ...(version.errors ? [b.text(version.errors.join("；"), "error")] : []),
-    ...(app.capabilities.rollback && app.status !== "migrating" && app.activeHash && version.status === "approved" && version.hash !== app.activeHash ? [b.node("SystemAction", { label: "回滚到此版本", tool: "module-rollback", args: { id: app.name, hash: version.hash }, confirm: `回滚 ${app.name} 到 ${version.hash.slice(0, 8)}？如需恢复数据，会另行请你确认。` })] : []),
+    ...(app.capabilities.rollback && app.status !== "migrating" && app.activeHash && version.status === "approved" && version.hash !== app.activeHash ? [b.node("SystemAction", { label: "回滚到此版本", tool: "module-rollback", args: { id: app.id, hash: version.hash }, confirm: `回滚 ${app.name} 到 ${version.hash.slice(0, 8)}？如需恢复数据，会另行请你确认。` })] : []),
   ])), "还没有版本记录。")];
   return appOverview(b, app, state);
 }
@@ -90,15 +90,20 @@ function systemPanel(b: Builder, view: Overview, route: DetailRoute, state: Reco
   return rows;
 }
 const detailTabs = (system: boolean, app: App | undefined) => system ? SYSTEM_TABS : APP_TABS.filter(([key]) => key !== "versions" || app!.origin === "external" || app!.capabilities.update || app!.capabilities.rollback);
+function detailNavigation(b: Builder, route: DetailRoute, system: boolean, app: App | undefined) {
+  const tab = selectedTab(route.tab, system, system ? route.session : "");
+  const tabs = detailTabs(system, app), currentTab = tabs.some(([key]) => key === tab) ? tab : "overview";
+  const base = `/apps/${system ? `system/${encodeURIComponent(route.id)}` : encodeURIComponent(app!.id)}`;
+  return { currentTab, navigation: b.node("TabNav", { items: tabs.map(([key, label]) => ({ label, href: `${base}?tab=${key}`, current: key === currentTab })) }) };
+}
 export function detailSpec(state: Record<string, unknown>, route: DetailRoute, system = false) {
   const b = builder(), view = state.overview as Overview | undefined, title = `${route.id} · 内核`;
   if (!view) return b.finish(system ? title : "模块", [b.text("加载中……", "muted")]);
   if (!system && !view.app) return b.finish("应用", [b.text("没有这个应用", "error")]);
-  const tab = selectedTab(route.tab, system, system ? route.session : ""), app = view.app;
-  const base = `/apps/${system ? `system/${encodeURIComponent(route.id)}` : encodeURIComponent(app!.id)}`;
+  const app = view.app;
   const rows = system ? [b.text(`内核接口，随 Chrona 版本更新。${view.runtime ? runtimeCapabilityBoundary : "在此查看合同与运行记录。"}`, "muted")] : [];
-  const tabs = detailTabs(system, app), currentTab = tabs.some(([key]) => key === tab) ? tab : "overview";
-  rows.push(b.node("TabNav", { items: tabs.map(([key, label]) => ({ label, href: `${base}?tab=${key}`, current: key === currentTab })) }));
+  const { currentTab, navigation } = detailNavigation(b, route, system, app);
+  rows.push(navigation);
   rows.push(...(system ? systemPanel(b, view, route, state, currentTab) : appPanel(b, app!, state, currentTab)));
   return b.finish(system ? title : app!.name, rows);
 }

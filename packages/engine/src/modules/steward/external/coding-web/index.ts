@@ -1,9 +1,10 @@
+import { applicationCall } from "./kernel-client";
 import { chrona, ModelError, on } from "chrona";
 import { randomUUID } from "node:crypto";
 import { authorize, createClient } from "./client";
 import { PAGE } from "./page";
-const client = createClient((target, args) => chrona.call(target, args));
-on("activated", async () => { await chrona.call("web.page-set", PAGE); });
+const client = createClient((target, args) => applicationCall(target, args));
+on("activated", async () => { await chrona.call({ moduleId: chrona.dependencies["web"]!, tool: "page-set" }, PAGE); });
 on("tool", async event => {
   try {
     authorize(event.caller);

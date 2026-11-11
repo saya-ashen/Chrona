@@ -166,7 +166,7 @@ try {
   process.env.CHRONA_DATA = sdkDir;
   let mod: Awaited<ReturnType<typeof startModule>> | undefined;
   try {
-    const start = () => startModule("index.ts", { stubs: { "modules.list": () => testDirectory().modules, "modules.tools": () => testDirectory().tools, "activity.facts": () => ({ revision: "test", facts: [] }), "activity.withdrawals": () => ({ withdrawn: [] }) } });
+    const start = () => startModule("index.ts", { stubs: { "modules.list": () => ({ items: testDirectory().modules, nextCursor: null }), "modules.describe": () => ({ items: testDirectory().tools, nextCursor: null }), "activity.facts": () => ({ revision: "test", facts: [] }), "activity.withdrawals": () => ({ withdrawn: [] }) } });
     mod = await start();
     let n = 0;
     const tool = (id: string, args: Record<string, unknown>) => mod!.send({ trigger: { kind: "tool", id, args, firedAt: new Date(noon.getTime() + n++ * 1000).toISOString(), caller: id === "channel" ? channelOwner : kernel }, now: noon.toISOString(), params: {} });
@@ -174,7 +174,7 @@ try {
     await tool("channel", { channel: "chrona_qqbot", tool: "deliver", ready: true, at: noon.toISOString() });
     const queued = await tool("send", message("sdk-md", { format: "markdown", responds: true }));
     const id = queued.result!.result.id;
-    const deliveries = () => mod!.calls.filter((c: { params: { target?: unknown } }) => c.params.target === "qq.deliver");
+    const deliveries = () => mod!.calls.filter((c: { params: { target?: unknown } }) => targetName(c.params.target) === "qq.deliver");
     for (let i = 0; i < 200 && !deliveries().length; i++) await Bun.sleep(10);
     assert.equal(deliveries().length, 1); const call = deliveries()[0]!;
     assert.equal((call.params.args as any).format, "markdown");
@@ -192,3 +192,10 @@ try {
     assert.equal((await tool("list", {})).result!.result.items.find((r: any) => r.id === id).status, "sent");
   } finally { if (mod) await mod.stop(); process.env.CHRONA_DATA = previousData; }
 } finally { await rm(root, { recursive: true, force: true }); }
+
+function targetName(raw: unknown): string {
+  if (typeof raw === "string") return raw;
+  const target = raw as { moduleId: string; tool: string };
+  const names: Record<string, string> = {};
+  return `${names[target.moduleId] ?? target.moduleId.replace(/-id$/, "")}.${target.tool}`;
+}

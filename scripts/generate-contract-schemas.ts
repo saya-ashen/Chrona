@@ -12,12 +12,12 @@ export const contractSchemasDirectory = resolve(import.meta.dirname, "../package
 export function generateContractSchemas() {
   const systemTools = Object.fromEntries(Object.entries(publicSystemTools).flatMap(([namespace, tools]) => tools.map(tool => [
     `${namespace}.${tool.name}`,
-    { input: tool.input ? z.toJSONSchema(tool.input) : normalizedToolInputSchema(tool),
+    { input: tool.input ? z.toJSONSchema(tool.input, { io: "input" }) : normalizedToolInputSchema(tool),
       output: tool.output ? z.toJSONSchema(tool.output) : null,
       visibility: [...tool.visibility].sort(), idempotent: tool.idempotent },
   ])));
   // The public build response tool has no module handler or application runtime.
-  systemTools.chrona_reply = { input: z.toJSONSchema(chronaToolInputSchemas.chrona_reply), output: null, visibility: ["provider"], idempotent: false };
+  systemTools.chrona_reply = { input: z.toJSONSchema(chronaToolInputSchemas.chrona_reply, { io: "input" }), output: null, visibility: ["provider"], idempotent: false };
   return {
     "system-tools.json": systemTools,
     "module-wire.json": { ...z.toJSONSchema(moduleWireMessageSchema, { io: "input", unrepresentable: "any" }), $id: "https://chrona.local/contracts/module-wire.json", title: "Chrona module wire protocol v1", "x-chrona-transport": moduleWireTransport },

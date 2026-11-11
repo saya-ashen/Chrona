@@ -13,6 +13,11 @@ let pending = false;
 const project = { projectRef: "p1", path: "/tmp/project", label: "示例项目" };
 const session = { id: "s1", title: "修复测试", projectRef: "p1", currentWorkId: "w1", workIds: ["w1"], turns: [] };
 const view = { workId: "w1", runId: "r1", attemptId: "a1", status: "running", cancelRequested: false, stopConfirmed: false };
+function commandReceipt(c: Record<string, unknown>) {
+  const status = pending ? "pending" : "accepted";
+  if (c.op === "round.retry") return { receipt: { requestKey: c.requestKey, op: c.op, status: "accepted", value: { receipt: { requestKey: c.originalRequestKey, op: "round.send", status } } } };
+  return { receipt: { requestKey: c.requestKey, op: c.op, status, ...(c.op === "conversations.create" ? { value: session } : c.op === "projects.register" ? { value: project } : {}) } };
+}
 const stub = (args: Record<string, unknown>) => {
   assert.deepEqual(Object.keys(args), ["input"]);
   const c = JSON.parse(String(args.input)); calls.push(c);
@@ -24,9 +29,8 @@ const stub = (args: Record<string, unknown>) => {
     case "events": return { events: [{ seq: 1, payload: { type: "tool_finished", tool: "edit", summary: "已修改文件", isError: false } }], gap: false };
     case "results": return { results: [{ resultId: "result1", artifactRef: "artifact1", accepted: false, checks: [{ command: "bun test", outcome: "passed", exitCode: 0 }] }] };
     case "read-result": return { mime: "application/json", base64: Buffer.from(JSON.stringify({ finalMessage: { text: "成果已完成", truncated: false }, changes: { status: "complete", patch: "diff --git a/a b/a", files: [{ path: "new.txt", text: "新文件" }] } })).toString("base64") };
-    case "receipt": return { receipt: { requestKey: c.requestKey, op: "round.send", status: pending ? "pending" : "accepted" } };
-    case "round.retry": return { receipt: { requestKey: c.requestKey, op: c.op, status: "accepted", value: { receipt: { requestKey: c.originalRequestKey, op: "round.send", status: pending ? "pending" : "accepted" } } } };
-    default: return { receipt: { requestKey: c.requestKey, op: c.op, status: pending ? "pending" : "accepted", ...(c.op === "conversations.create" ? { value: session } : c.op === "projects.register" ? { value: project } : {}) } };
+    case "receipt": return commandReceipt({ ...c, op: "round.send" });
+    default: return commandReceipt(c);
   }
 };
 const call: Call = async <T>(target: string, args: Record<string, unknown>) => { assert.equal(target, "coding.command"); return stub(args) as T; };
@@ -205,7 +209,7 @@ try {
   assert.equal((relay.result?.result as { status: string }).status, "rejected");
   const independent = await tool("ui-catalog", { project: "p2" });
   assert.equal(independent.error, undefined);
-  assert.equal(runtime.calls.filter((c: { params: { target: string } }) => c.params.target === "web.page-set").length, 1);
+  assert.equal(runtime.calls.filter((c: { params: { target: string } }) => targetName(c.params.target) === "web.page-set").length, 1);
 } finally {
   const count = runtime.calls.length;
   await runtime.stop();
@@ -213,3 +217,10 @@ try {
 }
 assert.equal(calls.some(c => Object.hasOwn(c, "selected") || Object.hasOwn(c, "clientId")), false);
 await writeFile(join(paths.data, "output-examples.json"), JSON.stringify(examples));
+
+function targetName(raw: unknown): string {
+  if (typeof raw === "string") return raw;
+  const target = raw as { moduleId: string; tool: string };
+  const names: Record<string, string> = {};
+  return `${names[target.moduleId] ?? target.moduleId.replace(/-id$/, "")}.${target.tool}`;
+}

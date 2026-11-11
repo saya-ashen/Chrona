@@ -34,9 +34,9 @@ function listDetails(details: Record<string, unknown>): Record<string, Json> {
   return result;
 }
 /** Bounded, workspace-scoped persistence query; presentation and incident aggregation live in notify. */
-export async function activityRecords(ports: StewardPorts, workspaceId: string, { before }: { before?: string }) {
+export async function activityRecords(ports: StewardPorts, workspaceId: string, { before, after, limit = 200, ascending = false }: { before?: string; after?: { at: Date; id: string }; limit?: number; ascending?: boolean }) {
   const { db } = ports, at = before ? new Date(before) : undefined, cursor = at && !Number.isNaN(at.getTime()) ? at : undefined;
-  const rows = await db.audit.findMany({ where: { workspaceId, kind: { in: [...KINDS] }, ...(cursor ? { createdAt: { lt: cursor } } : {}) }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 200 });
+  const rows = await db.audit.findMany({ where: { workspaceId, kind: { in: [...KINDS] }, ...(cursor ? { createdAt: { lt: cursor } } : {}), ...(after ? { OR: [{ createdAt: { gt: after.at } }, { createdAt: after.at, id: { gt: after.id } }] } : {}) }, orderBy: [{ createdAt: ascending ? "asc" : "desc" }, { id: ascending ? "asc" : "desc" }], take: limit });
   const ids = [...new Set(rows.flatMap(row => row.subjectId ? [row.subjectId] : []))];
   const modules = new Map((await db.module.findMany({ where: { workspaceId }, select: { id: true, name: true } })).map(row => [row.id, row.name]));
   const versions = new Map((await db.moduleVersion.findMany({ where: { module: { workspaceId }, id: { in: ids } }, select: { id: true, hash: true, moduleId: true } })).map(row => [row.id, row]));

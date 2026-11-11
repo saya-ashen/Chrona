@@ -13,9 +13,11 @@ function agent(f: Fixture): CallOrigin { return { ...kernelOrigin(f.workspaceId)
 async function consumer(f: Fixture, name: string, uses = ["*"]): Promise<CallOrigin> {
   const hash = name + "-v1", source = join(f.ports.dataDir, "platform/store", hash);
   await mkdir(source);
-  await writeFile(join(source, "index.ts"), `import {chrona,on} from 'chrona';on('tool',async t=>({result:await chrona.call('agent.projects',JSON.parse(t.args.request))}));`);
-  const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], effects: [], uses,
-    tools: [{ name: "projects", description: "Project fixture", visibility: ["owner"], parameters: { type: "object", properties: { request: { type: "string" } }, required: ["request"] } }] });
+  await writeFile(join(source, "index.ts"), `import {chrona,on} from 'chrona';on('tool',async t=>({result:await chrona.call({moduleId:chrona.dependencies.agent,tool:'work-projects'},JSON.parse(t.args.request))}));`);
+  const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], effects: [], uses, authority: uses.includes("*") ? "owner" : undefined,
+    tools: [{ name: "projects", description: "Project fixture", visibility: ["owner"], parameters: { type: "object", properties: { request: { type: "string" } }, required: ["request"] },
+        output: {}
+    }] });
   const module = await f.ports.db.module.create({ data: { workspaceId: f.workspaceId, name, status: "active", activeHash: hash } });
   await f.ports.db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest, source: "user", status: "approved", intent: {}, report: {} } });
   return { ...kernelOrigin(f.workspaceId), caller: { kind: "module", module: name, moduleId: module.id, hash } };
@@ -59,15 +61,15 @@ test("real SDK Coding owner application uses Agent projects with its original pr
       { action: "list", path: directory }, { action: "register", path: directory, name: "extra" }, { action: "create", name: "scratch", path: directory },
       { action: "list", moduleId: origin.caller.moduleId }, { action: "list", principal }, { action: "list", input: "{}" }, { action: "list", callId: "forged" },
       { action: "register", path: "x".repeat(8193) }, { action: "create", name: "x".repeat(65) }]) {
-      await expect(callSync(f.ports, origin, "agent.projects", args)).rejects.toMatchObject({ code: "invalid" });
+      await expect(callSync(f.ports, origin, "agent.work-projects", args)).rejects.toMatchObject({ code: "invalid" });
     }
     expect(seen.length).toBe(calls);
-    await expect(callSync(f.ports, origin, "agent.projects", { action: "create", name: "../escape" })).rejects.toMatchObject({ code: "invalid" });
-    await expect(callSync(f.ports, origin, "agent.projects", { action: "register", path: "relative" })).rejects.toMatchObject({ code: "invalid" });
+    await expect(callSync(f.ports, origin, "agent.work-projects", { action: "create", name: "../escape" })).rejects.toMatchObject({ code: "invalid" });
+    await expect(callSync(f.ports, origin, "agent.work-projects", { action: "register", path: "relative" })).rejects.toMatchObject({ code: "invalid" });
     await rename(directory, directory + "-old"); await mkdir(directory);
-    await expect(callSync(f.ports, origin, "agent.projects", { action: "register", path: directory })).rejects.toMatchObject({ code: "conflict" });
+    await expect(callSync(f.ports, origin, "agent.work-projects", { action: "register", path: directory })).rejects.toMatchObject({ code: "conflict" });
     await expect(host.resolve(principal, registered.project.projectRef)).rejects.toMatchObject({ code: "conflict" });
-    const completed = await callSync(f.ports, origin, "agent.projects", { action: "list" });
+    const completed = await callSync(f.ports, origin, "agent.work-projects", { action: "list" });
     await expect(callback(f, agent(f), completed.callId)).rejects.toMatchObject({ code: "forbidden" });
     expect(await f.ports.db.moduleCall.count({ where: { method: "model" } })).toBe(0);
   } finally { await f.close(); }
@@ -76,7 +78,7 @@ test("real SDK Coding owner application uses Agent projects with its original pr
 test("Agent projects denies non-owner, unapproved, stale, forged and foreign original module identities", async () => {
   const f = await agentFixture();
   try {
-    const current = await consumer(f, "project-current"), ordinary = await consumer(f, "project-ordinary", ["agent.projects"]);
+    const current = await consumer(f, "project-current"), ordinary = await consumer(f, "project-ordinary", ["agent.work-projects"]);
     if (current.caller.kind !== "module") throw new Error("Expected module caller");
     const identity = { moduleId: current.caller.moduleId, hash: current.caller.hash };
     let effects = 0;
@@ -93,7 +95,7 @@ test("Agent projects denies non-owner, unapproved, stale, forged and foreign ori
       { ...foreignOrigin, workspaceId: f.workspaceId },
       { ...current, caller: { kind: "provider", runId: "forged" } }];
     for (const origin of invalid) {
-      await expect(callSync(f.ports, origin, "agent.projects", { action: "list" })).rejects.toMatchObject({ code: "forbidden" });
+      await expect(callSync(f.ports, origin, "agent.work-projects", { action: "list" })).rejects.toMatchObject({ code: "forbidden" });
       const callId = crypto.randomUUID(), release = retainAgentCaller(f.ports, callId, origin, "projects", { action: "create", name: "denied" });
       try { await expect(callback(f, agent(f), callId)).rejects.toMatchObject({ code: "forbidden" }); }
       finally { release(); }
@@ -103,8 +105,8 @@ test("Agent projects denies non-owner, unapproved, stale, forged and foreign ori
     try {
       await f.ports.db.moduleVersion.update({ where: { moduleId_hash: identity }, data: { status: "rejected" } });
       await expect(callback(f, agent(f), callId)).rejects.toMatchObject({ code: "forbidden" });
-      await expect(callSync(f.ports, current, "agent.projects", { action: "list" })).rejects.toMatchObject({ code: "forbidden" });
-      await f.ports.db.moduleVersion.update({ where: { moduleId_hash: identity }, data: { status: "approved", manifest: { ...version.manifest as object, uses: ["agent.projects"] } } });
+      await expect(callSync(f.ports, current, "agent.work-projects", { action: "list" })).rejects.toMatchObject({ code: "forbidden" });
+      await f.ports.db.moduleVersion.update({ where: { moduleId_hash: identity }, data: { status: "approved", manifest: { ...version.manifest as object, authority: undefined, uses: ["agent.work-projects"] } } });
       await expect(callback(f, agent(f), callId)).rejects.toMatchObject({ code: "forbidden" });
       await f.ports.db.moduleVersion.update({ where: { moduleId_hash: identity }, data: { manifest: version.manifest! } });
       await f.ports.db.module.update({ where: { id: identity.moduleId }, data: { status: "paused" } });
@@ -152,6 +154,6 @@ test("project admission binds the trusted current Agent, live operation, workspa
     } finally { release(); }
     await expect(callback(f, trusted, callId)).rejects.toMatchObject({ code: "forbidden" });
     f.ports.executionProjects = undefined;
-    await expect(callSync(f.ports, original, "agent.projects", { action: "list" })).rejects.toMatchObject({ code: "unavailable" });
+    await expect(callSync(f.ports, original, "agent.work-projects", { action: "list" })).rejects.toMatchObject({ code: "unavailable" });
   } finally { await f.close(); }
 }, 30000);

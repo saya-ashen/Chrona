@@ -9,7 +9,7 @@ import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 import { moduleOutputImpacts, outputImpactSummary } from "./module-output-impact";
 
 const output = (type: string) => ({ type: "object", properties: { value: { type } }, required: ["value"], additionalProperties: false });
-const manifest = (name: string, tools: unknown[], uses: string[] = []) => moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], uses, tools });
+const manifest = (name: string, tools: unknown[], uses: string[] = []) => moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], uses, authority: uses.includes("*") ? "owner" : undefined, tools });
 const tool = (name = "read", overrides: Partial<ModuleTool> = {}): ModuleTool => manifest("target", [{ name, description: name, visibility: ["modules"], idempotent: true, parameters: { type: "object", properties: {}, required: [] }, output: output("string"), ...overrides }]).tools[0]!;
 
 const cleanups: (() => Promise<unknown>)[] = [];

@@ -1,3 +1,4 @@
+import { apiPage } from "../api-page";
 import { publicSystemTools } from "./tool-contract-declarations";
 import { APPROVAL_STATUSES } from "@chrona/contracts/steward";
 import { createApprovals, isModuleRequest } from "../approvals";
@@ -8,8 +9,8 @@ import { entry, json, requireOwner } from "./shared";
 
 /** `approvals`: owner decisions, plus each module's own requests. */
 /** v2-16: one approval per async call (redeliveries find it); the call waits until the user decides. */
-async function moduleRequest(ports: StewardPorts, workspaceId: string, module: Extract<Caller, { kind: "module" }>, call: { id: string } | undefined, args: Record<string, unknown>) {
-  if (!call) throw new CallError("invalid", "approvals.request waits for the user: call it with mode async and reply: true");
+async function moduleRequest(ports: StewardPorts, workspaceId: string, module: Extract<Caller, { kind: "module" }>, call: { id: string; mode?: "sync" | "async" } | undefined, args: Record<string, unknown>) {
+  if (!call || call.mode !== "async") throw new CallError("invalid", "approvals.request waits for the user: call it with mode async and reply: true");
   const rows = await ports.db.approval.findMany({ where: { workspaceId, moduleId: module.moduleId, action: "modify_external" }, orderBy: { createdAt: "desc" }, take: 200 });
   const existing = rows.find(row => isModuleRequest(row.payload) && row.payload.call === call.id);
   const approval = existing ?? await ports.db.approval.findUniqueOrThrow({ where: { id: (await createApprovals({ db: ports.db, workspaceId, now: ports.now }).create({
@@ -39,7 +40,7 @@ export const approvals: SystemModule = {
       if (isModuleApproval(action.payload)) await modules.onApproved(action);
       else await ports.onApproved?.(action);
     }, ports);
-    if (name === "list") return json(await service.list((args.status as (typeof APPROVAL_STATUSES)[number] | undefined) ?? "open"));
+    if (name === "list") return json(apiPage(await service.list((args.status as (typeof APPROVAL_STATUSES)[number] | undefined) ?? "open"), { cursor: args.cursor, limit: args.limit }, `approvals:${workspaceId}:${args.status ?? "open"}`, row => `${row.createdAt}:${row.id}`));
     const source = owner.kind === "owner" ? owner.via ?? "owner" : owner.module;
     if (name === "resolve") return json((await service.resolve(String(args.approval), { decision: args.decision, scope: "once" }, source)).approval);
     throw new CallError("not_found", `approvals.${name} not found`);

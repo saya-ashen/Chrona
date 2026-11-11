@@ -21,13 +21,13 @@ try {
   for (let i = 0; i < 100 && reply.result?.result?.error === "QQ bot is starting"; i++) { await new Promise(resolve => setTimeout(resolve, 20)); reply = await deliver(); }
   assert.deepEqual(reply.result?.result, { outcome: "rejected", retryable: false, error: "QQ bot is not configured" });
   // Credentials are a routed call too (secrets.get, v2-10).
-  assert.deepEqual(module.calls.map((call: { params: { target: string } }) => call.params.target), ["secrets.get", "notify.channel"]);
-  assert.equal(module.calls[1].params.target, "notify.channel");
+  assert.deepEqual(module.calls.map((call: { params: { target: string } }) => targetName(call.params.target)), ["secrets.get", "notify.channel"]);
+  assert.equal(targetName(module.calls[1].params.target), "notify.channel");
   assert.equal(module.calls[1].params.mode, "sync");
   assert.deepEqual(module.calls[1].params.args, { channel: "chrona_qqbot", tool: "deliver", ready: false, at: module.calls[1].params.args.at });
   assert.equal((await module.send({ trigger: { kind: "activated", id: "activated", firedAt: now }, now, params: {} })).error, undefined, "absent Web must not break QQ");
   webAvailable = true;
-  assert.equal(module.calls[2].params.target, "notify.channel");
+  assert.equal(targetName(module.calls[2].params.target), "notify.channel");
   assert.equal(module.calls[2].params.args.tool, "deliver");
   assert.equal(module.calls[2].params.args.ready, false);
   const activated = () => module.send({ trigger: { kind: "activated", id: "activated", firedAt: now }, now, params: {} });
@@ -59,6 +59,13 @@ try {
   assert.equal((await settings({})).result?.result.provider, "memory-local");
   assert.deepEqual((await ui({ provider: "" })).result?.result, { provider: "", autoRecall: true, autoRetain: false });
   assert.deepEqual((await settings({})).result?.result, { provider: null, autoRecall: true, autoRetain: false });
-  assert.equal(module.calls.some((call: { params: { target: string } }) => /modules\.(settings|contributions)/.test(call.params.target)), false);
+  assert.equal(module.calls.some((call: { params: { target: string } }) => /modules\.(settings|contributions)/.test(targetName(call.params.target))), false);
   assert.equal(existsSync(join(paths.data, "network-attempts")), false);
 } finally { await module.stop(); }
+
+function targetName(raw: unknown): string {
+  if (typeof raw === "string") return raw;
+  const target = raw as { moduleId: string; tool: string };
+  const names: Record<string, string> = {};
+  return `${names[target.moduleId] ?? target.moduleId.replace(/-id$/, "")}.${target.tool}`;
+}

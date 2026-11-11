@@ -56,14 +56,22 @@ async function authorizedAdmission(context: ModuleContext, db: CandidateDb, call
   await assertCandidateOwner(db, context.workspaceId, admission.issuer);
   return admission;
 }
+/** Project one fixed member, retaining the terminal result after a recorded module removal. */
+async function receiptMemberView(context: ModuleContext, db: CandidateDb, state: CandidateSet["state"], member: CandidateSet["members"][number]): Promise<CandidateReceipt["members"][number]> {
+  const version = await db.moduleVersion.findUnique({ where: { id: member.versionId } });
+  const module = await db.module.findFirst({ where: { id: member.moduleId, workspaceId: context.workspaceId } });
+  if (!version || !module) {
+    if ((state === "approved" || state === "rejected") && await db.moduleRemoval.findFirst({ where: { workspaceId: context.workspaceId, moduleId: member.moduleId } })) {
+      return { ...member, status: state, selected: false };
+    }
+    throw new StewardError("conflict", "Fixed candidate member is missing");
+  }
+  if (version.moduleId !== member.moduleId || version.hash !== member.hash) throw new StewardError("conflict", "Fixed candidate member changed");
+  return { ...member, status: candidateReceiptSchema.shape.members.element.shape.status.parse(version.status), selected: module.activeHash === member.hash };
+}
 async function receiptView(context: ModuleContext, db: CandidateDb, set: CandidateSet): Promise<CandidateReceipt> {
   const members: CandidateReceipt["members"] = [];
-  for (const member of set.members) {
-    const version = await db.moduleVersion.findUnique({ where: { id: member.versionId } });
-    const module = await db.module.findFirst({ where: { id: member.moduleId, workspaceId: context.workspaceId } });
-    if (!version || !module || version.moduleId !== member.moduleId || version.hash !== member.hash) throw new StewardError("conflict", "Fixed candidate member is missing");
-    members.push({ ...member, status: candidateReceiptSchema.shape.members.element.shape.status.parse(version.status), selected: module.activeHash === member.hash });
-  }
+  for (const member of set.members) members.push(await receiptMemberView(context, db, set.state, member));
   const rejected = members.some(member => member.status === "rejected");
   const approved = members.every(member => member.status === "approved");
   let state = set.state;

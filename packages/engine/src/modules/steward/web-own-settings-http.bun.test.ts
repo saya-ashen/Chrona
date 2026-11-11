@@ -124,7 +124,7 @@ test("own-settings HTTP retains page revision and contract pins and input/output
 
 test("local own-settings dispatch cannot retain revoked approved-owner authority", async () => {
   await success(await f.request("web.ui-settings", savedArgs), saved);
-  await f.changeManifest({ ...f.manifest, uses: [] });
+  await f.changeManifest({ ...f.manifest, authority: undefined, uses: [] });
   for (const target of ["web.ui-settings", "web.ui-preferences"]) {
     expect((await f.request(target)).status).toBe(404);
   }

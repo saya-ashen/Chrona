@@ -16,7 +16,9 @@ import type { StewardPorts } from "./ports";
 
 const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
-const tool = (name: string, visibility = ["modules"]) => ({ name, description: name, visibility, parameters: { type: "object", properties: {} } });
+const tool = (name: string, visibility = ["modules"]) => ({ name, description: name, visibility, parameters: { type: "object", properties: {} },
+    output: {}
+});
 const targets = ["context-origin.observe", "context-origin.self", "context-origin.bounce", "context-peer.back"];
 
 /** Real admission, Run claim, router and supervisor; the wire peer only replaces application handlers. */
@@ -48,7 +50,7 @@ async function fixture() {
   await admitContextPrimitive(ports, principal, "run", { requestKey: "run", contextId: admitted.contextId, lane: "background", prompt: "offline", tools: targets, content: [] });
   const run = (await createRuns(ports, workspaceId).claimNext("background"))!;
   const context = (await contextRunTools(ports, run))!;
-  const invoke = (name: string, candidate = context) => callContextTool(ports, candidate, name, {}, Date.now() + 5000);
+  const invoke = (name: string, candidate = context) => callContextTool(ports, candidate, name, {}, { deadline: Date.now() + 5000 });
   return { db, ports, workspaceId, origin, other, run, context, principal, invoke };
 }
 
@@ -131,7 +133,7 @@ test("audit retention does not change context ownership, admitted tools or fixed
   expect(await f.invoke("m_context_origin_observe")).toMatchObject({ result: { caller: f.context.caller } });
   const event = await f.db.runEvent.findFirstOrThrow({ where: { runId: f.run.id, kind: "tool-result" } });
   expect(runToolResultSchema.parse((event.payload as { value: unknown }).value).contractHash).toMatch(/^[a-f0-9]{64}$/);
-  expect(event.payload).toMatchObject({ type: "tool-result", value: { runId: f.run.id, target: "context-origin.observe", moduleId: f.origin.id, hash: f.origin.activeHash, status: "succeeded", outputState: "complete", output: { caller: f.context.caller } } });
+  expect(event.payload).toMatchObject({ type: "tool-result", value: { runId: f.run.id, target: { moduleId: f.origin.id, tool: "observe" }, moduleId: f.origin.id, hash: f.origin.activeHash, status: "succeeded", outputState: "complete", output: { caller: f.context.caller } } });
   const page = await admitContextPrimitive(f.ports, f.principal, "stream", { runId: f.run.id, after: 0, limit: 10 }) as { items: { sequence: number; payload: unknown }[] };
   expect(page.items).toEqual([expect.objectContaining({ sequence: event.sequence, payload: event.payload })]);
 });

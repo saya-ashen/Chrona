@@ -189,7 +189,7 @@ test("SDK events preserve caller hash; source HTTP authenticates transport and p
     const identity = ${JSON.stringify(caller)}, definition = ${JSON.stringify(definition)}, registration = ${JSON.stringify(registration)};
     const inventory = [{id:'alpha-id',name:'alpha',status:'active',activeHash:'approved-v1'}];
     const tools = [{target:'alpha.play',moduleId:'alpha-id',contractHash:'${"a".repeat(64)}',inputSchema:{type:'object',properties:{title:{type:'string'}}}}];
-    const module = await startModule(${JSON.stringify(join(import.meta.dirname, "index.ts"))}, {stubs:{'modules.list':()=>inventory, 'modules.tools':()=>tools, 'alpha.play':args=>args}});
+    const module = await startModule(${JSON.stringify(join(import.meta.dirname, "index.ts"))}, {stubs:{'modules.list':()=>({items:inventory,nextCursor:null}), 'modules.describe':()=>({items:tools,nextCursor:null}), 'alpha.play':args=>args}});
     async function event(id,args,caller=identity) { return module.send({trigger:{kind:'tool',id,args,caller,firedAt:new Date().toISOString()},now:new Date().toISOString(),params:{}}); }
     try {
       const registered = await event('component-set',definition);
@@ -210,7 +210,7 @@ test("SDK events preserve caller hash; source HTTP authenticates transport and p
       const body = {target:'alpha.play',args:{title:'Play'},page:{module:'alpha',id:'main',revision:page.revision}};
       const call = body => module.fetch('/api/web/call',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
       assert.equal((await call(body)).status,200);
-      const routed = module.calls.findLast(call=>call.params.target==='alpha.play'); assert.deepEqual(routed.params.expectedTarget,{moduleId:'alpha-id',contractHash:'${"a".repeat(64)}'});
+      const routed = module.calls.findLast(call=>call.params.target?.moduleId==='alpha-id' && call.params.target?.tool==='play'); assert.deepEqual(routed.params.expectedTarget,{moduleId:'alpha-id',contractHash:'${"a".repeat(64)}'});
       assert.equal((await call({...body,target:'beta.play'})).status,409);
       assert.equal((await call({...body,page:{...body.page,revision:'old'}})).status,409);
       inventory[0].activeHash='approved-v2';

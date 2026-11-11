@@ -11,9 +11,9 @@ function appControls(node: Node, app: ListedApp) {
   const rows: string[] = [];
   if (app.activeHash && (app.status === "active" && app.capabilities.disable || app.status === "paused" && app.capabilities.enable)) {
     const paused = app.status === "paused", label = paused ? "恢复" : "暂停";
-    rows.push(node("SystemAction", { label, tool: paused ? "module-enable" : "module-disable", args: { id: app.name }, confirm: paused ? `恢复 ${app.name}？应用及随暂停停止的日程将恢复运行。` : `暂停 ${app.name}？应用和它的日程会停止，数据和文件会保留。` }));
+    rows.push(node("SystemAction", { label, tool: paused ? "module-enable" : "module-disable", args: { id: app.id }, confirm: paused ? `恢复 ${app.name}？应用及随暂停停止的日程将恢复运行。` : `暂停 ${app.name}？应用和它的日程会停止，数据和文件会保留。` }));
   }
-  if (app.activeHash && app.capabilities.remove && app.status !== "migrating") rows.push(node("AppRemoval", { name: app.name }));
+  if (app.activeHash && app.capabilities.remove && app.status !== "migrating") rows.push(node("AppRemoval", { moduleId: app.id, name: app.name }));
   return rows;
 }
 function appDescription(app: ListedApp) {

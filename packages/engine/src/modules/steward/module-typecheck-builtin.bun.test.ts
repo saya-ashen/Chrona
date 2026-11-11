@@ -62,7 +62,7 @@ test("detached Agent uses frozen ordinary dependencies for candidate checking", 
 
 test("ordinary Agent dependencies retain Pi options, missing imports and candidate output diagnostics", async () => {
   const f = await fixture(), entry = join(f.agent, "index.ts"), original = await readFile(entry, "utf8");
-  const caller = `${original}\nimport { chrona } from "chrona";\nconst registered: string = (await chrona.call("web.page-set", { id: "probe", title: "Probe", spec: {} })).id;\nvoid registered;\n`;
+  const caller = `${original}\nimport { chrona, type ChronaCalls } from "chrona";\nconst registered: string = (await chrona.call<ChronaCalls["web.page-set"]["output"]>({ moduleId: chrona.dependencies.web!, tool: "page-set" }, { id: "probe", title: "Probe", spec: {} })).id;\nvoid registered;\n`;
   await writeFile(entry, caller);
   const candidate = { moduleName: "web", manifest: f.web };
   const good = await typecheckBuild(f.context, f.agent, f.manifest, candidate);

@@ -47,12 +47,14 @@ async function fixture(definition = google, publicUrl: string | null = "https://
   }
   const args = { name, provider: definition.provider };
   async function authorize(account?: string) {
-    const started = await call("secrets.authorize", { ...args, scopes: definition.scopes.join(" "), ...(account ? { account } : {}) });
+    const started = await call("secrets.authorize", { ...args, scopes: definition.scopes, ...(account ? { account } : {}) });
     const url = new URL(started.url);
     return { started, url, state: url.searchParams.get("state")! };
   }
   async function owner() {
-    const manifest = moduleManifestSchema.parse({ name: "web", entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], uses: ["*"] });
+    const manifest = moduleManifestSchema.parse({ name: "web", entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], uses: ["*"],
+        authority: "owner"
+    });
     const page = await db.module.create({ data: { workspaceId, name: "web", activeHash: "page" } });
     await db.moduleVersion.create({ data: { moduleId: page.id, hash: "page", manifest, source: "provider", intent: {}, report: {}, status: "approved" } });
     return (target: string, args: Record<string, unknown>) => call(target, args, page.id);
@@ -105,7 +107,7 @@ test("PKCE/state, Google offline extras, bound callback, rotation and cache rema
   expect(visible.value).not.toHaveProperty("oauthBinding_work");
   expect(visible.value).not.toHaveProperty("refreshToken_work");
   expect(visible.value).not.toHaveProperty("clientSecret");
-  await expect(f.call("secrets.token", f.args)).rejects.toMatchObject({ code: "reauthorize" });
+  await expect(f.call("secrets.token", f.args)).rejects.toMatchObject({ code: "unavailable", reason: "reauthorize" });
   for (let i = 0; i < 2; i++) expect(await f.call("secrets.token", { ...f.args, account: "work" })).toMatchObject({ accessToken: "a-1" });
   expect(requests).toHaveLength(2);
   expect(requests.every(request => request.url === google.tokenUrl)).toBe(true);
@@ -129,21 +131,21 @@ test("credential names do not grant or block OAuth: qq_bot follows its approved 
   const where = { moduleId_hash: { moduleId: f.module.id, hash: "v1" } };
   const version = await f.db.moduleVersion.findUniqueOrThrow({ where });
   await f.db.moduleVersion.update({ where, data: { manifest: { ...moduleManifestSchema.parse(version.manifest), secrets: ["qq_bot"] } } });
-  await expect(f.call("secrets.authorize", { ...f.args, scopes: google.scopes.join(" ") })).rejects.toMatchObject({ code: "forbidden" });
+  await expect(f.call("secrets.authorize", { ...f.args, scopes: google.scopes })).rejects.toMatchObject({ code: "forbidden" });
   await expect(f.call("secrets.token", f.args)).rejects.toMatchObject({ code: "forbidden" });
 });
 
 test("entry authorization uses the approved manifest; credential edits clear bindings and metadata stays private", async () => {
   const f = await fixture(), owner = await f.owner();
-  const started = await owner("secrets.authorize", { ...f.args, scopes: google.scopes.join(" ") });
+  const started = await owner("secrets.authorize", { ...f.args, scopes: google.scopes });
   expect(new URL(started.url).origin).toBe("https://accounts.google.com");
   await expect(owner("secrets.token", f.args)).rejects.toMatchObject({ code: "forbidden" });
   await f.bound("work");
   const spec = { name: "mail_google", fields: [], oauth: google };
   expect(secretView(spec, await f.store.read("mail_google")).oauth!.authorized).toEqual(["work"]);
   expect(secretView({ ...spec, oauth: { ...google, tokenUrl: "https://changed.example/token" } }, await f.store.read("mail_google")).oauth!.authorized).toEqual([]);
-  for (const merge of [true, false]) await expect(owner("secrets.set", { name: "mail_google", merge, value: JSON.stringify({ oauthBinding_work: "forged" }) })).rejects.toMatchObject({ code: "invalid" });
-  await owner("secrets.set", { name: "mail_google", merge: true, value: JSON.stringify({ clientId: "new-client" }) });
+  for (const merge of [true, false]) await expect(owner("secrets.set", { name: "mail_google", merge, value: { oauthBinding_work: "forged" } })).rejects.toMatchObject({ code: "invalid" });
+  await owner("secrets.set", { name: "mail_google", merge: true, value: { clientId: "new-client" } });
   expect(await f.store.read("mail_google")).toEqual({ clientId: "new-client", clientSecret: "cs" });
   await f.bound();
   await owner("secrets.remove", { name: "mail_google", field: "clientSecret" });
@@ -155,7 +157,7 @@ test("entry authorization refuses ambiguous definitions for the same declared se
   const manifest = moduleManifestSchema.parse({ name: "other", entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], secrets: [{ name: "mail_google", oauth: { ...google, tokenUrl: "https://other.example/token" } }] });
   const module = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "other", activeHash: "v1" } });
   await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest, source: "provider", intent: {}, report: {}, status: "approved" } });
-  await expect(owner("secrets.authorize", { ...f.args, scopes: google.scopes.join(" ") })).rejects.toMatchObject({ code: "forbidden" });
+  await expect(owner("secrets.authorize", { ...f.args, scopes: google.scopes })).rejects.toMatchObject({ code: "forbidden" });
   expect(new URL((await f.authorize()).started.url).origin).toBe("https://accounts.google.com");
 });
 
@@ -165,9 +167,9 @@ test("undeclared OAuth authorization requires checked owner authority rather tha
   const where = { moduleId_hash: { moduleId: page.id, hash: "page" } };
   const version = await f.db.moduleVersion.findUniqueOrThrow({ where });
   const manifest = moduleManifestSchema.parse(version.manifest);
-  const args = { ...f.args, scopes: google.scopes.join(" ") };
+  const args = { ...f.args, scopes: google.scopes };
   for (const part of [{ uses: ["secrets.authorize"] }, { uses: ["chat.send"] }, { uses: [], listen: "/" }]) {
-    await f.db.moduleVersion.update({ where, data: { manifest: { ...manifest, ...part } } });
+    await f.db.moduleVersion.update({ where, data: { manifest: { ...manifest, authority: undefined, ...part } } });
     await expect(owner("secrets.authorize", args)).rejects.toMatchObject({ code: "forbidden" });
   }
   await f.db.moduleVersion.update({ where, data: { manifest, status: "candidate" } });
@@ -192,11 +194,11 @@ test("unbound legacy tokens and same-name endpoint changes never send credential
   const f = await fixture();
   const requests = provider(() => ({ json: { access_token: "a", expires_in: 3600 } }));
   await f.store.write("mail_google", { clientId: "cid", refreshToken: "legacy" });
-  await expect(f.call("secrets.token", f.args)).rejects.toMatchObject({ code: "reauthorize" });
+  await expect(f.call("secrets.token", f.args)).rejects.toMatchObject({ code: "unavailable", reason: "reauthorize" });
   await f.bound();
   await f.call("secrets.token", f.args);
   await f.update({ ...google, tokenUrl: "https://new.example/token" });
-  await expect(f.call("secrets.token", f.args)).rejects.toMatchObject({ code: "reauthorize" });
+  await expect(f.call("secrets.token", f.args)).rejects.toMatchObject({ code: "unavailable", reason: "reauthorize" });
   expect(requests).toHaveLength(1);
   await f.db.module.update({ where: { id: f.module.id }, data: { activeHash: "v1" } });
   await f.call("secrets.token", f.args);
@@ -237,7 +239,7 @@ test("concurrent refreshes coalesce, but credential replacement prevents token r
   await entered;
   await f.store.write("mail_google", { clientId: "new", refreshToken: "user" });
   release();
-  for (const reply of await result) expect(reply).toMatchObject({ status: "rejected", reason: { code: "reauthorize" } });
+  for (const reply of await result) expect(reply).toMatchObject({ status: "rejected", reason: { code: "unavailable", reason: "reauthorize" } });
   expect(requests).toBe(1);
   expect(await f.store.read("mail_google")).toEqual({ clientId: "new", refreshToken: "user" });
 });
@@ -265,7 +267,7 @@ for (const changed of ["none", "first", "second"] as const) test(`two modules sh
   release();
   const replies = await result;
   for (const [index, reply] of replies.entries()) {
-    if (changed === (index === 0 ? "first" : "second")) expect(reply).toMatchObject({ status: "rejected", reason: { code: "reauthorize" } });
+    if (changed === (index === 0 ? "first" : "second")) expect(reply).toMatchObject({ status: "rejected", reason: { code: "unavailable", reason: "reauthorize" } });
     else expect(reply).toMatchObject({ status: "fulfilled", value: { accessToken: "shared" } });
   }
   expect(requests).toBe(1);
@@ -290,7 +292,7 @@ test("definition changes separate in-flight work and reject late responses from 
   await f.bound("", next);
   expect(await f.call("secrets.token", f.args)).toMatchObject({ accessToken: next.tokenUrl });
   release();
-  expect((await oldResult)[0]).toMatchObject({ status: "rejected", reason: { code: "reauthorize" } });
+  expect((await oldResult)[0]).toMatchObject({ status: "rejected", reason: { code: "unavailable", reason: "reauthorize" } });
   expect(urls).toEqual([google.tokenUrl, next.tokenUrl]);
 });
 
@@ -303,13 +305,13 @@ test("callback rechecks definition after exchange before saving", async () => {
 
 test("denial, missing URL, undeclared scopes/provider and invalid_grant fail explicitly", async () => {
   const f = await fixture();
-  await expect(f.call("secrets.authorize", { ...f.args, scopes: "not-declared" })).rejects.toMatchObject({ code: "invalid" });
-  await expect(f.call("secrets.authorize", { ...f.args, provider: "microsoft", scopes: "x" })).rejects.toMatchObject({ code: "forbidden" });
+  await expect(f.call("secrets.authorize", { ...f.args, scopes: ["not-declared"] })).rejects.toMatchObject({ code: "invalid" });
+  await expect(f.call("secrets.authorize", { ...f.args, provider: "microsoft", scopes: ["x"] })).rejects.toMatchObject({ code: "forbidden" });
   const { state } = await f.authorize();
   expect(await completeOAuth(f.ports, { state, error: "access_denied" })).toMatchObject({ ok: false, message: "已取消授权。" });
   const missing = await fixture(google, null);
   await expect(missing.authorize()).rejects.toMatchObject({ code: "unavailable" });
   await f.bound();
   provider(() => ({ status: 400, json: { error: "invalid_grant" } }));
-  await expect(f.call("secrets.token", f.args)).rejects.toMatchObject({ code: "reauthorize" });
+  await expect(f.call("secrets.token", f.args)).rejects.toMatchObject({ code: "unavailable", reason: "reauthorize" });
 });

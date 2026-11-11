@@ -33,7 +33,7 @@ export async function pauseIn(context: ModuleContext, tx: Prisma.TransactionClie
   await assertExecutionModuleIdle(tx, moduleId);
   // The public scheduler is removed. Retire remaining calendar work instead of reviving it on enable.
   // A running delivery keeps its lease and outcome evidence; only undelivered occurrences can be cancelled.
-  const schedules = (await tx.schedule.findMany({ where: { workspaceId, moduleId, status: { in: ["active", "paused"] } }, select: { id: true } })).map(row => row.id);
+  const schedules = (await tx.schedule.findMany({ where: { workspaceId, moduleId, mode: { not: "timer" }, status: { in: ["active", "paused"] } }, select: { id: true } })).map(row => row.id);
   await tx.moduleInvocation.updateMany({ where: { workspaceId, target: module.name, mode: "schedule", status: "queued" }, data: { status: "cancelled", finishedAt: context.now(), error: "Module paused before delivery" } });
   await tx.module.update({ where: { id: moduleId }, data: { status: "paused" } });
   await tx.schedule.updateMany({ where: { workspaceId, moduleId, id: { in: schedules } }, data: { status: "cancelled", nextAt: null } });

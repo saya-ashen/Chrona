@@ -18,8 +18,8 @@ try {
   assert.equal(found.items[0].id, id);
   assert.match(found.items[0].content, /okx/);
   assert.equal((await ok("recall", { query: "concise replies" })).items.length, 1);
-  assert.equal(module.calls.filter((call: { params: { target: string } }) => call.params.target === "secrets.get").length, 1);
-  assert.equal(module.calls.some((call: { params: { target: string } }) => call.params.target === "provider.complete"), false);
+  assert.equal(module.calls.filter((call: { params: { target: string } }) => targetName(call.params.target) === "secrets.get").length, 1);
+  assert.equal(module.calls.some((call: { params: { target: string } }) => targetName(call.params.target) === "provider.complete"), false);
   assert.equal((await ok("forget", { id })).forgotten, true);
   assert.equal((await ok("recall", { query: "okx 自动" })).items.length, 0);
   // The router and SDK supply real module/owner/Provider identities; kernel proxy calls are gone.
@@ -39,3 +39,10 @@ try {
   const smoke = await module.send({ trigger: { kind: "tool", id: "recall", firedAt: "2026-10-27T12:00:00.000Z", args: {} }, now: "2026-10-27T12:00:00.000Z", params: {} });
   assert.deepEqual(smoke.result.result, { ignored: "no caller" });
 } finally { await module.stop(); }
+
+function targetName(raw: unknown): string {
+  if (typeof raw === "string") return raw;
+  const target = raw as { moduleId: string; tool: string };
+  const names: Record<string, string> = {};
+  return `${names[target.moduleId] ?? target.moduleId.replace(/-id$/, "")}.${target.tool}`;
+}

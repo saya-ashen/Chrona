@@ -48,8 +48,12 @@ async function fixture() {
           name, description: "Authenticated signal sender fixture", entry: "index.ts", effects: [], tests: ["test.ts"], uses: ["mind.signal", "mind.note", "mind.agenda"],
           tools: [
             { name: "emit", description: "Forward one bounded signal", visibility: ["owner"], parameters, output: { type: "object", properties: { signalId: { type: "string" }, associations: { type: "array", items: { type: "string" } }, duplicate: { type: "boolean" } }, required: ["signalId", "associations", "duplicate"], additionalProperties: false } },
-            { name: "attempt-note", description: "Attempt a mutation as this ordinary module", visibility: ["owner"], parameters },
-            { name: "attempt-agenda", description: "Attempt a private read as this ordinary module", visibility: ["owner"], parameters },
+            { name: "attempt-note", description: "Attempt a mutation as this ordinary module", visibility: ["owner"], parameters,
+                output: {}
+            },
+            { name: "attempt-agenda", description: "Attempt a private read as this ordinary module", visibility: ["owner"], parameters,
+                output: {}
+            },
           ],
         }));
         await writeFile(join(code, "index.ts"), `import { chrona, on, ModelError } from "chrona";
@@ -57,7 +61,7 @@ async function fixture() {
             const input = String(args.input);
             if (input.length > 32_000) throw new ModelError("invalid", "Signal fixture input exceeds 32000 characters");
             return { result: await chrona.call(
-              id === "emit" ? "mind.signal" : id === "attempt-note" ? "mind.note" : "mind.agenda",
+              { moduleId: chrona.dependencies.mind, tool: id === "emit" ? "signal" : id === "attempt-note" ? "note" : "agenda" },
               JSON.parse(input)
             ) };
           });`);
@@ -171,7 +175,7 @@ test("Mind rejects ordinary-module owner claims and loses revoked Web owner auth
   const before = await readFile(f.privateFile, "utf8");
   const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.web.id, hash: f.web.activeHash! } } });
   const manifest = moduleManifestSchema.parse(version.manifest);
-  await f.db.moduleVersion.update({ where: { id: version.id }, data: { manifest: { ...manifest, uses: [] } } });
+  await f.db.moduleVersion.update({ where: { id: version.id }, data: { manifest: { ...manifest, authority: undefined, uses: [] } } });
   for (const [target, input] of [["mind.note", args], ["mind.note", { ...args, "request-key": "revoked", title: "Unauthorized" }], ["mind.ui-agenda", {}], ["mind.ui-settings", { enabled: true }]] as const) {
     const response = await f.request(target, input);
     expect(response.status, await response.text()).toBe(404);

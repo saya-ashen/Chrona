@@ -2,7 +2,7 @@ import { fenceExecutionVersionChange } from "./execution-delivery-controls";
 import { join } from "node:path";
 import { z } from "zod";
 import type { Prisma } from "@chrona/db";
-import { moduleManifestSchema, secretNames } from "@chrona/contracts/steward";
+import { moduleManifestSchema } from "@chrona/contracts/steward";
 import type { ApprovedAction, StewardPorts } from "./ports";
 import { StewardError } from "./errors";
 import { createApprovals } from "./approvals";
@@ -15,7 +15,7 @@ import { audit } from "./audit";
 import { insertCodeDiff } from "./module-preview";
 import { activationNotice } from "./module-activation-notice";
 import { assertExternalModule } from "./module-identity";
-import { addsOAuthDefinitions } from "./oauth-definition";
+import { requiresCapabilityApproval } from "./module-owner";
 import { assertCandidateSetIn, findCandidateSet, readCandidateSetIn, setCandidateSetStateIn, type CandidateSet } from "./module-candidate-records";
 import { recordApprovalFact, recordWithdrawal } from "./notification-facts";
 import { ModuleIdentityError } from "./module-identity";
@@ -74,7 +74,7 @@ async function groupMember(db: Prisma.TransactionClient, workspaceId: string, se
   const active = module.activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } }) : null;
   const previous = active ? moduleManifestSchema.parse(active.manifest) : null;
   const manifest = moduleManifestSchema.parse(version.manifest);
-  const addsCredentials = secretNames(manifest).some(name => !previous || !secretNames(previous).includes(name)) || addsOAuthDefinitions(manifest, previous);
+  const addsCredentials = requiresCapabilityApproval(manifest, previous);
   return { module, version, name, hash, review, addsCredentials };
 }
 function checkedGroupNames(declared: string[], versions: { module: string; hash: string }[]) {
@@ -188,13 +188,12 @@ async function fixedVersionIn(tx: Prisma.TransactionClient, member: CandidateSet
   if (!version || version.moduleId !== member.moduleId || version.hash !== member.hash) throw new StewardError("conflict", `${member.name} fixed version changed`);
   return version;
 }
-/** Recheck migration and credential requirements against the current active version. */
-async function fixedMemberCapabilities(context: ModuleContext, tx: Prisma.TransactionClient, module: Awaited<ReturnType<typeof assertExternalModule>>, version: ModuleVersion, name: string) {
+/** Recheck capability approval requirements against the current active version. */
+async function fixedMemberCapabilities(tx: Prisma.TransactionClient, module: Awaited<ReturnType<typeof assertExternalModule>>, version: ModuleVersion) {
   const manifest = moduleManifestSchema.parse(version.manifest);
-  if (module.dataSchema !== null && manifest.data.schema > module.dataSchema && !await dataEmpty(join(context.platform, "data", module.id))) throw new StewardError("conflict", `${name} now needs a migration`);
   const active = module.activeHash ? await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } }) : null;
   const previous = active ? moduleManifestSchema.parse(active.manifest) : null;
-  return secretNames(manifest).some(name => !previous || !secretNames(previous).includes(name)) || addsOAuthDefinitions(manifest, previous);
+  return requiresCapabilityApproval(manifest, previous);
 }
 /** Readiness and all mutable activation facts are checked before any member is approved. */
 async function fixedMembersIn(context: ModuleContext, tx: Prisma.TransactionClient, set: CandidateSet) {
@@ -209,8 +208,8 @@ async function fixedMembersIn(context: ModuleContext, tx: Prisma.TransactionClie
     if (version.status !== "pending_review") throw new StewardError("conflict", `${member.name} is no longer waiting for review`);
     const review = reviewSchema.safeParse(await tx.moduleReview.findUnique({ where: { versionId: version.id }, select: { prefix: true, suffix: true, codeDiff: true, detail: true, needsMigration: true } })).data;
     if (!review) { ready = false; continue; }
-    if (review.needsMigration) throw new StewardError("conflict", `${member.name} needs a migration; fixed sets cannot partially migrate`);
-    const addsCredentials = await fixedMemberCapabilities(context, tx, module, version, member.name);
+    if (review.needsMigration && set.members.length !== 1) throw new StewardError("conflict", `${member.name} needs a migration; fixed sets cannot partially migrate`);
+    const addsCredentials = review.needsMigration || await fixedMemberCapabilities(tx, module, version);
     members.push({ module, version, name: member.name, hash: member.hash, review, addsCredentials });
   }
   return ready ? members : null;
@@ -254,7 +253,7 @@ async function requestFixedApprovalIn(context: ModuleContext, tx: Prisma.Transac
   const approval = await tx.approval.create({ data: {
     workspaceId: context.workspaceId, ...(single ? { moduleId: single.module.id } : {}), action: "activate_module",
     title: `启用模块 ${members.map(member => member.name).join("、")}`.slice(0, 200),
-    detail: "这组固定材料一起启用；任何成员失效时全部保持原样。此版本需要新的凭据。", preview,
+    detail: "这组固定材料一起启用；任何成员失效时全部保持原样。此版本需要新的凭据或 owner 权限。", preview,
     payload: single ? { kind: "activate_module", moduleId: single.module.id, hash: single.hash } : { kind: "activate_modules", versions: members.map(member => ({ moduleId: member.module.id, hash: member.hash })) },
     createdAt: context.now(),
   } });
@@ -277,26 +276,40 @@ async function recoverFixedApprovalIn(context: ModuleContext, tx: Prisma.Transac
   else if (!await activateFixedCandidateApprovedIn(context, tx, action)) throw new StewardError("conflict", "Approval does not bind a fixed candidate");
   return readCandidateSetIn(context, tx, set.receiptId);
 }
+/** Synchronize a single candidate with ordinary activation, or wait while its migration owns progress. */
+async function reconcileSingleFixedCandidateIn(context: ModuleContext, tx: Prisma.TransactionClient, set: CandidateSet): Promise<boolean> {
+  if (set.members.length !== 1) return false;
+  const member = set.members[0]!;
+  const module = await tx.module.findUnique({ where: { id: member.moduleId } });
+  const version = await tx.moduleVersion.findUnique({ where: { id: member.versionId } });
+  if (module?.activeHash === member.hash && version?.status === "approved") {
+    await setCandidateSetStateIn(context, tx, set, "approved", set.approvalId);
+    return true;
+  }
+  return module?.status === "migrating";
+}
 /** Runs after each recorded review/failure and during recovery; it never activates a subset. */
 export async function advanceFixedCandidateSet(context: ModuleContext, version: Pick<ModuleVersion, "id" | "moduleId" | "hash">): Promise<CandidateSet | null> {
   const found = await findCandidateSet(context, version);
   if (!found) return null;
   try {
-  const ready = await context.db.$transaction(async tx => {
-    const set = await readCandidateSetIn(context, tx, found.receiptId);
-    if (!set || set.state === "approved" || set.state === "rejected") return null;
-    const members = await fixedMembersIn(context, tx, set);
-    if (!members) return null;
-    if (set.state === "pending_approval") {
-      const approval = set.approvalId ? await tx.approval.findUnique({ where: { id: set.approvalId } }) : null;
-      return approval?.status === "approved" ? members : null;
-    }
-    return members.some(member => member.addsCredentials) ? null : members;
-  });
-  for (const member of ready ?? []) await fenceExecutionVersionChange(context.ports, context.workspaceId, member.module.id, member.hash);
+    const ready = await context.db.$transaction(async tx => {
+      const set = await readCandidateSetIn(context, tx, found.receiptId);
+      if (!set || set.state === "approved" || set.state === "rejected") return null;
+      if (await reconcileSingleFixedCandidateIn(context, tx, set)) return null;
+      const members = await fixedMembersIn(context, tx, set);
+      if (!members) return null;
+      if (set.state === "pending_approval") {
+        const approval = set.approvalId ? await tx.approval.findUnique({ where: { id: set.approvalId } }) : null;
+        return approval?.status === "approved" ? members : null;
+      }
+      return members.some(member => member.addsCredentials) ? null : members;
+    });
+    for (const member of ready ?? []) await fenceExecutionVersionChange(context.ports, context.workspaceId, member.module.id, member.hash);
     return await context.db.$transaction(async tx => {
       const set = await readCandidateSetIn(context, tx, found.receiptId);
       if (!set || set.state === "approved" || set.state === "rejected") return set;
+      if (set.members.length === 1 && (await tx.module.findUnique({ where: { id: set.members[0]!.moduleId } }))?.status === "migrating") return set;
       const members = await fixedMembersIn(context, tx, set);
       if (set.state === "pending_approval") return recoverFixedApprovalIn(context, tx, set);
       if (!members) return set;
@@ -330,16 +343,27 @@ async function approveFixedSetIn(context: ModuleContext, tx: Prisma.TransactionC
   }
   await activateFixedSetIn(context, tx, set, members, action.approvalId);
 }
+/** Recognize single-version activation fields without excluding extensions checked against the stored approval. */
+function isSingleActivationPayload(payload: ApprovedAction["payload"]): payload is { kind: "activate_module"; moduleId: string; hash: string } {
+  return !!payload && typeof payload === "object" && !Array.isArray(payload) && payload.kind === "activate_module" && typeof payload.moduleId === "string" && typeof payload.hash === "string";
+}
 /** Called before ordinary single activation. A single payload can never activate one member of a larger receipt. */
 export async function activateFixedCandidateApprovedIn(context: ModuleContext, tx: Prisma.TransactionClient, action: ApprovedAction): Promise<boolean> {
   const payload = action.payload;
-  if (!payload || typeof payload !== "object" || Array.isArray(payload) || payload.kind !== "activate_module" || typeof payload.moduleId !== "string" || typeof payload.hash !== "string") return false;
+  if (!isSingleActivationPayload(payload)) return false;
   const version = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: payload.moduleId, hash: payload.hash } } });
   if (!version) return false;
   const set = await fixedSetIn(context, tx, version);
   if (!set) return false;
   const approval = await tx.approval.findFirst({ where: { id: action.approvalId, workspaceId: context.workspaceId, action: "activate_module", status: "approved", moduleId: payload.moduleId } });
   if (!approval || JSON.stringify(approval.payload) !== JSON.stringify(payload) || "restore" in payload) throw new StewardError("conflict", "Module approval does not match the fixed candidate");
+  const members = await fixedMembersIn(context, tx, set);
+  if (set.members.length === 1 && members?.[0]?.review.needsMigration) {
+    await assertCandidateSetIn(context, tx, set);
+    if (!exactFixedPayload(set, [{ moduleId: version.moduleId, hash: version.hash }])) throw new StewardError("conflict", "Migration approval does not bind the fixed candidate");
+    await assertFixedExecutionIdle(tx, version.moduleId);
+    return false; // The existing approved single-version migration owns backup, actual stop and recovery.
+  }
   await approveFixedSetIn(context, tx, set, action, [{ moduleId: version.moduleId, hash: version.hash }]);
   return true;
 }

@@ -22,14 +22,14 @@ export function SystemAction({ props }: { props: { label: string; tool: string; 
     });
   }}>{action.pending ? "处理中……" : props.label}</button>{note ? <p role="status">{note}</p> : null}{action.error ? <p role="alert" className="error">{action.error}</p> : null}</div>;
 }
-export function AppRemoval({ props: { name } }: { props: { name: string } }) {
+export function AppRemoval({ props: { moduleId, name } }: { props: { moduleId: string; name: string } }) {
   const action = useAction(), [approvalId, setApprovalId] = useState(""), [approval, setApproval] = useState<ApprovalData | null>(null);
   return <div>
     {approvalId ? <div className="app-removal">
       <p>删除 {name} 及其数据、文件、日程和设置；删除前会自动备份。</p>
       {approval ? <Approval props={{ approval, destructive: true }} /> : <p role="status">删除申请已提交，尚未删除。请到<a href="/">今天的「待你决定」</a>批准或拒绝。</p>}
     </div> : <button type="button" className="danger" disabled={action.pending} onClick={() => void action.act(async () => {
-      const result = await action.call("module-remove", { id: name }) as { approvalId?: string };
+      const result = await action.call("module-remove", { id: moduleId }) as { approvalId?: string };
       if (!result.approvalId) throw new Error("未收到删除申请，请刷新查看待你决定。");
       setApprovalId(result.approvalId);
       const today = await action.call("today", {}) as { approvals: ApprovalData[] };

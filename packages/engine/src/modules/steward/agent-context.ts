@@ -7,6 +7,7 @@ import { CallError } from "./module-call-error";
 import { createRuns, createRunSession } from "./runs";
 import { createProviderControl, validateExecutionAnswer } from "./provider-channel";
 import { assertExecutionPrincipal } from "./execution-principal";
+import { moduleCallbackContractHash } from "./module-tool-contract";
 import { selectContextTools } from "./agent-context-tools";
 import { contextInteractions } from "./agent-context-read";
 import { providerAnswerSchema } from "@chrona/contracts/steward";
@@ -46,9 +47,10 @@ async function readContextPrimitive(ports: StewardPorts, principal: ModulePrinci
 export async function admitContextPrimitive(ports: StewardPorts, rawPrincipal: ExecutionPrincipal, name: string, args: Record<string, unknown>, settle = false) {
   const principal = modulePrincipal(rawPrincipal), { workspaceId } = principal;
   if (name === "get" || name === "stream") return readContextPrimitive(ports, principal, name, args);
+  let selection: Awaited<ReturnType<typeof selectContextTools>> | undefined;
   if (name === "run") {
-    const selection = await selectContextTools(ports, principal, args.tools as string[]);
-    if ((args.content as string[]).some(ref => !ref.startsWith(`${selection.caller.module}/`))) throw new CallError("forbidden", "Agent input content must belong to the originating module");
+    selection = await selectContextTools(ports, principal, args.tools as import("@chrona/contracts/steward").RoutedTarget[]);
+    if ((args.content as string[]).some(ref => !ref.startsWith(`${selection!.caller.module}/`))) throw new CallError("forbidden", "Agent input content must belong to the originating module");
   }
   let answer: ReturnType<typeof providerAnswerSchema.parse> | undefined;
   if (name === "respond") {
@@ -81,7 +83,7 @@ export async function admitContextPrimitive(ports: StewardPorts, rawPrincipal: E
       const active = await tx.run.findFirst({ where: { workspaceId, sessionId: context.id, OR: [{ status: { in: ["queued", "running"] } }, { stopStatus: "unknown" }] }, select: { id: true } });
       if (active) throw new CallError("conflict", "Agent context already has an active run");
       const run = await createRuns(ports, workspaceId).enqueue({ sessionId: context.id, lane: args.lane as "foreground" | "background", trigger: "source", prompt: String(args.prompt) }, tx);
-      await tx.agentRunAdmission.create({ data: { runId: run.id, moduleId: principal.caller.moduleId, hash: principal.caller.hash, targets: args.tools as string[], content: args.content as string[] } });
+      await tx.agentRunAdmission.create({ data: { runId: run.id, moduleId: principal.caller.moduleId, hash: principal.caller.hash, targets: selection!.entries.map(entry => ({ target: `${entry.module.name}.${entry.tool.name}`, moduleId: entry.module.id, contractHash: moduleCallbackContractHash(entry.tool) })), content: args.content as string[] } });
       output = view(run);
     } else {
       const run = await ownedRun(tx, principal, String(args.runId));

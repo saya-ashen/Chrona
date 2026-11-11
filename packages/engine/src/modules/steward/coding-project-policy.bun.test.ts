@@ -22,7 +22,7 @@ async function makeFixture() {
     const projects = registries.get(caller) ?? [{ projectRef: `${caller}-repo`, path: `/fixture/${caller}`, label: `${caller} project` }];
     registries.set(caller, projects);
     const context: CodingContext = { dir: join(root, caller), content: join(root, caller, "public"), async call<T>(target: string, raw: Record<string, unknown>): Promise<T> {
-      expect(target).toBe("agent.projects"); calls.push({ caller, args: structuredClone(raw) });
+      expect(target).toBe("agent.work-projects"); calls.push({ caller, args: structuredClone(raw) });
       // These are the actual Agent schemas: list is tagged, register takes only
       // path, create takes only name. Caller identity is supplied by routing.
       const parsed = projectsInput.safeParse(raw);

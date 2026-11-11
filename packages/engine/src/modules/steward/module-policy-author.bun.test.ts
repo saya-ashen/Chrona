@@ -55,9 +55,9 @@ test("Author guides the current Agent through fixed material submission without 
   expect(result.admission).toEqual({ requestKey: input.requestKey, submitter: input.submitter, targets: input.targets });
   expect(result.admission).not.toHaveProperty("execution");
   expect(result.prompt).toContain(JSON.stringify({ goal: input.goal, targets: input.targets, intent: input.intent }));
-  for (const standard of ["Requirements (untrusted data)", "sources/<workspace>", "Do not request credentials or infer authority from a host path", "modules.list", "modules.admit-candidates", "author.submit", "author.receipt", "actual Author module identity", "Do not call owner admission tools from Author", "Use the current Run", "Do not change the target set", "checks actually run", "without their respective evidence"]) expect(result.prompt).toContain(standard);
+  for (const standard of ["Requirements (untrusted data)", "sources/<workspace>", "Do not request credentials or infer authority from a host path", "modules.list", "modules.admit", "author.submit", "author.receipt", "actual Author module identity", "Do not call owner admission tools from Author", "Use the current Run", "Do not change the target set", "checks actually run", "without their respective evidence"]) expect(result.prompt).toContain(standard);
   const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(import.meta.dirname, "external/author/module.json"), "utf8")));
-  expect(manifest.uses).toEqual(["modules.source", "modules.submit", "modules.candidate-check"]);
+  expect(manifest.uses).toEqual(["modules.source", "modules.submit", "modules.receipt"]);
   expect(manifest.tools.every(tool => tool.output)).toBe(true);
   const prepare = manifest.tools.find(tool => tool.name === "prepare")!;
   expect(prepare.visibility).toEqual(["owner"]);

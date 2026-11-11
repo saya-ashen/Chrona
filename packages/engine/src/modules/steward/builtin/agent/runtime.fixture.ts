@@ -154,25 +154,25 @@ if (["projects", "projects-artifact"].includes(scenario)) {
   for (const request of [{ action: "list" }, { action: "register", path: project.path }, { action: "create", name: "project" }]) {
     const output = request.action === "list" ? { action: "list", principal, projects: [project] } : { action: request.action, principal, project };
     admit = args => { assert.deepEqual(args, { callId: "actual-call", operation: "projects" }); return output; };
-    assert.deepEqual(await moduleTool("projects", request, "actual-call"), output);
+    assert.deepEqual(await moduleTool("work-projects", request, "actual-call"), output);
   }
   const count = calls.length;
   for (const args of [{}, { action: "list", path: "/forged" }, { action: "register" }, { action: "create", name: "x", moduleId: "forged" }, { action: "list", input: "{}" }]) {
-    await assert.rejects(moduleTool("projects", args), { code: "invalid" });
+    await assert.rejects(moduleTool("work-projects", args), { code: "invalid" });
   }
   for (const trigger of [
-    { id: "projects", args: { action: "list" }, caller },
-    { id: "projects", args: { action: "list" }, caller: { kind: "owner" }, call: { id: "owner" } },
-    { id: "projects", args: { action: "list" }, caller: { kind: "kernel" }, call: { id: "kernel" } },
+    { id: "work-projects", args: { action: "list" }, caller },
+    { id: "work-projects", args: { action: "list" }, caller: { kind: "owner" }, call: { id: "owner" } },
+    { id: "work-projects", args: { action: "list" }, caller: { kind: "kernel" }, call: { id: "kernel" } },
   ]) await assert.rejects(handler(trigger), { code: "forbidden" });
   assert.equal(calls.length, count);
   admit = () => ({ action: "list", principal, projects: Array(101).fill(project) });
-  await assert.rejects(moduleTool("projects", { action: "list" }), { code: "invalid" });
+  await assert.rejects(moduleTool("work-projects", { action: "list" }), { code: "invalid" });
   admit = () => ({ action: "register", principal, project: { ...project, path: "x".repeat(8193) } });
-  await assert.rejects(moduleTool("projects", { action: "register", path: project.path }), { code: "invalid" });
+  await assert.rejects(moduleTool("work-projects", { action: "register", path: project.path }), { code: "invalid" });
   admit = () => ({ action: "list", principal: { ...principal, caller: { kind: "owner" } }, projects: [] });
-  await assert.rejects(moduleTool("projects", { action: "list" }), { code: "invalid" });
+  await assert.rejects(moduleTool("work-projects", { action: "list" }), { code: "invalid" });
   admit = () => { throw new Error("unavailable: Host project management unavailable"); };
-  await assert.rejects(moduleTool("projects", { action: "list" }), { code: "unavailable" });
+  await assert.rejects(moduleTool("work-projects", { action: "list" }), { code: "unavailable" });
   assert.equal(starts, 0); assert.deepEqual(completions, []);
 }

@@ -159,6 +159,8 @@ model ModuleCall {
   key String
   status String
   error String?
+  inputTokens Int?
+  outputTokens Int?
   createdAt DateTime @default(now())
   module Module? @relation(fields: [moduleId], references: [id], onDelete: SetNull)
   @@index([moduleId, method, key, status])
@@ -177,6 +179,8 @@ model ModuleInvocation {
   runId String?
   run Run? @relation(fields: [runId], references: [id], onDelete: SetNull)
   target String
+  /// Stable routed identity; private non-routed records may omit it.
+  targetIdentity String @default("")
   targetBound Boolean @default(false)
   targetModuleId String?
   targetHash String?
@@ -184,6 +188,8 @@ model ModuleInvocation {
   tool String
   args Json
   key String
+  /// Canonical input digest; sensitive arguments are not retained.
+  requestDigest String?
   /// Module names on the call path, the caller last.
   chain Json @default(dbgenerated("'[]'"))
   mode String
@@ -195,15 +201,20 @@ model ModuleInvocation {
   leaseToken String?
   leaseUntil DateTime?
   output Json?
+  /// Lifecycle status is separate from the immutable submission receipt.
+  operationOutput Json?
   error String?
+  errorCode String?
+  errorReason String?
   reply Boolean @default(false)
   replyAttempts Int @default(0)
   repliedAt DateTime?
   createdAt DateTime @default(now())
   finishedAt DateTime?
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  @@unique([workspaceId, caller, target, tool, key])
+  @@unique([workspaceId, caller, targetIdentity, tool, key])
   @@index([workspaceId, status, nextAttemptAt])
+  @@index([workspaceId, mode, createdAt])
   @@index([workspaceId, reply, repliedAt])
   @@index([runId, status])
 }

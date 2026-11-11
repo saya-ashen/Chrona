@@ -18,16 +18,18 @@ const application = {
   budget: { ...local.budget, "max-model-calls": 2, "max-output-tokens": 100 },
 };
 
+const publicInput = ({ ["request-key"]: _key, ...args }: Record<string, unknown>) => args;
+
 test("generated Agent manifest admits local and application runs while SDK validation stays strict", async () => {
   const root = await mkdtemp(join(tmpdir(), "chrona-agent-build-contract-"));
   try {
     await buildAgentApplication(root);
     const generated = JSON.parse(await readFile(join(root, "module.json"), "utf8"));
     expect(generated).toEqual(JSON.parse(await readFile(join(import.meta.dir, "../../packages/engine/src/modules/steward/builtin/agent/module.json"), "utf8")));
-    const run = moduleManifestSchema.parse(generated).tools.find(tool => tool.name === "run")!;
+    const run = moduleManifestSchema.parse(generated).tools.find(tool => tool.name === "work-run")!;
     for (const input of [local, application]) {
-      expect(validateToolArgs(run, input)).toEqual(input);
-      expect(() => primitiveInput("run", validateToolArgs(run, input))).not.toThrow();
+      expect(validateToolArgs(run, publicInput(input))).toEqual(publicInput(input));
+      expect(() => primitiveInput("run", { ...validateToolArgs(run, publicInput(input)), "request-key": input["request-key"] })).not.toThrow();
     }
     // Branch-only requirements cannot be expressed by manifest parameters; the SDK still enforces them.
     const { "max-output-tokens": _tokens, ...incompleteBudget } = application.budget;
@@ -40,7 +42,7 @@ test("generated Agent manifest admits local and application runs while SDK valid
       { ...local, placement: { ...local.placement, "application-id": "runner" } },
       { ...local, budget: { ...local.budget, "max-model-calls": 2 } },
     ]) {
-      expect(() => validateToolArgs(run, input)).not.toThrow();
+      expect(() => validateToolArgs(run, publicInput(input))).not.toThrow();
       expect(() => primitiveInput("run", input)).toThrow();
     }
     const { "timeout-ms": _timeout, ...missingSharedLimit } = local.budget;
@@ -50,13 +52,13 @@ test("generated Agent manifest admits local and application runs while SDK valid
       { ...local, budget: missingSharedLimit },
       { ...local, budget: { ...local.budget, "timeout-ms": "5000" } },
     ]) {
-      expect(() => validateToolArgs(run, input)).toThrow();
+      expect(() => validateToolArgs(run, publicInput(input))).toThrow();
       expect(() => primitiveInput("run", input)).toThrow();
     }
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
-test("Agent input object unions merge recursively inside arrays and reject incompatible leaf types", () => {
+test("Agent input object unions merge recursively inside arrays and preserve mixed leaf unions", () => {
   const object = (properties: Record<string, ReturnType<typeof parameters>>, required = Object.keys(properties)) => ({ type: "object", properties, required });
   const string = { type: "string" }, number = { type: "number" };
   const union = (left: unknown, right: unknown) => ({ anyOf: [left, right] });
@@ -64,6 +66,6 @@ test("Agent input object unions merge recursively inside arrays and reject incom
     object({ entries: { type: "array", items: object({ shared: string, local: number }) } }),
     object({ entries: { type: "array", items: object({ shared: string, application: number }) } }),
   ))).toEqual(object({ entries: { type: "array", items: object({ shared: string, local: number, application: number }, ["shared"]) } }));
-  expect(() => parameters(union(object({ field: string }), object({ field: number })))).toThrow("Incompatible Agent input parameter types");
-  expect(() => parameters(union(object({ field: string }), object({ field: object({}) })))).toThrow("Incompatible Agent input parameter types");
+  expect(parameters(union(object({ field: string }), object({ field: number })))).toEqual(object({ field: { type: ["string", "number"] } }));
+  expect(parameters(union(object({ field: string }), object({ field: object({}) })))).toEqual(object({ field: { anyOf: [string, object({})] } }));
 });

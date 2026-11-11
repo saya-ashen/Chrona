@@ -9,10 +9,10 @@ function fixture(failure?: { target: string; code: string }) {
     if (target === failure?.target) throw Object.assign(new Error("read failed"), { code: failure.code });
     switch (target) {
       case "activity.runtime": return { at: "2026-11-08T00:00:00Z", queuedRuns: 2 };
-      case "approvals.list": return [{ id: "approval" }];
+      case "approvals.list": return { items: [{ id: "approval" }], nextCursor: null };
       case "notify.list": return { items: [{ id: "notice", format: "private", body: "提醒" }] };
       case "notify.status": return { queued: 3, failed: 1 };
-      case "modules.list": return [{ id: "app", name: "example", status: "active" }];
+      case "modules.list": return { items: [{ id: "app", name: "example", status: "active" }], nextCursor: null };
       case "modules.health": return args?.cursor ? { items: [{ module: "closed", open: false }], nextCursor: null }
         : { items: [{ module: "example", moduleId: "app", open: true, incident: { status: "unresolved", lastAt: "2026-11-07" }, contractFailureCount: 2, nextAction: "检查应用" }], nextCursor: "next" };
       default: throw new Error(`Unexpected ${target}`);
@@ -28,7 +28,7 @@ test("Today composes app facts and foreground sessions without a schedule API or
     problems: [{ module: "example", incidentStatus: "unresolved", contractFailures: 2 }], health: { queuedRuns: 2, queuedNotifications: 3, failedNotifications: 1 } });
   expect(view.updates[0]).not.toHaveProperty("format");
   expect(view.sessions).toEqual(sessions.slice(0, 20));
-  expect(f.calls).toContainEqual(["modules.health", { open: "true", cursor: "next" }]);
+  expect(f.calls).toContainEqual(["modules.health", { limit: 100, cursor: "next" }]);
   expect(f.calls.some(([target]) => target.startsWith("schedules.") || target.startsWith("modules.build-"))).toBe(false);
 });
 

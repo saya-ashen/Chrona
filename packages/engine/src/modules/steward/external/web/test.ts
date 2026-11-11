@@ -10,9 +10,28 @@ const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 255]);
 // @ts-expect-error Chrona supplies the test kernel at run time.
 import { startModule } from "chrona/testing";
 
+/** Read complete SSE frames until the requested reply arrives, allowing earlier reconciliation events. */
+async function readReply(reader: ReadableStreamDefaultReader<Uint8Array>, session: string, message: string) {
+  const decoder = new TextDecoder();
+  let chunk = "";
+  for (;;) {
+    const part = await reader.read();
+    assert.equal(part.done, false, "Reply stream ended before the target reply");
+    chunk += decoder.decode(part.value, { stream: true });
+    let boundary: number;
+    while ((boundary = chunk.indexOf("\n\n")) !== -1) {
+      const frame = chunk.slice(0, boundary); chunk = chunk.slice(boundary + 2);
+      const event = frame.split("\n").filter(line => line.startsWith("data: "))
+        .map(line => JSON.parse(line.slice(6)))
+        .find(item => item.type === "reply" && item.session === session && item.message === message);
+      if (event) return event;
+    }
+  }
+}
+
 type Args = Record<string, unknown>;
 const calls: [string, Args][] = [];
-const stub = (target: string, answer: (args: Args) => unknown) => [target, (args: Args) => { calls.push([target, args]); return answer(args); }] as const;
+const stub = (target: string, answer: (args: Args, options: { key?: string }) => unknown) => [target, (args: Args, options: { key?: string }) => { calls.push([target, args]); return answer(args, options); }] as const;
 let inventoryFailure = false;
 const inventory = [{ id: "m-files", name: "files", status: "active", activeHash: "h" }, { id: "m-p", name: "planning", status: "active", activeHash: "h" }];
 let filesContract = "a".repeat(64);
@@ -20,10 +39,10 @@ let execution = { status: "queued", active: true }, phase = "", earlyText = fals
 const admissions = new Map<string, { digest: string; runId: string; status: string; active: boolean }>();
 const module = await startModule("index.ts", { stubs: Object.fromEntries([
   stub("activity.runtime", () => ({ at: "2026-10-27T04:00:00Z", provider: { name: "fixture", available: false, sandboxed: false, lastError: null }, moduleSandbox: false, queuedRuns: 0, runningRuns: 0, failedRunsToday: 0, dueSchedules: 0, lastTickAt: null })),
-  stub("approvals.list", () => []), stub("modules.health", () => ({ items: [], nextCursor: null })), stub("notify.list", () => ({ items: [] })), stub("notify.status", () => ({ queued: 0, failed: 0 })),
+  stub("approvals.list", () => ({ items: [], nextCursor: null })), stub("modules.health", () => ({ items: [], nextCursor: null })), stub("notify.list", () => ({ items: [] })), stub("notify.status", () => ({ queued: 0, failed: 0 })),
   stub("agent.context", () => ({ contextId: "context-author" })),
-  stub("agent.run", args => {
-    const key = String(args["request-key"]), digest = JSON.stringify(args);
+  stub("agent.run", (args, options) => {
+    const key = String(options.key), digest = JSON.stringify(args);
     if (admissions.has(key)) assert.equal(admissions.get(key)!.digest, digest);
     else admissions.set(key, { digest, runId: `run-author-${admissions.size + 1}`, status: "queued", active: true });
     const { digest: _digest, ...run } = admissions.get(key)!; return run;
@@ -34,9 +53,9 @@ const module = await startModule("index.ts", { stubs: Object.fromEntries([
   stub("modules.disable", () => ({ status: "paused" })),
   stub("modules.enable", () => ({ status: "active" })),
   stub("modules.remove", () => ({ status: "pending_approval", approvalId: "remove-1" })),
-  stub("modules.diagnostics", args => [{ moduleId: args.module, incidents: [] }]),
+  stub("modules.health", args => ({ items: [{ moduleId: args.moduleId, incidents: [] }], nextCursor: null })),
   stub("notify.activity", args => ({ items: [{ id: "x", at: "2026-10-27T04:42:00.000Z", kind: "module_activate", module: "web", text: "web 已切换到版本 5caef53c" }], before: null, args })),
-  stub("modules.tools", args => {
+  stub("modules.describe", args => {
     const tools = [
       ...[{ target: "files.list", description: "List", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: [] }, idempotent: true },
         { target: "files.read-image", description: "Read image", inputSchema: { type: "object", properties: { ref: { type: "string" } }, required: ["ref"] }, idempotent: true },
@@ -48,14 +67,14 @@ const module = await startModule("index.ts", { stubs: Object.fromEntries([
       ...(args.audience === "user" ? [] : [{ target: "agent.run", moduleId: "agent" }]),
     ];
     // Search may return a related contract; forwarding must still require the exact target.
-    if (args.query === "planning.missing") return tools.filter(tool => tool.target === "planning.get");
-    return tools.filter(tool => !args.query || tool.target.includes(String(args.query)));
+    if (args.query === "planning.missing") return { items: tools.filter(tool => tool.target === "planning.get"), nextCursor: null };
+    return { items: tools.filter(tool => !args.query || tool.target.includes(String(args.query))), nextCursor: null };
   }),
-  stub("modules.list", () => inventoryFailure ? null : inventory),
+  stub("modules.list", () => ({ items: inventoryFailure ? null : inventory, nextCursor: null })),
   stub("modules.rollback", () => ({ status: "pending_approval", approvalId: "rollback-1" })),
   stub("planning.get", () => ({ plan: 1 })),
-  stub("settings.get", () => ({ timezone: "UTC", runTimeoutMinutes: null, moduleModel: null, modelUsage: [] })), stub("notify.settings", () => ({ settings: {} })),
-  stub("secrets.list", () => [{ name: "okx_demo", configured: false, updatedAt: null, modules: ["okx-ai-trader"] }]), stub("secrets.set", args => ({ name: args.name, configured: true })), stub("secrets.remove", args => ({ name: args.name, configured: false })), stub("secrets.authorize", () => ({ url: "https://accounts.example/auth", redirectUri: "https://chrona.example/oauth/callback", expiresAt: "2026-11-02T04:00:00Z" })),
+  stub("activity.usage", () => ({ items: [], nextCursor: null })), stub("settings.get", () => ({ timezone: "UTC", runTimeoutMinutes: null, moduleModel: null, wake: { minIntervalMs: 60000, dailyLimit: 1000, moduleDailyLimit: 100 } })), stub("notify.settings", () => ({ settings: {} })),
+  stub("secrets.list", () => ({ items: [{ name: "okx_demo", configured: false, updatedAt: null, modules: ["okx-ai-trader"] }], nextCursor: null })), stub("secrets.set", args => ({ name: args.name, configured: true })), stub("secrets.remove", args => ({ name: args.name, configured: false })), stub("secrets.authorize", () => ({ url: "https://accounts.example/auth", redirectUri: "https://chrona.example/oauth/callback", expiresAt: "2026-11-02T04:00:00Z" })),
   stub("settings.update", args => args), stub("agent.configure", () => ({ config: null, ready: false })),
   stub("files.read-image", args => {
     if (args.ref === "files/missing.png") return null;
@@ -97,11 +116,11 @@ try {
   // The data API answers from routed calls.
   assert.deepEqual((await (await get("/api/web/today")).json()).approvals, []);
   assert.deepEqual(await (await get("/api/web/modules/a1/diagnostics")).json(), [{ moduleId: "a1", incidents: [] }]);
-  assert.deepEqual(calls.at(-1), ["modules.diagnostics", { module: "a1" }]);
+  assert.deepEqual(calls.at(-1), ["modules.health", { moduleId: "a1", detail: true }]);
   assert.equal((await (await get("/api/web/activity?module=web&before=2026-10-27T05:00:00.000Z")).json()).items[0].text, "web 已切换到版本 5caef53c");
   assert.deepEqual(calls.at(-1), ["notify.activity", { module: "web", before: "2026-10-27T05:00:00.000Z" }]);
   assert.equal((await (await get("/api/web/system-apps?module=modules")).json()).name, "modules");
-  assert.deepEqual(calls.at(-1), ["modules.tools", {}]);
+  assert.deepEqual(calls.at(-1), ["modules.describe", {}]);
   const overview = await (await get("/api/web/modules/m-files/overview")).json();
   assert.equal(overview.kind, "app"); assert.equal(overview.app.name, "files"); assert.ok(overview.tools.some((tool: Args) => tool.target === "files.list"));
   assert.equal((await get("/api/web/modules/missing/overview")).status, 404);
@@ -110,7 +129,7 @@ try {
   for (const operation of ["disable", "enable", "remove"]) {
     const result = await post(`/api/web/modules/example/${operation}`, { reason: "untrusted replacement" });
     assert.equal(result.status, 200);
-    assert.deepEqual(calls.at(-1), [`modules.${operation}`, { module: "example", reason: operation === "remove" ? "用户在网页申请删除应用" : "用户在网页操作" }]);
+    assert.deepEqual(calls.at(-1), [`modules.${operation}`, { moduleId: "example", reason: operation === "remove" ? "用户在网页申请删除应用" : "用户在网页操作" }]);
     await lifecycle(`$web.module-${operation}`, { id: "app/name" });
     assert.deepEqual(lifecycleCalls.at(-1), [`/modules/app%2Fname/${operation}`, { method: "POST", body: {} }]);
     assert.equal((await get(`/api/web/modules/example/${operation}`)).status, 404);
@@ -151,7 +170,8 @@ try {
   assert.equal(admissions.size, 2);
   const runRequests = calls.filter(([target]) => target === "agent.run");
   assert.equal(runRequests.length, 2);
-  assert.notEqual(runRequests[0]![1]["request-key"], runRequests[1]![1]["request-key"]);
+  const wireRuns = module.calls.filter((call: {params: Args}) => targetName(call.params.target) === "agent.run");
+  assert.notEqual(wireRuns[0].params.key, wireRuns[1].params.key);
   assert.equal(runRequests[0]![1]["context-id"], runRequests.at(-1)![1]["context-id"]);
   assert.match(String(runRequests.at(-1)![1].prompt), /Inspect the current state and prior tool outcomes/);
   execution = { status: "queued", active: true };
@@ -164,8 +184,8 @@ try {
   await post("/api/web/approvals/a1/resolve", { decision: "deny" });
   assert.deepEqual(calls.at(-1), ["approvals.resolve", { approval: "a1", decision: "deny" }]);
   assert.deepEqual(await (await post("/api/web/call", { target: "planning.get", args: {} })).json(), { plan: 1 });
-  assert.deepEqual(calls.at(-2), ["modules.tools", { query: "planning.get", audience: "user" }]);
-  assert.deepEqual(module.calls.findLast((call: { method: string; params: Args }) => call.method === "call" && call.params.target === "planning.get")?.params.expectedTarget, { moduleId: "m-p", contractHash: "b".repeat(64) });
+  assert.deepEqual(calls.at(-2), ["modules.describe", { query: "planning.get", audience: "user" }]);
+  assert.deepEqual(module.calls.findLast((call: { method: string; params: Args }) => call.method === "call" && targetName(call.params.target) === "planning.get")?.params.expectedTarget, { moduleId: "m-p", contractHash: "b".repeat(64) });
   assert.equal((await post("/api/web/call", { target: "approvals.resolve", args: {} })).status, 404);
   assert.equal((await post("/api/web/call", { target: "$web.resolve", args: {} })).status, 404);
   assert.equal((await get("/api/web/nope")).status, 404);
@@ -176,18 +196,18 @@ try {
   for (const path of ["/catalog", "/schedules", "/sessions/build-1/messages", "/sessions/build-1/transcript"]) assert.equal((await get(`/api/web${path}`)).status, 404);
   assert.equal(calls.length, beforeRetired);
   await get("/api/web/tools?query=planning");
-  assert.deepEqual(calls.at(-1), ["modules.tools", { query: "planning", audience: "user" }]);
+  assert.deepEqual(calls.at(-1), ["modules.describe", { query: "planning", audience: "user" }]);
   const userTools = await (await get("/api/web/tools?audience=caller")).json() as { target: string }[];
   assert.ok(userTools.some(tool => tool.target === "agent.configure"));
   assert.ok(!userTools.some(tool => tool.target === "agent.run"));
-  assert.deepEqual(calls.at(-1), ["modules.tools", { audience: "user" }]);
+  assert.deepEqual(calls.at(-1), ["modules.describe", { audience: "user" }]);
   for (const target of ["agent.run", "planning.missing", "planning.private", "runtime-callback.agent-admit"]) {
     const before = module.calls.length;
     assert.equal((await post("/api/web/call", { target, args: {} })).status, 404);
-    assert.equal(module.calls.slice(before).some((call: { method: string; params: Args }) => call.method === "call" && call.params.target === target), false);
+    assert.equal(module.calls.slice(before).some((call: { method: string; params: Args }) => call.method === "call" && targetName(call.params.target) === target), false);
   }
   // Global Settings governs kernel budgets only; applications save through their own pages.
-  assert.deepEqual(await (await get("/api/web/settings")).json(), { settings: { timezone: "UTC", runTimeoutMinutes: null, moduleModel: null, modelUsage: [] } });
+  assert.deepEqual(await (await get("/api/web/settings")).json(), { settings: { timezone: "UTC", runTimeoutMinutes: null, moduleModel: null, modelUsage: [], wake: { minIntervalMs: 60000, dailyLimit: 1000, moduleDailyLimit: 100 } } });
   const beforeOwnSettings = calls.length;
   for (const body of [{ memory: { provider: "memory-local", autoRecall: false, autoRetain: false } }, { agent: { clear: true } }, { notifications: { dailyCap: 3 } }]) {
     assert.equal((await post("/api/web/settings", body)).status, 400);
@@ -196,13 +216,13 @@ try {
   // Credentials (v2-16): written through, never echoed; not reachable through the generic call route.
   assert.deepEqual(await (await post("/api/web/secrets/okx_demo", { value: { apiKey: "k" } })).json(), { name: "okx_demo", configured: true });
   // The page merges: fields it leaves out keep their saved values.
-  assert.deepEqual(calls.at(-1), ["secrets.set", { name: "okx_demo", value: JSON.stringify({ apiKey: "k" }), merge: true }]);
+  assert.deepEqual(calls.at(-1), ["secrets.set", { name: "okx_demo", value: { apiKey: "k" }, merge: true }]);
   await post("/api/web/secrets/okx_demo/remove", {});
   assert.deepEqual(calls.at(-1), ["secrets.remove", { name: "okx_demo" }]);
   await post("/api/web/secrets/okx_demo/remove", { field: "apiKey" });
   assert.deepEqual(calls.at(-1), ["secrets.remove", { name: "okx_demo", field: "apiKey" }]);
   await post("/api/web/secrets/okx_demo/authorize", { provider: "google", scopes: "s1 s2", account: "work" });
-  assert.deepEqual(calls.at(-1), ["secrets.authorize", { name: "okx_demo", provider: "google", scopes: "s1 s2", account: "work" }]);
+  assert.deepEqual(calls.at(-1), ["secrets.authorize", { name: "okx_demo", provider: "google", scopes: ["s1", "s2"], account: "work" }]);
   assert.equal((await post("/api/web/call", { target: "secrets.set", args: {} })).status, 404);
   assert.equal((await post("/api/web/settings", { builds: { dailyLimit: 20 } })).status, 400);
   for (const invalid of [null, [], { sessions: {} }, { notifications: null }, { builds: [] }, { memory: { autoRecall: "yes" } }]) assert.equal((await post("/api/web/settings", invalid)).status, 400);
@@ -222,22 +242,23 @@ try {
   await checkAttachments(get, post, calls);
 
   // A pushed reply reaches an open page.
-  const stream = await get("/api/web/events");
+  const stream = await get("/api/web/events", { signal: AbortSignal.timeout(10_000) });
   assert.equal(stream.headers.get("content-type"), "text/event-stream");
   const reader = stream.body!.getReader();
   await new Promise(resolve => setTimeout(resolve, 100));
+  // Existing conversations may emit reconciliation replies before this reply.
+  await module.send({ trigger: { kind: "tool", id: "reply", firedAt: new Date().toISOString(), args: { session: "background", message: "prior", text: "earlier reply", workspace: "w" } }, now: new Date().toISOString(), params: {} });
   const reply = await module.send({ trigger: { kind: "tool", id: "reply", firedAt: new Date().toISOString(), args: { session: "s1", message: "m2", text: "hello", workspace: "w" } }, now: new Date().toISOString(), params: {} });
   assert.match(JSON.stringify(reply), /"pages":1/);
-  // Heartbeat pings may come first.
-  let chunk = "";
-  while (!chunk.includes("data: ")) chunk += new TextDecoder().decode((await reader.read()).value);
-  assert.match(chunk, /"type":"reply"/); assert.match(chunk, /"text":"hello"/);
-  await reader.cancel();
+  try {
+    const event = await readReply(reader, "s1", "m2");
+    assert.equal(event.text, "hello");
+  } finally { await reader.cancel(); }
 
   // Lifecycle rollback retains its protected route.
   assert.equal((await post("/api/web/call", { target: "modules.build", args: {} })).status, 404);
   assert.equal((await post("/api/web/modules/example/rollback", { hash: "a".repeat(64) })).status, 200);
-  assert.deepEqual(calls.at(-1), ["modules.rollback", { module: "example", hash: "a".repeat(64) }]);
+  assert.deepEqual(calls.at(-1), ["modules.rollback", { moduleId: "example", hash: "a".repeat(64), reason: "用户在网页回滚应用" }]);
 
   // Apps register pages (module-dependency-direction §4): owned by the recorded caller, checked against the catalog and the app's own tools.
   const tool = (id: string, args: Args, caller?: unknown) => module.send({ trigger: { kind: "tool", id, firedAt: new Date().toISOString(), args, caller }, now: new Date().toISOString(), params: {} });
@@ -263,7 +284,7 @@ try {
   const page = await (await get("/api/web/pages/files/main")).json();
   const pageCall = { target: "files.list", args: { path: "" }, page: { module: "files", id: "main", revision: page.revision } };
   assert.equal((await post("/api/web/call", pageCall)).status, 200);
-  assert.deepEqual(module.calls.findLast((call: { method: string; params: Args }) => call.method === "call" && call.params.target === "files.list")?.params.expectedTarget, { moduleId: "m-files", contractHash: "a".repeat(64) });
+  assert.deepEqual(module.calls.findLast((call: { method: string; params: Args }) => call.method === "call" && targetName(call.params.target) === "files.list")?.params.expectedTarget, { moduleId: "m-files", contractHash: "a".repeat(64) });
   assert.equal((await post("/api/web/call", { ...pageCall, page: { ...pageCall.page, revision: "stale" } })).status, 409);
   assert.equal((await post("/api/web/call", { ...pageCall, target: "planning.get" })).status, 409);
   assert.equal(page.data.list.tool, "list"); assert.equal(page.spec.elements.remove.on.press.params.tool, "delete");
@@ -288,7 +309,7 @@ try {
   assert.equal(calls.filter(([target]) => target === "files.read-image").length, before); // Rejected before the owner's tool.
   await checkRasterContent(get, png);
   assert.deepEqual(calls.at(-1), ["files.read-image", { ref: "files/picture.png" }]);
-  assert.deepEqual(module.calls.findLast((call: { method: string; params: Args }) => call.method === "call" && call.params.target === "files.read-image")?.params.expectedTarget, { moduleId: "m-files", contractHash: "a".repeat(64) });
+  assert.deepEqual(module.calls.findLast((call: { method: string; params: Args }) => call.method === "call" && targetName(call.params.target) === "files.read-image")?.params.expectedTarget, { moduleId: "m-files", contractHash: "a".repeat(64) });
   inventory[0]!.status = "paused";
   assert.equal((await get(imageUrl + "files%2Fpicture.png")).status, 409);
   assert.equal((await get("/api/web/pages/files/main")).status, 409);
@@ -311,3 +332,10 @@ try {
   assert.equal((await get("/api/web/pages/files/main")).status, 404);
   assert.match(JSON.stringify(await tool("catalog", {}, files)), /"Button"/);
 } finally { await module.stop(); }
+
+function targetName(raw: unknown): string {
+  if (typeof raw === "string") return raw;
+  const target = raw as { moduleId: string; tool: string };
+  const names: Record<string, string> = {"m-p":"planning","m-files":"files","agent":"agent"};
+  return `${names[target.moduleId] ?? target.moduleId.replace(/-id$/, "")}.${target.tool}`;
+}

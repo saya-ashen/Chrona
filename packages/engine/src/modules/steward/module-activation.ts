@@ -13,6 +13,7 @@ import { activateFixedCandidateApprovedIn, activateGroupIn } from "./module-grou
 import { removeApproved } from "./module-remove";
 import { moduleRemovePayloadSchema } from "./module-remove-payload";
 import { assertExternalModule } from "./module-identity";
+import { completeApprovedOperations, completeApprovedOperationsIn } from "./module-operation-result";
 
 function parseRestore(value: Prisma.JsonValue | undefined): Restore | undefined {
   if (value === undefined) return;
@@ -61,6 +62,10 @@ function approvalVersions(payload: ApprovedAction["payload"]) {
   return group?.versions ?? (single?.kind === "activate_module" && single.moduleId && single.hash ? [{ moduleId: single.moduleId, hash: single.hash }] : []);
 }
 export async function onApproved(context: ModuleContext, action: ApprovedAction) {
+  await applyApproved(context, action);
+  await completeApprovedOperations(context.ports, context.workspaceId, action.approvalId);
+}
+async function applyApproved(context: ModuleContext, action: ApprovedAction) {
   const approval = await context.db.approval.findFirst({ where: { id: action.approvalId, workspaceId: context.workspaceId, status: "approved" } });
   if (!approval || action.workspaceId !== context.workspaceId || JSON.stringify(approval.payload) !== JSON.stringify(action.payload)) throw new StewardError("conflict", "Module approval does not match");
   const versions = approvalVersions(action.payload);
@@ -70,7 +75,7 @@ export async function onApproved(context: ModuleContext, action: ApprovedAction)
   const prepared = await context.db.$transaction(tx => activateApprovedIn(context, tx, action));
   if (!prepared) return;
   const payload = action.payload as Prisma.JsonObject, restore = parseRestore(payload.restore);
-  await migrateData(context, prepared, restore ? "rollback" : "activate", restore);
+  await migrateData(context, prepared, restore ? "rollback" : "activate", restore, tx => completeApprovedOperationsIn(tx, context.workspaceId, action.approvalId));
 }
 async function prepareRollback(context: ModuleContext, tx: Prisma.TransactionClient, moduleId: string, hash: string) {
   const module = await assertExternalModule(tx, context.workspaceId, moduleId, "rollback");

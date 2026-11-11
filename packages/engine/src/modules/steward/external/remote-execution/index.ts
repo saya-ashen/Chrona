@@ -1,3 +1,4 @@
+import { applicationCall } from "./kernel-client";
 import { chrona, ModelError, on, onDisconnect } from "chrona";
 import { RemoteExecutionApp } from "./app";
 import { check, ProtocolError, readStored, type Delivery } from "./contracts";
@@ -5,7 +6,7 @@ import { RoutedKernelPort } from "./kernel-port";
 import { Store } from "./store";
 
 const store = new Store(chrona.paths.data);
-const kernel = new RoutedKernelPort((target, args) => chrona.call(target, args), deliveryId => {
+const kernel = new RoutedKernelPort((target, args) => applicationCall(target, args), deliveryId => {
   const row = store.delivery(deliveryId); check(row, "not_found");
   return readStored<Delivery>("delivery", row.envelope).packet.target;
 });

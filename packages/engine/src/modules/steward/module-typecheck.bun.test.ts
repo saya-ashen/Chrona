@@ -34,7 +34,7 @@ async function moduleWith(dir: string, code: string) {
 
 test("calls.json declares module-callable system schemas and excludes Provider-only tools", async () => {
   const f = await fixture(), calls = await callsContracts(f.ports, f.workspaceId);
-  expect(calls["approvals.list"]!.output).toMatchObject({ type: "array", items: { type: "object", properties: { id: { type: "string" } } } });
+  expect(calls["approvals.list"]!.output).toMatchObject({ type: "object", properties: { items: { type: "array", items: { type: "object", properties: { id: { type: "string" } } } } } });
   expect(calls["approvals.status"]!.input).toMatchObject({ type: "object", properties: { approval: { type: "string" } }, required: ["approval"] });
   expect(calls["approvals.status"]!.output).toHaveProperty("properties.resolvedAt");
   expect(Object.keys(calls).some(target => target.startsWith("schedules."))).toBe(false);
@@ -47,29 +47,35 @@ test("build type check: contracts pass, wrong fields, arguments and guessed type
   const good = await moduleWith(f.dir, `import { chrona, on } from "chrona";
 on("tool", async () => {
   const approvals = await chrona.call("approvals.list");
-  for (const approval of approvals) await chrona.call("approvals.status", { approval: approval.id });
-  const other = await chrona.call<{ ok: boolean }>("planning.get", { id: "p" });
-  await chrona.call<{ delivered: number }>("events.emit", { event: "e" });
-  return { result: other.ok };
+  for (const approval of approvals.items) await chrona.call("approvals.status", { approval: approval.id });
+  const other = await chrona.call<{ ok: boolean }>({ moduleId: "planning-id", tool: "get" }, { id: "p" });
+  await chrona.call<{ delivered: number }>({ moduleId: "events-id", tool: "emit" }, { event: "e" });
+  const queued = await chrona.call({ moduleId: "events-id", tool: "emit" }, { event: "e" }, { mode: "async", key: "emit-once" });
+  const queuedId: string = queued.callId;
+  return { result: { ok: other.ok, queuedId } };
 });
 `);
-  // An active app's tool without a declared output: its result is unknown, so stating the expected type is fine.
+  // An open JSON output contract stays unknown unless the caller states its expected result.
   await f.ports.db.module.create({ data: { workspaceId: f.workspaceId, name: "events", status: "active", activeHash: "e1",
     versions: { create: { hash: "e1", status: "approved", source: "builtin", manifest: moduleManifestSchema.parse({ name: "events", entry: "index.ts", tests: ["test.ts"], effects: [],
-      tools: [{ name: "emit", description: "Emit", parameters: { type: "object", properties: { event: { type: "string" } }, required: ["event"] }, visibility: ["modules"] }] }), intent: { changes: ["t"] }, report: {} } } } });
-  expect((await callsContracts(f.ports, f.workspaceId))["events.emit"]).toEqual({ input: { type: "object", properties: { event: { type: "string" } }, required: ["event"] }, output: null });
+      tools: [{ name: "emit", description: "Emit", parameters: { type: "object", properties: { event: { type: "string" } }, required: ["event"] }, visibility: ["modules"],
+          output: {}
+    }] }), intent: { changes: ["t"] }, report: {} } } } });
+  expect((await callsContracts(f.ports, f.workspaceId))["events.emit"]).toEqual({ input: { type: "object", properties: { event: { type: "string" } }, required: ["event"] }, output: {} });
   await f.ports.db.module.create({ data: { workspaceId: f.workspaceId, name: "typed-app", status: "active", activeHash: "t1",
     versions: { create: { hash: "t1", status: "approved", source: "user", manifest: moduleManifestSchema.parse({ name: "typed-app", entry: "index.ts", tests: ["test.ts"], effects: [],
       tools: [{ name: "read", description: "Read", parameters: { type: "object", properties: {}, required: [] }, visibility: ["modules"], output: { type: "object", properties: { value: { type: "string" } }, required: ["value"], additionalProperties: false } },
-        { name: "legacy", description: "Legacy", parameters: { type: "object", properties: {}, required: [] }, visibility: ["modules"] }] }), intent: {}, report: {} } } } });
+        { name: "legacy", description: "Legacy", parameters: { type: "object", properties: {}, required: [] }, visibility: ["modules"],
+            output: {}
+        }] }), intent: {}, report: {} } } } });
   const appCalls = await callsContracts(f.ports, f.workspaceId);
   expect(appCalls["typed-app.read"]!.output).toEqual({ type: "object", properties: { value: { type: "string" } }, required: ["value"], additionalProperties: false });
-  expect(appCalls["typed-app.legacy"]!.output).toBeNull();
+  expect(appCalls["typed-app.legacy"]!.output).toEqual({});
   expect(await typecheckBuild(context, f.dir, good)).toEqual({ status: "passed" });
 
   const bad = await moduleWith(f.dir, `import { chrona } from "chrona";
 const approvals = await chrona.call("approvals.list");
-approvals[0]?.ids;
+approvals.items[0]?.ids;
 await chrona.call("approvals.status", { approval: 1 });
 await chrona.call<{ guessed: true }>("approvals.list");
 `);
@@ -89,17 +95,17 @@ test("a Python entry or a missing type check is skipped, never a failure", async
 
 test("build helpers render readonly declarations externally and run the declared check", async () => {
   const f = await fixture();
-  const calls = { "x.y": { input: { type: "object" }, output: { const: 1 } } };
+  const calls = { "settings.get": { input: { type: "object" }, output: { const: 1 } } };
   await writeBuildHelpers(f.dir, f.ports.moduleSdk!, { calls, typecheck: f.ports.moduleTypecheck!, runtimes });
   const pkg = join(f.dir, "node_modules/chrona"), declaration = await readFile(join(pkg, "calls.d.ts"), "utf8");
-  expect(declaration).toContain('"x.y": { args: {  }; output: 1 }');
+  expect(declaration).toContain('"settings.get": { args: {  }; output: 1 }');
   expect(JSON.parse(await readFile(join(pkg, "calls.json"), "utf8"))).toEqual(calls);
   if (process.platform !== "win32") for (const file of ["calls.d.ts", "calls.json"]) expect((await stat(join(pkg, file))).mode & 0o777).toBe(0o444);
   const moduleDir = join(f.dir, "module with spaces");
   await mkdir(moduleDir);
-  await moduleWith(moduleDir, 'import { chrona } from "chrona"; const value: 1 = await chrona.call("x.y"); void value;');
+  await moduleWith(moduleDir, 'import { chrona } from "chrona"; const value: 1 = await chrona.call("settings.get"); void value;');
   expect(await runHelper(f.dir, "typecheck", moduleDir)).toMatchObject({ code: 0, stderr: "" });
-  await writeFile(join(moduleDir, "index.ts"), 'import { chrona } from "chrona"; const value: 2 = await chrona.call("x.y"); void value;');
+  await writeFile(join(moduleDir, "index.ts"), 'import { chrona } from "chrona"; const value: 2 = await chrona.call("settings.get"); void value;');
   const failed = await runHelper(f.dir, "typecheck", moduleDir);
   expect(failed.code).toBe(1);
   expect(JSON.parse(failed.stdout).errors).toEqual(expect.arrayContaining([expect.objectContaining({ code: 2322 })]));
@@ -118,7 +124,7 @@ test("affected caller type checks use candidate output contracts without modifyi
   await f.ports.db.module.create({ data: { workspaceId: f.workspaceId, name: "target", status: "active", activeHash: "target-old",
     versions: { create: { hash: "target-old", status: "approved", source: "user", manifest: moduleManifestSchema.parse({ name: "target", entry: "index.ts", tests: ["test.ts"], effects: [],
       tools: [{ name: "read", description: "Read", parameters: { type: "object", properties: {}, required: [] }, visibility: ["modules"], output: oldOutput }] }), intent: {}, report: {} } } } });
-  const caller = await moduleWith(f.dir, `import { chrona } from "chrona";\nconst result = await chrona.call("target.read");\nconst value: string = result.value;\nvoid value;\n`);
+  const caller = await moduleWith(f.dir, `import { chrona, type ChronaCalls } from "chrona";\nconst result = await chrona.call<ChronaCalls["target.read"]["output"]>({ moduleId: chrona.dependencies.target!, tool: "read" });\nconst value: string = result.value;\nvoid value;\n`);
   expect(await typecheckBuild(context, f.dir, caller)).toMatchObject({ status: "passed" });
   const candidate = moduleManifestSchema.parse({ name: "target", entry: "index.ts", tests: ["test.ts"], effects: [],
     tools: [{ name: "read", description: "Read", parameters: { type: "object", properties: {}, required: [] }, visibility: ["modules"], output: candidateOutput }] });
@@ -163,7 +169,7 @@ console.log("diagnostic preamble"); console.log(JSON.stringify({ errors: [], tot
   expect(await run()).toEqual({ status: "passed" });
   const receipt = JSON.parse(await readFile(join(moduleDir, "receipt.json"), "utf8"));
   expect(receipt.literal).toBe(literal);
-  expect(receipt.contracts["approvals.list"].output.type).toBe("array");
+  expect(receipt.contracts["approvals.list"].output.properties.items.type).toBe("array");
   await expect(stat(receipt.sdk)).rejects.toThrow();
   registry.runtimes[0]!.check!.programs = { default: ["missing-chrona-interpreter", process.execPath] };
   expect(await run()).toEqual({ status: "passed" });
@@ -178,11 +184,13 @@ console.log("diagnostic preamble"); console.log(JSON.stringify({ errors: [], tot
 test("candidate contracts replace removed tools and preserve JSON schemas", async () => {
   const f = await fixture();
   const manifest = moduleManifestSchema.parse({ name: "target", entry: "main.py", tests: ["test.py"], effects: [], tools: [
-    { name: "removed", description: "Removed", parameters: { type: "object" }, visibility: ["modules"] },
+    { name: "removed", description: "Removed", parameters: { type: "object" }, visibility: ["modules"],
+        output: {}
+    },
   ] });
   await f.ports.db.module.create({ data: { workspaceId: f.workspaceId, name: "target", status: "active", activeHash: "old",
     versions: { create: { hash: "old", status: "approved", source: "user", manifest, intent: {}, report: {} } } } });
-  expect((await callsContracts(f.ports, f.workspaceId))["target.removed"]).toEqual({ input: manifest.tools[0]!.parameters, output: null });
+  expect((await callsContracts(f.ports, f.workspaceId))["target.removed"]).toEqual({ input: manifest.tools[0]!.parameters, output: {} });
   const candidate = moduleManifestSchema.parse({ ...manifest, tools: [
     { name: "added", description: "Added", parameters: { type: "object", properties: { nested: { type: "array", items: { type: "string", enum: ["one", "two"] } } } }, output: { type: "object", properties: { value: { type: "array", items: { type: "integer" } } }, required: ["value"], additionalProperties: false }, visibility: ["modules"] },
   ] });

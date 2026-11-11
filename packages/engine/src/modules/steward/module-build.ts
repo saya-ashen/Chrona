@@ -1,3 +1,4 @@
+import { requiresCapabilityApproval } from "./module-owner";
 import { moduleMaterialDigest, moduleMaterialRecord, snapshotModuleMaterial } from "./module-artifacts";
 import { activationNotice } from "./module-activation-notice";
 export { activationNotice } from "./module-activation-notice";
@@ -13,9 +14,8 @@ import { assertExternalModule, ModuleIdentityError } from "./module-identity";
 import { ModuleUnavailableError } from "./module-availability";
 import { createHash } from "node:crypto";
 import { chmod, mkdir, rename, rm } from "node:fs/promises";
-import { addsOAuthDefinitions } from "./oauth-definition";
 import { join, relative } from "node:path";
-import { isEntryModule, listenPaths, moduleManifestSchema, secretNames } from "@chrona/contracts/steward";
+import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { createApprovals } from "./approvals";
 import { notifyLifecycle } from "./notify-user";
 import { intentSchema, groupPayloadSchema, json, requireModule, expireModuleApprovals, type ModuleContext, type ModuleVersion, type BuildReport, type Proposal } from "./module-context";
@@ -111,8 +111,7 @@ async function supersedeCandidates(context: ModuleContext, moduleId: string, has
 /** New credential declarations require the owner's confirmation. */
 function addsCredentials(version: ModuleVersion, active: ModuleVersion | null) {
   const manifest = moduleManifestSchema.parse(version.manifest), previous = active ? moduleManifestSchema.parse(active.manifest) : null;
-  const had = previous ? secretNames(previous) : [];
-  return secretNames(manifest).some(name => !had.includes(name)) || addsOAuthDefinitions(manifest, previous);
+  return requiresCapabilityApproval(manifest, previous);
 }
 /** Checks passed and nothing needs the owner: activate now and tell them afterwards. */
 async function activateChecked(context: ModuleContext, { version, module }: Review, update: boolean) {
@@ -152,7 +151,7 @@ async function requestReview(context: ModuleContext, review: Review): Promise<Pr
     return { moduleId: module.id, hash, status: "rejected", report };
   }
   const card = { moduleId: module.id, action: "activate_module" as const, title: `启用模块 ${module.name}`,
-    detail: review.needsMigration ? "此版本需要迁移已有数据" : addsCredentials(version, active) ? "此版本需要新的凭据" : "与同一构建的其他应用一起启用", payload: { kind: "activate_module" as const, moduleId: module.id, hash }, preview };
+    detail: review.needsMigration ? "此版本需要迁移已有数据" : addsCredentials(version, active) ? "此版本需要新的凭据或 owner 权限" : "与同一构建的其他应用一起启用", payload: { kind: "activate_module" as const, moduleId: module.id, hash }, preview };
   // v2-15: one module of a group build waits for the group's single approval (modules.request-group), never alone or automatically.
   const group = await groupReview(context, review, { ...parts, detail: card.detail, needsMigration: review.needsMigration });
   if (group) return group;
@@ -170,11 +169,7 @@ async function modelManifestError(context: ModuleContext, manifest: ReturnType<t
 }
 async function validateBuildManifest(context: ModuleContext, version: ModuleVersion, manifest: ReturnType<typeof moduleManifestSchema.parse>, report: BuildReport) {
   const { db } = context;
-  let error: string | null = null;
-  const missingOutput = manifest.tools.find(tool => tool.visibility.some(value => value === "owner" || value === "modules") && !tool.output);
-  if (missingOutput) error = `Public tool ${missingOutput.name} must declare an output schema`;
-  if (!error) error = manifest.tools.map(moduleToolExampleError).find((value): value is string => value !== null) ?? null;
-  if (!error && listenPaths(manifest).length && !isEntryModule(manifest)) error = "listen is only for entry modules (web, MCP): expose tools instead; the web module shows them";
+  let error = manifest.tools.map(moduleToolExampleError).find((value): value is string => value !== null) ?? null;
   if (!error) error = await modelManifestError(context, manifest);
   if (!error) return null;
   report.errors = [error];

@@ -148,16 +148,16 @@ test.each([299, 300, 301, 800])("%i-character incident reasons satisfy routed he
   const healthCall = await callSync(f.ports, origin, "modules.health", {});
   const health = moduleHealthOutputSchema.parse(healthCall.output);
   expect(health.items[0]).toMatchObject({ incident: { reason: reason.slice(0, 300) }, truncated: length > 300, open: true });
-  const diagnosticsCall = await callSync(f.ports, origin, "modules.diagnostics", { module: "example" });
-  const diagnostics = moduleDiagnosticsOutputSchema.parse(diagnosticsCall.output);
+  const diagnosticsCall = await callSync(f.ports, origin, "modules.health", { moduleId: f.module.id, detail: true });
+  const diagnostics = moduleDiagnosticsOutputSchema.parse((diagnosticsCall.output as { items: unknown }).items);
   expect(diagnostics[0]!.incident).toEqual(health.items[0]!.incident);
   expect(diagnostics[0]!.truncated).toBe(length > 300);
   expect(diagnostics[0]!.incidents[0]).toMatchObject({ firstEvidence: { reason }, evidence: { reason }, attempts: [{ detail: reason }] });
   const listed = await createModules(f.ports, f.workspace.id).list();
   expect(listed[0]!.health).toEqual(health.items[0]!);
   // Exercise another legitimate routed request after both diagnostic outputs were validated.
-  const next = await callSync(f.ports, origin, "modules.tools", { query: "modules.health" });
-  expect(next.output).toEqual(expect.arrayContaining([expect.objectContaining({ target: "modules.health" })]));
+  const next = await callSync(f.ports, origin, "modules.describe", { query: "modules.health" });
+  expect(next.output).toMatchObject({ items: expect.arrayContaining([expect.objectContaining({ target: "modules.health" })]) });
   const invocations = await f.db.moduleInvocation.findMany({ where: { id: { in: [healthCall.callId, diagnosticsCall.callId, next.callId] } } });
   expect(invocations).toHaveLength(3);
   expect(invocations.every(item => item.status === "succeeded")).toBe(true);
@@ -168,8 +168,8 @@ test("long incident summaries redact credentials before clipping and retain deta
   const prefix = "x".repeat(285), suffix = " y".repeat(200);
   await f.fail({ evidence: { ...evidence, reason: `${prefix} password=private-example${suffix}` } });
   const origin = { workspaceId: f.workspace.id, caller: { kind: "owner" as const, via: null }, chain: [], path: [] };
-  const output = (await callSync(f.ports, origin, "modules.diagnostics", { module: "example" })).output;
-  const [view] = moduleDiagnosticsOutputSchema.parse(output);
+  const output = (await callSync(f.ports, origin, "modules.health", { moduleId: f.module.id, detail: true })).output;
+  const [view] = moduleDiagnosticsOutputSchema.parse((output as { items: unknown }).items);
   expect(view).toMatchObject({ truncated: true, incident: { reason: `${prefix} credential=[Re` } });
   expect(view!.incident!.reason).toHaveLength(300);
   const detailed = `${prefix} credential=[Redacted]${suffix}`;
@@ -234,10 +234,10 @@ test("detailed diagnostics admit Provider, owner and available modules without a
     const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [], uses: [] });
     await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: name, manifest, source: "user", status: "approved", report: {}, intent: {} } });
     const origin = { workspaceId: f.workspace.id, caller: { kind: "module" as const, moduleId: module.id, module: name, hash: name }, chain: [], path: [] };
-    const request = callSync(f.ports, origin, "modules.diagnostics", { module: "example" });
-    expect((await request).output).toMatchObject([{ module: "example", incidents: [{ failures: 1 }] }]);
+    const request = callSync(f.ports, origin, "modules.health", { moduleId: f.module.id, detail: true });
+    expect((await request).output).toMatchObject({ items: [{ module: "example", incidents: [{ failures: 1 }] }] });
   }
   for (const caller of [{ kind: "owner" as const, via: null }, { kind: "provider" as const, runId: "test-run" }]) {
-    expect((await callSync(f.ports, { workspaceId: f.workspace.id, caller, chain: [], path: [] }, "modules.diagnostics", {})).output).toBeArray();
+    expect((await callSync(f.ports, { workspaceId: f.workspace.id, caller, chain: [], path: [] }, "modules.health", {} )).output).toMatchObject({ items: expect.any(Array) });
   }
 });

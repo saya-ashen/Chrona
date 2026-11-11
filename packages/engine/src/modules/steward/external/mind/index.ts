@@ -1,3 +1,4 @@
+import { applicationCall } from "./kernel-client";
 import { chrona, on, onDisconnect, ModelError } from "chrona";
 import { z } from "zod";
 import { MAIN_PAGE } from "./page";
@@ -10,14 +11,14 @@ import type { Tool } from "./types";
 
 const store = new MindStore(chrona.paths.data);
 const service = new MindService(store);
-const runtime = new MindRuntime(store, (target, args, options) => chrona.call(target, args, options));
+const runtime = new MindRuntime(store, (target, args, options) => applicationCall(target, args, options));
 let pagesReady = false, registering = false;
 async function registerPages() {
   if (pagesReady || registering) return;
   registering = true;
   try {
     for (const page of [MAIN_PAGE, SETTINGS_PAGE]) {
-      const result = await chrona.call("web.page-set", page);
+      const result = await chrona.call({ moduleId: chrona.dependencies["web"]!, tool: "page-set" }, page);
       if (result && typeof result === "object" && "error" in result) throw new Error("Web rejected a Mind page");
     }
     pagesReady = true;

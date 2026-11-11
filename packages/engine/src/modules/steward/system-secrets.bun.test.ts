@@ -23,7 +23,7 @@ async function fixture(name: string) {
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest, source: "provider", intent: {}, report: {}, status: "approved" } });
   const caller: Extract<Caller, { kind: "module" }> = { kind: "module", moduleId: module.id, module: manifest.name, hash: "v1" };
   const ports: StewardPorts = { db, dataDir, now: () => new Date(), publicUrl: null };
-  const direct = (identity: Caller = caller, tool = "get", args: Record<string, unknown> = { name }, workspace = workspaceId) => secrets.handle({ ports, workspaceId: workspace, caller: identity }, tool, args);
+  const direct = (identity: Caller = caller, tool = "get", args: Record<string, unknown> = { name }, workspace = workspaceId) => secrets.handle({ ports, workspaceId: workspace, caller: identity }, tool, args).then(value => tool === "list" ? (value as { items: unknown }).items : value);
   const routed = (tool = "get", args: Record<string, unknown> = { name }, identity: Caller = caller) => callSync(ports, { workspaceId, caller: identity, chain: [], path: [] }, `secrets.${tool}`, args);
   return { db, ports, dataDir, workspaceId, module, manifest, where, caller, direct, routed, store: createSecrets(dataDir) };
 }
@@ -38,7 +38,7 @@ for (const name of ["qq_bot", "other_service"]) {
     expect(hostReads).toEqual([]);
     expect((await f.routed()).output).toEqual({ value: { appId: "host-id", clientSecret: "host-private" } });
     expect(hostReads).toEqual([name]);
-    await f.routed("set", { name, value: JSON.stringify({ appId: "saved-id", clientSecret: "saved-private" }) }, owner);
+    await f.routed("set", { name, value: { appId: "saved-id", clientSecret: "saved-private" } }, owner);
     expect((await f.routed()).output).toEqual({ value: { appId: "saved-id", clientSecret: "saved-private" } });
     expect(hostReads).toEqual([name]);
     await f.routed("remove", { name }, owner);
@@ -80,13 +80,15 @@ for (const name of ["qq_bot", "other_service"]) {
 test("credential declarations and exact uses do not grant owner management authority", async () => {
   const f = await fixture("qq_bot");
   await f.db.moduleVersion.update({ where: f.where, data: { manifest: { ...f.manifest, uses: ["secrets.set", "secrets.list", "secrets.remove", "chat.send"], listen: "/" } } });
-  const cases: [string, Record<string, unknown>][] = [["set", { name: "qq_bot", value: '{"key":"private"}' }], ["remove", { name: "qq_bot" }], ["list", {}]];
+  const cases: [string, Record<string, unknown>][] = [["set", { name: "qq_bot", value: { key: "private" } }], ["remove", { name: "qq_bot" }], ["list", {}]];
   for (const [tool, args] of cases) {
     await expect(f.direct(f.caller, tool, args)).rejects.toMatchObject({ code: "forbidden" });
     await expect(f.routed(tool, args)).rejects.toMatchObject({ code: "forbidden" });
   }
-  await f.db.moduleVersion.update({ where: f.where, data: { manifest: { ...f.manifest, uses: ["*"] } } });
-  await f.routed("set", { name: "qq_bot", value: '{"key":"private"}' });
+  await f.db.moduleVersion.update({ where: f.where, data: { manifest: { ...f.manifest, uses: ["*"],
+      authority: "owner"
+} } });
+  await f.routed("set", { name: "qq_bot", value: { key: "private" } });
   expect((await f.routed()).output).toEqual({ value: { key: "private" } });
 });
 

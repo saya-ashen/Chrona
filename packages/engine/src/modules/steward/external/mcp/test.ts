@@ -9,7 +9,7 @@ const pages: Args[] = [];
 const objectSchema = (properties: Args = {}, required: string[] = []) => ({ type: "object", properties, required, additionalProperties: false });
 const contract = (target: string, inputSchema = objectSchema(), app?: string) => ({ target, description: target, inputSchema, outputSchema: null, ...(app ? { moduleId: `${app}-id`, hash: "a".repeat(64), contractHash: "b".repeat(64) } : {}) });
 const authorInput = objectSchema({ input: { type: "string" } }, ["input"]);
-const admissionInput = objectSchema({ requestKey: { type: "string", minLength: 1 }, submitter: objectSchema({ moduleId: { type: "string" }, hash: { type: "string", pattern: "^[a-f0-9]{64}$" } }, ["moduleId", "hash"]), targets: { type: "array", minItems: 1, items: objectSchema({ name: { type: "string" }, moduleId: { type: ["string", "null"] }, expectedActiveHash: { type: ["string", "null"] } }, ["name", "moduleId", "expectedActiveHash"]) } }, ["requestKey", "submitter", "targets"]);
+const admissionInput = objectSchema({ submitter: objectSchema({ moduleId: { type: "string" }, hash: { type: "string", pattern: "^[a-f0-9]{64}$" } }, ["moduleId", "hash"]), targets: { type: "array", minItems: 1, items: objectSchema({ name: { type: "string" }, moduleId: { type: ["string", "null"] }, expectedActiveHash: { type: ["string", "null"] } }, ["name", "moduleId", "expectedActiveHash"]) } }, ["submitter", "targets"]);
 const contracts = [
   contract("modules.list"), contract("approvals.resolve", objectSchema({ approval: { type: "string" }, decision: { enum: ["approve", "deny"] } }, ["approval", "decision"])),
   contract("files.list", objectSchema(), "files"), contract("web.today", objectSchema(), "web"), contract("notify.list", objectSchema(), "notify"),
@@ -17,7 +17,7 @@ const contracts = [
   contract("author.write", objectSchema({ path: { type: "string" }, content: { type: "string" } }, ["path", "content"]), "author"),
   contract("author.read", objectSchema({ path: { type: "string" }, offset: { type: "number" }, limit: { type: "number" } }, ["path"]), "author"),
   contract("author.list", objectSchema({ path: { type: "string" } }, ["path"]), "author"),
-  contract("modules.admit-candidates", admissionInput),
+  contract("modules.admit", admissionInput),
   contract("planning.search", objectSchema({ filters: { type: "array", items: objectSchema({ state: { type: "string", enum: ["open", "done"] } }, ["state"]) } }, ["filters"]), "planning"),
   contract("agent.respond", objectSchema(), "agent"),
   contract("memory-local.recall", objectSchema({ query: { type: "string" }, limit: { type: "number" } }, ["query"]), "memory-local"),
@@ -27,19 +27,19 @@ const diagnostic = { moduleId: "files-id", module: "files", runtime: { state: "c
 const routed = (target: string, answer: (args: Args) => unknown = () => ({ ok: target })) => [target, (args: Args) => { calls.push([target, args]); return answer(args); }] as const;
 const module = await startModule("index.ts", { stubs: Object.fromEntries([
   routed("web.page-set", args => { if (!webAvailable) return { error: { code: "unavailable", message: "Web unavailable" } }; pages.push(args); return { registered: true }; }),
-  routed("modules.tools", args => {
-    if (args.audience === undefined) assert.equal(args.query, "memory-local", "only generated memory discovery uses the caller audience");
-    else assert.equal(args.audience, "user");
-    return contracts.filter(tool => !(args.audience === "user" && "user" in tool && tool.user === false) && (!args.query || tool.target.includes(String(args.query))));
+  routed("modules.describe", args => {
+    if (args.target) return { target: args.target, outputSchema: null, admission: { visibility: ["owner"] } };
+    if (args.audience === undefined && args.query) assert.equal(args.query, "memory-local", "only generated memory discovery uses the caller audience");
+    else if (args.audience !== undefined) assert.equal(args.audience, "user");
+    return { items: contracts.filter(tool => !(args.audience === "user" && "user" in tool && tool.user === false) && (!args.query || tool.target.includes(String(args.query)))), nextCursor: null };
   }),
-  routed("modules.reference", args => args.target ? { target: args.target, outputSchema: null, admission: { visibility: ["owner"] } } : contracts.map(({ target }) => ({ target }))),
-  routed("modules.list", () => [{ id: "files-id", name: "files", status: "active" }]), routed("modules.diagnostics", () => [diagnostic]),
+  routed("modules.list", () => ({ items: [{ id: "files-id", name: "files", status: "active" }], nextCursor: null })), routed("modules.health", () => ({ items: [diagnostic], nextCursor: null })),
   routed("agent.context", () => ({ contextId: "context-mcp" })), routed("agent.run", () => ({ runId: "run-mcp", status: "queued", active: true })),
   routed("agent.get", () => ({ status: "finished", active: false })), routed("agent.stream", () => ({ items: [], after: 0, ended: true, transcript: [{ at: "2026-11-08T00:00:00Z", kind: "text", text: "done" }], interactions: [{ id: "i1", status: "pending" }] })),
-  routed("agent.respond"), routed("agent.interrupt"), routed("approvals.resolve"), routed("approvals.list", () => []), routed("activity.records", () => ({ items: [], before: null })),
+  routed("agent.respond"), routed("agent.interrupt"), routed("approvals.resolve"), routed("approvals.list", () => ({ items: [], nextCursor: null })), routed("activity.records", () => ({ items: [], before: null })),
   routed("planning.search", args => args), routed("files.list", () => ["file"]), routed("web.today", () => ({ approvals: [] })), routed("notify.list", () => ({ items: [] })),
   routed("author.prepare", args => ({ kind: "material-only", execution: { supported: false }, admission: { requestKey: JSON.parse(String(args.input)).requestKey, submitter: { moduleId: "author-id", hash: "a".repeat(64) }, targets: [{ name: "example", moduleId: null, expectedActiveHash: null }] } })),
-  routed("modules.admit-candidates", args => ({ ...args, admissionId: "fixed-admission" })),
+  routed("modules.admit", args => ({ ...args, admissionId: "fixed-admission" })),
   routed("author.write"), routed("author.read", () => ({ content: "material" })), routed("author.list", () => ({ items: [] })), routed("author.stage"), routed("author.source"),
   routed("author.submit", args => ({ requestKey: JSON.parse(String(args.input)).requestKey, receiptId: "fixed-receipt", state: "submitted" })),
   routed("author.receipt", () => ({ receiptId: "fixed-receipt", state: "submitted" })),
@@ -93,7 +93,7 @@ try {
   assert.equal(listed.find((entry: { name: string }) => entry.name === "chrona_approval_resolve").annotations.destructiveHint, true);
   assert.equal(listed.find((entry: { name: string }) => entry.name === "chrona_module_call").annotations, undefined);
   assert.deepEqual(await json("chrona_modules"), [{ id: "files-id", name: "files", status: "active" }]);
-  assert.equal((await json("chrona_module_reference", { target: "author.prepare" })).target, "author.prepare");
+  assert.deepEqual((await json("chrona_module_reference", { target: "author.prepare" })).target, { moduleId: "author", tool: "prepare" });
   assert.equal((await json("chrona_module_reference")).length, contracts.length);
   const overview = await json("chrona_app", { module: "files" });
   assert.equal(overview.kind, "app"); assert.equal(overview.app.id, "files-id"); assert.equal(overview.tools[0].target, "files.list"); assert.deepEqual(overview.diagnostics, diagnostic);
@@ -128,7 +128,9 @@ try {
   const prepared = await author("prepare", { requestKey: "material-one", submitter: { moduleId: "author-id", hash: "a".repeat(64) }, targets: [{ name: "example", moduleId: null, expectedActiveHash: null }], goal: "Use supplied material", intent: { changes: ["Add example"] } });
   assert.equal(prepared.kind, "material-only"); assert.equal(prepared.execution.supported, false);
   assert.deepEqual(forwarded().at(-1)!.params.expectedTarget, { moduleId: "author-id", contractHash: "b".repeat(64) });
-  const admission = await json("chrona_module_call", { name: "modules.admit-candidates", arguments: prepared.admission });
+  const { requestKey: admissionKey, ...admissionArgs } = prepared.admission;
+  const admission = await json("chrona_module_call", { name: "modules.admit", arguments: admissionArgs, key: admissionKey });
+  assert.equal(forwarded().at(-1)!.params.key, admissionKey);
   assert.equal(admission.admissionId, "fixed-admission");
   assert.equal(forwarded().at(-1)!.params.expectedTarget, undefined);
   await json("chrona_module_call", { name: "author.write", arguments: { path: "sources/workspace/index.ts", content: "material" } });
@@ -207,9 +209,9 @@ try {
     assert.equal((await tool("chrona_session_update", { sessionId, title: "new" })).isError, true);
   }
   await json("chrona_run_answer", { interactionId: "i1", decision: "submit", value: "answer" });
-  assert.deepEqual(calls.at(-1), ["agent.respond", { "run-id": "run-mcp", "request-key": "mcp-answer:i1", "question-id": "i1", answer: JSON.stringify({ decision: "submit", value: "answer" }) }]);
+  assert.deepEqual(calls.at(-1), ["agent.respond", { "run-id": "run-mcp", "question-id": "i1", answer: { decision: "submit", value: "answer" } }]);
   await json("chrona_run_cancel", { runId: "run-mcp" });
-  assert.deepEqual(calls.at(-1), ["agent.interrupt", { "run-id": "run-mcp", "request-key": "mcp-stop:run-mcp" }]);
+  assert.deepEqual(calls.at(-1), ["agent.interrupt", { "run-id": "run-mcp",  }]);
   assert.equal((await tool("chrona_run_cancel", { runId: "foreign-run" })).isError, true);
   assert.equal((await tool("chrona_run_answer", { interactionId: "foreign-question", decision: "cancel" })).isError, true);
   await json("chrona_session_update", { sessionId: reply.sessionId, title: "Renamed" });

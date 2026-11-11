@@ -5,6 +5,7 @@
  * sessions, keyed by the entry that owns them. There are no affairs.
  */
 import { z } from "zod";
+import { wakeBudgetSchema, routedTargetSchema, pageInput, PUBLIC_CALL_ERRORS, PUBLIC_CALL_REASONS } from "./kernel-api";
 import { THINKING_LEVELS } from "./agent";
 import { slug, moduleToolSchema } from "./module-tool";
 import { moduleEntrySchema } from "./module-entry";
@@ -149,6 +150,8 @@ export const moduleManifestSchema = z.object({
    * `"*"`: every tool open to the user (`owner` visibility), for entry modules that offer all apps to the user (web, MCP).
    */
   uses: z.array(z.union([interfaceRefSchema, z.literal("*")])).max(40).default([]),
+  /** Explicit owner authority, granted only through checked version activation. */
+  authority: z.literal("owner").optional(),
   /**
    * System programs already installed on the host, named by their executable names. Language libraries come from lockfiles instead (package.json + bun.lock, pyproject.toml + uv.lock), which
    * Chrona installs at build time; `node_modules`, `.venv` and `.chrona` are never submitted.
@@ -188,15 +191,9 @@ export const moduleManifestSchema = z.object({
     for (const key of tool.parameters.required) if (!(key in tool.parameters.properties)) ctx.addIssue({ code: "custom", path: ["tools", index, "parameters", "required"], message: `Required parameter ${key} is not in properties` });
   });
 });
-/** Acts as the user, or serves the page holding the user's key: never activated automatically. */
-/** v2-16: any module may ask the user to decide something; these do not make it an entry module. */
-const MODULE_APPROVAL_TOOLS = ["approvals.request", "approvals.status"];
-/**
- * Acts as the user (their conversations, `chat.*`; their approvals, `approvals.*`; every tool open to them, `*`),
- * or serves the page holding the user's key: every version needs the user, never activated automatically.
- */
-export const isEntryModule = (manifest: { listen?: string | readonly string[]; uses?: readonly string[] }) =>
-  listenPaths(manifest).includes("/") || (manifest.uses ?? []).some(target => target === "*" || target.startsWith("chat.") || (target.startsWith("approvals.") && !MODULE_APPROVAL_TOOLS.includes(target)));
+/** HTTP hosting is independent of owner authority and dependency declarations. */
+export const isEntryModule = (manifest: { listen?: string | readonly string[]; authority?: "owner" }) =>
+  listenPaths(manifest).length > 0;
 /**
  * v2 module channel (`CHRONA_IPC_ENDPOINT` + `CHRONA_IPC_TOKEN`, authenticated TCP loopback, JSON lines; see docs/module-wire.md). Modules import the SDK as
  * `chrona` and find their directories through `chrona.paths`, with or without a sandbox.
@@ -219,6 +216,7 @@ export const callerSchema = z.discriminatedUnion("kind", [
 ]);
 export const moduleEventSchema = z.object({
   trigger: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("timer"), id: z.string().min(1).max(120), eventId: z.string(), timerId: z.string(), timerRevision: z.string(), scheduledAt: iso, firedAt: iso, payload: z.json() }).strict(),
     /** Retained private schedule delivery; no public schedule creation API. */
     z.object({ kind: z.literal("schedule"), id: slug, firedAt: iso, scheduleId: z.string().max(128).optional(), payload: z.record(z.string(), z.unknown()).optional() }).strict(),
     /**
@@ -229,12 +227,13 @@ export const moduleEventSchema = z.object({
       caller: callerSchema.optional(),
       call: z.object({ id: z.string().max(128), key: z.string().max(500).nullable(), attempt: z.number().int().min(1), chain: z.array(slug).max(16) }).strict().optional() }).strict(),
     /** The result of an async call this module made with `reply: true` (`id` is always "call"). */
-    z.object({ kind: z.literal("call_result"), id: z.literal("call"), firedAt: iso, callId: z.string().max(128), target: interfaceRefSchema, key: z.string().max(500),
+    z.object({ kind: z.literal("call_result"), id: z.literal("call"), firedAt: iso, callId: z.string().max(128), target: routedTargetSchema, key: z.string().max(500),
       status: z.enum(["succeeded", "failed", "unknown"]), output: z.json().optional(), error: z.string().max(2000).optional() }).strict(),
     /** For manifests with `activated`: once per active version, and again when a module this one `uses` changes version (e.g. to call web.page-set). */
     z.object({ kind: z.literal("activated"), id: z.literal("activated"), firedAt: iso }).strict(),
   ]),
   now: iso,
+  bindings: z.record(z.string(), z.string()).optional(),
   params: z.record(z.string(), z.union([z.number(), z.string(), z.boolean()])),
 }).strict();
 export const moduleEventMessageSchema = z.object({ id: channelId, event: moduleEventSchema }).strict();
@@ -246,7 +245,7 @@ export const MODULE_CALL_ERRORS = ["undeclared", "invalid", "internal",
   "unconfigured", "budget_exceeded", "provider_error", "timeout"] as const;
 /** `result` answers a tool call. `handled` is ignored (it handed inbound items back before connectors were removed); kept so older modules still answer. */
 export const moduleEventReplySchema = z.object({ id: channelId, result: z.object({ handled: z.boolean().optional(), result: moduleResultSchema }).strict().default({}) }).strict()
-  .or(z.object({ id: channelId, error: z.string().max(2000), errorCode: z.enum(MODULE_CALL_ERRORS).optional() }).strict());
+  .or(z.object({ id: channelId, error: z.string().max(2000), errorCode: z.enum(MODULE_CALL_ERRORS).optional(), errorReason: z.enum(PUBLIC_CALL_REASONS).optional() }).strict());
 /** The credential names a manifest declares, whichever form each entry takes. */
 export const secretNames = (manifest: { secrets?: readonly (string | { name: string })[] }) => (manifest.secrets ?? []).map(secret => typeof secret === "string" ? secret : secret.name);
 export const SECRET_TARGETS = ["secrets.get", "secrets.authorize", "secrets.token"];
@@ -257,7 +256,7 @@ export function grantedUses(manifest: { uses?: readonly string[]; secrets?: read
 /** Default notification application target; no kernel routing privilege. */
 export const NOTIFY_INTERFACE = "notify.send";
 /** Chrona's in-process system modules: reached by routed calls like modules, but part of Chrona (not proposable, not sandboxed). */
-export const SYSTEM_MODULES = ["approvals", "modules", "settings", "secrets", "activity"] as const;
+export const SYSTEM_MODULES = ["approvals", "modules", "settings", "secrets", "activity", "timers"] as const;
 /** Longest call path; synchronous calls are refused when the target is already on their path (it is waiting). */
 export const MAX_CALL_DEPTH = 6;
 /** A saved registration may only call this exact app identity and tool contract; this grants no access. */
@@ -271,11 +270,11 @@ export const moduleCallSchema = z.discriminatedUnion("method", [
    * deliveries that never reached the target, or `idempotent` targets. `reply` sends a `call_result` event back.
    */
   z.object({ id: channelId, method: z.literal("call"), params: z.object({
-    target: interfaceRefSchema, args: z.record(z.string(), z.json()).default({}), mode: z.enum(["sync", "async"]).default("sync"),
+    target: routedTargetSchema, args: z.record(z.string(), z.json()).default({}), mode: z.enum(["sync", "async"]).default("sync"),
     key: z.string().min(1).max(200).optional(), reply: z.boolean().default(false), timeoutMs: z.number().int().min(1000).max(600_000).optional(), expectedTarget: expectedModuleTargetSchema.optional(),
   }).strict().refine(params => params.mode === "sync" || params.key !== undefined, "async calls need a key") }).strict(),
   /** State of an async call this module made. */
-  z.object({ id: channelId, method: z.literal("callStatus"), params: z.object({ callId: z.string().min(1).max(128) }).strict() }).strict(),
+  z.object({ id: channelId, method: z.literal("callStatus"), params: z.union([z.object({ callId: z.string().min(1).max(128) }).strict(), z.object({ target: routedTargetSchema, key: z.string().min(1).max(200) }).strict()]) }).strict(),
 ]);
 export const moduleCallReplySchema = z.object({ id: channelId, result: z.union([
   /** Sync `call` replies: the target's result. */
@@ -283,7 +282,7 @@ export const moduleCallReplySchema = z.object({ id: channelId, result: z.union([
   /** Async `call` and `callStatus` replies. */
   z.object({ callId: z.string().max(128), status: z.enum(CALL_STATUSES), duplicate: z.boolean().optional(), output: z.json().optional(), error: z.string().max(2000).optional() }).strict(),
 ]) }).strict()
-  .or(z.object({ id: channelId, error: z.object({ code: z.enum(MODULE_CALL_ERRORS), message: z.string().max(500) }).strict() }).strict());
+  .or(z.object({ id: channelId, error: z.object({ code: z.enum(PUBLIC_CALL_ERRORS), reason: z.enum(PUBLIC_CALL_REASONS).optional(), message: z.string().max(500) }).strict() }).strict());
 export type ModuleEvent = z.infer<typeof moduleEventSchema>;
 export type ModuleCall = z.infer<typeof moduleCallSchema>;
 export type ModuleManifest = z.infer<typeof moduleManifestSchema>;
@@ -372,10 +371,9 @@ export const buildSettingsSchema = z.object({
 }).strict();
 export const settingsSchema = z.object({
   timezone: z.string().min(1).max(80),
+  wake: wakeBudgetSchema.default({ minIntervalMs: 60_000, dailyLimit: 1000, moduleDailyLimit: 100 }),
   /** null: ordinary foreground/background Runs have no total execution deadline. */
   runTimeoutMinutes: z.number().int().min(1).max(525_600).nullable().default(null),
-  /** v2-17: today's module model calls (local day), per module. */
-  modelUsage: z.array(z.object({ module: z.string(), calls: z.number().int().min(0), inputTokens: z.number().int().min(0), outputTokens: z.number().int().min(0) }).strict()),
   /** null: modules cannot use the `model` effect (builds declaring it fail). */
   moduleModel: moduleModelSettingsSchema.nullable(),
 }).strict();
@@ -391,7 +389,7 @@ export const healthSchema = z.object({
 
 export const resolveApprovalSchema = z.object({ decision: z.enum(["approve", "deny"]), scope: z.enum(APPROVAL_SCOPES).default("once") }).strict();
 export const createGrantSchema = z.object({ action: z.enum(ACTIONS), mode: z.enum(GRANT_MODES), scope: grantScopeSchema, expiresAt: iso.optional() }).strict();
-export const updateSettingsSchema = z.object({ timezone: z.string().min(1).max(80).optional(), runTimeoutMinutes: settingsSchema.shape.runTimeoutMinutes.removeDefault().optional(), moduleModel: moduleModelSettingsSchema.nullable().optional() }).strict();
+export const updateSettingsSchema = z.object({ wake: wakeBudgetSchema.optional(), timezone: z.string().min(1).max(80).optional(), runTimeoutMinutes: settingsSchema.shape.runTimeoutMinutes.removeDefault().optional(), moduleModel: moduleModelSettingsSchema.nullable().optional() }).strict();
 
 /** Short codes (e.g. QQ binding codes): no 0/O/1/I/L. */
 export const REF_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
@@ -407,10 +405,8 @@ export const chronaToolInputSchemas = {
 } as const;
 /** Shared inputs used by the public modules router; candidate inputs are exported separately. */
 export const modulesToolInputSchemas = {
-  reference: z.object({ target: z.string().regex(/^[a-z][a-z0-9-]{1,40}\.[a-z][a-z0-9-]{1,40}$/).optional() }).strict()
-    .describe("Read development reference only: without target, list available interfaces (target, source, one-line description); with <module>.<tool>, get its input schema, declared output schema/examples and admission rules. Never executes the target or reads its business data. Undeclared outputs are explicitly unknown, not inferred from empty results."),
-  rollback: z.object({ module: slug, hash: moduleVersionHashSchema }).strict()
-    .describe('Roll back to a previously approved version. May return { status: "pending_approval", approvalId } when restoring a data snapshot needs user approval.'),
+  describe: pageInput.extend({ target: routedTargetSchema.optional(), query: z.string().optional(), audience: z.enum(["caller", "user"]).default("caller") }),
+  rollback: z.object({ moduleId: z.string().min(1), hash: moduleVersionHashSchema, reason: z.string().min(1) }).strict(),
 } as const;
 export const CHRONA_TOOLS = Object.keys(chronaToolInputSchemas) as (keyof typeof chronaToolInputSchemas)[];
 
@@ -480,3 +476,5 @@ export type Health = z.infer<typeof healthSchema>;
 export * from "./module-candidates";
 
 export * from "./agent";
+
+export * from "./kernel-api";

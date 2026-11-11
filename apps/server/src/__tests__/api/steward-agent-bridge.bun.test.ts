@@ -8,7 +8,9 @@ test("Pi bridge surfaces structured HTTP errors and redacts capability", async (
   process.env.CHRONA_AGENT_TOKEN = "secret-capability";
   let execute: ((id: string, params: unknown) => Promise<unknown>) | undefined;
   globalThis.fetch = (async (url: string | URL | Request) => String(url).endsWith("/catalog")
-    ? Response.json({ tools: [{ name: "chrona_schedules", description: "schedules", parameters: {} }] })
+    ? Response.json({ tools: [{ name: "chrona_schedules", description: "schedules", parameters: {},
+        output: {}
+    }] })
     : Response.json({ ok: false, error: { code: "invalid", message: "Use chrona_focus first secret-capability" } }, { status: 400 })) as typeof fetch;
   try {
     await bridge({ registerTool(tool) { execute = tool.execute; } });

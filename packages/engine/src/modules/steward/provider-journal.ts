@@ -31,10 +31,10 @@ function eventValue(row: { payload: unknown }) {
   const details = row.payload as { type?: unknown; value?: unknown; at?: string } | null;
   return details ?? {};
 }
-export async function providerRuns(ctx: RecordContext, sessionId: string | undefined, connected: (id: string) => boolean, waiting: (id: string) => boolean, liveQuestion: (id: string) => ProviderQuestion | null = () => null): Promise<ProviderRunView[]>  {
+export async function providerRuns(ctx: RecordContext, { sessionId, ids }: { sessionId?: string; ids?: string[] }, connected: (id: string) => boolean, waiting: (id: string) => boolean, liveQuestion: (id: string) => ProviderQuestion | null = () => null): Promise<ProviderRunView[]>  {
   const { db, workspaceId, now } = ctx;
   const scope = { workspaceId, ...(sessionId ? { sessionId } : {}) };
-  const [active, recent] = await Promise.all([
+  const [active, recent] = ids ? [[], await db.run.findMany({ where: { ...scope, id: { in: ids } }, include: { session: true } })] : await Promise.all([
     db.run.findMany({ where: { ...scope, status: "running" }, include: { session: true }, orderBy: { createdAt: "desc" }, take: 2 }),
     db.run.findMany({ where: scope, include: { session: true }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 15 }),
   ]);

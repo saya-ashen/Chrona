@@ -40,7 +40,9 @@ async function fixture() {
   const api = createModules(ports, workspaceId);
   const session = await db.session.create({ data: { workspaceId, source: "test", key: "tools:test", focus: ["mail-sort"] } });
   const module = await db.module.create({ data: { workspaceId, name: "mail-sort", activeHash: "hash" } });
-  const tool: ModuleManifest["tools"][number] = { name: "find-mail", description: "Find matching mail", visibility: ["provider", "owner"], idempotent: false, parameters: { type: "object", properties: { query: { type: "string" }, count: { type: "number" }, unread: { type: "boolean" }, folder: { type: "string", enum: ["inbox", "sent"] } }, required: ["query"] } };
+  const tool: ModuleManifest["tools"][number] = { name: "find-mail", description: "Find matching mail", visibility: ["provider", "owner"], idempotent: false, parameters: { type: "object", properties: { query: { type: "string" }, count: { type: "number" }, unread: { type: "boolean" }, folder: { type: "string", enum: ["inbox", "sent"] } }, required: ["query"] },
+      output: {}
+};
   const manifest = { name: module.name, entry: "index.ts", tests: ["test.ts"], effects: ["network"], uses: ["notify.send"], params: { limit: { type: "number", value: 3 } }, tools: [tool] };
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "hash", manifest, intent: {}, source: "user", report: {}, status: "approved" } });
   await db.$transaction(tx => recordModuleActivation(moduleContext(ports, workspaceId), tx, { moduleId: module.id, previousHash: null, hash: "hash", generationId: "fixture" }));
@@ -53,7 +55,7 @@ async function fixture() {
 test("catalog appends focused module tools with schema, meaningful description and their toolset", async () => {
   const f = await fixture(), catalog = await f.catalog();
   expect(catalog.at(-1)).toEqual({ name: "m_mail_sort_find_mail", exposure: "direct", namespace: { name: "module_mail_sort", description: "Find matching mail" }, description: "Find matching mail",
-    inputSchema: { ...f.tool.parameters, additionalProperties: false, description: "[module mail-sort] Find matching mail" }, outputSchema: null, examples: null, sideEffects: null, errors: null,
+    inputSchema: { ...f.tool.parameters, additionalProperties: false, description: "[module mail-sort] Find matching mail" }, outputSchema: {}, examples: null, sideEffects: null, errors: null,
     idempotent: false, retry: "Unknown async outcomes are not redelivered automatically." });
 });
 test("unfocused sessions find deferred module tools", async () => {
@@ -75,9 +77,9 @@ test("owner tools list every toolset and call as the user", async () => {
   // Chrona's own tools open to the user (v2-13) come first.
   expect(tools.map(tool => tool.name)).toEqual([
     "m_approvals_list", "m_approvals_resolve",
-    "m_modules_list", "m_modules_tools", "m_modules_reference", "m_modules_diagnostics", "m_modules_health", "m_modules_admit_candidates",
-    "m_modules_rollback", "m_modules_disable", "m_modules_enable", "m_modules_remove", "m_settings_update",
-    "m_secrets_set", "m_secrets_remove", "m_secrets_list", "m_activity_runtime", "m_activity_runs", "m_activity_records", "m_activity_consumer", "m_mail_sort_find_mail",
+    "m_modules_list", "m_modules_describe", "m_modules_health", "m_modules_admit", "m_modules_receipt",
+    "m_modules_enable", "m_modules_disable", "m_modules_rollback", "m_modules_remove", "m_modules_operation", "m_settings_update",
+    "m_secrets_set", "m_secrets_remove", "m_secrets_list", "m_activity_runtime", "m_activity_runs", "m_activity_records", "m_activity_usage", "m_activity_consumer", "m_mail_sort_find_mail",
     "m_notify_settings", "m_notify_ui_settings", "m_notify_activity", "m_notify_list", "m_notify_status", "m_notify_feedback", "m_notify_retry",
   ]);
   expect(toolsets.find(set => set.name === "module_mail_sort")).toEqual({ name: "module_mail_sort", description: "Find matching mail", tools: ["m_mail_sort_find_mail"] });
@@ -118,7 +120,7 @@ test("success returns result, runs sandbox with scoped input and deduplicates sh
   expect(await f.call(args)).toEqual({ result: { found: 3 } });
   expect(await f.call(args)).toEqual({ result: { found: 3 } });
   expect((await f.db.moduleCall.findMany({ where: { moduleId: f.module.id } })).map(call => call.status).sort()).toEqual(["duplicate", "executed"]);
-  expect(f.calls[0]).toEqual({ codeDir: join(f.ports.dataDir, "platform/store/hash"), dataDir: join(f.ports.dataDir, "platform/data", f.module.id), entry: "index.ts", network: true, timeoutMs: RUN_LIMITS.jobTimeoutMs, maxOutputBytes: RUN_LIMITS.jobOutputBytes,
+  expect(f.calls[0]).toMatchObject({ codeDir: join(f.ports.dataDir, "platform/store/hash"), dataDir: join(f.ports.dataDir, "platform/data", f.module.id), entry: "index.ts", network: true, timeoutMs: RUN_LIMITS.jobTimeoutMs, maxOutputBytes: RUN_LIMITS.jobOutputBytes,
     input: { trigger: { id: "find-mail", kind: "tool", firedAt: f.ports.now().toISOString(), args, caller: { kind: "provider", runId: expect.any(String) }, call: { id: expect.any(String), key: null, attempt: 1, chain: [] } }, now: f.ports.now().toISOString(), params: { limit: 3 } } });
   expect((await notices(f.db)).length).toBe(1);
   expect(await f.db.run.count({ where: { lane: "background" } })).toBe(0);

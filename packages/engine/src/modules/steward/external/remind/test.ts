@@ -29,5 +29,12 @@ try {
   assert.deepEqual(await tool("create", args), created);
   assert.equal((await tool("list", {})).reminders.length, 1);
   assert.deepEqual(await tool("cancel", { key: created.key }), { cancelled: true });
-  assert.equal(module.calls.some((call: { params: { target: string } }) => call.params.target.startsWith("schedules.")), false);
+  assert.equal(module.calls.some((call: { params: { target: string } }) => targetName(call.params.target).startsWith("schedules.")), false);
 } finally { await module.stop(); }
+
+function targetName(raw: unknown): string {
+  if (typeof raw === "string") return raw;
+  const target = raw as { moduleId: string; tool: string };
+  const names: Record<string, string> = {};
+  return `${names[target.moduleId] ?? target.moduleId.replace(/-id$/, "")}.${target.tool}`;
+}

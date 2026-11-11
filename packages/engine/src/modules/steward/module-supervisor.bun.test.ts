@@ -4,7 +4,8 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema, type ModuleEvent } from "@chrona/contracts/steward";
 import { createModuleSupervisor, moduleSupervisor } from "./module-supervisor";
-import { callsSettled } from "./module-calls";
+import { registerSystemModules } from "./system-modules";
+import { callsSettled, callSync, kernelOrigin } from "./module-calls";
 import { installNotifyTarget } from "./test-notify-target";
 import { testModuleProcess } from "./module-test-process";
 import { testDb } from "./test-db";
@@ -27,22 +28,24 @@ function clock() {
     pending: () => [...tasks.values()].map(task => task.at - time),
     advance(ms: number) { time += ms; for (const [id, task] of [...tasks]) if (task.at <= time) { tasks.delete(id); task.fn(); } } };
 }
-async function fixture({ keepAlive = false, listen, uses = ["notify.send", "provider.wake"], handler = async () => ({}) }: { keepAlive?: boolean; listen?: string; uses?: string[]; handler?: Parameters<typeof testModuleProcess>[0] } = {}) {
+async function fixture({ shared = false, keepAlive = false, listen, uses = ["notify.send", "provider.wake"], handler = async () => ({}) }: { shared?: boolean; keepAlive?: boolean; listen?: string; uses?: string[]; handler?: Parameters<typeof testModuleProcess>[0] } = {}) {
   const db = testDb(), dataDir = await mkdtemp("/tmp/cms-test-");
   const workspace = await db.workspace.create({ data: { name: "supervisor" } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "v1" } });
-  const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", tests: ["test.ts"], keepAlive, listen, effects: [], uses, tools: [{ name: "daily", description: "Ordinary application operation", visibility: ["owner"], parameters: { type: "object", properties: {} } }] });
+  const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", tests: ["test.ts"], keepAlive, listen, effects: [], uses, tools: [{ name: "daily", description: "Ordinary application operation", visibility: ["owner"], parameters: { type: "object", properties: {} },
+      output: {}
+}] });
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest, source: "user", intent: {}, report: {}, status: "approved" } });
   const peer = testModuleProcess(handler), fakeClock = clock();
   let now = 0;
   const ports: StewardPorts = { db, dataDir, now: () => new Date(Date.UTC(2026, 9, 21) + now++), publicUrl: null, sandbox: { available: true, isolated: true, startModule: peer.startModule } };
   const activation = await db.$transaction(tx => recordModuleActivation(moduleContext(ports, workspace.id), tx, { moduleId: module.id, previousHash: null, hash: "v1", generationId: "fixture" }));
-  const supervisor = createModuleSupervisor(ports, { timers: fakeClock.timers });
+  const supervisor = shared ? moduleSupervisor(ports) : createModuleSupervisor(ports, { timers: fakeClock.timers });
   let stopErrors: Error[] | undefined;
   cleanups.push(async () => {
     try {
       await callsSettled(ports);
-      await moduleSupervisor(ports).stop();
+      if (!shared) await moduleSupervisor(ports).stop();
       if (stopErrors) await expect(supervisor.stop()).rejects.toMatchObject({ name: "AggregateError", errors: stopErrors });
       else await supervisor.stop();
     } finally {
@@ -133,7 +136,9 @@ test.each(["handler", "lost"] as const)("post-delivery %s failures never trigger
   const db = testDb(), dataDir = await mkdtemp("/tmp/cms-post-delivery-");
   const workspace = await db.workspace.create({ data: { name: "post-delivery" } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "v2", dataSchema: 1 } });
-  const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", keepAlive: true, tests: ["test.ts"], tools: [{ name: "daily", description: "Ordinary application operation", visibility: ["owner"], parameters: { type: "object", properties: {} } }], effects: [] });
+  const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", keepAlive: true, tests: ["test.ts"], tools: [{ name: "daily", description: "Ordinary application operation", visibility: ["owner"], parameters: { type: "object", properties: {} },
+      output: {}
+}], effects: [] });
   for (const hash of ["v1", "v2"]) await db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest, source: "user", status: "approved", intent: {}, report: { continuity: { status: "passed", fromSchema: 1, toSchema: 1, migrated: false } } } });
   const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-30T12:00:00Z"), publicUrl: null,
     sandbox: { available: true, isolated: true, startModule: (() => {
@@ -336,7 +341,7 @@ test.each(["same activation", "new hash", "new activation"])("rejected exit reta
   await f.supervisor.start();
   f.processes[0]!.rejectExit(unknown);
   await until(async () => (await moduleIncidents(f.db, f.module.workspaceId, f.module.id)).length === 1);
-  expect(f.supervisor.status(f.module.id, "v1", true)).toMatchObject({ state: "unavailable", pid: 1, error: expect.stringContaining(unknown.message) });
+  expect(f.supervisor.status(f.module.id, "v1", true)).toMatchObject({ state: "unknown", pid: 1, error: expect.stringContaining(unknown.message) });
   expect(await moduleIncidents(f.db, f.module.workspaceId, f.module.id)).toMatchObject([{ status: "unresolved", failures: 1, evidence: { phase: "process", exitCode: null } }]);
   // No restart timer survives an unknown exit; the polling loop is still present.
   expect(f.pending()).toEqual([30_000]);
@@ -352,7 +357,7 @@ test.each(["same activation", "new hash", "new activation"])("rejected exit reta
   await expect(f.supervisor.deliver(f.module.id, hash, event)).rejects.toMatchObject({ stage: "unavailable", message: unknown.message });
   await expect(f.supervisor.settleModule(f.module.id)).rejects.toBe(unknown);
   await expect(f.supervisor.stop()).rejects.toMatchObject({ name: "AggregateError", errors: [unknown] });
-  expect(f.supervisor.status(f.module.id, hash, true)).toMatchObject({ state: "unavailable", pid: 1 });
+  expect(f.supervisor.status(f.module.id, hash, true)).toMatchObject({ state: "unknown", pid: 1 });
   expect(f.processes).toHaveLength(1);
   expect(await f.db.moduleRun.count()).toBe(1);
   expect(f.pending()).toEqual([]);
@@ -369,7 +374,7 @@ test("exit rejection before authentication retains startup ownership and blocks 
     return process;
   };
   await expect(f.deliver()).rejects.toMatchObject({ stage: "unavailable", message: unknown.message });
-  expect(f.supervisor.status(f.module.id, "v1", false)).toMatchObject({ state: "unavailable", pid: 1 });
+  expect(f.supervisor.status(f.module.id, "v1", false)).toMatchObject({ state: "unknown", pid: 1 });
   await expect(f.deliver()).rejects.toMatchObject({ stage: "unavailable", message: unknown.message });
   expect(f.processes).toHaveLength(1);
   expect(await f.db.moduleRun.count()).toBe(1);
@@ -384,7 +389,7 @@ test("in-flight exit rejection reports lost delivery and retains ownership witho
   f.expectStopErrors(unknown);
   await expect(f.deliver()).rejects.toMatchObject({ stage: "lost", message: unknown.message });
   await expect(f.deliver()).rejects.toMatchObject({ stage: "unavailable", message: unknown.message, cause: unknown });
-  expect(f.supervisor.status(f.module.id, "v1", true)).toMatchObject({ state: "unavailable", pid: 1 });
+  expect(f.supervisor.status(f.module.id, "v1", true)).toMatchObject({ state: "unknown", pid: 1 });
   expect(await moduleIncidents(f.db, f.module.workspaceId, f.module.id)).toMatchObject([{ status: "unresolved", failures: 1, deliveryUnknown: true, evidence: { phase: "event", delivery: "lost", exitCode: null } }]);
   f.advance(60_000);
   expect(f.pending()).toEqual([]);
@@ -414,7 +419,7 @@ test("stop aggregates every unknown owner while still stopping healthy modules",
   expect(healthy.socket.destroyed).toBe(false);
   await expect(f.supervisor.stop()).rejects.toBeInstanceOf(AggregateError);
   expect(healthy.socket.destroyed).toBe(true);
-  for (const moduleId of [f.module.id, others[0]!.id]) expect(f.supervisor.status(moduleId, "v1", true)).toMatchObject({ state: "unavailable" });
+  for (const moduleId of [f.module.id, others[0]!.id]) expect(f.supervisor.status(moduleId, "v1", true)).toMatchObject({ state: "unknown" });
   expect(f.pending()).toEqual([]);
 });
 
@@ -570,7 +575,9 @@ test("activated reaches opted-in modules once per version and again when a modul
   const workspace = await db.workspace.create({ data: { name: "activated" } });
   const create = async (name: string, hash: string, extra: Record<string, unknown>) => {
     const module = await db.module.create({ data: { workspaceId: workspace.id, name, activeHash: hash } });
-    await db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest: moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], effects: [], tools: [{ name: "go", description: "go", parameters: { type: "object", properties: {}, required: [] } }], ...extra }), source: "user", intent: {}, report: {}, status: "approved" } });
+    await db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest: moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], effects: [], tools: [{ name: "go", description: "go", parameters: { type: "object", properties: {}, required: [] },
+        output: {}
+    }], ...extra }), source: "user", intent: {}, report: {}, status: "approved" } });
     return module;
   };
   const web = await create("web", "w1", {}), app = await create("app", "a1", { activated: true, uses: ["web.page-set"] }), quiet = await create("quiet", "q1", { uses: ["web.page-set"] });
@@ -653,4 +660,30 @@ test("audit retention cannot reset activation ownership, failure streak or recei
   await f.db.$transaction(tx => recordModuleExecution(tx, { ...input, resultId: "second" }));
   expect(await f.db.$transaction(tx => recordModuleExecution(tx, { ...input, resultId: "third" }))).toMatchObject({ consecutiveFailures: 3, shouldPause: true });
   expect(await f.db.moduleExecutionResult.count()).toBe(3);
+});
+
+
+test("public health preserves stopping evidence while configured status is paused", async () => {
+  registerSystemModules(); let release!: () => void, entered = false;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const f = await fixture({ shared: true, handler: async () => { entered = true; await gate; return {}; } });
+  const delivery = f.deliver();
+  try {
+    await until(() => entered);
+    await f.db.module.update({ where: { id: f.module.id }, data: { status: "paused" } });
+    await f.supervisor.reconcile();
+    const result = await callSync(f.ports, { ...kernelOrigin(f.module.workspaceId), caller: { kind: "owner", via: null } }, "modules.health", { moduleId: f.module.id });
+    expect(result.output).toMatchObject({ items: [{ configuredStatus: "paused", runtime: { state: "stopping", pid: 1 } }] });
+  } finally { release(); await delivery; }
+});
+
+test("public health retains unknown process ownership after the application is paused", async () => {
+  registerSystemModules();
+  const f = await fixture({ shared: true }), unknown = new Error("synthetic public stop unknown");
+  f.expectStopErrors(unknown); await f.deliver();
+  f.processes[0]!.rejectExit(unknown);
+  await until(() => f.supervisor.status(f.module.id, "v1", false).state === "unknown");
+  await f.db.module.update({ where: { id: f.module.id }, data: { status: "paused" } });
+  const result = await callSync(f.ports, { ...kernelOrigin(f.module.workspaceId), caller: { kind: "owner", via: null } }, "modules.health", { moduleId: f.module.id });
+  expect(result.output).toMatchObject({ items: [{ configuredStatus: "paused", runtime: { state: "unknown", pid: 1, error: expect.stringContaining(unknown.message) } }] });
 });

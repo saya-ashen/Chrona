@@ -22,7 +22,7 @@ test("events consumes kernel target binding: two real callback targets, one paus
   const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => new Date("2026-11-05T04:00:00Z"), sandbox: { available: true, isolated: false, startModule: peer.startModule } };
   const workspaceId = (await db.workspace.create({ data: { name: "events-routed" } })).id;
   async function module(name: string, hash: string, tools: unknown[] = []) {
-    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], tools, uses: ["modules.list", "modules.tools"] });
+    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], tools, uses: ["modules.list", "modules.describe"] });
     const row = await db.module.create({ data: { workspaceId, name, activeHash: hash, builtin: name === "events" } });
     await db.moduleVersion.create({ data: { moduleId: row.id, hash, manifest, status: "approved", source: "user", intent: {}, report: {} } });
     const code = join(dataDir, "platform/store", hash); await mkdir(code, { recursive: true }); await writeFile(join(code, "index.ts"), "// offline wire peer\n");
@@ -35,9 +35,9 @@ test("events consumes kernel target binding: two real callback targets, one paus
     const eventsRow = await module("events", "e".repeat(64)), source = await module("source", "c".repeat(64));
     const alpha = await module("alpha", "a".repeat(64), [tool]), beta = await module("beta", "b".repeat(64), [tool]);
     const origin: CallOrigin = { workspaceId, caller: { kind: "module", module: "events", moduleId: eventsRow.id, hash: eventsRow.activeHash! }, chain: [], path: [] };
-    const read = async (target: string, args = {}) => (await callSync(ports, origin, target, args)).output;
+    const read = async (target: string, args = {}) => { const page = (await callSync(ports, origin, target, args)).output as { items: Record<string, unknown>[] }; return page.items.map(item => typeof item.target === "object" && item.target ? { ...item, target: `${[alpha,beta].find(row=>row.id === (item.target as {moduleId:string}).moduleId)?.name}.${(item.target as {tool:string}).tool}` } : item); };
     const dir = join(dataDir, "event-state"); await mkdir(dir);
-    const events = createEvents({ dataDir: dir, directory: async () => ({ modules: await read("modules.list"), tools: await read("modules.tools") }) as Directory,
+    const events = createEvents({ dataDir: dir, directory: async () => ({ modules: await read("modules.list"), tools: await read("modules.describe") }) as Directory,
       call: (target, raw, options) => enqueueCall({ tx: db, ports, origin, target, raw }, options) });
     const from = (row: typeof alpha) => ({ kind: "module" as const, module: row.name, moduleId: row.id, hash: row.activeHash! });
     await events.handle("register", { emits: JSON.stringify([{ name: "changed" }]) }, from(source));
@@ -51,8 +51,8 @@ test("events consumes kernel target binding: two real callback targets, one paus
     const alphaCall = firstCalls.find(call => call.target === "alpha")!;
     const alphaBinding = { moduleId: alphaCall.targetModuleId!, contractHash: alphaCall.targetContractHash! };
     expect(alphaBinding.moduleId).toBe(alpha.id);
-    expect((await enqueueCall({ tx: db, ports, origin, target: "alpha.receive", raw: { event: "source.changed", from: "source", payload: '{}' } }, { key: alphaCall.key!, expectedTarget: alphaBinding })).duplicate).toBe(true);
-    await expect(enqueueCall({ tx: db, ports, origin, target: "alpha.receive", raw: {} }, { key: alphaCall.key!, expectedTarget: { ...alphaBinding, moduleId: beta.id } })).rejects.toThrow("different registered target");
+    expect((await enqueueCall({ tx: db, ports, origin, target: "alpha.receive", raw: alphaCall.args }, { key: alphaCall.key!, reply: true, expectedTarget: alphaBinding })).duplicate).toBe(true);
+    await expect(enqueueCall({ tx: db, ports, origin, target: "alpha.receive", raw: alphaCall.args }, { key: alphaCall.key!, reply: true, expectedTarget: { ...alphaBinding, moduleId: beta.id } })).rejects.toThrow("different registered target");
     expect(await db.moduleInvocation.count({ where: { workspaceId, targetBound: true, id: { in: firstCalls.map(call => call.id) } } })).toBe(2);
     let rolledBackId = "";
     await expect(db.$transaction(async tx => {

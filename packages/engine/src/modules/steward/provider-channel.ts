@@ -125,7 +125,7 @@ export function createProviderControl(ports: StewardPorts, workspaceId: string) 
   }
   const cancel = (id: string) => cancelProviderRun(ports, workspaceId, id);
   return {
-    list: (sessionId?: string) => providerRuns({ db, workspaceId, now }, sessionId, id => liveRuns.has(id), id => pending.has(id), id => {
+    list: (sessionId?: string, ids?: string[]) => providerRuns({ db, workspaceId, now }, { sessionId, ids }, id => liveRuns.has(id), id => pending.has(id), id => {
       const entry = pending.get(id);
       return entry && entry.db === db && entry.workspaceId === workspaceId ? entry.request.question : null;
     }),

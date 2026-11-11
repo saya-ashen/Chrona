@@ -15,12 +15,7 @@ export async function requireOwner(db: Parameters<typeof isOwnerCaller>[0], work
   return caller;
 }
 export const json = (value: unknown) => (value === undefined ? null : JSON.parse(JSON.stringify(value))) as Json;
-/** Structured arguments travel as JSON text (tool parameters are scalars). */
-export function parsed(value: unknown, name: string) {
-  try { return JSON.parse(String(value)) as unknown; } catch { throw new CallError("invalid", `${name} must be JSON`); }
-}
 export async function callerManifest(db: StewardPorts["db"], caller: Extract<Caller, { kind: "module" }>) {
   const version = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: caller.moduleId, hash: caller.hash } } });
   return moduleManifestSchema.safeParse(version?.manifest).data ?? null;
 }
-export const usesAll = async (db: StewardPorts["db"], caller: Extract<Caller, { kind: "module" }>) => (await callerManifest(db, caller))?.uses.includes("*") ?? false;

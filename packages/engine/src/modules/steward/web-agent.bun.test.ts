@@ -39,7 +39,8 @@ test("Web owns persisted conversations while actual Agent SDK admits scoped and 
     const caller = { kind: "module" as const, module: "web", moduleId: web.id, hash: web.activeHash! };
     let loseRunResponse = false;
     const call = async (target: string, args: Record<string, unknown> = {}) => {
-      const output = (await callSync(f.ports, { ...kernelOrigin(f.workspaceId), caller }, target, args)).output;
+      const { ["request-key"]: key, ["command-key"]: commandKey, ...input } = args;
+      const output = (await callSync(f.ports, { ...kernelOrigin(f.workspaceId), caller }, target, target.startsWith("agent.") ? input : args, { key: target.startsWith("agent.") ? (key ?? commandKey) as string | undefined : undefined })).output;
       if (target === "agent.run" && loseRunResponse) { loseRunResponse = false; throw new Error("admission response lost"); }
       return output;
     };

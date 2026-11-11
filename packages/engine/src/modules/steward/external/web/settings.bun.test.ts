@@ -7,17 +7,18 @@ import { createPreferences } from "./settings-store";
 import { pageErrors } from "./pages";
 
 type Args = Record<string, unknown>;
-const kernel = { timezone: "UTC", runTimeoutMinutes: null, moduleModel: null, modelUsage: [] };
+const kernel = { timezone: "UTC", runTimeoutMinutes: null, moduleModel: null, wake: { minIntervalMs: 60_000, dailyLimit: 1000, moduleDailyLimit: 100 }, modelUsage: [] };
 function fixture() {
   const calls: [string, Args][] = [];
   const call = async (target: string, args: Args = {}): Promise<unknown> => {
     calls.push([target, args]);
     if (target === "settings.get") return kernel;
+    if (target === "activity.usage") return { items: [], nextCursor: null };
     if (target === "settings.update") return {};
-    if (target === "modules.tools") return ["conversation-context", "conversation-retain", "preferences", "forget"].map(name => {
+    if (target === "modules.describe") return { items: ["conversation-context", "conversation-retain", "preferences", "forget"].map(name => {
       const field = name === "preferences" ? undefined : name === "forget" ? "id" : "snapshot";
       return { target: `memory-local.${name}`, moduleId: "current-id", hash: "current-hash", inputSchema: { type: "object", properties: field ? { [field]: { type: "string" } } : {}, required: field ? [field] : [] } };
-    });
+    }), nextCursor: null };
     if (target === "memory-local.preferences") return [{ id: "p", text: "中文" }];
     if (target === "memory-local.forget") return { forgotten: true };
     throw new Error(`Unexpected ${target}`);
@@ -27,21 +28,21 @@ function fixture() {
 test("global settings reads kernel governance without application discovery or projections", async () => {
   const f = fixture();
   expect(await settingsView(f.call)).toEqual({ settings: kernel });
-  expect(f.calls).toEqual([["settings.get", {}]]);
+  expect(f.calls).toEqual([["settings.get", {}], ["activity.usage", { limit: 100 }]]);
 });
 test("global saves only supplied kernel settings and empty input is read-only", async () => {
   const f = fixture(), caps = { maxCallsPerEvent: 2, maxOutputTokens: 1000, dailyCalls: 20, eventTimeoutMs: 5000 };
   expect(await updateSettings(f.call, { timezone: "Asia/Shanghai", moduleModel: caps })).toEqual({ settings: kernel });
-  expect(f.calls).toEqual([["settings.update", { settings: JSON.stringify({ timezone: "Asia/Shanghai", moduleModel: caps }) }], ["settings.get", {}]]);
+  expect(f.calls).toEqual([["settings.update", { timezone: "Asia/Shanghai", moduleModel: caps }], ["settings.get", {}], ["activity.usage", { limit: 100 }]]);
   f.calls.length = 0;
   await updateSettings(f.call, {});
-  expect(f.calls).toEqual([["settings.get", {}]]);
+  expect(f.calls).toEqual([["settings.get", {}], ["activity.usage", { limit: 100 }]]);
 });
 test.each([null, 1, 45, 525600])("global settings forwards explicit task timeout %j without changing other settings", async runTimeoutMinutes => {
   const f = fixture();
   const call = async (target: string, args?: Args) => target === "settings.get" ? { ...kernel, runTimeoutMinutes } : f.call(target, args);
   expect(await updateSettings(call, { runTimeoutMinutes })).toEqual({ settings: { ...kernel, runTimeoutMinutes } });
-  expect(f.calls).toEqual([["settings.update", { settings: JSON.stringify({ runTimeoutMinutes }) }]]);
+  expect(f.calls).toEqual([["settings.update", { runTimeoutMinutes }], ["activity.usage", { limit: 100 }]]);
 });
 test.each([0, -1, 1.5, 525601, NaN, Infinity, "45", "", false, {}, [], undefined])("global settings rejects invalid task timeout %j before a write", async runTimeoutMinutes => {
   const f = fixture();

@@ -1,7 +1,7 @@
 import { publicSystemTools } from "./tool-contract-declarations";
 import { createSettings } from "../settings";
 import { CallError, type SystemModule } from "../module-calls";
-import { entry, json, parsed, requireOwner } from "./shared";
+import { entry, json, requireOwner } from "./shared";
 
 /** Kernel governance only. Applications own their settings and preferences. */
 export const settings: SystemModule = {
@@ -13,7 +13,7 @@ export const settings: SystemModule = {
     else entry(caller);
     const service = createSettings({ db: ports.db, workspaceId, now: ports.now });
     if (name === "get") return json(await service.get());
-    if (name === "update") return json(await service.update(parsed(args.settings, "settings")));
+    if (name === "update") return json(await service.update(args));
     throw new CallError("not_found", `settings.${name} not found`);
   },
 };

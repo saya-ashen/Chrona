@@ -3,7 +3,7 @@ import { moduleManifestSchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import type { CallScope } from "./module-supervisor";
 import { finishCompletion, reserveCompletion } from "./module-model-budget";
-import { createSettings } from "./settings";
+import { createSettings, modelUsage } from "./settings";
 import { testDb } from "./test-db";
 
 const cleanups: (() => Promise<unknown>)[] = [];
@@ -57,7 +57,7 @@ for (const status of ["pending", "failed", "executed", "unknown"]) for (const ca
   const f = await fixture(cap === "daily" ? { dailyCalls: 1 } : { maxCallsPerEvent: 1 });
   await f.seed(status);
   expect((await f.reserve()).error).toBe("budget_exceeded");
-  expect((await createSettings({ ...f.ports, workspaceId: f.workspace.id }).get()).modelUsage).toMatchObject([{ module: f.module.name, calls: 1 }]);
+  expect((await modelUsage(f.db, f.workspace.id, (await f.db.workspace.findUniqueOrThrow({ where: { id: f.workspace.id } })).settings, f.ports.now()))).toMatchObject([{ module: f.module.name, calls: 1 }]);
 });
 
 test("other methods and other workspace calls do not consume model capacity", async () => {
@@ -135,4 +135,13 @@ test("reservation rejects a module or event from another durable owner", async (
   await expect(reserveCompletion(f.ports, { ...f.scope, workspaceId: foreign.id }, params, f.now)).rejects.toMatchObject({ code: "not_found" });
   await expect(reserveCompletion(f.ports, { ...f.scope, hash: "wrong" }, params, f.now)).rejects.toMatchObject({ code: "not_found" });
   expect(await f.db.moduleCall.count()).toBe(0);
+});
+
+test("reported token usage survives audit retention", async () => {
+  const f = await fixture();
+  const reservation = await f.reserve();
+  await finishCompletion(f.ports, f.workspace.id, { id: reservation.id, result: { inputTokens: 3, outputTokens: 4 }, error: null });
+  await f.db.audit.deleteMany({ where: { workspaceId: f.workspace.id } });
+  const workspace = await f.db.workspace.findUniqueOrThrow({ where: { id: f.workspace.id } });
+  expect(await modelUsage(f.db, f.workspace.id, workspace.settings, f.ports.now())).toMatchObject([{ moduleId: f.module.id, calls: 1, inputTokens: 3, outputTokens: 4 }]);
 });

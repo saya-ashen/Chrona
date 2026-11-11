@@ -1,3 +1,4 @@
+import { timers } from "./system/timers";
 import { delegateAgent } from "./agent-delegation";
 import { installAgentDelegation } from "./agent-delegation-port";
 import { registerSystemModule } from "./module-calls";
@@ -12,5 +13,5 @@ let registered = false;
 export function registerSystemModules() {
   if (registered) return;
   installAgentDelegation(delegateAgent);
-  registered = true; [approvals, modules, settings, secrets, activity].forEach(registerSystemModule);
+  registered = true; [approvals, modules, settings, secrets, activity, timers].forEach(registerSystemModule);
 }

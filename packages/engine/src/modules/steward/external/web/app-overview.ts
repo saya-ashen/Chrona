@@ -10,6 +10,7 @@ const kernelDescriptions = {
   settings: "内核运行设置与授权规则。",
   secrets: "凭据的受控存取与授权。",
   activity: "内核运行事实与消费确认。",
+  timers: "应用持久唤醒与预算。",
 };
 
 /** Only known kernel namespaces without an application identity belong in this projection. */
@@ -25,7 +26,7 @@ function notFound(module: string) {
 
 /** Web owns the page projection; discovery returns only currently reachable contracts. */
 export async function systemApps(call: Call, module?: string) {
-  const entries = kernelEntries(await call("modules.tools") as Tool[]);
+  const entries = kernelEntries(await call("modules.describe").then(page => (page as { items: unknown }).items) as Tool[]);
   if (module === undefined) return entries;
   const entry = entries.find(item => item.name === module);
   if (!entry) throw notFound(module);
@@ -39,15 +40,15 @@ async function recentActivity(call: Call, tools: Tool[], module: string) {
 }
 
 export async function appOverview(call: Call, module: string) {
-  const tools = await call("modules.tools") as Tool[];
+  const tools = await call("modules.describe").then(page => (page as { items: unknown }).items) as Tool[];
   const system = kernelEntries(tools).find(item => item.name === module);
   if (system) return { kind: "system" as const, ...system, activity: await recentActivity(call, tools, module) };
 
-  const apps = await call("modules.list") as App[];
+  const apps = await call("modules.list").then(page => (page as { items: unknown }).items) as App[];
   const app = apps.find(item => item.id === module || item.name === module);
   if (!app) throw notFound(module);
   const [diagnostics, activity] = await Promise.all([
-    call("modules.diagnostics", { module: app.name }) as Promise<Diagnostic[]>,
+    call("modules.health", { moduleId: app.id, detail: true }).then(page => (page as { items: unknown }).items) as Promise<Diagnostic[]>,
     recentActivity(call, tools, app.name),
   ]);
   return {

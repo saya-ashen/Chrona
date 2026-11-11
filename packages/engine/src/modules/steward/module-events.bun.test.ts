@@ -22,13 +22,17 @@ afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) awai
   await installNotifyTarget(ports, workspace.id);
   const api = createStewardService(ports).forWorkspace(workspace.id);
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "event-counter", activeHash: "sdk" } });
-  const manifest = { name: "event-counter", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["notify.send"], tools: [{ name: "increment", description: "Increment and notify", parameters: { type: "object", properties: {}, required: [] } }, { name: "read", description: "Read event count", parameters: { type: "object", properties: {}, required: [] } }] };
+  const manifest = { name: "event-counter", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["notify.send"], tools: [{ name: "increment", description: "Increment and notify", parameters: { type: "object", properties: {}, required: [] },
+      output: {}
+}, { name: "read", description: "Read event count", parameters: { type: "object", properties: {}, required: [] },
+      output: {}
+}] };
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "sdk", manifest, source: "user", intent: {}, report: {}, status: "approved" } });
   const code = join(dataDir, "platform/store/sdk"); await mkdir(code, { recursive: true });
   await writeFile(join(code, "index.ts"), `
 import { on, chrona } from 'chrona';
 let count = 0;
-on('tool', async event => { if (event.id === 'increment') { count++; const key = event.id + ':' + event.firedAt + ':increment'; await chrona.call('notify.send', { key, level: 'now', title: 'Incremented', body: String(count) }, { mode: 'async', key }); } return { result: { count } }; });
+on('tool', async event => { if (event.id === 'increment') { count++; const key = event.id + ':' + event.firedAt + ':increment'; await chrona.call({moduleId:chrona.dependencies.notify,tool:'send'}, { key, level: 'now', title: 'Incremented', body: String(count) }, { mode: 'async', key }); } return { result: { count } }; });
 `);
   expect(await api.modules.callTool("m_event_counter_increment", {})).toEqual({ result: { count: 1 } });
   expect(await api.modules.callTool("m_event_counter_read", {})).toEqual({ result: { count: 1 } });

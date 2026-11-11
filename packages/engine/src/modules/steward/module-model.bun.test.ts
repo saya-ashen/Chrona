@@ -14,7 +14,7 @@ async function fixture(settings = {}) {
 
 test("kernel settings default to disabled; owner can configure, preserve, and disable budgets", async () => {
   const f = await fixture();
-  expect(await f.service.get()).toEqual({ timezone: "Asia/Shanghai", runTimeoutMinutes: null, moduleModel: null, modelUsage: [] });
+  expect(await f.service.get()).toEqual({ wake: { minIntervalMs: 60_000, dailyLimit: 1000, moduleDailyLimit: 100 }, timezone: "Asia/Shanghai", runTimeoutMinutes: null, moduleModel: null });
   expect((await f.service.update({ moduleModel: limits })).moduleModel).toEqual(limits);
   expect((await f.service.update({ timezone: "UTC" })).moduleModel).toEqual(limits);
   expect((await f.service.update({ moduleModel: null })).moduleModel).toBeNull();

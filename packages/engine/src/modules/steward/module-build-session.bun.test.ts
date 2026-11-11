@@ -439,15 +439,14 @@ test("private multi-module diagnostics require a declared target and fail closed
 test("private proposals reject public tools without an output contract before executing tests", async () => {
   const f = await fixture();
   await f.writeModule(f.requester.cwd);
-  await writeFile(join(f.requester.cwd, "mail-sort/module.json"), JSON.stringify({ ...manifest, tools: [{ name: "read", description: "Read", idempotent: true, visibility: ["modules"], parameters: { type: "object", properties: {} } }] }));
+  await writeFile(join(f.requester.cwd, "mail-sort/module.json"), JSON.stringify({ ...manifest, tools: [{ name: "read", description: "Read", visibility: ["modules"], parameters: { type: "object", properties: {} } }] }));
+  let executed = 0;
+  f.ports.sandbox!.runModule = async () => { executed++; throw new Error("Invalid material must not execute"); };
   const modules = createModules(f.ports, f.workspaceId);
   const proposal = await modules.propose({ root: f.requester.cwd, dir: request.name, intent }, "provider");
-  expect(proposal.status).toBe("building");
-  let executed = 0;
-  const run = f.ports.sandbox!.runModule!;
-  f.ports.sandbox!.runModule = async input => { executed++; return run(input); };
   await modules.buildPending();
-  expect(await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: proposal.moduleId!, hash: proposal.hash } } })).toMatchObject({ status: "rejected", report: { errors: ["Public tool read must declare an output schema"] } });
+  expect(proposal).toMatchObject({ status: "rejected", moduleId: null });
+  expect(await f.db.moduleVersion.count({ where: { module: { workspaceId: f.workspaceId } } })).toBe(0);
   expect(executed).toBe(0);
 });
 

@@ -61,7 +61,10 @@ export function createApprovals(context: RecordContext & { ports?: StewardPorts 
       const input = parseInput(resolveApprovalSchema, raw);
       const row = await tx.approval.findFirst({ where: { workspaceId, id } });
       if (!row) throw new StewardError("not_found", "Approval not found");
-      if (row.status !== "open") throw new StewardError("conflict", "Approval already resolved");
+      if (row.status !== "open") {
+        if (row.status !== (input.decision === "approve" ? "approved" : "denied")) throw new StewardError("conflict", "Approval already resolved differently");
+        return { approval: toApproval(row), grantId: null, payload: null, request: isModuleRequest(row.payload) };
+      }
       if (input.decision === "approve") await approve(tx, workspaceId, row);
       const grantId = null;
       const changed = await tx.approval.updateMany({ where: { workspaceId, id, status: "open" }, data: { status: input.decision === "approve" ? "approved" : "denied", scope: input.scope, grantId, resolvedAt: now() } });

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /** Public kernel namespaces, reserved independently of database initialization. */
-export const KERNEL_MODULE_NAMES = ["modules", "approvals", "settings", "secrets", "activity"] as const;
+export const KERNEL_MODULE_NAMES = ["modules", "approvals", "settings", "secrets", "activity", "timers"] as const;
 export const RESERVED_ENTRY_NAMES = ["rescue"] as const;
 /** Private kernel host identities routed internally; never installable applications. */
 export const LOCAL_CAPABILITY_NAMES = ["runtime-callback", "workspace-local"] as const;

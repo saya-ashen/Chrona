@@ -147,7 +147,9 @@ test("queued callbacks cannot switch to a same-name reinstall or a changed tool 
   for (const change of ["reinstall", "contract"] as const) {
     const f = await fixture(); let starts = 0;
     f.ports.sandbox = { available: true, isolated: false, startModule() { starts++; throw new Error("Callback must be refused before execution"); } };
-    const manifest = moduleManifestSchema.parse({ ...fixtures.external.manifest, tools: [{ name: "receive", description: "Fixture", parameters: { type: "object", properties: {}, required: [] }, visibility: ["kernel"], idempotent: true }] });
+    const manifest = moduleManifestSchema.parse({ ...fixtures.external.manifest, tools: [{ name: "receive", description: "Fixture", parameters: { type: "object", properties: {}, required: [] }, visibility: ["kernel"], idempotent: true,
+        output: {}
+    }] });
     const row = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "alpha", activeHash: "a".repeat(64) } });
     await f.db.moduleVersion.create({ data: { moduleId: row.id, hash: row.activeHash!, status: "approved", source: "user", manifest, intent: {}, report: {} } });
     const call = await enqueueCall({ tx: f.db, ports: f.ports, origin: kernelOrigin(f.workspaceId), target: "alpha.receive", raw: {} }, { key: "callback-one" });
@@ -236,7 +238,9 @@ test("approval creation refuses Agent updates, removal and forged identities wit
 test.each(["web", "notify", "other-entry"])("list and interface projections expose ordinary entry %s removal without overwriting permission descriptions", async name => {
   const f = await fixture(); createStewardService(f.ports);
   const row = await f.db.module.create({ data: { workspaceId: f.workspaceId, name, builtin: false, activeHash: "a".repeat(64) } });
-  const manifest = moduleManifestSchema.parse({ ...fixtures.external.manifest, name, uses: ["*"] });
+  const manifest = moduleManifestSchema.parse({ ...fixtures.external.manifest, name, uses: ["*"],
+      authority: "owner"
+});
   await f.db.moduleVersion.create({ data: { moduleId: row.id, hash: row.activeHash!, source: "user", status: "approved", manifest, intent: {}, report: {} } });
   const [list] = await createModules(f.ports, f.workspaceId).list();
   expect(list).toMatchObject({ origin: "external", capabilities: { build: true, rollback: true, remove: true, install: false } });

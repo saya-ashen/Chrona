@@ -5,32 +5,46 @@ import { readFile } from "node:fs/promises";
 import { createLoopbackChannel } from "./transport";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
-import type { Trigger } from "./sdk";
+import type { Trigger, CallOptions } from "./sdk";
 
 type Call = { id: string; method: string; params: Record<string, unknown> };
 type Event = { trigger: Trigger; now: string; params: Record<string, string | number | boolean> };
 type Reply = { id: string; result?: { result?: unknown }; error?: string };
 /** The directories the module under test sees (same variables as `chrona.paths`). */
 export const paths = { module: process.env.CHRONA_MODULE ?? process.cwd(), data: process.env.CHRONA_DATA ?? "/data", content: process.env.CHRONA_CONTENT ?? "/content" };
-type Stub = (params: Record<string, unknown>) => unknown | Promise<unknown>;
+type Stub = (params: Record<string, unknown>, options: CallOptions) => unknown | Promise<unknown>;
 function findStub(stubs: Record<string, Stub>, target: string) {
   return Object.hasOwn(stubs, target) ? stubs[target] : undefined;
 }
 // eslint-disable-next-line complexity -- Keep fake-kernel credential authorization and stub fallbacks together to preserve test protocol behavior.
-async function effectReply(target: string, args: Record<string, unknown>, stubs: Record<string, Stub>, manifest: { secrets?: (string | { name: string })[] }): Promise<unknown> {
+async function effectReply(target: string, args: Record<string, unknown>, stubs: Record<string, Stub>, manifest: { secrets?: (string | { name: string })[] }, options: CallOptions): Promise<unknown> {
   if (target === "secrets.get" || target === "secrets.authorize" || target === "secrets.token") {
     // Entry modules (the page) may authorize any credential; the kernel enforces who.
     const listed = target === "secrets.authorize" || (manifest.secrets ?? []).some(secret => (typeof secret === "string" ? secret : secret.name) === String(args.name)), stub = findStub(stubs, target) ?? (target === "secrets.get" ? findStub(stubs, "secret") : undefined);
-    return listed && stub ? { result: { output: await stub(args) } } : { error: { code: listed ? "unavailable" : "forbidden", message: "No secret in tests" } };
+    return listed && stub ? { result: { output: await stub(args, options) } } : { error: { code: listed ? "unavailable" : "forbidden", message: "No secret in tests" } };
   }
   const stub = findStub(stubs, target);
-  return { result: { output: stub ? await stub(args) ?? null : null } };
+  return { result: { output: stub ? await stub(args, options) ?? null : null } };
 }
-async function callReply(call: Call, stubs: Record<string, Stub>, manifest: { secrets?: (string | { name: string })[] }, seen: Set<string>, completions: Map<string, unknown>): Promise<unknown> {
+type TestState = { stubs: Record<string, Stub>; manifest: { secrets?: (string | { name: string })[] }; seen: Set<string>; completions: Map<string, unknown>; bindings: Record<string, string> };
+function updateBindings(target: string, reply: unknown, bindings: Record<string, string>) {
+  if (target !== "modules.list" && target !== "modules.describe") return;
+  const output = (reply as { result: { output: { items: { id: string; name: string; moduleId?: string; target?: unknown }[] } | null } }).result.output;
+  if (!Array.isArray(output?.items)) return;
+  for (const row of output.items) {
+    if (target === "modules.list") bindings[row.name] = row.id;
+    else if (row.moduleId && typeof row.target === "string") bindings[row.target.split(".")[0]!] = row.moduleId;
+  }
+}
+function initialBindings(uses: string[] = [], names: string[], ownName?: string) {
+  return Object.fromEntries([...uses, ...names, ...(ownName ? [ownName] : [])].map(target => target.split(".")[0]!).filter(name => name !== "*").map(name => [name, name]));
+}
+async function callReply(call: Call, { stubs, manifest, seen, completions, bindings }: TestState): Promise<unknown> {
   if (call.method === "callStatus") return { result: { callId: String(call.params.callId), status: "queued" } };
-  const target = String(call.params.target), args = (call.params.args ?? {}) as Record<string, unknown>;
+  const address = call.params.target as string | { moduleId: string; tool: string };
+  const target = typeof address === "string" ? address : `${Object.entries(bindings).find(([, id]) => id === address.moduleId)?.[0] ?? address.moduleId}.${address.tool}`, args = (call.params.args ?? {}) as Record<string, unknown>;
   if (target.startsWith("agent.") && !findStub(stubs, target)) {
-    const result = await agentReply(target, args, completions);
+    const result = await agentReply(target, args, completions, call.params.key);
     if (result) return result;
   }
   if (call.params.mode === "async") {
@@ -39,16 +53,20 @@ async function callReply(call: Call, stubs: Record<string, Stub>, manifest: { se
     seen.add(key);
     return { result: { callId: call.id, status: "queued", duplicate } };
   }
-  return effectReply(target, args, stubs, manifest);
+  const reply = await effectReply(target, args, stubs, manifest, { key: call.params.key as string | undefined, mode: call.params.mode as CallOptions["mode"] });
+  updateBindings(target, reply, bindings);
+  return reply;
 }
 /**
  * Fake kernel for author tests. No call ever executes a real external effect. Routed calls answer from
  * `stubs["<module>.<tool>"]` (sync: its value is the output), built-in Agent fixtures, or a queued call.
  * `stubs.secret` also supplies secrets.get.
  */
-export async function startModule(entry: string | ExplicitModuleEntry, { stubs = {} }: { stubs?: Record<string, (params: Record<string, unknown>) => unknown | Promise<unknown>> } = {}) {
-  const manifest = JSON.parse(await readFile(join(process.env.CHRONA_MODULE ?? process.cwd(), "module.json"), "utf8")) as { effects: string[]; uses?: string[]; secrets?: (string | { name: string })[] };
+export async function startModule(entry: string | ExplicitModuleEntry, { stubs = {} }: { stubs?: Record<string, Stub> } = {}) {
+  const manifest = JSON.parse(await readFile(join(process.env.CHRONA_MODULE ?? process.cwd(), "module.json"), "utf8")) as { name?: string; effects: string[]; uses?: string[]; secrets?: (string | { name: string })[] };
+  const bindings = initialBindings(manifest.uses, Object.keys(stubs), manifest.name);
   const calls: Call[] = [], seen = new Set<string>(), completions = new Map<string, unknown>();
+  const state = { stubs, manifest, seen, completions, bindings };
   let closed = false;
   const pending = new Map<string, { resolve(reply: Reply): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }>();
   function fail(error = new Error("Module disconnected")) {
@@ -61,8 +79,10 @@ export async function startModule(entry: string | ExplicitModuleEntry, { stubs =
     if ("method" in value && typeof value.method === "string") {
       const call = value as Call;
       calls.push(call);
-      const reply = await callReply(call, stubs, manifest, seen, completions);
-      channel.send({ id: call.id, ...reply as object });
+      try {
+        const reply = await callReply(call, state);
+        channel.send({ id: call.id, ...reply as object });
+      } catch (error) { channel.send({ id: call.id, error: { code: "failed", message: error instanceof Error ? error.message : String(error) } }); }
       return;
     }
     const request = pending.get(value.id);
@@ -77,7 +97,7 @@ export async function startModule(entry: string | ExplicitModuleEntry, { stubs =
   const loader = process.env.CHRONA_SDK_LOADER ?? join(import.meta.dirname, "chrona-sdk-loader.ts");
   let task: ReturnType<typeof spawnSupervised>;
   try {
-    const env: NodeJS.ProcessEnv = { ...process.env, CHRONA_SDK: process.env.CHRONA_SDK ?? import.meta.dirname, CHRONA_IPC_ENDPOINT: channel.endpoint, CHRONA_IPC_TOKEN: channel.token };
+    const env: NodeJS.ProcessEnv = { ...process.env, CHRONA_SDK: process.env.CHRONA_SDK ?? import.meta.dirname, CHRONA_IPC_ENDPOINT: channel.endpoint, CHRONA_IPC_TOKEN: channel.token, CHRONA_MODULE_BINDINGS: JSON.stringify(bindings) };
     delete env.CHRONA_SOCKET; delete env.CHRONA_HTTP_SOCKET;
     const command = typeof entry === "string"
       ? { program: process.execPath, argv: ["--no-install", ...(process.env.CHRONA_SDK_LOADER || existsSync(loader) ? ["--preload", loader] : []), entry] }
@@ -117,7 +137,7 @@ export async function startModule(entry: string | ExplicitModuleEntry, { stubs =
         void channel.ready.then(() => {
           if (closed) throw new Error("Module disconnected");
           if (pending.has(id)) {
-            channel.send({ id, event });
+            channel.send({ id, event: { ...event, bindings } });
           }
         }).catch(error => { pending.delete(id); clearTimeout(timer); reject(error); });
       }));
@@ -131,13 +151,13 @@ export async function startModule(entry: string | ExplicitModuleEntry, { stubs =
   };
 }
 
-async function agentReply(target: string, args: Record<string, unknown>, completions: Map<string, unknown>) {
+async function agentReply(target: string, args: Record<string, unknown>, completions: Map<string, unknown>, key: unknown) {
   if ((target === "agent.context" || target === "agent.run")) {
-    const key = `${target}:${String(args["request-key"])}`;
-    return { result: { output: target === "agent.context" ? { contextId: key } : { contextId: args["context-id"], runId: key, status: "queued", active: true } } };
+    const receiptId = `${target}:${String(key)}`;
+    return { result: { output: target === "agent.context" ? { contextId: receiptId } : { contextId: args["context-id"], runId: receiptId, status: "queued", active: true } } };
   }
   if (target === "agent.complete") {
-    const operationId = String(args["command-key"]);
+    const operationId = String(key);
     if (!completions.has(operationId)) completions.set(operationId, { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 });
     return { result: { output: { operationId } } };
   }

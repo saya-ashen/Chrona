@@ -1,3 +1,4 @@
+import { apiPage } from "../api-page";
 import { publicSystemTools } from "./tool-contract-declarations";
 import { secretNames, moduleManifestSchema, type ModuleManifest } from "@chrona/contracts/steward";
 import { CallError, type Caller, type SystemModule } from "../module-calls";
@@ -7,7 +8,7 @@ import { resolveOAuthDefinition } from "../oauth-definition";
 import { kernelField } from "../secret-fields";
 import { audit } from "../audit";
 import type { StewardPorts } from "../ports";
-import { entry, json, parsed, requireOwner } from "./shared";
+import { entry, json, requireOwner } from "./shared";
 import { isOwnerCaller } from "../module-owner";
 
 /**
@@ -34,7 +35,7 @@ async function approvedCallerManifest(db: StewardPorts["db"], workspaceId: strin
   return manifest?.name === caller.module ? manifest : null;
 }
 function secretValue(raw: unknown) {
-  const value = parsed(raw, "value");
+  const value = raw;
   if (!value || typeof value !== "object" || Array.isArray(value) || !Object.keys(value).length || Object.keys(value).length > 20
     || !Object.entries(value).every(([key, field]) => /^[A-Za-z][A-Za-z0-9_]{0,40}$/.test(key) && typeof field === "string" && field.length > 0 && field.length <= 8192)) {
     throw new CallError("invalid", "value must be a JSON object of 1-20 non-empty string fields");
@@ -88,8 +89,8 @@ function mergeCredentialFields(current: Record<string, string> | null, value: Re
 async function manageSecrets(ports: StewardPorts, workspaceId: string, store: ReturnType<typeof createSecrets>, name: "set" | "remove" | "list", args: Record<string, unknown>) {
   if (name === "list") {
     const saved = new Map((await store.list()).map(row => [row.name, row.updatedAt])), declared = await declaredSecrets(ports.db, workspaceId);
-    return json(await Promise.all([...new Set([...saved.keys(), ...declared.keys()])].sort()
-      .map(async secret => ({ name: secret, configured: saved.has(secret) || await ports.secretConfigured?.(secret) === true, updatedAt: saved.get(secret) ?? null, modules: declared.get(secret) ?? [] }))));
+    return json(apiPage(await Promise.all([...new Set([...saved.keys(), ...declared.keys()])].sort()
+      .map(async secret => ({ name: secret, configured: saved.has(secret) || await ports.secretConfigured?.(secret) === true, updatedAt: saved.get(secret) ?? null, modules: declared.get(secret) ?? [] }))), args, `secrets:${workspaceId}`, row => row.name));
   }
   const secret = String(args.name);
   if (!SECRET_NAME.test(secret)) throw new CallError("invalid", "Invalid credential name");

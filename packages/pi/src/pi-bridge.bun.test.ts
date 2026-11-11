@@ -40,7 +40,9 @@ test("bridge registers catalog schemas, forwards calls, never terminates or nudg
   const parameters = { type: "object", properties: { text: { type: "string" } }, required: ["text"] };
   const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
     seen.push({ url: String(url), init });
-    return Response.json(String(url).endsWith("/catalog") ? { tools: [{ name: "chrona_reply", description: "Reply", parameters }] } : { ok: true, data: { messageId: "id" } });
+    return Response.json(String(url).endsWith("/catalog") ? { tools: [{ name: "chrona_reply", description: "Reply", parameters,
+        output: {}
+    }] } : { ok: true, data: { messageId: "id" } });
   }) as typeof fetch;
   await withBridge(base, fetcher, async tools => {
     // Every tool also takes timeoutSeconds (v2-13): how long the caller lets this call take.
@@ -52,7 +54,7 @@ test("bridge registers catalog schemas, forwards calls, never terminates or nudg
     expect(seen[0].init?.method).toBe("GET"); expect(seen[1].init?.method).toBe("POST");
     expect(seen[1].init?.body).toBe('{"text":"hello"}');
     expect(seen[1].init?.redirect).toBe("error");
-    expect(seen[1].init?.headers).toEqual({ authorization: "Bearer bridge-token", "content-type": "application/json", "x-chrona-timeout-seconds": "60" });
+    expect(seen[1].init?.headers).toEqual({ authorization: "Bearer bridge-token", "content-type": "application/json", "x-chrona-timeout-seconds": "60", "x-chrona-call-key": "call" });
     // It travels as a header, not as a tool argument; out-of-range values fall back to the default or the cap.
     await tools[0].execute("call", { text: "wait", timeoutSeconds: 300 });
     expect(seen[2].init?.body).toBe('{"text":"wait"}');
@@ -71,7 +73,9 @@ test("bridge refuses non-loopback URLs without sending the capability", async ()
 });
 test("bridge preserves refusal and cancellation and redacts run token", async () => {
   const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
-    if (String(url).endsWith("/catalog")) return Response.json({ tools: [{ name: "chrona_schedule", description: "Schedule", parameters: {} }] });
+    if (String(url).endsWith("/catalog")) return Response.json({ tools: [{ name: "chrona_schedule", description: "Schedule", parameters: {},
+        output: {}
+    }] });
     init?.signal?.throwIfAborted();
     return Response.json({ ok: false, error: { code: "forbidden", message: "bridge-token refused" } });
   }) as typeof fetch;

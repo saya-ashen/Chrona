@@ -36,9 +36,9 @@ async function fixture() {
 const management: { system: SystemModule; tool: string; args?: Record<string, unknown> }[] = [
   { system: approvals, tool: "list" },
   { system: approvals, tool: "resolve", args: { approval: "missing", decision: "approve" } },
-  { system: settings, tool: "update", args: { settings: '{"timezone":"UTC"}' } },
+  { system: settings, tool: "update", args: { timezone: "UTC" } },
   { system: secrets, tool: "list" },
-  { system: secrets, tool: "set", args: { name: "demo_key", value: '{"key":"private"}' } },
+  { system: secrets, tool: "set", args: { name: "demo_key", value: { key: "private" } } },
   { system: secrets, tool: "remove", args: { name: "demo_key" } },
   { system: activity, tool: "consumer" },
 ];
@@ -58,7 +58,9 @@ test("management tools are owner-visible and deny exact uses, root listeners and
 });
 
 test("owner authority binds workspace, id, name, active hash/status and approved parsed wildcard version", async () => {
-  const f = await fixture(), caller = await f.moduleNamed("checked", { uses: ["*"] });
+  const f = await fixture(), caller = await f.moduleNamed("checked", { uses: ["*"],
+      authority: "owner"
+});
   expect(await isOwnerCaller(f.db, f.workspaceId, caller)).toBe(true);
   expect(await f.db.$transaction(tx => isOwnerCaller(tx, f.workspaceId, caller))).toBe(true);
   for (const bad of [{ ...caller, moduleId: "missing" }, { ...caller, module: "forged" }, { ...caller, hash: "stale" }, { kind: "system", module: "web" }, { kind: "kernel" }, { kind: "provider", runId: "run" }] satisfies Caller[]) {
@@ -78,7 +80,11 @@ test("owner authority binds workspace, id, name, active hash/status and approved
   await f.db.moduleVersion.update({ where, data: { status: "candidate" } });
   expect(await isOwnerCaller(f.db, f.workspaceId, caller)).toBe(false);
   await expect(f.direct(caller, secrets, "list")).rejects.toMatchObject({ code: "forbidden" });
-  for (const manifest of [{ name: "checked", uses: ["*"] }, { name: "forged", entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: ["*"] }]) {
+  for (const manifest of [{ name: "checked", uses: ["*"],
+      authority: "owner"
+}, { name: "forged", entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: ["*"],
+      authority: "owner"
+}]) {
     await f.db.moduleVersion.update({ where, data: { status: "approved", manifest } });
     expect(await isOwnerCaller(f.db, f.workspaceId, caller)).toBe(false);
   }
@@ -86,20 +92,22 @@ test("owner authority binds workspace, id, name, active hash/status and approved
 
 test("checked wildcard and real owners manage resources while preserving caller provenance and secret declarations", async () => {
   const f = await fixture();
-  const wildcard = await f.moduleNamed("checked", { uses: ["*"] });
+  const wildcard = await f.moduleNamed("checked", { uses: ["*"],
+      authority: "owner"
+});
   const ordinary = await f.moduleNamed("ordinary");
   for (const caller of [wildcard, { kind: "owner", via: null }, { kind: "owner", via: "web" }] satisfies Caller[]) {
     expect(await isOwnerCaller(f.db, f.workspaceId, caller)).toBe(true);
-    expect(await f.routed(caller, "approvals.list")).toMatchObject({ output: [] });
-    const updated = await f.routed(caller, "settings.update", { settings: '{"timezone":"UTC"}' });
+    expect(await f.routed(caller, "approvals.list")).toMatchObject({ output: { items: [], nextCursor: null } });
+    const updated = await f.routed(caller, "settings.update", { timezone: "UTC" });
     expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: updated.callId } })).toMatchObject({
       caller: caller.kind === "module" ? `module:${caller.moduleId}` : "owner",
       callerModuleId: caller.kind === "module" ? caller.moduleId : null,
       callerHash: caller.kind === "module" ? caller.hash : null,
     });
-    await f.routed(caller, "activity.consumer", { module: ordinary.moduleId });
-    await f.routed(caller, "secrets.set", { name: "demo_key", value: '{"key":"private"}' });
-    expect(await f.routed(caller, "secrets.list")).toMatchObject({ output: [{ name: "demo_key", configured: true }] });
+    await f.routed(caller, "activity.consumer", { moduleId: ordinary.moduleId });
+    await f.routed(caller, "secrets.set", { name: "demo_key", value: { key: "private" } });
+    expect(await f.routed(caller, "secrets.list")).toMatchObject({ output: { items: [{ name: "demo_key", configured: true }] } });
     await expect(f.direct(caller, secrets, "get", { name: "demo_key" })).rejects.toMatchObject({ code: "forbidden" });
     const approval = await f.api.approvals.create({ action: "modify_external", moduleId: ordinary.moduleId, title: "Decide", detail: "", preview: "", payload: {} });
     for (const scope of ["once", "always"]) {
@@ -112,7 +120,7 @@ test("checked wildcard and real owners manage resources while preserving caller 
   }
   expect(await f.direct(ordinary, settings, "get")).toHaveProperty("timezone", "UTC");
   for (const caller of [wildcard, { kind: "owner", via: null }] satisfies Caller[]) {
-    const discovered = await f.routed(caller, "modules.tools", { query: "approvals" });
+    const discovered = await f.routed(caller, "modules.describe", { query: "approvals" });
     expect(discovered.output).not.toEqual(expect.arrayContaining([expect.objectContaining({ target: "approvals.grants" })]));
     expect(discovered.output).not.toEqual(expect.arrayContaining([expect.objectContaining({ target: "approvals.revoke-grant" })]));
     for (const target of ["approvals.grants", "approvals.revoke-grant", "schedules.list", "schedules.create", "projects.list"]) {

@@ -94,7 +94,7 @@ test("expiry rejects late approval and returns cancellation; queued notice is su
 test("restart/no live process cannot reuse pending requests", async () => {
   const f = await fixture(), result = f.channel.events.question(question(), f.controller.signal), request = await waiting();
   liveRuns.delete(f.run.id);
-  const views = await providerRuns({ db, workspaceId, now: ports.now }, undefined, () => false, () => false);
+  const views = await providerRuns({ db, workspaceId, now: ports.now }, {}, () => false, () => false);
   expect(views[0]!.interactions[0]!.status).toBe("interrupted");
   await expect(api.provider.answer(request.id, { decision: "submit", value: true })).rejects.toMatchObject({ code: "conflict" });
   f.controller.abort(); expect(await result).toEqual({ decision: "cancel" });

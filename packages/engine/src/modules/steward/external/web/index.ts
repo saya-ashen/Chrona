@@ -1,3 +1,4 @@
+import { applicationCall } from "./kernel-client";
 import { chrona, on } from "chrona";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -21,7 +22,7 @@ const files: Record<string, string> = { "/app.js": "text/javascript; charset=utf
 const headers = { "cache-control": "no-cache", "x-content-type-options": "nosniff", "referrer-policy": "same-origin",
   "content-security-policy": "default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob:; frame-src blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'" };
 const preferences = createPreferences(chrona.paths.data);
-const call = (target: string, args: Args = {}) => target === "web.settings" ? preferences.tool(args) : chrona.call(target, Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined)));
+const call = (target: string, args: Args = {}) => target === "web.settings" ? preferences.tool(args) : applicationCall(target, Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined)), /^modules\.(enable|disable|rollback|remove)$/.test(target) ? { key: typeof args.requestKey === "string" ? args.requestKey : crypto.randomUUID() } : {});
 const ownSettings = new Map<string, (args: Args) => Promise<unknown>>([
   ["web.ui-settings", args => webSettings(call, preferences, args)],
   ["web.ui-preferences", args => webPreferences(call, args)],
@@ -62,8 +63,8 @@ function events() {
   return new Response(body, { headers: { "content-type": "text/event-stream", "cache-control": "no-cache" } });
 }
 // Pages apps register (module-dependency-direction §4); `tools` is what this page may call of that app.
-const pages = createPages({ dataDir: chrona.paths.data, modules: () => call("modules.list") as Promise<ModuleState[]>, tools: async module => {
-  const tools = await call("modules.tools", { query: module, audience: "user" }) as (PageTool & { target: string })[];
+const pages = createPages({ dataDir: chrona.paths.data, modules: () => call("modules.list").then(page => (page as { items: unknown }).items) as Promise<ModuleState[]>, tools: async module => {
+  const tools = await call("modules.describe", { query: module, audience: "user" }).then(page => (page as { items: unknown }).items) as (PageTool & { target: string })[];
   return new Map(tools.filter(tool => tool.target.startsWith(`${module}.`)).map(tool => [tool.target.slice(module.length + 1), tool]));
 } });
 on("tool", async (event: { id: string; args: Args; caller?: Caller }) => {
@@ -79,7 +80,7 @@ on("tool", async (event: { id: string; args: Args; caller?: Caller }) => {
 });
 
 on("activated", async () => {
-  const modules = await call("modules.list") as ModuleState[];
+  const modules = await call("modules.list").then(page => (page as { items: unknown }).items) as ModuleState[];
   const own = modules.find(module => module.name === "web" && module.status === "active" && module.activeHash);
   if (own) await pages.tool("page-set", WEB_SETTINGS_PAGE, { kind: "module", module: "web", moduleId: own.id });
 });
@@ -125,10 +126,10 @@ async function settingsRoute({ request, path }: ApiContext): Promise<ApiResult> 
 async function secretRoute({ request, path, body }: ApiContext): Promise<ApiResult> {
   if (request.method !== "POST" || path[0] !== "secrets") return NO_ROUTE;
   // The page saves field by field: what is left blank keeps its saved value (v2-16 §2.1).
-  if (path.length === 2) return call("secrets.set", { name: path[1], value: JSON.stringify(body.value), merge: true });
+  if (path.length === 2) return call("secrets.set", { name: path[1], value: body.value, merge: true });
   if (path[2] === "remove" && path.length === 3) return call("secrets.remove", { name: path[1], ...(typeof body.field === "string" ? { field: body.field } : {}) });
   // v2-30 §4: the scopes come from the declaring app's manifest, shown on the page.
-  if (path[2] === "authorize" && path.length === 3) return call("secrets.authorize", { name: path[1], provider: body.provider, scopes: body.scopes, ...(body.account ? { account: body.account } : {}) });
+  if (path[2] === "authorize" && path.length === 3) return call("secrets.authorize", { name: path[1], provider: body.provider, scopes: typeof body.scopes === "string" ? body.scopes.split(/\s+/).filter(Boolean) : body.scopes, ...(body.account ? { account: body.account } : {}) });
   return NO_ROUTE;
 }
 async function runRoute({ request, path, body }: ApiContext): Promise<ApiResult> {
@@ -142,12 +143,12 @@ async function runRoute({ request, path, body }: ApiContext): Promise<ApiResult>
 }
 // /modules/<module>/<view>: read-only views, and (v2-23) one app's page in one read and its own settings.
 const MODULE_ROUTES: Record<string, (module: string, body: Args) => Promise<unknown>> = {
-  "GET diagnostics": module => call("modules.diagnostics", { module }),
+  "GET diagnostics": module => call("modules.health", { moduleId: chrona.dependencies[module] ?? module, detail: true }).then(page => (page as { items: unknown }).items),
   "GET overview": module => appOverview(call, module),
-  "POST disable": module => call("modules.disable", { module, reason: "用户在网页操作" }),
-  "POST enable": module => call("modules.enable", { module, reason: "用户在网页操作" }),
-  "POST remove": module => call("modules.remove", { module, reason: "用户在网页申请删除应用" }),
-  "POST rollback": (module, body) => call("modules.rollback", { module, hash: body.hash }),
+  "POST disable": module => call("modules.disable", { moduleId: module, reason: "用户在网页操作" }),
+  "POST enable": module => call("modules.enable", { moduleId: module, reason: "用户在网页操作" }),
+  "POST remove": module => call("modules.remove", { moduleId: module, reason: "用户在网页申请删除应用" }),
+  "POST rollback": (module, body) => call("modules.rollback", { moduleId: module, hash: body.hash, reason: "用户在网页回滚应用" }),
 };
 async function moduleRoute({ request, path, body }: ApiContext): Promise<ApiResult> {
   const route = `${request.method} ${path[2]}`;
@@ -180,17 +181,17 @@ async function api(request: Request, path: string[]) {
     },
     "GET /settings": () => getSettings(),
     "POST /settings": () => updateSettings(call, body),
-    "GET /runs": async () => [...await conversations.runs(), ...await call("activity.runs") as unknown[]],
+    "GET /runs": async () => [...await conversations.runs(), ...await call("activity.runs").then(page => (page as { items: unknown }).items) as unknown[]],
     // v2-18: the kernel's activity trail, worded by the kernel; the page only shows it.
     "GET /activity": () => call("notify.activity", { ...(url.searchParams.get("module") ? { module: url.searchParams.get("module") } : {}), ...(url.searchParams.get("before") ? { before: url.searchParams.get("before") } : {}) }),
-    "GET /modules": () => call("modules.list"),
-    "GET /credentials": () => call("secrets.list"),
+    "GET /modules": () => call("modules.list").then(page => (page as { items: unknown }).items),
+    "GET /credentials": () => call("secrets.list").then(page => (page as { items: unknown }).items),
     "GET /pages": () => listPages(),
     // Memory discovery and selection belong to this entry application.
     "GET /memory": () => memoryView(call, "web", url.searchParams.get("query") ?? undefined),
     "POST /memory/forget": () => memoryForget(call, "web", body.id),
     "GET /system-apps": () => systemApps(call, url.searchParams.get("module") ?? undefined),
-    "GET /tools": () => call("modules.tools", { query: url.searchParams.get("query") ?? undefined, audience: "user" }),
+    "GET /tools": () => call("modules.describe", { query: url.searchParams.get("query") ?? undefined, audience: "user" }).then(page => (page as { items: unknown }).items),
     "POST /call": () => moduleCall(body),
   };
   if (Object.hasOwn(routes, context.route)) return routes[context.route]!(context);
@@ -215,7 +216,7 @@ async function moduleCall(body: Args) {
 }
 async function invokeUserTool(target: string, args: Args, tool: UserTool, expectedTarget?: TargetPin) {
   const own = ownSettings.get(target);
-  if (!own) return chrona.call(target, args, expectedTarget ? { expectedTarget } : undefined);
+  if (!own) return applicationCall(target, args, expectedTarget ? { expectedTarget } : undefined);
   // Discovery admits the actual SDK caller against its current approved owner authority.
   // Own business dispatch avoids a routed self-call, retaining the page's identity and contract pins.
   if (!expectedTarget || tool.moduleId !== expectedTarget.moduleId || tool.contractHash !== expectedTarget.contractHash) throw Object.assign(new Error("页面或工具已变化，请重新打开页面"), { code: "conflict" });
@@ -226,7 +227,7 @@ async function invokeUserTool(target: string, args: Args, tool: UserTool, expect
   return output;
 }
 async function userTool(target: string) {
-  const tools = await call("modules.tools", { query: target, audience: "user" }) as UserTool[];
+  const tools = await call("modules.describe", { query: target, audience: "user" }).then(page => (page as { items: unknown }).items) as UserTool[];
   const tool = tools.find(tool => tool.target === target);
   if (!tool) throw Object.assign(new Error(`Unknown user tool ${target}`), { code: "not_found" });
   return tool;
@@ -267,7 +268,7 @@ async function pageContentResponse(request: Request, module: string, id: string)
     if (!page) return new Response("没有这张图片", { status: 404, headers: imageHeaders });
     const ref = new URL(request.url).searchParams.get("ref") ?? "";
     if (!page.content || !validPageContentRef(ref, page.module)) return new Response("只能读取本应用声明的图片", { status: 403, headers: imageHeaders });
-    const file = await chrona.call(`${page.module}.${page.content.tool}`, { ref }, { expectedTarget: { moduleId: page.moduleId, contractHash: page.contracts[page.content.tool]! } }) as { base64: string; mime: string } | null;
+    const file = await chrona.call({ moduleId: page.moduleId, tool: page.content.tool }, { ref }, { expectedTarget: { moduleId: page.moduleId, contractHash: page.contracts[page.content.tool]! } }) as { base64: string; mime: string } | null;
     return rasterResponse(file, imageHeaders);
   } catch (error) {
     const { code } = error as { code?: string };

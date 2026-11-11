@@ -2,16 +2,16 @@ import { expect, test } from "bun:test";
 import * as contracts from "./index";
 
 test("shared modules inputs expose only schemas used by the public router", () => {
-  expect(Object.keys(contracts.modulesToolInputSchemas)).toEqual(["reference", "rollback"]);
-  expect(contracts.modulesToolInputSchemas.reference.parse({})).toEqual({});
-  expect(contracts.modulesToolInputSchemas.reference.parse({ target: "author.submit" })).toEqual({ target: "author.submit" });
-  expect(contracts.modulesToolInputSchemas.reference.safeParse({ target: "author.submit", dir: "checkout" }).success).toBe(false);
+  expect(Object.keys(contracts.modulesToolInputSchemas)).toEqual(["describe", "rollback"]);
+  expect(contracts.modulesToolInputSchemas.describe.parse({})).toEqual({ limit: 50, audience: "caller" });
+  expect(contracts.modulesToolInputSchemas.describe.parse({ target: { moduleId: "author-id", tool: "submit" } })).toEqual({ target: { moduleId: "author-id", tool: "submit" }, limit: 50, audience: "caller" });
+  expect(contracts.modulesToolInputSchemas.describe.safeParse({ target: { moduleId: "author-id", tool: "submit" }, dir: "checkout" }).success).toBe(false);
   expect(contracts.modulesToolInputSchemas.rollback.safeParse({ module: "example" }).success).toBe(false);
   expect(contracts.modulesToolInputSchemas.rollback.safeParse({ module: "example", hash: "a".repeat(64), dir: "checkout" }).success).toBe(false);
 });
 
-test("public kernel namespace vocabulary matches the five registered services", () => {
-  const expected: Array<(typeof contracts.KERNEL_MODULE_NAMES)[number]> = ["activity", "approvals", "modules", "secrets", "settings"];
+test("public kernel namespace vocabulary matches the six registered services", () => {
+  const expected: Array<(typeof contracts.KERNEL_MODULE_NAMES)[number]> = ["activity", "approvals", "modules", "secrets", "settings", "timers"];
   expect([...contracts.KERNEL_MODULE_NAMES].sort()).toEqual(expected);
   expect([...contracts.SYSTEM_MODULES].sort()).toEqual(expected);
 });

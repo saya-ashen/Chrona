@@ -23,9 +23,10 @@ async function fixture(source: "web" | "mcp" | "qq" = "web", discovered?: string
   const call = async (target: string, args: Args = {}): Promise<unknown> => {
     calls.push({ target, args });
     if (target === `${source}.settings`) return { provider: memory ? "memory-local" : null, autoRecall: true, autoRetain: true };
-    if (target === "modules.tools") return args.query ? ["conversation-context", "conversation-retain"].map(name => ({
-      target: `memory-local.${name}`, moduleId: "memory-id", hash: "approved-hash", inputSchema: { type: "object", properties: { snapshot: { type: "string" } }, required: ["snapshot"] },
-    })) : (discovered ?? []).map(target => ({ target }));
+    if (target === "modules.list") return { items: ["agent", "web", "qq", "mcp"].map(name => ({ id: `${name}-id`, name })), nextCursor: null };
+    if (target === "modules.describe") return { items: args.query ? ["conversation-context", "conversation-retain"].map(name => ({
+          target: `memory-local.${name}`, moduleId: "memory-id", hash: "approved-hash", inputSchema: { type: "object", properties: { snapshot: { type: "string" } }, required: ["snapshot"] },
+        })) : (discovered ?? []).map(target => ({ target, ...(!/^(modules|approvals|settings|secrets|activity|timers)\./.test(target) ? { moduleId: `${target.split(".")[0]}-id` } : {}) })), nextCursor: null };
     if (target === "memory-local.conversation-context") return { text: "用户偏好中文", recalled: true };
     if (target === "memory-local.conversation-retain") return { retained: true, through: JSON.parse(String(args.snapshot)).messages.at(-1)?.at, chars: 4 };
     if (target === "agent.context") {
@@ -41,7 +42,7 @@ async function fixture(source: "web" | "mcp" | "qq" = "web", discovered?: string
       if (failRun) { failRun = false; throw new Error("response lost"); }
       return runs.get(key);
     }
-    if (target === "modules.candidate-check") { if (delivery.unavailable) throw new Error("denied"); return delivery.receipt; }
+    if (target === "modules.receipt") { if (delivery.unavailable) throw new Error("denied"); return delivery.receipt; }
     if (target === "modules.health") { if (delivery.unavailable) throw new Error("offline"); return { items: delivery.health, nextCursor: null }; }
     if (target === "agent.get") return current;
     if (target === "agent.stream") { if (failStream) { failStream = false; throw new Error("stream unavailable"); } return stream; }
@@ -92,14 +93,14 @@ test("a lost run response requires the original send and reuses its persisted id
 });
 
 for (const [discovered, expected] of [
-  [["projects.scan", "projects.scan", "agent.run", "web.send", "qq.deliver", "mcp.call", "chat.send"], ["projects.scan"]],
+  [["projects.scan", "projects.scan", "agent.run", "web.send", "qq.deliver", "mcp.call"], ["projects.scan"]],
   [["modules.build", "modules.check", "custom.inspect"], ["modules.build", "modules.check", "custom.inspect"]],
   [[], []],
 ] as const) test(`tool selection uses only available routed targets: ${expected.join(", ") || "empty"}`, async () => {
   const f = await fixture("web", [...discovered]);
   await f.restart().send({ text: "查看工具", requestKey: "tools" });
-  expect(f.calls.find(item => item.target === "modules.tools")?.args).toEqual({ audience: "user" });
-  expect(f.calls.find(item => item.target === "agent.run")?.args.tools).toEqual([...expected]);
+  expect(f.calls.find(item => item.target === "modules.describe")?.args).toEqual({ audience: "user", limit: 100 });
+  expect(f.calls.find(item => item.target === "agent.run")?.args.tools).toEqual(expected.map(target => /^(modules|approvals|settings|secrets|activity|timers)\./.test(target) ? target : { moduleId: `${target.split(".")[0]}-id`, tool: target.split(".")[1] }));
 });
 
 test("running conversations accept supplemental input once and preserve unresolved delivery", async () => {
@@ -265,7 +266,7 @@ test("lost continuation admission freezes the tool catalog and prompt across rel
   await f.restart().continue(sent.sessionId, request);
   const requests = f.calls.filter(call => call.target === "agent.run");
   expect(requests[1]!.args).toEqual(requests[2]!.args);
-  expect(requests[2]!.args.tools).toEqual(["files.list"]);
+  expect(requests[2]!.args.tools).toEqual([{ moduleId: "files-id", tool: "list" }]);
 });
 
 test("a transcript read failure cannot hide terminal failure and a later refresh reconciles early text", async () => {
@@ -336,7 +337,7 @@ test("timeout receipt survives restart and later activation reconciles without a
   f.delivery.pages = [{ module: "music", moduleId: "music-id", hash: "b".repeat(40), id: "home", title: "音乐" }];
   const observed = await f.restart().execution(first.sessionId);
   expect(observed).toMatchObject({ status: "timed_out", active: false, canContinue: true, applicationDelivery: [{ targets: [{ activation: "active", health: "observed", pages: [{ href: "/p/music/home" }] }], browser: "unknown" }] });
-  expect(f.calls.slice(before).map(call => call.target)).toEqual(["modules.health", "modules.candidate-check"]);
+  expect(f.calls.slice(before).map(call => call.target)).toEqual(["modules.health", "modules.receipt"]);
   const reloaded = (await f.restart().messages(first.sessionId)).at(-1)!;
   expect(reloaded.id).toBe(pending.id);
   expect(reloaded.execution?.applicationDelivery).toEqual(observed?.applicationDelivery);
@@ -357,7 +358,7 @@ test("assistant receipt text and unrelated active applications never establish d
   f.delivery.health = [healthFixture()];
   await f.restart().poll();
   expect((await f.restart().execution(sent.sessionId))?.applicationDelivery).toBeUndefined();
-  expect(f.calls.some(call => call.target === "modules.health" || call.target === "modules.candidate-check")).toBe(false);
+  expect(f.calls.some(call => call.target === "modules.health" || call.target === "modules.receipt")).toBe(false);
 });
 
 for (const source of ["web", "qq", "mcp"] as const) test(`${source} reconciles a late real receipt after terminal Run and restart without replay`, async () => {

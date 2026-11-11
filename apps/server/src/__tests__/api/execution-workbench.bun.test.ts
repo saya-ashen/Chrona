@@ -2,6 +2,10 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { cp, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { BUILTIN_MODULE_NAMES, PREINSTALLED_MODULE_NAMES, moduleManifestSchema, type ExecutionPayload, type ExecutionView, type ProviderAdapter, type ProviderRunInput } from "@chrona/contracts/steward";
+import { z } from "zod";
+import { localModules, registerLocalModule } from "../../../../../packages/engine/src/modules/steward/module-registry";
+import { registerLocalRuntime } from "../../../../../packages/engine/src/modules/steward/local-runtime";
+import { tool } from "../../../../../packages/engine/src/modules/steward/system/shared";
 import { callSync } from "@chrona/engine";
 import { PrismaClient } from "@chrona/db";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
@@ -23,7 +27,7 @@ function deferred<T>() {
   const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; });
   return { promise, resolve, reject };
 }
-/** Only the Provider is a test double: routing, SDK processes, questions and persistence are real. */
+/** Controlled Provider plus a private Agent primitive shim; the HTTP, SDK and execution journal are real. */
 function controlledProvider() {
   const started: {
     input: ProviderRunInput; finish: (outcome: Outcome) => void; disconnect: () => void;
@@ -70,6 +74,15 @@ async function boot() {
   runtime = createStewardRuntime(db, { dataDir: join(root, "data"), provider: fake.provider, onError: error => { errors.push(error); } });
   runtime.ports.moduleBuiltinResources = join(root, "builtin");
   runtime.ports.packages = testReleasePackages(runtime.ports.moduleBuiltinResources);
+  registerLocalRuntime();
+  const callbacks = localModules.get("runtime-callback")!;
+  registerLocalModule({ ...callbacks, unrecorded: [...callbacks.unrecorded!, "fixture-execution"],
+    tools: [...callbacks.tools, tool("fixture-execution", "Test-only controlled execution", {}, [], { input: z.object({ tool: z.enum(methods as [string, ...string[]]), input: z.record(z.string(), z.json()) }).strict(), output: z.json(), visibility: ["modules"] })],
+    async handle(context, name, args) {
+      if (name !== "fixture-execution") return callbacks.handle(context, name, args);
+      return (await callSync(context.ports, { workspaceId: context.workspaceId, caller: context.caller, chain: [], path: [], run: context.run }, `agent.${args.tool}`, args.input)).output;
+    },
+  }, db);
   app = await createServerApp({ steward: runtime });
 }
 beforeEach(async () => {
@@ -90,14 +103,16 @@ beforeEach(async () => {
   await installAgentFixtureDependencies(join(builtin, "agent"));
   for (const name of BUILTIN_MODULE_NAMES) await seedTestModuleRelease(builtin, name);
   const manifest = moduleManifestSchema.parse({ name: "execution-test", entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, listen: "/api/execution-test",
-    uses: methods.map(method => `agent.${method}`), tools: [{ name: "dispatch", description: "Owner execution fixture", visibility: ["owner"], parameters: { type: "object", properties: { tool: { type: "string" }, input: { type: "string" } }, required: ["tool", "input"] } }] });
+    uses: ["runtime-callback.fixture-execution"], tools: [{ name: "dispatch", description: "Owner execution fixture", visibility: ["owner"], parameters: { type: "object", properties: { tool: { type: "string" }, input: { type: "string" } }, required: ["tool", "input"] },
+        output: {}
+    }] });
   const module = await db.module.create({ data: { workspaceId, name: manifest.name, activeHash: "execution-fixture", status: "active" } });
   entry = { id: module.id, hash: "execution-fixture" };
   await db.moduleVersion.create({ data: { moduleId: entry.id, hash: entry.hash, manifest, source: "user", status: "approved", intent: {}, report: {} } });
   const code = join(root, "data/platform/store", entry.hash); await mkdir(code, { recursive: true });
   await writeFile(join(code, "index.ts"), `import { chrona, on, ModelError } from "chrona";
 const methods = new Set(${JSON.stringify(methods)});
-async function dispatch(tool, input) { if (!methods.has(tool)) throw new ModelError("forbidden", "Fixture method denied"); return chrona.call("agent." + tool, input); }
+async function dispatch(tool, input) { if (!methods.has(tool)) throw new ModelError("forbidden", "Fixture method denied"); return chrona.call("runtime-callback.fixture-execution", {tool, input}); }
 on("tool", async event => ({ result: await dispatch(event.args.tool, JSON.parse(event.args.input)) }));
 chrona.serve(async request => { try { const { tool, input } = await request.json(); return Response.json({ result: await dispatch(tool, input) }); }
 catch (error) { return Response.json({ error: { code: error.code, message: error.message } }, { status: 409 }); } });`);
@@ -144,7 +159,9 @@ test("generic HTTP execution retains auth, owner visibility, private fences, que
   expect((await direct({ kind: "owner", via: null }, "execution-test.dispatch", { tool: "get", input: JSON.stringify(target(view)) })).output).toMatchObject({ runId: view.runId });
   const other = await db.module.create({ data: { workspaceId, name: "other-execution-test", activeHash: "other-fixture" } });
   await db.moduleVersion.create({ data: { moduleId: other.id, hash: "other-fixture", source: "user", status: "approved", intent: {}, report: {},
-    manifest: moduleManifestSchema.parse({ name: other.name, entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["agent.get"], tools: [{ name: "noop", description: "Unused identity fixture", visibility: ["owner"], parameters: { type: "object", properties: {} } }] }) } });
+    manifest: moduleManifestSchema.parse({ name: other.name, entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["agent.get"], tools: [{ name: "noop", description: "Unused identity fixture", visibility: ["owner"], parameters: { type: "object", properties: {} },
+        output: {}
+    }] }) } });
   await expect(direct({ kind: "module", module: other.name, moduleId: other.id, hash: "other-fixture" }, "agent.get", target(view))).rejects.toMatchObject({ code: "not_found" });
   const invocations = await db.moduleInvocation.findMany();
   expect(invocations.length).toBeGreaterThan(0);

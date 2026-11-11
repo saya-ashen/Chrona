@@ -1,8 +1,9 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
+import { onApproved } from "./module-activation";
 import { createApprovals } from "./approvals";
 import { createExecutionEventStore } from "./execution-event-store";
 import type { StewardPorts } from "./ports";
@@ -17,9 +18,9 @@ import { testDb } from "./test-db";
 const closes: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const close of closes.splice(0).reverse()) await close(); });
 const baseline = "a".repeat(40);
-const manifest = (name: string, uses: string[] = []) => moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], keepAlive: true, uses, effects: [] });
+const manifest = (name: string, uses: string[] = []) => moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], keepAlive: true, uses, authority: uses.includes("*") ? "owner" : undefined, effects: [] });
 
-async function fixture(count = 2) {
+async function fixture(count = 2, migration = false) {
   const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-fixed-recovery-"));
   closes.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "fixed recovery fixture" } });
@@ -36,16 +37,17 @@ async function fixture(count = 2) {
     await db.moduleVersion.create({ data: { moduleId: module.id, hash: baseline, manifest: manifest(name), intent: {}, report: {}, source: "user", status: "approved" } });
     const dir = join(dataDir, "platform", "content", author.id, name);
     await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, "module.json"), JSON.stringify({ ...manifest(name), secrets: [{ name: "mail", label: "Mail", fields: [], oauth: { provider: "google", authorizationUrl: "https://mail.example.test/authorize", tokenUrl: "https://mail.example.test/token", scopes: ["mail.read"] } }] }));
+    await writeFile(join(dir, "module.json"), JSON.stringify({ ...manifest(name), ...(migration ? { data: { schema: 2, migrate: "migrate.ts" } } : {}), secrets: [{ name: "mail", label: "Mail", fields: [], oauth: { provider: "google", authorizationUrl: "https://mail.example.test/authorize", tokenUrl: "https://mail.example.test/token", scopes: ["mail.read"] } }] }));
     await writeFile(join(dir, "index.ts"), "export {};");
     await writeFile(join(dir, "test.ts"), "export {};");
+    if (migration) await writeFile(join(dir, "migrate.ts"), "// offline migration fixture");
     targets.push({ name, moduleId: module.id, expectedActiveHash: baseline });
   }
   const admission = await admitCandidates(ports, workspace.id, caller, { requestKey: "admit", submitter: { moduleId: author.id, hash: baseline }, targets });
   const receipt = await submitCandidates(ports, workspace.id, caller, { admissionId: admission.admissionId, requestKey: "submit", items: targets.map(target => ({ name: target.name, dir: target.name, intent: { changes: ["Add credentials"], preserves: [] } })) });
   for (const member of receipt.members) {
     const version = await db.moduleVersion.update({ where: { id: member.versionId }, data: { status: "pending_review" } });
-    await recordGroupReview(context, version, { prefix: "Reviewed fixed material", suffix: "", codeDiff: "", detail: "Offline fixture", needsMigration: false });
+    await recordGroupReview(context, version, { prefix: "Reviewed fixed material", suffix: "", codeDiff: "", detail: "Offline fixture", needsMigration: migration });
   }
   const version = await db.moduleVersion.findUniqueOrThrow({ where: { id: receipt.members[0]!.versionId } });
   const set = await advanceFixedCandidateSet(context, version);
@@ -185,4 +187,20 @@ test("a late permanent activation conflict rolls back every approval and switch 
   expect((await advanceFixedCandidateSet(f.context, f.version))?.state).toBe("rejected");
   await expectUnchanged(f, "rejected");
   expect(await f.db.audit.count({ where: { workspaceId: f.workspace.id, kind: "module_activate" } })).toBe(0);
+});
+
+
+test("a fixed single candidate uses the existing approved data migration and preserves its backup", async () => {
+  const f = await fixture(1, true), member = f.receipt.members[0]!;
+  const data = join(f.ports.dataDir, "platform/data", member.moduleId);
+  await mkdir(data, { recursive: true }); await writeFile(join(data, "value"), "original");
+  f.ports.sandbox = { available: true, isolated: true, async runModule(input) {
+    await writeFile(join(input.dataDir, "value"), "migrated");
+    return { status: "succeeded", output: "", exitCode: 0, error: null };
+  } };
+  const approvals = createApprovals({ db: f.db, workspaceId: f.workspace.id, now: f.ports.now }, action => onApproved(f.context, action));
+  await approvals.resolve(f.approval.id, { decision: "approve" });
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: member.moduleId } })).toMatchObject({ activeHash: member.hash, dataSchema: 2, status: "active" });
+  expect(await readFile(join(data, "value"), "utf8")).toBe("migrated");
+  expect(await readFile(join(f.ports.dataDir, "platform/snapshots", member.moduleId, "schema-1", "value"), "utf8")).toBe("original");
 });

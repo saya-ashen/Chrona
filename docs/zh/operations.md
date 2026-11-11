@@ -2,7 +2,13 @@
 
 适用于重构后的单一 owner 版本。先读[快速开始与配置表](../../README.zh.md)。所有命令均在仓库根目录执行，或使用对应版本的打包 CLI；不要用旧版本可执行文件操作新库。
 
-## 当前应用状态（2026-11-09）
+## 新版 API 开发边界（2026-11-10）
+
+公开合同见[API 规范](kernel-api-design.md)，工程验证见[实施记录](kernel-api-implementation.md)。这次改造只面向全新数据目录，既有数据库继续受迁移 checksum 拒绝守卫保护；不要覆盖旧服务的数据或将旧部署验收用于新版。
+
+新增 `authority: "owner"` 的应用检查通过后仍须批准精确版本，包括 Web、QQ、MCP；预装不是审批例外。Web 尚未启用时，使用已有的认证救援页处理审批。只看到 building、pending_approval 或连接成功，都不表示入口与业务已可用。
+
+## 此前应用状态（2026-11-09，仅作运维背景）
 
 Agent 是唯一不可变内置应用；Web、Notify、QQ、Author 是普通默认预装应用。Coding 是无界面的普通可选服务，coding-web 是独立可选客户端；使用[客户端协议](coding-peer-clients-protocol.md)和[实施记录](coding-peer-clients-implementation.md)。旧 Editor 应用及安装入口已退役移除，见[退役记录](editor-retirement.md)。仅 Mind、Remind 整应用暂停并保留源码；memory-local 仅暂停定时整理。Editor 清理没有更新现有 3112 部署，下方历史升级和验收不证明清理版本已经部署。
 

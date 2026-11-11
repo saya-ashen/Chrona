@@ -15,7 +15,7 @@ import type { StewardPorts } from "./ports";
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 type Handler = Parameters<typeof testModuleProcess>[0];
-const tool = (name: string, extra: Record<string, unknown> = {}) => ({ name, description: name, parameters: { type: "object", properties: { text: { type: "string" } } }, visibility: ["modules"], ...extra });
+const tool = (name: string, extra: Record<string, unknown> = {}) => ({ name, description: name, output: {}, parameters: { type: "object", properties: { text: { type: "string" } } }, visibility: ["modules"], ...extra });
 const startEvent = { trigger: { id: "pong", kind: "tool", args: {}, caller: { kind: "kernel" }, firedAt: "2026-10-24T00:00:00Z" }, now: "2026-10-24T00:00:00Z", params: {} } satisfies ModuleEvent;
 
 /** Two modules, alpha (the caller) and beta (the callee), on the real supervisor, socket and database. */
@@ -53,7 +53,9 @@ test("shipped files capability examples match its input and output contracts", a
 test("routed argument validation rejects non-JSON numbers and preserves open nested object keys", () => {
   const schema = { name: "input", description: "input", visibility: ["modules"], idempotent: false, parameters: {
     type: "object" as const, properties: { value: { type: "number" as const }, metadata: { type: "object" as const, properties: {}, required: [], additionalProperties: true } }, required: ["value", "metadata"],
-  } } as Parameters<typeof validateToolArgs>[0];
+  },
+      output: {}
+} as Parameters<typeof validateToolArgs>[0];
   for (const value of [null, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
     expect(() => validateToolArgs(schema, { value, metadata: { arbitrary_key: [1, null] } })).toThrow();
   }
@@ -89,7 +91,7 @@ test("structured native arguments survive sync and async routed delivery", async
 });
 
 test("expectedTarget is an optional strict routed identity contract", () => {
-  const params = { target: "beta.echo", args: {}, mode: "sync" };
+  const params = { target: { moduleId: "module-fixture", tool: "echo" }, args: {}, mode: "sync" };
   expect(moduleCallSchema.safeParse({ id: "fixture", method: "call", params }).success).toBe(true);
   const expectedTarget = { moduleId: "module-fixture", contractHash: "a".repeat(64) };
   expect(moduleCallSchema.safeParse({ id: "fixture", method: "call", params: { ...params, expectedTarget } }).success).toBe(true);
@@ -249,7 +251,7 @@ test("visibility admission is independent of target contracts; only uses star re
   const f = await fixture({ alpha: async () => ({}), beta: async () => ({}) });
   const row = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.alpha.id, hash: "alpha-v1" } } });
   for (const uses of [[], ["beta.hidden"], ["*"]]) {
-    const manifest = moduleManifestSchema.parse({ ...row.manifest as object, uses });
+    const manifest = moduleManifestSchema.parse({ ...row.manifest as object, uses, authority: uses.includes("*") ? "owner" : undefined });
     await f.db.moduleVersion.update({ where: { id: row.id }, data: { manifest } });
     const moduleCaller = { kind: "module" as const, module: "alpha", moduleId: f.alpha.id, hash: "alpha-v1" };
     for (const [caller, visibility, expected] of [
@@ -424,7 +426,7 @@ test("async calls are stored under the caller's key, delivered once and answered
   await callsSettled(f.ports); await runDueCalls(f.ports, f.workspace.id); await callsSettled(f.ports);
   expect(deliveries).toHaveLength(1);
   expect(deliveries[0]).toMatchObject({ kind: "tool", id: "echo", caller: { kind: "module", module: "alpha" }, call: { id: callId, key: "k1", attempt: 1, chain: ["alpha"] } });
-  expect(results).toMatchObject([{ kind: "call_result", callId, target: "beta.echo", key: "k1", status: "succeeded", output: { echo: "once" } }]);
+  expect(results).toMatchObject([{ kind: "call_result", callId, target: { moduleId: f.beta.id, tool: "echo" }, key: "k1", status: "succeeded", output: { echo: "once" } }]);
   const status = await moduleSupervisor(f.ports).deliver(f.alpha.id, "alpha-v1", { trigger: { id: "pong", kind: "tool", firedAt: "2026-10-24T00:00:01Z", args: {} }, now: "2026-10-24T00:00:01Z", params: {} });
   expect(output(status)).toMatchObject({ result: { callId, status: "succeeded", output: { echo: "once" } } });
 });
@@ -477,24 +479,24 @@ test.each(["owner", "provider"] as const)("%s tool calls preserve unknown delive
   expect(await f.db.moduleRun.count({ where: { moduleId: f.beta.id } })).toBe(1);
 });
 
-test("uses \"*\" reaches owner and modules tools but not kernel-only tools", async () => {
+test("approved owner authority reaches owner and modules tools but not kernel-only tools", async () => {
   registerSystemModules();
   const f = await fixture({
     alpha: async (_event, call) => {
       const results: Record<string, unknown> = {};
-      for (const target of ["beta.hidden", "beta.echo", "beta.private", "modules.tools"]) results[target] = await call("call", { target, args: target === "modules.tools" ? {} : { text: "x" } } as never);
+      for (const target of ["beta.hidden", "beta.echo", "beta.private", "modules.describe"]) results[target] = await call("call", { target, args: target === "modules.describe" ? {} : { text: "x" } } as never);
       return { result: results };
     },
     beta: async event => ({ result: { tool: (event.trigger as { id: string }).id } }),
   });
-  const alpha = moduleManifestSchema.parse({ name: "alpha", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["*", "modules.tools"], tools: [tool("pong")] });
+  const alpha = moduleManifestSchema.parse({ name: "alpha", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["*", "modules.describe"], authority: "owner", tools: [tool("pong")] });
   await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: f.alpha.id, hash: "alpha-v1" } }, data: { manifest: alpha } });
   const results = output(await f.fire()) as Record<string, { result?: { output: unknown }; error?: { code: string } }>;
   expect(results["beta.hidden"]).toMatchObject({ result: { output: { tool: "hidden" } } });
   expect(results["beta.echo"]).toMatchObject({ result: { output: { tool: "echo" } } });
   expect(results["beta.private"]).toMatchObject({ error: { code: "forbidden" } });
   // Discovery uses the same visibility rule, independent of declared target contracts.
-  expect((results["modules.tools"]!.result!.output as { target: string }[]).map(entry => entry.target).filter(target => target.startsWith("beta."))).toEqual(["beta.echo", "beta.hidden", "beta.bounce", "beta.crash", "beta.again", "beta.unlisted"]);
+  expect((results["modules.describe"]!.result!.output as { items: { target: { moduleId: string; tool: string } | string }[] }).items.flatMap(entry => typeof entry.target !== "string" && entry.target.moduleId === f.beta.id ? [`beta.${entry.target.tool}`] : [])).toEqual(["beta.again", "beta.bounce", "beta.crash", "beta.echo", "beta.hidden", "beta.unlisted"]);
 });
 
 test("a module can call a modules-visible tool absent from uses; retired contributions stay unavailable", async () => {
@@ -536,13 +538,14 @@ test("installed paused apps stay undiscoverable and never dispatch sync or queue
     await expect(callSync(f.ports, kernelOrigin(f.workspace.id), `${name}.echo`, {})).rejects.toMatchObject({ code: "unavailable", reason: "module_paused" });
     calls.push(await enqueueCall({ tx: f.db, ports: f.ports, origin: kernelOrigin(f.workspace.id), target: `${name}.echo`, raw: {} }, { key: `paused-${name}` }));
   }
-  const found = (await callSync(f.ports, { ...kernelOrigin(f.workspace.id), caller: { kind: "owner", via: null } }, "modules.tools", { query: "echo" })).output as { target: string }[];
-  expect(found.some(item => item.target === "beta.echo")).toBe(false); // beta.echo is not owner visible.
-  expect(found.filter(item => PAUSED_MODULE_NAMES.some(name => item.target.startsWith(`${name}.`)))).toEqual([]);
+  const pausedIds = new Set((await f.db.module.findMany({ where: { workspaceId: f.workspace.id, name: { in: [...PAUSED_MODULE_NAMES] } } })).map(row => row.id));
+  const found = (await callSync(f.ports, { ...kernelOrigin(f.workspace.id), caller: { kind: "owner", via: null } }, "modules.describe", { query: "echo" })).output as { items: { target: unknown }[] };
+  expect(found.items.some(item => item.target === "beta.echo")).toBe(false); // beta.echo is not owner visible.
+  expect(found.items.filter(item => typeof item.target === "object" && item.target && pausedIds.has((item.target as { moduleId: string }).moduleId))).toEqual([]);
   // A module audience still sees ordinary application tools.
-  const visible = (await callSync(f.ports, { ...kernelOrigin(f.workspace.id), caller: { kind: "module", module: "alpha", moduleId: f.alpha.id, hash: "alpha-v1" } }, "modules.tools", { query: "echo" })).output as { target: string }[];
-  expect(visible.map(item => item.target)).toContain("beta.echo");
-  expect(visible.filter(item => PAUSED_MODULE_NAMES.some(name => item.target.startsWith(`${name}.`)))).toEqual([]);
+  const visible = (await callSync(f.ports, { ...kernelOrigin(f.workspace.id), caller: { kind: "module", module: "alpha", moduleId: f.alpha.id, hash: "alpha-v1" } }, "modules.describe", { query: "echo" })).output as { items: { target: unknown }[] };
+  expect(visible.items.map(item => item.target)).toContainEqual({ moduleId: f.beta.id, tool: "echo" });
+  expect(visible.items.filter(item => typeof item.target === "object" && item.target && pausedIds.has((item.target as { moduleId: string }).moduleId))).toEqual([]);
   for (let attempt = 1; attempt <= 6; attempt++) {
     await runDueCalls(f.ports, f.workspace.id);
     for (const call of calls) expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: call.callId } })).toMatchObject({ attempts: attempt, status: attempt < 6 ? "queued" : "failed", error: expect.stringContaining("unavailable: paused") });
@@ -590,7 +593,7 @@ test("ordinary async calls reject absent Notify and other absent apps before que
   const f = await fixture({ alpha: async (_event, call) => {
     const errors = [];
     for (const target of ["notify.send", "missing.echo"]) {
-      const reply = await call("call", { target, args: {}, mode: "async", key: target, reply: false }) as { error?: { code: string } };
+      const reply = await call("call", { target: { moduleId: target.split(".")[0]!, tool: target.split(".")[1]! }, args: {}, mode: "async", key: target, reply: false }) as { error?: { code: string } };
       errors.push(reply.error?.code);
     }
     return { result: { errors } };

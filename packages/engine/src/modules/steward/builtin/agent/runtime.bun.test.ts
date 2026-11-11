@@ -6,7 +6,7 @@ import { moduleAgentInputs, moduleAgentOutputs } from "@chrona/contracts/steward
 import manifest from "./module.json";
 
 const privateTools = ["start", "status", "inject", "abort", "release", "transcript"];
-const publicTools = ["health", "complete", "completion", "context", "run", "get", "lookup", "stream", "write", "interrupt", "respond", "inspect", "placement", "locations", "cleanup", "projects"];
+const publicTools = ["health", "complete", "completion", "context", "run", "get", "stream", "write", "interrupt", "respond", "work-run", "work-get", "work-lookup", "work-stream", "work-write", "work-interrupt", "work-respond", "work-inspect", "work-placement", "work-locations", "work-cleanup", "work-projects"];
 test("Agent manifest keeps legacy execution controls kernel-only and retains app contracts", () => {
   const parsed = moduleManifestSchema.parse(manifest);
   expect(parsed.tools.filter(tool => tool.visibility.includes("modules")).map(tool => tool.name).sort()).toEqual([...publicTools].sort());
@@ -21,7 +21,7 @@ test("Agent manifest keeps legacy execution controls kernel-only and retains app
   for (const name of ["complete", "completion"]) expect(parsed.tools.find(tool => tool.name === name)!.visibility).toEqual(["modules"]);
   expect(parsed.tools.find(tool => tool.name === "configure")!.visibility).toEqual(["owner"]);
   const complete = parsed.tools.find(tool => tool.name === "complete")!;
-  expect(Object.keys(complete.parameters.properties)).toEqual(["command-key", "prompt", "system", "max-output-tokens"]);
+  expect(Object.keys(complete.parameters.properties)).toEqual(["prompt", "system", "max-output-tokens"]);
 });
 
 for (const [scenario, description] of [

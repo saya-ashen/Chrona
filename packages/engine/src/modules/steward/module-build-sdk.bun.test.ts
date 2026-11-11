@@ -17,7 +17,9 @@ const sandbox = createScriptSandbox({  });
     const code = join(dir, "platform/store/sdk"); await mkdir(code, { recursive: true });
     const manifest = moduleManifestSchema.parse({ name: "sdk-check", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["notify.send", "agent.complete", "agent.completion"], model: { tier: "fast", maxCalls: 1, maxOutputTokens: 20 }, data: { schema: 2, migrate: "migrate.ts" },
       keepAlive: true,
-      tools: [{ name: "lookup", description: "Lookup", idempotent: true, parameters: { type: "object", properties: {} } }] });
+      tools: [{ name: "lookup", description: "Lookup", idempotent: true, parameters: { type: "object", properties: {} },
+          output: {}
+    }] });
     await writeFile(join(code, "module.json"), JSON.stringify(manifest));
     await writeFile(join(code, "index.ts"), `
 import { on, chrona } from 'chrona';
@@ -27,14 +29,14 @@ on('tool', async ev => {
   const state = chrona.paths.data + '/state';
   if (existsSync(state) && readFileSync(state, 'utf8') !== 'migrated') throw new Error('migration missing');
   const key = ev.id + ':' + ev.firedAt;
-  const started = await chrona.call('agent.complete', { 'command-key': key, prompt: 'Never send this to a real model', 'max-output-tokens': 20 });
-  if ((await chrona.call('agent.complete', { 'command-key': key, prompt: 'Never send this to a real model', 'max-output-tokens': 20 })).operationId !== started.operationId) throw new Error('completion receipt changed');
-  const completion = await chrona.call('agent.completion', { 'operation-id': started.operationId });
+  const started = await chrona.call({moduleId:chrona.dependencies.agent,tool:'complete'}, { prompt: 'Never send this to a real model', 'max-output-tokens': 20 }, { key });
+  if ((await chrona.call({moduleId:chrona.dependencies.agent,tool:'complete'}, { prompt: 'Never send this to a real model', 'max-output-tokens': 20 }, { key })).operationId !== started.operationId) throw new Error('completion receipt changed');
+  const completion = await chrona.call({moduleId:chrona.dependencies.agent,tool:'completion'}, { 'operation-id': started.operationId });
   if (completion.failure || !completion.result) throw new Error('completion failed or unconfirmed');
   if (!['Chrona test model response', 'Stub summary'].includes(completion.result.text)) throw new Error('unexpected model response');
   const params = { key, level: 'now', title: 'Build', body: completion.result.text };
-  await chrona.call('notify.send', params, { mode: 'async', key });
-  if (!(await chrona.call('notify.send', params, { mode: 'async', key })).duplicate) throw new Error('dedup missing');
+  await chrona.call({moduleId:chrona.dependencies.notify,tool:'send'}, params, { mode: 'async', key });
+  if (!(await chrona.call({moduleId:chrona.dependencies.notify,tool:'send'}, params, { mode: 'async', key })).duplicate) throw new Error('dedup missing');
 });
 `);
     await writeFile(join(code, "migrate.ts"), `import { writeFileSync } from 'node:fs'; writeFileSync(process.env.CHRONA_DATA + '/state', 'migrated');`);
@@ -44,14 +46,14 @@ import { strict as assert } from 'node:assert';
 import { writeFileSync } from 'node:fs';
 if (${runtime.health.isolated}) for (const path of ['/node_modules/chrona/sdk.ts', '/node_modules/chrona/testing.ts']) assert.throws(() => writeFileSync(path, 'changed'));
 const module = await startModule('index.ts', { stubs: {
-  'agent.complete': args => ({ operationId: args['command-key'] }),
+  'agent.complete': (_args, options) => ({ operationId: options.key }),
   'agent.completion': () => ({ result: { text: 'Stub summary', inputTokens: 1, outputTokens: 2 }, failure: false }),
 } });
 try {
   const now = '2026-10-21T04:00:00.000Z';
   const reply = await module.send({ trigger: { kind: 'tool', id: 'lookup', args: {}, firedAt: now }, now, params: {} });
   assert.equal(reply.error, undefined);
-  assert.deepEqual(module.calls.map(call => call.params.target), ['agent.complete', 'agent.complete', 'agent.completion', 'notify.send', 'notify.send']);
+  assert.deepEqual(module.calls.map(call => typeof call.params.target === "string" ? call.params.target : call.params.target.moduleId + "." + call.params.target.tool), ['agent.complete', 'agent.complete', 'agent.completion', 'notify.send', 'notify.send']);
   assert.deepEqual(module.calls[0].params.args, module.calls[1].params.args);
   assert.equal(module.calls[3].params.args.body, 'Stub summary');
   assert.equal(module.calls[3].params.key, 'lookup:' + now);

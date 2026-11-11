@@ -5,6 +5,8 @@ import { testDb } from "./test-db";
 import { handleModuleCall } from "./module-effects";
 import { resolveExecutionPrincipal } from "./execution-principal";
 import { admitted, validateToolArgs, registerSystemModule, CallError, type Caller } from "./module-calls";
+import { publicSystemTools } from "./system/tool-contract-declarations";
+import { publicCallError } from "./module-call-error";
 import { createFakeExecutionPorts, createFakeExecutionEventStore, createFakeP1Provider, projectP1ToolStart } from "./p1-fixtures";
 const owner: ExecutionPrincipal = { workspaceId: "ws", ownerId: "owner", caller: { kind: "owner" } };
 const moduleCaller: ExecutionPrincipal = { ...owner, caller: { kind: "module", moduleId: "coding", hash: "v1" } };
@@ -120,21 +122,23 @@ test("P1 consumer smoke: routed identity, manifest JSON input, bound Provider si
   try {
     const workspace = await db.workspace.create({ data: { name: "p1-consumer" } });
     const callers: Caller[] = [];
-    for (const [name, uses] of [["p1-consumer", ["p1-error-probe.probe"]], ["p1-other-consumer", []], ["owner-entry", ["*"]]] as const) {
-      const manifest = moduleManifestSchema.parse({ name, uses, entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], tools: name === "p1-consumer" ? codingToolDeclarations() : [] });
+    for (const [name, uses] of [["p1-consumer", ["settings.get"]], ["p1-other-consumer", []], ["owner-entry", ["*"]]] as const) {
+      const manifest = moduleManifestSchema.parse({ name, uses, ...(uses.includes("*" as never) ? { authority: "owner" } : {}), entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], tools: name === "p1-consumer" ? codingToolDeclarations() : [] });
       if (name === "p1-consumer") expect(validateToolArgs(manifest.tools[0]!, { input: JSON.stringify(input) })).toEqual({ input: JSON.stringify(input) });
       const row = await db.module.create({ data: { workspaceId: workspace.id, name, activeHash: "v1", status: "active" } });
       await db.moduleVersion.create({ data: { moduleId: row.id, hash: "v1", manifest, status: "approved", source: "user", intent: {}, report: {} } });
       callers.push({ kind: "module", module: name, moduleId: row.id, hash: "v1" });
     }
     const [consumer, otherConsumer, entry] = callers;
-    registerSystemModule({ name: "p1-error-probe", description: "Test-only error consumer", tools: [{ ...executionToolContracts[0]!, name: "probe", visibility: ["modules"] }],
-      async handle(_context, _tool, args) { throw new CallError(args.goal as (typeof MODULE_CALL_ERRORS)[number], "bounded fixture error"); },
+    let currentError: (typeof MODULE_CALL_ERRORS)[number] = "invalid";
+    registerSystemModule({ name: "settings", description: "Test-only failing implementation", tools: [publicSystemTools.settings.find(tool => tool.name === "get")!],
+      async handle() { throw new CallError(currentError, "bounded fixture error"); },
     });
-    const manifest = moduleManifestSchema.parse({ name: "p1-consumer", uses: ["p1-error-probe.probe"], entry: "index.ts", tests: ["test.ts"], effects: [], tools: codingToolDeclarations() });
+    const manifest = moduleManifestSchema.parse({ name: "p1-consumer", uses: ["settings.get"], entry: "index.ts", tests: ["test.ts"], effects: [], tools: codingToolDeclarations() });
     for (const code of ["invalid", "forbidden", "conflict", "unavailable", "capacity", "cursor_expired", "too_large", "unsupported_version"] as const) {
-      const reply = await handleModuleCall(ports, { workspaceId: workspace.id, moduleId: (consumer as Extract<Caller, { kind: "module" }>).moduleId, hash: "v1", manifest }, { id: "error-smoke", method: "call", params: { target: "p1-error-probe.probe", mode: "sync", reply: false, args: { ...input, goal: code } } });
-      expect(moduleCallReplySchema.parse(reply)).toMatchObject({ error: { code } });
+      currentError = code;
+      const reply = await handleModuleCall(ports, { workspaceId: workspace.id, moduleId: (consumer as Extract<Caller, { kind: "module" }>).moduleId, hash: "v1", manifest }, { id: "error-smoke", method: "call", params: { target: "settings.get", mode: "sync", reply: false, args: {} } });
+      expect(moduleCallReplySchema.parse(reply)).toMatchObject({ error: { code: publicCallError(code) } });
     }
     const consumerPrincipal = await resolveExecutionPrincipal(ports, workspace.id, consumer!);
     expect(consumerPrincipal.caller).toMatchObject({ kind: "module", moduleId: (consumer as Extract<Caller, { kind: "module" }>).moduleId });

@@ -38,7 +38,9 @@ async function fixture(handler: Parameters<typeof testModuleProcess>[0] = async 
   const workspace = await db.workspace.create({ data: { name: "supervisor boundary", settings: { moduleModel: modelCaps, limit: 888 } } });
   async function app(name = "ordinary", extra: Record<string, unknown> = {}) {
     const hash = `${name}-v1`;
-    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], effects: [], tools: [{ name: "go", description: "Go", parameters: { type: "object", properties: {}, required: [] } }], ...extra });
+    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], effects: [], tools: [{ name: "go", description: "Go", parameters: { type: "object", properties: {}, required: [] },
+        output: {}
+    }], ...extra });
     const row = await db.module.create({ data: { workspaceId: workspace.id, name, activeHash: hash } });
     await db.moduleVersion.create({ data: { moduleId: row.id, hash, manifest, source: "user", status: "approved", intent: {}, report: {} } });
     return { row, hash, manifest, deliver: (input = event, options = {}) => supervisor.deliver(row.id, hash, input, options) };
@@ -95,7 +97,7 @@ test("ordinary manual tool delivery, declared activation, owned timers and runti
   const inputs: ModuleEvent[] = [event,
     { ...event, trigger: { kind: "activated", id: "activated", firedAt } },
     { ...event, trigger: { kind: "schedule", id: "timer", firedAt, scheduleId: timer.id, payload: { value: 1 } } },
-    { ...event, trigger: { kind: "call_result", id: "call", firedAt, callId: "call-1", target: "other.go", key: "request-1", status: "succeeded", output: {} } },
+    { ...event, trigger: { kind: "call_result", id: "call", firedAt, callId: "call-1", target: { moduleId: "other-id", tool: "go" }, key: "request-1", status: "succeeded", output: {} } },
   ];
   for (const input of inputs) expect(await app.deliver(input)).toMatchObject({ result: { result: input.trigger.kind } });
   expect(seen.map(input => input.trigger)).toEqual(inputs.map(input => input.trigger));

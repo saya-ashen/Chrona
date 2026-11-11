@@ -14,9 +14,11 @@ function agent(f: Fixture): CallOrigin { return { ...kernelOrigin(f.workspaceId)
 async function consumer(f: Fixture, name: string, uses: string[]): Promise<CallOrigin> {
   const hash = name + "-v1", source = join(f.ports.dataDir, "platform/store", hash);
   await mkdir(source);
-  await writeFile(join(source, "index.ts"), `import {chrona,on} from 'chrona';on('tool',async t=>({result:await chrona.call('agent.configure',t.args)}));`);
-  const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], effects: [], uses,
-    tools: [{ name: "configure-agent", description: "Configure Agent from the calling application", visibility: ["owner"], parameters: { type: "object", properties: {} } }] });
+  await writeFile(join(source, "index.ts"), `import {chrona,on} from 'chrona';on('tool',async t=>({result:await chrona.call({moduleId:chrona.dependencies.agent,tool:'configure'},t.args)}));`);
+  const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], effects: [], uses, authority: uses.includes("*") ? "owner" : undefined,
+    tools: [{ name: "configure-agent", description: "Configure Agent from the calling application", visibility: ["owner"], parameters: { type: "object", properties: {} },
+        output: {}
+    }] });
   const module = await f.ports.db.module.create({ data: { workspaceId: f.workspaceId, name, status: "active", activeHash: hash } });
   await f.ports.db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest, source: "user", status: "approved", intent: {}, report: {} } });
   return { ...kernelOrigin(f.workspaceId), caller: { kind: "module", module: name, moduleId: module.id, hash } };

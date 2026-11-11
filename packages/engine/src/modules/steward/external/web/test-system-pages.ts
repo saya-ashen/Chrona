@@ -1,4 +1,5 @@
 import { strict as assert } from "node:assert";
+import { runtimeText } from "./src/system/text";
 import { builder } from "./src/system/spec";
 import { diagnosticNodes, checksText } from "./src/system/diagnostics";
 import { detailSpec, selectedTab } from "./src/system/detail";
@@ -140,7 +141,7 @@ function checkDetailSpecs() {
     if (status === "migrating") assert.equal(control, undefined);
     else {
       assert.equal(control!.props.label, status === "active" ? "暂停" : "恢复"); assert.equal(control!.props.tool, status === "active" ? "module-disable" : "module-enable");
-      assert.deepEqual(control!.props.args, { id: "example" }); assert.match(String(control!.props.confirm), /example/);
+      assert.deepEqual(control!.props.args, { id: "app/1" }); assert.match(String(control!.props.confirm), /example/);
     }
   }
   const fallback = detailSpec({ overview }, { id: "app/1", tab: "unknown", session: "" });
@@ -257,3 +258,6 @@ export async function checkSystemPages() {
   checkListSpecs();
   checkDisplayAndReach();
 }
+
+assert.equal(runtimeText({ runtime: { state: "stopping" } }), "正在停止（尚未确认）");
+assert.equal(runtimeText({ runtime: { state: "unknown" } }), "停止结果未知");

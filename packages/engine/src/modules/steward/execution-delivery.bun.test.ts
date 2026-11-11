@@ -37,7 +37,9 @@ async function fixture() {
   return { db, ports, caller, app, principal, owner, receiver, key, approval, input, final, service, setNow: (next: Date) => { now = next; } };
 }
 async function installCompletionOutbox(f: Awaited<ReturnType<typeof fixture>>) {
-  const manifest = moduleManifestSchema.parse({ name: f.caller.name, entry: "index.ts", tests: ["test.ts"], effects: [], tools: [{ name: "get", description: "Read work", idempotent: true, visibility: ["owner"], parameters: { type: "object", properties: { input: { type: "string" } }, required: ["input"] } }] });
+  const manifest = moduleManifestSchema.parse({ name: f.caller.name, entry: "index.ts", tests: ["test.ts"], effects: [], tools: [{ name: "get", description: "Read work", idempotent: true, visibility: ["owner"], parameters: { type: "object", properties: { input: { type: "string" } }, required: ["input"] },
+      output: {}
+}] });
   await f.db.moduleVersion.create({ data: { moduleId: f.caller.id, hash: f.caller.activeHash!, manifest, source: "user", status: "approved", intent: {}, report: {} } });
   f.ports.onExecutionFinishedIn = async (tx, workspaceId, runId) => {
     const attempt = await tx.executionAttempt.findUniqueOrThrow({ where: { runId } });

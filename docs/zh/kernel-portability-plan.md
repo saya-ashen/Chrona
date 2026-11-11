@@ -6,7 +6,7 @@
 
 完整 API 曾通过 105 项 / 19 文件；第三轮 full Bun 在物理存储改动前结束 229 文件，最终文件结果为 2450 pass / 38 skip，包含 notify 首次失败后隔离重试通过，**不能称为无重试全绿**；持久化等待修复后定向回归 17 pass / 0 fail。helper 路径与 ELF RPATH/RUNPATH 泄漏已修复，18 项发行回归通过；17:55 默认 Linux CLI 经离线缓存、frozen lockfile、禁用安装脚本完成迁移/health/Web runtime smoke。包含最终物理存储改动的 14 seeds、核心和独立设备包已刷新，默认 Linux runtime、可选应用实际安装及复制设备 smoke 再次通过；883 个源码文件 sourceguard 与 archive 比对通过。分次结果及失败历史见[验证记录](kernel-portability-verification.md)。所有结果限本地，completion 为假实现，无真实外部模型、部署或生产验收。
 
-本文由两份方案合并而成：一份是《内核语言无关化实施方案》（提交 `38310f75`，已删除），另一份是《可信本地跨平台运行与远程执行应用化方案》（已归档至 [history](history/cross-platform-runtime-and-remote-execution-plan.md)）。两者都在改造内核，而且会改到同一批文件，因此合并为同一条实施路线。
+本文由两份方案合并而成：一份是《内核语言无关化实施方案》（提交 `38310f75`，已删除），另一份是《可信本地跨平台运行与远程执行应用化方案》（旧稿已删除，可从 Git 历史查阅）。两者都在改造内核，而且会改到同一批文件，因此合并为同一条实施路线。
 
 当前已有运行时、合同、应用及独立设备实现；本文保留原始目标和阶段交付标准，以阶段状态区分已实施、待验证和未完成。实际 RemoteDevice→生产 HTTP→真实应用 SDK→内核预算预留→实际 Pi 1.5.0 原生文件工具→内核验证签名停止→cleanup 已定向通过，仅 completion I/O 使用假实现，无外部模型调用。实际程序在本机运行不等于跨主机、外部模型或生产验收；Windows 后端已实现但未原生验证，macOS 完整后代监管后端未实现并保守拒绝。现有用户数据迁移仍不在目标内。
 
@@ -344,4 +344,4 @@ flowchart LR
 - [当前架构](architecture.md)、[模块依赖方向](module-dependency-direction.md)：依赖与所有权规则。
 - [Coding 客户端协议](coding-peer-clients-protocol.md)：业务调用面；不借远程拆分重建 Coding 协议。
 - [统一模块协议与本地／远端宿主](unified-module-runtime-plan.md)：历史与阶段背景；本文不重启已推迟的通用远程宿主工作。
-- [归档：可信本地跨平台运行与远程执行应用化方案](history/cross-platform-runtime-and-remote-execution-plan.md)：合并前的原文。
+- 合并前的《可信本地跨平台运行与远程执行应用化方案》：`git show fbc4464a:docs/zh/history/cross-platform-runtime-and-remote-execution-plan.md`。

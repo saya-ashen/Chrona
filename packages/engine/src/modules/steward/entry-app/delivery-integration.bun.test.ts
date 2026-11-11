@@ -31,7 +31,7 @@ for (const size of [2000, 2001]) test(`actual Agent stream receipt envelope at $
   expect(item.text).toHaveLength(size);
   const event = receiptEvent(); event.payload.value.output = receipt;
   const stream = await agentStream(() => [item], () => [event])();
-  const turn = { runId: "run-1", at: "2026-11-09T00:00:02.000Z", baseline: [], runRequest: { tools: ["author.submit"] }, applicationDelivery: [] as ApplicationDelivery[] };
+  const turn = { runId: "run-1", at: "2026-11-09T00:00:02.000Z", baseline: [], runRequest: { tools: [{ moduleId: "author-id", tool: "submit" }] }, applicationDelivery: [] as ApplicationDelivery[] };
   captureApplicationDelivery(turn, stream.items);
   expect(turn.applicationDelivery[0]?.receipt).toEqual(receipt);
   if (size > 2000) expect(stream.transcript[0]).toMatchObject({ text: `${item.text.slice(0, 2000)}…（已截断）` });
@@ -58,12 +58,12 @@ async function conversationFixture() {
       return stream(String(args["run-id"]));
     }
     if (target === "modules.health") return { items: state.health, nextCursor: null };
-    if (target === "modules.candidate-check") {
+    if (target === "modules.receipt") {
       expect(args).toEqual({ receiptId: "receipt-1" }); return receiptFixture();
     }
     throw new Error(`Unexpected delivery call ${target}`);
   };
-  const restart = () => createAgentConversations({ dataDir, call, tools: ["author.submit"], now: () => new Date(clock), reply: event => { replies.push(event); }, deliveryPages: async () => state.pages });
+  const restart = () => createAgentConversations({ dataDir, call, tools: [{ moduleId: "author-id", tool: "submit" }], now: () => new Date(clock), reply: event => { replies.push(event); }, deliveryPages: async () => state.pages });
   const journal = async () => JSON.parse(await readFile(join(dataDir, "conversations/state.json"), "utf8"));
   return { restart, journal, calls, replies, runs, state, advance: () => { clock += 2000; } };
 }
@@ -89,7 +89,7 @@ for (const pendingAdmission of [false, true]) test(`old timeout delivery reconci
   const messages = await f.restart().messages(first.sessionId);
   const corrected = messages.find(message => message.id === saved.id)!;
   expect(corrected.execution).toMatchObject({ runId: first.runId, status: "timed_out", active: false, canContinue: true, applicationDelivery: [{ receipt: receiptFixture(), targets: [{ activation: "active", health: "observed", pages: [{ href: "/p/music/home" }] }], browser: "unknown" }] });
-  expect(f.calls.slice(before).every(call => ["agent.get", "agent.stream", "modules.health", "modules.candidate-check"].includes(call.target))).toBe(true);
+  expect(f.calls.slice(before).every(call => ["agent.get", "agent.stream", "modules.health", "modules.receipt"].includes(call.target))).toBe(true);
   expect(f.calls.filter(call => call.target === "agent.run")).toHaveLength(2);
   expect((await f.journal()).sessions[0].turns[0].applicationDelivery[0].receipt).toEqual(receiptFixture());
   expect(f.replies.some(event => event.message === saved.id && JSON.stringify(event.execution).includes('"activation":"active"'))).toBe(true);
@@ -113,7 +113,7 @@ test("a delayed terminal transcript cannot capture a later Run's receipt or pros
   expect(turns[0].applicationDelivery).toBeUndefined();
   expect(turns[0].transcript).toEqual([]);
   expect(turns[1].applicationDelivery[0].receipt).toEqual(receiptFixture());
-  expect(f.calls.some(call => call.target === "modules.health" || call.target === "modules.candidate-check")).toBe(false);
+  expect(f.calls.some(call => call.target === "modules.health" || call.target === "modules.receipt")).toBe(false);
 });
 
 test("Web private list/get reader proves only the full current page identity", async () => {
@@ -126,7 +126,7 @@ test("Web private list/get reader proves only the full current page identity", a
   await pages.tool("page-set", page, owner);
   expect((await pages.list())[0]).not.toHaveProperty("hash");
   expect(await readDeliveryPages(pages)).toEqual([{ module: "music", moduleId: "music-id", hash, id: "home", title: "音乐" }]);
-  const turn = { runId: "run-1", at: "2026-11-09T00:00:02.000Z", baseline: [], runRequest: { tools: ["author.submit"] }, applicationDelivery: [] as ApplicationDelivery[] };
+  const turn = { runId: "run-1", at: "2026-11-09T00:00:02.000Z", baseline: [], runRequest: { tools: [{ moduleId: "author-id", tool: "submit" }] }, applicationDelivery: [] as ApplicationDelivery[] };
   captureApplicationDelivery(turn, [receiptEvent()]);
   const call = async (target: string) => target === "modules.health" ? { items: [healthFixture()], nextCursor: null } : receiptFixture();
   await reconcileApplicationDelivery(call, turn.applicationDelivery, "2026-11-09T00:00:05.000Z", () => readDeliveryPages(pages));
@@ -148,7 +148,7 @@ test("declarative pages retain the real registering version; legacy callers rema
   const evidence = [{ module: "music", moduleId: "music-id", hash, id: "home", title: "Music" }];
   expect(await readDeliveryPages(createPages(dependencies))).toEqual(evidence);
   inventory[0]!.activeHash = "d".repeat(40);
-  const turn = { runId: "run-1", runRequest: { tools: ["author.submit"] }, baseline: [], at: "2026-11-09T00:00:00.000Z", applicationDelivery: [] as ApplicationDelivery[] };
+  const turn = { runId: "run-1", runRequest: { tools: [{ moduleId: "author-id", tool: "submit" }] }, baseline: [], at: "2026-11-09T00:00:00.000Z", applicationDelivery: [] as ApplicationDelivery[] };
   captureApplicationDelivery(turn, [receiptEvent()]);
   await reconcileApplicationDelivery(async (name: string) => name === "modules.health" ? { items: [{ ...healthFixture(), activeHash: inventory[0]!.activeHash }], nextCursor: null } : receiptFixture(), turn.applicationDelivery, "2026-11-09T00:00:07.000Z", () => readDeliveryPages(pages));
   expect(turn.applicationDelivery[0]!.targets[0]).toMatchObject({ activation: "different", pages: [], pagesCheck: "unknown" });
@@ -167,11 +167,14 @@ test("private page reader excludes legacy, replaced, missing and unreadable reco
 
 test("release generator ships matching conversation and delivery helpers to all three entries", async () => {
   const root = await directory();
-  await Promise.all(["web", "mcp", "qq", "memory-local"].map(app => mkdir(join(root, "external", app), { recursive: true })));
+  await Promise.all(["web", "mcp", "qq", "memory-local", "mind", "coding", "events", "notify", "author", "coding-web", "remote-execution"].map(app => mkdir(join(root, "external", app), { recursive: true })));
   const generator = resolve(import.meta.dir, "../../../../../../build/entry-conversations.ts");
   const child = Bun.spawn([process.execPath, generator, root], { stdout: "pipe", stderr: "pipe" });
   const [exit, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()]);
   expect(stderr).toBe(""); expect(exit).toBe(0);
+  const client = `// Generated by build/entry-conversations.ts from entry-app/kernel-client.ts.\n${await readFile(join(import.meta.dir, "kernel-client.ts"), "utf8")}`;
+  for (const app of ["web", "mcp", "qq", "mind", "coding", "events", "notify", "author", "coding-web", "remote-execution"]) expect(await readFile(join(root, "external", app, "kernel-client.ts"), "utf8")).toBe(client);
+
   for (const [file, source] of [["agent-conversations.ts", "conversations.ts"], ["delivery.ts", "delivery.ts"]]) {
     const expected = `// Generated by build/entry-conversations.ts from entry-app/${source}.\n${await readFile(join(import.meta.dir, source!), "utf8")}`;
     for (const app of ["web", "mcp", "qq"]) {

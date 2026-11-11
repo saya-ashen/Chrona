@@ -76,19 +76,19 @@ export function moduleToolsets(catalog: CatalogEntry[]) {
   return [...sets.values()];
 }
 /** A routed call to a system tool (v2-13): the system module's own admission and validation apply, and the real caller is recorded. */
-async function callSystemTool(ports: StewardPorts, caller: { workspaceId: string; runId: string | null; via?: string | null; deadline?: number }, resolved: Entry, raw: unknown) {
+async function callSystemTool(ports: StewardPorts, caller: { workspaceId: string; runId: string | null; via?: string | null; deadline?: number; key?: string }, resolved: Entry, raw: unknown) {
   const origin = { workspaceId: caller.workspaceId, caller: caller.runId ? { kind: "provider" as const, runId: caller.runId } : { kind: "owner" as const, via: caller.via ?? null }, chain: [], path: [], deadline: caller.deadline };
   try {
-    const { output } = await callSync(ports, origin, `${resolved.module.name}.${resolved.tool.name}`, raw, caller.deadline ? { timeoutMs: Math.max(1000, caller.deadline - ports.now().getTime()) } : {});
+    const { output } = await callSync(ports, origin, `${resolved.module.name}.${resolved.tool.name}`, raw, { key: caller.key, ...(caller.deadline ? { timeoutMs: Math.max(1000, caller.deadline - ports.now().getTime()) } : {}) });
     return { result: output };
   } catch (error) {
     // Restore system business refusals at the HTTP/tool boundary, not an opaque 500.
-    if (error instanceof CallError && (error.code === "conflict" || error.code === "invalid" || error.code === "forbidden" || error.code === "not_found")) throw new StewardError(error.code, error.message);
+    if (error instanceof CallError && (error.code === "conflict" || error.code === "invalid" || error.code === "forbidden" || error.code === "not_found")) throw Object.assign(new StewardError(error.code, error.message), { reason: error.reason });
     throw error;
   }
 }
 /** Runs a workspace-owned module tool for a Provider run or the owner (`via`: the entry module that relayed an owner request). */
-export async function callModuleTool(ports: StewardPorts, caller: Omit<Scope, "audience"> & { runId: string | null; via?: string | null; deadline?: number }, name: string, raw: unknown) {
+export async function callModuleTool(ports: StewardPorts, caller: Omit<Scope, "audience"> & { runId: string | null; via?: string | null; deadline?: number; key?: string }, name: string, raw: unknown) {
   const audience = caller.runId ? "provider" as const : "owner" as const;
   const resolved = (await moduleTools(ports, { ...caller, audience })).find(tool => tool.name === name);
   if (!resolved) throw new StewardError("not_found", "Module tool not found");

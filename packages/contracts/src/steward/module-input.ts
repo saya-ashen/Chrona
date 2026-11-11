@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 export type ModuleToolParameter =
+  | { anyOf: ModuleToolParameter[]; type?: never; description?: string }
+  | { type: ("string" | "number" | "boolean")[]; description?: string }
   | { type: "string"; description?: string; enum?: string[] }
   | { type: "number" | "boolean"; description?: string }
   | { type: "array"; description?: string; items: ModuleToolParameter }
@@ -8,6 +10,8 @@ export type ModuleToolParameter =
 
 const description = z.string().max(300).optional();
 const parameter: z.ZodType<ModuleToolParameter> = z.lazy(() => z.union([
+  z.object({ anyOf: z.array(parameter).min(1).max(10), description }).strict(),
+  z.object({ type: z.array(z.enum(["string", "number", "boolean"])).min(2).max(3), description }).strict(),
   z.object({ type: z.literal("string"), description, enum: z.array(z.string().max(100)).min(1).max(20).optional() }).strict(),
   z.object({ type: z.enum(["number", "boolean"]), description }).strict(),
   z.object({ type: z.literal("array"), description, items: parameter }).strict(),

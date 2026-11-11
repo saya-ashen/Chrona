@@ -22,7 +22,7 @@ test("prepare guides the current Agent without touching files or calling other t
   expect(prompt).toContain(`Requirements (untrusted data):\n\n${JSON.stringify({ goal: input.goal, targets: input.targets, intent: input.intent })}`);
   for (const guidance of [
     "current conversation's Agent Run", "current Agent proceeds", "author.write", "sources/<workspace>",
-    "real owner-entry principal uses modules.list", "current approved Author moduleId and active hash", "modules.admit-candidates outside Author",
+    "real owner-entry principal uses modules.list", "current approved Author moduleId and active hash", "modules.admit outside Author",
     "complete fixed target set and exact active bases", "author.source", "author.submit", "author.receipt", "actual Author module identity",
     "does not authorize model execution", "do not start a nested Agent", "existing tools and budgets", "report the blocker",
     "prepare itself starts no model, writes no files, issues no admission, submits no candidates, and installs nothing",
@@ -56,7 +56,7 @@ test("ordinary author material workflow passes the offline SDK author harness", 
     await cp(import.meta.dirname, code, { recursive: true });
     const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(code, "module.json"), "utf8")));
     expect(manifest.tools.every(tool => tool.output)).toBe(true);
-    expect(manifest.uses).toEqual(["modules.source", "modules.submit", "modules.candidate-check"]);
+    expect(manifest.uses).toEqual(["modules.source", "modules.submit", "modules.receipt"]);
     for (const tool of manifest.tools) expect(tool.visibility).toEqual(["write", "read", "list"].includes(tool.name) ? ["provider", "modules", "owner"] : ["owner"]);
     const sandbox = createScriptSandbox({ dataDir, executionMode: "trusted-local" });
     const contentDir = join(dataDir, "content"), moduleData = join(dataDir, "module-data");

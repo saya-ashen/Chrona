@@ -39,9 +39,11 @@ test("actual Web owner call saves Agent form through configure's live callback; 
     const web = await f.ports.db.module.findFirstOrThrow({ where: { workspaceId: f.workspaceId, name: "web" } });
     const hash = "settings-web", source = join(f.ports.dataDir, "platform/store", hash);
     await mkdir(source);
-    await writeFile(join(source, "index.ts"), "import {chrona,on} from 'chrona'; on('tool', async t=>({result:await chrona.call('agent.configure',t.args)}));");
+    await writeFile(join(source, "index.ts"), "import {chrona,on} from 'chrona'; on('tool', async t=>({result:await chrona.call({moduleId:chrona.dependencies.agent,tool:'configure'},t.args)}));");
     const configure = parsed.tools.find(tool => tool.name === "configure")!;
-    const webManifest = moduleManifestSchema.parse({ name: "web", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["*"], tools: [{ ...configure, name: "agent-settings" }] });
+    const webManifest = moduleManifestSchema.parse({ name: "web", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["*"], tools: [{ ...configure, name: "agent-settings" }],
+        authority: "owner"
+    });
     await f.ports.db.module.update({ where: { id: web.id }, data: { builtin: false, activeHash: hash } });
     await f.ports.db.moduleVersion.create({ data: { moduleId: web.id, hash, manifest: webManifest, source: "user", status: "approved", intent: {}, report: {} } });
     await callSync(f.ports, owner, "agent.configure", { config: { tiers: { "deep-work": { model: "fixture/custom" } }, "preferred-timeout-ms": 1000 } });
@@ -64,7 +66,7 @@ test("actual Web owner call saves Agent form through configure's live callback; 
     }
     expect((await callSync(f.ports, owner, "agent.configure", { view: true })).output).toEqual(saved);
     const origin = { ...kernelOrigin(f.workspaceId), caller: { kind: "module" as const, module: "web", moduleId: web.id, hash } };
-    await f.ports.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: web.id, hash } }, data: { manifest: { ...webManifest, uses: ["agent.configure"] } } });
+    await f.ports.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: web.id, hash } }, data: { manifest: { ...webManifest, authority: undefined, uses: ["agent.configure"] } } });
     await expect(callSync(f.ports, origin, "agent.configure", { form })).rejects.toMatchObject({ code: "forbidden" });
     expect(await f.ports.db.moduleCall.count({ where: { method: "model" } })).toBe(0);
   } finally { await f.close(); }

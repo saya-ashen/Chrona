@@ -19,10 +19,10 @@ const kernel = { kind: "kernel" };
 // Delivery ticks use the wall clock. Events must stay due regardless of polling count or time of day.
 const now = () => new Date(Date.now() - 1000).toISOString();
 const tool = (id: string, args: Record<string, unknown>, caller: unknown = kernel) => module.send({ trigger: { kind: "tool", id, firedAt: now(), args, caller }, now: now(), params: {} });
-const deliveries = () => (module.calls as Call[]).filter(call => call.method === "call" && call.params.target === "qq.deliver");
+const deliveries = () => (module.calls as Call[]).filter(call => call.method === "call" && targetName(call.params.target) === "qq.deliver");
 async function until(condition: () => boolean) { for (let i = 0; i < 200 && !condition(); i++) await new Promise(resolve => setTimeout(resolve, 10)); assert.ok(condition()); }
 try {
-  module = await startModule("index.ts", { stubs: { "modules.list": () => directory.modules, "modules.tools": () => directory.tools, "activity.facts": () => ({ revision: "test", facts: [] }), "activity.withdrawals": () => ({ withdrawn: [] }) } });
+  module = await startModule("index.ts", { stubs: { "modules.list": () => ({ items: directory.modules, nextCursor: null }), "modules.describe": () => ({ items: directory.tools, nextCursor: null }), "activity.facts": () => ({ revision: "test", facts: [] }), "activity.withdrawals": () => ({ withdrawn: [] }) } });
   // Explicit preferences in the fixture only; existing settings and their timestamps stay untouched.
   assert.deepEqual((await tool("settings", { settings: JSON.stringify({ dailyCap: 5, quietHours: null, timezone: "UTC", digestAt: "00:00" }) })).result.result.settings,
     { dailyCap: 5, quietHours: null, timezone: "UTC", digestAt: "00:00" });
@@ -71,4 +71,11 @@ try {
   if (module) await module.stop();
   if (previousData === undefined) delete process.env.CHRONA_DATA; else process.env.CHRONA_DATA = previousData;
   await rm(fixture, { recursive: true, force: true });
+}
+
+function targetName(raw: unknown): string {
+  if (typeof raw === "string") return raw;
+  const target = raw as { moduleId: string; tool: string };
+  const names: Record<string, string> = {};
+  return `${names[target.moduleId] ?? target.moduleId.replace(/-id$/, "")}.${target.tool}`;
 }

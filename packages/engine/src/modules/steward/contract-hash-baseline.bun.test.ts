@@ -5,6 +5,7 @@ import transitions from "../../../../contracts/fixtures/contract-hash-transition
 import additions from "../../../../contracts/fixtures/contract-hash-additions.json";
 import mainMerge from "../../../../contracts/fixtures/contract-hash-main-merge.json";
 import migration from "../../../../contracts/fixtures/contract-hash-kernel-app-migration.json";
+import api from "../../../../contracts/fixtures/contract-hash-kernel-api.json";
 import agentTools from "../../../../contracts/fixtures/agent-tools.json";
 import cases from "../../../../contracts/fixtures/contract-hash-cases.json";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
@@ -32,8 +33,6 @@ test("all tool hashes preserve the baseline except explicitly enumerated plan ch
     expect(change.after).toMatch(/^[a-f0-9]{64}$/);
     expected[change.target] = change.after;
   }
-  const newTargets = Object.keys(current).filter(target => !Object.hasOwn(expected, target)).sort();
-  expect(newTargets).toEqual([...additions.map(addition => addition.target), ...migration.changes.filter(change => change.before === null).map(change => change.target)].sort());
   for (const addition of additions) {
     expect(addition.hash).toMatch(/^[a-f0-9]{64}$/);
     expect(addition.stage).toBe("S5");
@@ -49,6 +48,12 @@ test("all tool hashes preserve the baseline except explicitly enumerated plan ch
     expect(change.after).toMatch(/^[a-f0-9]{64}$/);
     expected[change.target] = change.after;
   }
+  for (const change of api.changes) {
+    expect((expected as Record<string, string | null>)[change.target] ?? null).toBe(change.before);
+    expect(change.reason.length).toBeGreaterThan(20);
+    if (change.after === null) delete expected[change.target];
+    else expected[change.target] = change.after;
+  }
   expect(current).toEqual(expected);
   expect([...new Set(Object.keys(hashes).map(target => target.split(".")[0]))].sort()).toEqual([
     "activity", "agent", "approvals", "author", "coding", "coding-web", "events", "files", "mcp", "memory-local", "mind", "modules", "notify", "qq", "remind", "secrets", "settings", "web",
@@ -59,17 +64,22 @@ test("Agent preserves snapshot tools except explicit placement and kernel/app mi
   const changed = transitions.filter(transition => transition.stage === "S5").map(transition => transition.target);
   expect(changed.sort()).toEqual(["agent.cleanup", "agent.locations", "agent.placement", "agent.run"]);
   const current = moduleManifestSchema.shape.tools.parse(await readAgentTools());
-  expect(current.map(tool => tool.name).sort()).toEqual(agentTools.map(tool => tool.name).sort());
-  for (const original of agentTools) {
-    const tool = current.find(tool => tool.name === original.name)!;
-    const transition = migration.changes.find(change => change.target === `agent.${tool.name}`) ?? transitions.find(transition => transition.target === `agent.${tool.name}` && transition.stage === "S5");
-    if (transition) expect(moduleCallbackContractHash(tool)).toBe(transition.after);
-    else expect(tool).toEqual(moduleManifestSchema.shape.tools.parse([original])[0]);
+  const expected = new Map(agentTools.map(tool => [tool.name, moduleCallbackContractHash(moduleManifestSchema.shape.tools.parse([tool])[0]!)]));
+  for (const change of [...transitions, ...migration.changes, ...api.changes]) if (change.target.startsWith("agent.")) {
+    const name = change.target.slice(6);
+    if (change.after === null) expected.delete(name); else expected.set(name, change.after);
   }
+  expect(current.map(tool => tool.name).sort()).toEqual([...expected.keys()].sort());
+  for (const tool of current) expect(moduleCallbackContractHash(tool)).toBe(expected.get(tool.name)!);
 });
 
 for (const entry of cases) {
   test(`portable contract golden: ${entry.name}`, () => {
+    if (!entry.tool.output) {
+      expect(moduleManifestSchema.shape.tools.safeParse([entry.tool]).success).toBe(false);
+      expect(createHash("sha256").update(entry.canonicalJson).digest("hex")).toBe(entry.contractHash);
+      return;
+    }
     const tool = moduleManifestSchema.shape.tools.parse([entry.tool])[0]!;
     expect(normalizedToolInputSchema(tool)).toEqual(entry.contract.input);
     expect(moduleCallbackContractHash(tool)).toBe(entry.contractHash);

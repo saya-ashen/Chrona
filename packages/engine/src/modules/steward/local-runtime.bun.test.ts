@@ -120,7 +120,7 @@ test("unconfirmed Provider failure retains the operation and never exposes adapt
     expect(await runtimeCall(f.ports, f.workspaceId, "agent.status", { operationId: "unknown" })).toMatchObject({ failure: true, outcome: null });
     await expect(runtimeCall(f.ports, f.workspaceId, "agent.release", { operationId: "unknown" })).rejects.toMatchObject({ code: "conflict" });
     const records = await f.ports.db.moduleInvocation.findMany();
-    expect(records.find(row => row.target === "agent" && row.tool === "wait")).toMatchObject({ status: "unknown", error: "unknown" });
+    expect(records.find(row => row.target === "agent" && row.tool === "wait")).toMatchObject({ status: "unknown", errorCode: "unknown", error: "Private operation failed" });
     expect(JSON.stringify(records)).not.toContain("private raw adapter payload");
   } finally { await f.close(); }
 });

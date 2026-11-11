@@ -1,3 +1,4 @@
+import { applicationCall } from "./kernel-client";
 import { chrona, on } from "chrona";
 import { openStore } from "./store";
 import { createNotify, type Caller, type CallResult } from "./notify";
@@ -8,10 +9,10 @@ import { settingsRegistration } from "./settings-page";
 
 const store = openStore(chrona.paths.data);
 const notify = createNotify({ store, publicUrl: process.env.CHRONA_PUBLIC_URL ?? null,
-  call: (target, args, options) => chrona.call(target, args, options), status: callId => chrona.callStatus(callId),
-  directory: async () => ({ modules: await chrona.call("modules.list", {}), tools: await chrona.call("modules.tools", {}) }) as Directory });
+  call: (target, args, options) => applicationCall(target, args, options), status: callId => chrona.callStatus(callId),
+  directory: async () => ({ modules: await applicationCall("modules.list", {}).then(page => (page as { items: unknown }).items), tools: await applicationCall("modules.describe", {}).then(page => (page as { items: unknown }).items) }) as Directory });
 
-const settingsPage = settingsRegistration((target, args) => chrona.call(target, args));
+const settingsPage = settingsRegistration((target, args) => applicationCall(target, args));
 on("activated", async () => { await settingsPage.activate(); return {}; });
 setInterval(() => void settingsPage.refresh(), 60_000).unref();
 
@@ -23,7 +24,7 @@ async function tick() {
   const pass = async () => {
     again = false;
     const now = new Date();
-    await tickNotify(store, notify, (target, args) => chrona.call(target, args), now);
+    await tickNotify(store, notify, (target, args) => applicationCall(target, args), now);
     return again;
   };
   try {
@@ -33,7 +34,7 @@ async function tick() {
   finally { busy = false; }
 }
 on("tool", async (event: { id: string; args: Record<string, unknown>; caller?: Caller; now: string }) => {
-  if (event.id === "activity") return { result: await activityView((target, args) => chrona.call(target, args), event.args) };
+  if (event.id === "activity") return { result: await activityView((target, args) => applicationCall(target, args), event.args) };
   if (["channel", "status"].includes(event.id)) {
     try { await notify.refresh(); }
     catch { return { result: { error: "unavailable", message: "Could not check current channels; try again when the module directory is available" } }; }

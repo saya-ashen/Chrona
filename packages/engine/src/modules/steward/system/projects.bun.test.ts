@@ -56,7 +56,9 @@ test("removed public project routes stay absent while private host calls retain 
   await expect(privateCall(provider.caller, "create", { name: "safe" })).rejects.toMatchObject({ code: "forbidden" });
   expect(register).toHaveBeenCalledTimes(1); expect(create).toHaveBeenCalledTimes(1);
   // Preserve the existing owner-proxy authority of approved uses:["*"] entry modules.
-  await db.moduleVersion.update({ where: { moduleId_hash: { moduleId: row.id, hash: "v1" } }, data: { manifest: { ...manifest, uses: ["*"] } } });
+  await db.moduleVersion.update({ where: { moduleId_hash: { moduleId: row.id, hash: "v1" } }, data: { manifest: { ...manifest, uses: ["*"],
+      authority: "owner"
+} } });
   expect((await privateCall(origin.caller, "create", { name: "safe" })).output).toEqual(project);
   expect(create).toHaveBeenLastCalledWith({ workspaceId, ownerId: "owner", caller: { kind: "owner" } }, "safe");
   await db.module.update({ where: { id: row.id }, data: { status: "paused" } });

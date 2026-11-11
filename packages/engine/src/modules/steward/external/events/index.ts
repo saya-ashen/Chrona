@@ -1,10 +1,11 @@
+import { applicationCall } from "./kernel-client";
 import { chrona, on } from "chrona";
 import { createEvents, type Caller, type CallResult, type Directory } from "./events";
 
 const events = createEvents({
   dataDir: chrona.paths.data,
-  directory: async () => ({ modules: await chrona.call("modules.list", {}), tools: await chrona.call("modules.tools", {}) }) as Directory,
-  call: (target, args, options) => chrona.call(target, args, options),
+  directory: async () => ({ modules: await applicationCall("modules.list", {}).then(page => (page as { items: unknown }).items), tools: await applicationCall("modules.describe", {}).then(page => (page as { items: unknown }).items) }) as Directory,
+  call: (target, args, options) => applicationCall(target, args, options),
 });
 on("activated", async () => { await startup; await events.reconcile(); return {}; });
 on("tool", async (event: { id: string; args: Record<string, unknown>; caller?: Caller }) => {

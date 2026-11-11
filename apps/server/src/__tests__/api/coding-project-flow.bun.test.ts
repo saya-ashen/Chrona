@@ -1,3 +1,5 @@
+import { selectContextTools } from "../../../../../packages/engine/src/modules/steward/agent-context-tools";
+import { moduleCallbackContractHash } from "../../../../../packages/engine/src/modules/steward/module-tool-contract";
 import { expect, mock, test } from "bun:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -48,22 +50,27 @@ test.each(["remind"] as const)("%s retains source but cannot be released, execut
     // Persist pre-policy approved material: discovery/admission must still enforce the pause.
     const paused = await db.module.create({ data: { workspaceId, name, activeHash: "b".repeat(64) } });
     await db.moduleVersion.create({ data: { moduleId: paused.id, hash: "b".repeat(64), status: "approved", source: "user", intent: {}, report: {},
-      manifest: moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], effects: [], tools: [{ name: "fixture", description: "Retained tool", visibility: ["owner", "modules", "provider"], parameters: { type: "object", properties: {} } }] }) } });
+      manifest: moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], effects: [], tools: [{ name: "fixture", description: "Retained tool", visibility: ["owner", "modules", "provider"], parameters: { type: "object", properties: {} },
+          output: {}
+    }] }) } });
     await expect(callSync(ports, { workspaceId, caller: { kind: "owner", via: null }, chain: [], path: [] }, `${name}.fixture`, {})).rejects.toMatchObject({ code: "unavailable", reason: "module_paused" });
     expect(await db.moduleRun.count()).toBe(0);
     const entry = await db.module.create({ data: { workspaceId, name: "pause-test-entry", activeHash: "a".repeat(64) } });
     await db.moduleVersion.create({ data: { moduleId: entry.id, hash: "a".repeat(64), status: "approved", source: "user", intent: {}, report: {},
-      manifest: moduleManifestSchema.parse({ name: entry.name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: ["*"] }) } });
+      manifest: moduleManifestSchema.parse({ name: entry.name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: ["*"],
+          authority: "owner"
+    }) } });
     const session = await db.session.create({ data: { workspaceId, source: "module", key: "pause-test", moduleId: entry.id } });
     await db.agentContext.create({ data: { sessionId: session.id, workspaceId, moduleId: entry.id, hash: "a".repeat(64) } });
     await api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "No model" });
     const run = (await api.runs.claimNext("foreground"))!;
-    await db.agentRunAdmission.create({ data: { runId: run.id, moduleId: entry.id, hash: (await db.agentContext.findUniqueOrThrow({ where: { sessionId: (await db.run.findUniqueOrThrow({ where: { id: run.id } })).sessionId! } })).hash, targets: ["modules.tools", "modules.admit-candidates"], content: [] } });
-    const post = (tool: string, body: unknown) => app.request(`/tools/${tool}`, { method: "POST", headers: { authorization: `Bearer ${run.token}`, "content-type": "application/json" }, body: JSON.stringify(body) }, peer);
-    const search = await post("m_modules_tools", { query: name });
+    const selected = await selectContextTools(ports, { workspaceId, ownerId: "owner", caller: { kind: "module", moduleId: entry.id, hash: "a".repeat(64) } }, ["modules.describe", "modules.admit"]);
+    await db.agentRunAdmission.create({ data: { runId: run.id, moduleId: entry.id, hash: (await db.agentContext.findUniqueOrThrow({ where: { sessionId: (await db.run.findUniqueOrThrow({ where: { id: run.id } })).sessionId! } })).hash, targets: selected.entries.map(entry => ({ target: `${entry.module.name}.${entry.tool.name}`, moduleId: entry.module.id, contractHash: moduleCallbackContractHash(entry.tool) })), content: [] } });
+    const post = (tool: string, body: unknown) => app.request(`/tools/${tool}`, { method: "POST", headers: { authorization: `Bearer ${run.token}`, "content-type": "application/json", "x-chrona-call-key": "paused-admission" }, body: JSON.stringify(body) }, peer);
+    const search = await post("m_modules_describe", { query: name });
     expect(search.status).toBe(200);
-    expect((await search.json()).data.result.some((tool: { target: string }) => tool.target.startsWith(`${name}.`))).toBe(false);
-    const admission = await post("m_modules_admit_candidates", { requestKey: "paused-admission", submitter: { moduleId: entry.id, hash: "a".repeat(64) }, targets: [{ name, moduleId: paused.id, expectedActiveHash: "b".repeat(64) }] });
+    expect((await search.json()).data.result.items.some((tool: { target: unknown }) => typeof tool.target === "object" && tool.target && (tool.target as {moduleId:string}).moduleId === paused.id)).toBe(false);
+    const admission = await post("m_modules_admit", { submitter: { moduleId: entry.id, hash: "a".repeat(64) }, targets: [{ name, moduleId: paused.id, expectedActiveHash: "b".repeat(64) }] });
     expect(admission.status).toBe(503);
     expect(await admission.json()).toMatchObject({ ok: false, error: { code: "unavailable", message: expect.stringContaining("source is retained") } });
     expect(await db.candidateAdmission.count()).toBe(0);
@@ -85,7 +92,7 @@ test("HTTP and routed clients share project conversations, defaults and durable 
   ];
   const principal = { workspaceId: "fixture-workspace", ownerId: "owner", caller: { kind: "module", moduleId: "coding", hash: "fixture-version" } } as const;
   const context: CodingContext = { dir, content: join(dir, "public"), async call<T>(target: string, args: Record<string, unknown>): Promise<T> {
-    expect(target).toBe("agent.projects"); expect(projectsInput.parse(args)).toEqual({ action: "list" });
+    expect(target).toBe("agent.work-projects"); expect(projectsInput.parse(args)).toEqual({ action: "list" });
     calls.push(structuredClone(args));
     return projectsOutput.parse({ action: "list", principal, projects }) as T;
   } };

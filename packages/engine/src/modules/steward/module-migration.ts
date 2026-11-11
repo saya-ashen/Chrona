@@ -61,7 +61,7 @@ async function finishMigration(context: ModuleContext, tx: Prisma.TransactionCli
   if (module.status === "paused") await tx.module.update({ where: { id: module.id }, data: { status: "paused" } });
   await activateIn(context, tx, { moduleId: module.id, hash: version.hash, reason, dataHandling });
 }
-export async function migrateData(context: ModuleContext, prepared: PreparedMigration, reason: "activate" | "rollback", restore?: Restore) {
+export async function migrateData(context: ModuleContext, prepared: PreparedMigration, reason: "activate" | "rollback", restore?: Restore, completedIn?: (tx: Prisma.TransactionClient) => Promise<void>) {
   const { db, platform } = context, { module, from, to } = prepared, moduleId = module.id;
   const live = join(platform, "data", moduleId), next = join(platform, "data-next", moduleId), old = join(platform, "data-old", moduleId);
   let output: TestReport[number] = { stdout: "", stderr: "Data migration failed", exitCode: 1 };
@@ -84,6 +84,7 @@ export async function migrateData(context: ModuleContext, prepared: PreparedMigr
         await rename(live, old); state.moved = true;
         await rename(next, live); state.swapped = true;
         await finishMigration(context, tx, prepared, reason, { output, restore });
+        await completedIn?.(tx);
       } catch (error) {
         try { await restoreSwap(live, old, state); }
         catch (recovery) { throw new AggregateError([error, recovery], "Migration activation and data recovery failed", { cause: recovery }); }

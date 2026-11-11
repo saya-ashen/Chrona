@@ -2,8 +2,8 @@ import { on, onDisconnect, chrona, ModelError } from "chrona";
 import { PAGE } from "./page";
 import { Reminders } from "./reminders";
 
-const reminders = new Reminders(chrona.paths.data, args => chrona.call("notify.send", args));
-on("activated", async () => { await chrona.call("web.page-set", PAGE); return {}; });
+const reminders = new Reminders(chrona.paths.data, args => chrona.call({ moduleId: chrona.dependencies["notify"]!, tool: "send" }, args));
+on("activated", async () => { await chrona.call({ moduleId: chrona.dependencies["web"]!, tool: "page-set" }, PAGE); return {}; });
 on("tool", async event => {
   if (!event.caller) throw new ModelError("forbidden", "Missing actual caller");
   if (event.id === "create") return { result: reminders.create(event.args, new Date(event.now)) };

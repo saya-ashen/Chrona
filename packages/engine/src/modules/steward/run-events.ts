@@ -18,9 +18,9 @@ export function retainedToolOutput(output: unknown, sensitive: boolean) {
 
 /** The target identity was frozen before delivery, not inferred from a same-name current app. */
 export function appendRunToolResultIn(tx: Prisma.TransactionClient, row: { id: string; runId: string | null; target: string; tool: string; targetModuleId: string | null; targetHash: string | null; targetContractHash: string | null; status: string; output: Prisma.JsonValue }, at: Date, sensitive: boolean) {
-  if (!row.runId) return;
+  if (!row.runId || !row.targetModuleId || !row.targetHash || !row.targetContractHash) return;
   return appendRunEventIn(tx, row.runId, "tool-result", { type: "tool-result", at: at.toISOString(), value: {
-    runId: row.runId, callId: row.id, target: `${row.target}.${row.tool}`, moduleId: row.targetModuleId!, hash: row.targetHash!, contractHash: row.targetContractHash!,
+    runId: row.runId, callId: row.id, target: row.targetModuleId!.startsWith("system:") ? `${row.target}.${row.tool}` : { moduleId: row.targetModuleId!, tool: row.tool }, moduleId: row.targetModuleId!, hash: row.targetHash!, contractHash: row.targetContractHash!,
     status: row.status, ...retainedToolOutput(row.output, sensitive),
   } }, at);
 }

@@ -25,7 +25,7 @@ async function makeFake() {
   const faults = { startBefore: false, startAfter: false, stopAfter: false, stopUnknown: false, writeAfter: false, questionIdentity: false, invalidControl: false, invalidStop: false, rejectAnswer: false, answerConflict: false, malformedRejection: false, largeSource: false, largeEvent: false, projectReply: undefined as unknown };
   const context: CodingContext = { dir, content: join(dir, "public"), async call<T>(target: string, args: Record<string, any>): Promise<T> {
     calls.push({ target, args: structuredClone(args) });
-    if (target === "agent.projects") {
+    if (target === "agent.work-projects") {
       if (faults.projectReply !== undefined) return faults.projectReply as T;
       if (args.action === "list") return { action: "list", principal, projects: registered } as T;
       const journal = await loadSessions(context);
@@ -33,8 +33,8 @@ async function makeFake() {
       const item = { projectRef: `project-${registered.length}`, path: args.action === "create" ? `/fixture/created/${args.name}` : String(args.path), label: String(args.name ?? "Project") }; registered.push(item); return { action: args.action, principal, project: item } as T;
     }
     const workId = String(args["execution-id"]), key = String(args["request-key"]);
-    if (target === "agent.lookup") { const view = starts.get(key); if (!view) throw fault("not_found"); return { ...view } as T; }
-    if (target === "agent.run") {
+    if (target === "agent.work-lookup") { const view = starts.get(key); if (!view) throw fault("not_found"); return { ...view } as T; }
+    if (target === "agent.work-run") {
       const journal = await loadSessions(context), session = journal.sessions.find(item => item.currentWorkId === workId);
       expect(session?.turns.at(-1)?.start?.workId).toBe(workId);
       expect(session?.turns.at(-1)?.accepted).toBe(false);
@@ -52,29 +52,29 @@ async function makeFake() {
       return { execution: { ...view } } as T;
     }
     const view = views.get(workId); if (!view) throw fault("not_found");
-    if (target === "agent.get") return { ...view } as T;
-    if (target === "agent.stream") return { events: faults.largeEvent ? Array.from({ length: 8 }, (_, index) => ({ workId, sessionId: view.sessionId, runId: view.runId, attemptId: view.attemptId, seq: index + 1, at: "2026-01-01T00:00:00Z", payload: { type: "message", messageId: `large-${index}`, role: "assistant", text: "\u0001".repeat(5000), complete: true } })) : [], cursor: "cursor-0", highWatermark: 0, gap: false, snapshotRequired: false } as T;
-    if (target === "agent.inspect") {
+    if (target === "agent.work-get") return { ...view } as T;
+    if (target === "agent.work-stream") return { events: faults.largeEvent ? Array.from({ length: 8 }, (_, index) => ({ workId, sessionId: view.sessionId, runId: view.runId, attemptId: view.attemptId, seq: index + 1, at: "2026-01-01T00:00:00Z", payload: { type: "message", messageId: `large-${index}`, role: "assistant", text: "\u0001".repeat(5000), complete: true } })) : [], cursor: "cursor-0", highWatermark: 0, gap: false, snapshotRequired: false } as T;
+    if (target === "agent.work-inspect") {
       const snapshot = { ...snapshots.get(workId)!, status: view.status, cancelRequested: view.cancelRequested, stopConfirmed: view.stopConfirmed };
       if (faults.questionIdentity) snapshot.sessionId = "alien";
       return { snapshot, source: { workId, sessionId: view.sessionId, runId: view.runId, attemptId: view.attemptId, baseline: { kind: "commit", digest: "fixture-baseline" }, changes: { scope: "baseline_to_worktree", status: "complete", patch: faults.largeSource ? "\u0001".repeat(20_000) : "diff --git a/f b/f\n+fixture\n", files: [{ path: "f", kind: "tracked" }] } } } as T;
     }
-    if (["agent.write", "agent.respond", "agent.interrupt"].includes(target)) {
+    if (["agent.work-write", "agent.work-respond", "agent.work-interrupt"].includes(target)) {
       expect(args["run-id"]).toBe(view.runId); expect(args["attempt-id"]).toBe(view.attemptId);
       const journal = await loadSessions(context);
       expect(journal.commands.find(item => item.command.requestKey === key)?.receipt.status).toBe("pending");
       if (controls.has(key)) return structuredClone(controls.get(key)) as T;
-      if (target === "agent.interrupt") {
+      if (target === "agent.work-interrupt") {
         view.cancelRequested = true;
         if (faults.stopUnknown) view.status = "unknown";
         const reply = { ...view }; controls.set(key, reply);
         if (faults.stopAfter) { faults.stopAfter = false; throw fault("unavailable"); }
         return (faults.invalidStop ? { ...reply, attemptId: "alien" } : reply) as T;
       }
-      if (target === "agent.respond" && faults.answerConflict) throw fault("conflict");
-      if (target === "agent.respond" && faults.rejectAnswer) return { accepted: false, error: { code: "conflict", message: "Question already answered" }, ...(faults.malformedRejection ? { extra: true } : {}) } as T;
+      if (target === "agent.work-respond" && faults.answerConflict) throw fault("conflict");
+      if (target === "agent.work-respond" && faults.rejectAnswer) return { accepted: false, error: { code: "conflict", message: "Question already answered" }, ...(faults.malformedRejection ? { extra: true } : {}) } as T;
       const reply = { accepted: true }; controls.set(key, reply);
-      if (target === "agent.respond") {
+      if (target === "agent.work-respond") {
         expect(args["question-id"]).toBe("question-1");
         snapshots.get(workId)!.questions[0]!.status = "answered";
       }
@@ -98,7 +98,7 @@ test("two clients share explicit conversations, duplicate receipts and one conti
   const [a, b] = await Promise.all([f.command(raw), f.command({ ...raw }, clientB)]);
   expect(a).toEqual(b); expect(a.receipt.status).toBe("accepted");
   const workId = a.receipt.workId;
-  expect(f.calls.filter(item => item.target === "agent.run")).toHaveLength(1);
+  expect(f.calls.filter(item => item.target === "agent.work-run")).toHaveLength(1);
   await expect(f.command({ ...raw, text: "Different arguments" })).rejects.toMatchObject({ code: "conflict" });
   const write = await f.send(first, "write-1", workId, "Follow up while running");
   expect(write.receipt.workId).toBe(workId); expect(f.controls.size).toBe(1);
@@ -113,9 +113,9 @@ test("two clients share explicit conversations, duplicate receipts and one conti
   expect(journal).not.toHaveProperty("selected"); expect(journal).not.toHaveProperty("draftProject");
   expect(journal.sessions.find(item => item.id === first)!.currentWorkId).toBe(next);
   expect(journal.sessions.find(item => item.id === second)!.workIds).toHaveLength(1);
-  const before = f.calls.filter(item => item.target === "agent.run").length;
+  const before = f.calls.filter(item => item.target === "agent.work-run").length;
   await f.command({ op: "conversations.get", sessionId: first });
-  expect(f.calls.filter(item => item.target === "agent.run")).toHaveLength(before);
+  expect(f.calls.filter(item => item.target === "agent.work-run")).toHaveLength(before);
 }));
 
 test("unknown admission remains pending across restart; reads and duplicate commands never resend", () => fixture(async f => {
@@ -123,11 +123,11 @@ test("unknown admission remains pending across restart; reads and duplicate comm
   const first = await f.send(sessionId); expect(first.receipt.status).toBe("pending");
   expect((await f.send(sessionId)).receipt.status).toBe("pending");
   await f.command({ op: "conversations.get", sessionId }, { ...f.context });
-  expect(f.calls.filter(item => item.target === "agent.run")).toHaveLength(1);
+  expect(f.calls.filter(item => item.target === "agent.work-run")).toHaveLength(1);
   await expect(f.send(sessionId, "new-key", first.receipt.workId)).rejects.toMatchObject({ code: "conflict" });
   const retry = await f.command({ op: "round.retry", requestKey: "retry-1", sessionId, originalRequestKey: "send-1" }, { ...f.context });
   expect(retry.receipt.status).toBe("accepted"); expect(retry.receipt.value.receipt.status).toBe("accepted");
-  expect(f.calls.filter(item => item.target === "agent.run")).toHaveLength(1);
+  expect(f.calls.filter(item => item.target === "agent.work-run")).toHaveLength(1);
   expect((await f.command({ op: "receipt", requestKey: "send-1" })).receipt.workId).toBe(first.receipt.workId);
 }));
 
@@ -135,10 +135,10 @@ test("explicit retry resubmits an unadmitted start with the durable original ide
   const sessionId = await f.create(); f.faults.startBefore = true;
   const pending = await f.send(sessionId); expect(pending.receipt.status).toBe("pending");
   await f.command({ op: "conversations.get", sessionId });
-  expect(f.calls.filter(item => item.target === "agent.run")).toHaveLength(1);
+  expect(f.calls.filter(item => item.target === "agent.work-run")).toHaveLength(1);
   f.faults.startBefore = false;
   await f.command({ op: "round.retry", requestKey: "retry-1", sessionId, originalRequestKey: "send-1" });
-  const starts = f.calls.filter(item => item.target === "agent.run"); expect(starts).toHaveLength(2); expect(starts[0]!.args).toEqual(starts[1]!.args);
+  const starts = f.calls.filter(item => item.target === "agent.work-run"); expect(starts).toHaveLength(2); expect(starts[0]!.args).toEqual(starts[1]!.args);
 }));
 
 test("unknown stop fences advancement and stop recovery retains exact run and key", () => fixture(async f => {
@@ -147,21 +147,21 @@ test("unknown stop fences advancement and stop recovery retains exact run and ke
   const stop = { op: "round.stop", requestKey: "stop-1", ...target };
   expect((await f.command(stop)).receipt.status).toBe("pending");
   expect((await f.command(stop)).receipt.status).toBe("pending");
-  expect(f.calls.filter(item => item.target === "agent.interrupt")).toHaveLength(1);
+  expect(f.calls.filter(item => item.target === "agent.work-interrupt")).toHaveLength(1);
   await expect(f.send(sessionId, "next", workId)).rejects.toMatchObject({ code: "conflict" });
   await f.command({ op: "round.retry", requestKey: "retry-stop", sessionId, originalRequestKey: "stop-1" });
   expect((await f.send(sessionId, "next", workId)).receipt.status).toBe("rejected");
   await expect(f.command({ ...stop, requestKey: "stale-stop", attemptId: "old-attempt" })).rejects.toMatchObject({ code: "conflict" });
-  expect(f.calls.filter(item => item.target === "agent.run")).toHaveLength(1);
+  expect(f.calls.filter(item => item.target === "agent.work-run")).toHaveLength(1);
   f.finish(workId); await f.send(sessionId, "next-after-stop", workId);
-  expect(f.calls.filter(item => item.target === "agent.run")).toHaveLength(2);
+  expect(f.calls.filter(item => item.target === "agent.work-run")).toHaveLength(2);
 }));
 
 test("malformed control acknowledgements retain pending identities until explicit recovery", () => fixture(async f => {
   const { sessionId, workId } = await f.begin(); f.faults.invalidControl = true;
   expect((await f.send(sessionId, "write", workId)).receipt.status).toBe("pending");
   expect((await f.send(sessionId, "write", workId)).receipt.status).toBe("pending");
-  expect(f.calls.filter(call => call.target === "agent.write")).toHaveLength(1);
+  expect(f.calls.filter(call => call.target === "agent.work-write")).toHaveLength(1);
   await expect(f.send(sessionId, "blocked", workId)).rejects.toMatchObject({ code: "conflict" });
   f.faults.invalidControl = false;
   await f.command({ op: "round.retry", requestKey: "recover-write", sessionId, originalRequestKey: "write" });
@@ -174,7 +174,7 @@ test("malformed control acknowledgements retain pending identities until explici
   await f.command({ op: "round.retry", requestKey: "recover-stop", sessionId, originalRequestKey: "stop" });
   expect((await f.command({ op: "receipt", requestKey: "stop" })).receipt.status).toBe("accepted");
   await expect(f.send(sessionId, "blocked-stopping", workId)).rejects.toMatchObject({ code: "conflict" });
-  expect(f.calls.filter(call => call.target === "agent.run")).toHaveLength(1);
+  expect(f.calls.filter(call => call.target === "agent.work-run")).toHaveLength(1);
 }));
 
 test("answers bind conversation, run, attempt and live pending question identity", () => fixture(async f => {
@@ -188,7 +188,7 @@ test("answers bind conversation, run, attempt and live pending question identity
   f.faults.questionIdentity = true; await expect(f.command({ ...raw, requestKey: "wrong-snapshot" })).rejects.toMatchObject({ code: "conflict" }); f.faults.questionIdentity = false;
   expect((await f.command(raw)).receipt.status).toBe("accepted");
   expect((await f.command(raw)).receipt.status).toBe("accepted");
-  const replies = f.calls.filter(item => item.target === "agent.respond"); expect(replies).toHaveLength(1);
+  const replies = f.calls.filter(item => item.target === "agent.work-respond"); expect(replies).toHaveLength(1);
   expect(JSON.parse(replies[0]!.args.answer)).toEqual({ decision: "submit", value: true });
   await expect(f.command({ ...raw, requestKey: "answer-2" })).rejects.toMatchObject({ code: "conflict" });
 }));
@@ -209,7 +209,7 @@ test("immutable results are scoped, verified, accepted once and never committed"
   expect(await readFile(path, "utf8")).toBe(bytes);
   await writeFile(join(f.context.dir, "artifacts", `${result!.artifactRef}.json`), `${bytes} `);
   await expect(f.command(read)).rejects.toMatchObject({ code: "conflict" });
-  expect(f.calls.every(item => ["agent.projects", "agent.run", "agent.get", "agent.lookup", "agent.stream", "agent.inspect"].includes(item.target))).toBe(true);
+  expect(f.calls.every(item => ["agent.work-projects", "agent.work-run", "agent.work-get", "agent.work-lookup", "agent.work-stream", "agent.work-inspect"].includes(item.target))).toBe(true);
 }));
 
 test("project registry uses Agent only, default is shared business preference and requests are strict", () => fixture(async f => {
@@ -218,7 +218,7 @@ test("project registry uses Agent only, default is shared business preference an
   await f.command({ op: "projects.create", requestKey: "create-project", name: "created" });
   await f.command({ op: "projects.default", requestKey: "default", projectRef: first.receipt.value.projectRef });
   expect((await f.command({ op: "projects.list" })).defaultProjectRef).toBe(first.receipt.value.projectRef);
-  expect(f.calls.filter(item => item.target === "agent.projects" && item.args.action === "register")).toHaveLength(1);
+  expect(f.calls.filter(item => item.target === "agent.work-projects" && item.args.action === "register")).toHaveLength(1);
   for (const raw of [null, [], { op: "projects.list", cwd: "/tmp" }, { op: "round.send", requestKey: "k", sessionId: "s", text: "hi" }, { op: "projects.register", requestKey: "../escape", path: "/tmp" }, { op: "projects.create", requestKey: "k", path: "relative" }, { op: "conversations.get", sessionId: "../escape" }, { op: "events", sessionId: "s", workId: "w", runId: "r", attemptId: "a", limit: 101 }, { op: "conversations.create", requestKey: "x", projectRef: "repo", title: "x".repeat(201) }]) await expect(f.command(raw)).rejects.toMatchObject({ code: "invalid" });
   await expect(f.command({ op: "round.send", requestKey: "large", sessionId: "s", workId: null, text: "界".repeat(20_000) })).rejects.toMatchObject({ code: "too_large" });
   const manifest = moduleManifestSchema.parse(await Bun.file(join(import.meta.dir, "module.json")).json());
@@ -280,7 +280,7 @@ test("only exact pre-admission answer rejection rejects a turn; unknown conflict
   const journal = await loadSessions(f.context), turn = journal.sessions[0]!.turns.at(-1)!;
   expect(turn).toMatchObject({ accepted: false, rejected: { code: "conflict" }, text: "" });
   expect((await f.command(raw)).receipt.status).toBe("rejected");
-  expect(f.calls.filter(call => call.target === "agent.respond")).toHaveLength(1);
+  expect(f.calls.filter(call => call.target === "agent.work-respond")).toHaveLength(1);
   // A rejected answer does not fence ordinary follow-up turns.
   expect((await f.send(sessionId, "follow", workId)).receipt.status).toBe("accepted");
   f.faults.malformedRejection = true;
@@ -295,7 +295,7 @@ test("input/editor answers preserve empty and whitespace text while send remains
   for (const [index, text] of ["", " \t\n", "x".repeat(8000)].entries()) {
     f.snapshots.get(workId)!.questions = [{ requestId: "question-1", title: "Input", method: index === 1 ? "editor" : "input", options: [], status: "pending", expiresAt: "2099-12-01T00:00:00Z" }];
     expect((await f.command({ op: "round.answer", requestKey: `answer-${index}`, ...f.target(sessionId, workId), questionId: "question-1", text })).receipt.status).toBe("accepted");
-    expect(JSON.parse(f.calls.filter(call => call.target === "agent.respond").at(-1)!.args.answer)).toEqual({ decision: "submit", value: text });
+    expect(JSON.parse(f.calls.filter(call => call.target === "agent.work-respond").at(-1)!.args.answer)).toEqual({ decision: "submit", value: text });
   }
   for (const text of ["\0", "x".repeat(8001)]) await expect(f.command({ op: "round.answer", requestKey: "bad", ...f.target(sessionId, workId), questionId: "question-1", text })).rejects.toMatchObject({ code: "invalid" });
   for (const text of ["", " \t\n"]) await expect(f.send(sessionId, "blank", workId, text)).rejects.toMatchObject({ code: "invalid" });
@@ -326,7 +326,7 @@ test("encoded envelopes bound escaped event/snapshot pages and explicitly omit c
   const { executionEventPageSchema, executionSnapshotSchema } = await import("./contract.js");
   const wireBytes = (value: unknown) => Buffer.byteLength(JSON.stringify({ result: { result: value } }));
   f.faults.largeEvent = true;
-  const agentPage = await f.context.call("agent.stream", { "execution-id": workId });
+  const agentPage = await f.context.call("agent.work-stream", { "execution-id": workId });
   expect(executionEventPageSchema.safeParse(agentPage).success).toBe(true);
   expect(wireBytes(agentPage)).toBeGreaterThan(230 * 1024);
   await expect(f.command({ op: "events", ...target, limit: 100 })).rejects.toMatchObject({ code: "too_large" });
@@ -377,7 +377,7 @@ for (const stale of [false, true]) test(`${stale ? "stale second-client" : "curr
   if (stale) { f.finish(workId); await f.send(sessionId, "advance", workId); }
   else f.views.get(workId)!.cancelRequested = true;
   const raw = { op: "round.send" as const, requestKey: "rejected-prepare", sessionId, workId, text: "Second client" };
-  const before = await loadSessions(f.context), effects = f.calls.filter(c => ["agent.run", "agent.write", "agent.respond", "agent.interrupt"].includes(c.target));
+  const before = await loadSessions(f.context), effects = f.calls.filter(c => ["agent.work-run", "agent.work-write", "agent.work-respond", "agent.work-interrupt"].includes(c.target));
   await expect(f.command(raw)).rejects.toMatchObject({ code: "conflict" });
   // The first HTTP reply may be lost; querying with a fresh client still proves rejection.
   const queried = await f.command({ op: "receipt", requestKey: raw.requestKey }, { ...f.context });
@@ -390,7 +390,7 @@ for (const stale of [false, true]) test(`${stale ? "stale second-client" : "curr
   expect(await f.command(raw, { ...f.context })).toEqual(queried);
   await expect(f.command({ ...raw, text: "Different" })).rejects.toMatchObject({ code: "conflict" });
   expect(f.calls).toHaveLength(callCount);
-  expect(f.calls.filter(c => ["agent.run", "agent.write", "agent.respond", "agent.interrupt"].includes(c.target))).toEqual(effects);
+  expect(f.calls.filter(c => ["agent.work-run", "agent.work-write", "agent.work-respond", "agent.work-interrupt"].includes(c.target))).toEqual(effects);
 }));
 
 for (const code of ["invalid", "conflict", "not_found", "forbidden", "capacity", "unavailable", "EIO"]) test(`prepare ${code} records only definitive rejection and preserves the original error`, () => fixture(async f => {

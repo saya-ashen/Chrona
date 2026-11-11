@@ -37,7 +37,9 @@ async function fixture(key: string | null = ownerKey, production = false) {
   await db.workspace.create({ data: { id: "ws_default", name: "S5 owner" } });
   const toolNames = ["bind", ...["pair", "poll", "report", "reconcile", "model"].map(name => `device-${name}`), ...(production ? ["sync", "forward", "lifecycle", "pairing-create", "mapping-set", "device-revoke", "status"] : [])];
   const ownerTools = ["pairing-create", "mapping-set", "device-revoke", "status"];
-  const tools = toolNames.map(name => ({ name, description: name, visibility: [ownerTools.includes(name) ? "owner" : "kernel"], parameters: { type: "object", properties: { input: { type: "string" } }, required: ["input"] } }));
+  const tools = toolNames.map(name => ({ name, description: name, visibility: [ownerTools.includes(name) ? "owner" : "kernel"], parameters: { type: "object", properties: { input: { type: "string" } }, required: ["input"] },
+      output: {}
+}));
   const applicationSource = fileURLToPath(new URL("../../../../../packages/engine/src/modules/steward/external/remote-execution", import.meta.url));
   const manifest = moduleManifestSchema.parse(production ? JSON.parse(await readFile(join(applicationSource, "module.json"), "utf8")) : { name: "remote-execution", entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [], tools });
   const receiver = await db.module.create({ data: { workspaceId: "ws_default", name: manifest.name, activeHash: production ? "5".repeat(40) : "s5-http-probe" } });

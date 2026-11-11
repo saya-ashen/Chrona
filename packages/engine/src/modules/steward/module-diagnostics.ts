@@ -22,13 +22,14 @@ export const incidentSchema = z.object({
 });
 // activationId absent: written before step 3 (hash-only); never counted toward the current activation.
 export const moduleOutputContractFailureSchema = z.object({ hash: z.string(), activationId: z.string().nullable().optional(), tool: z.string(), callId: z.string(), at: z.string(), issues: z.array(z.string()).max(5) }).strict();
-/** One light, stderr-free projection of a module's health: modules.list (`health`), modules.health pages and modules.diagnostics all use it. */
+/** One light, stderr-free projection of a module's health: modules.list (`health`), modules.health summaries and details use it. */
 export const moduleHealthSummarySchema = z.object({
   module: z.string(), moduleId: z.string(), activeHash: z.string().nullable(), configuredStatus: z.string(),
   /** When Chrona read these facts; runtime state "unobserved" means the supervisor is not running in this process. */
   observedAt: z.string(),
   runtime: z.union([
-    z.object({ state: z.enum(["running", "starting"]), pid: z.number().nullable() }),
+    z.object({ state: z.enum(["running", "starting", "stopping"]), pid: z.number().nullable() }),
+    z.object({ state: z.literal("unknown"), pid: z.number().nullable(), error: z.string().max(1000).optional() }),
     z.object({ state: z.enum(["unobserved", "backoff", "unavailable", "idle", "paused"]), pid: z.null() }),
   ]),
   /** Latest evolution record of the active hash; null when none is recorded (legacy or never activated). */

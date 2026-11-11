@@ -31,7 +31,7 @@ export async function createModuleChannel({ onCall, timers = globalThis }: { onC
       const result = moduleCallReplySchema.parse(await work);
       if (result.id !== call.data.id) throw new Error("Mismatched call reply");
       reply(result);
-    } catch { reply({ id: call.data.id, error: { code: "internal", message: "Module call failed" } }); }
+    } catch { reply({ id: call.data.id, error: { code: "unknown", message: "Module call failed" } }); }
     finally { inflight.delete(work); }
     return true;
   }
@@ -48,20 +48,26 @@ export async function createModuleChannel({ onCall, timers = globalThis }: { onC
   });
   const { ready, closedWithError } = transport;
   let queue: Promise<unknown> = Promise.resolve();
-  function exchange(message: { id: string; event?: ModuleEvent; ping?: true }, timeoutMs: number): Promise<EventReply> {
+  function exchange(message: { id: string; event?: ModuleEvent; ping?: true }, timeoutMs: number, dispatch?: (send: () => void) => Promise<void>): Promise<EventReply> {
     if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) return Promise.reject(new Error("Invalid event timeout"));
     const run = queue.then(() => new Promise<EventReply>((resolve, reject) => {
       let expired = false, written = false;
+      let dispatched: Promise<void> = Promise.resolve();
       const fail = (error: Error) => reject(Object.assign(error, { written }));
       const timer = timers.setTimeout(() => { expired = true; pending = undefined; fail(new Error("Module event timeout")); }, timeoutMs);
-      void ready.then(() => {
-        if (expired) return;
+      const send = () => {
+        if (expired) throw new Error("Module event timeout");
         if (closed || !transport.connected()) throw new Error("Module channel closed");
         pending = { id: message.id,
-          resolve: reply => { timers.clearTimeout(timer); pending = undefined; resolve(reply); },
+          resolve: reply => { void dispatched.then(() => { timers.clearTimeout(timer); pending = undefined; resolve(reply); }, fail); },
           reject: error => { timers.clearTimeout(timer); pending = undefined; fail(error); } };
         written = true;
         transport.send(message);
+      };
+      void ready.then(async () => {
+        if (expired) return;
+        dispatched = dispatch ? dispatch(send) : Promise.resolve().then(send);
+        await dispatched;
       }).catch(error => { timers.clearTimeout(timer); pending = undefined; fail(error); });
     }));
     queue = run.catch(() => {});
@@ -77,8 +83,8 @@ export async function createModuleChannel({ onCall, timers = globalThis }: { onC
     diagnostics: () => [...records],
     /** Resolves true when it had to wait for calls the module was still waiting on. */
     drained: async () => { const waiting = [...inflight]; await Promise.allSettled(waiting); return waiting.length > 0; },
-    send(event: ModuleEvent, timeoutMs = 60_000): Promise<EventReply> {
-      return exchange(moduleEventMessageSchema.parse({ id: randomUUID(), event }), timeoutMs);
+    send(event: ModuleEvent, timeoutMs = 60_000, dispatch?: (send: () => void) => Promise<void>): Promise<EventReply> {
+      return exchange(moduleEventMessageSchema.parse({ id: randomUUID(), event }), timeoutMs, dispatch);
     },
     async close() {
       closed = true; fail(new Error("Module channel closed"));

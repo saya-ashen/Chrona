@@ -18,7 +18,9 @@ async function fixture() {
   const ports: StewardPorts = { db, dataDir: "/unused-metadata-observation", publicUrl: null, now: () => new Date("2026-11-09T00:00:00Z") };
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "active", dataSchema: 77 } });
   const manifest = moduleManifestSchema.parse({ name: "example", description: "Active application description", entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [],
-    tools: [{ name: "settings", description: "Change this application's preferences", parameters: { type: "object" }, visibility: ["owner"] }] });
+    tools: [{ name: "settings", description: "Change this application's preferences", parameters: { type: "object" }, visibility: ["owner"],
+        output: {}
+    }] });
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "active", manifest, source: "user", status: "approved", intent: {}, report: {}, createdAt: new Date(0) } });
   return { db, ports, workspaceId: workspace.id, module, manifest };
 }
@@ -94,5 +96,5 @@ test("modules.list metadata integrates with its declared routed output schema", 
   const expected = JSON.parse(JSON.stringify(await createModules(f.ports, f.workspaceId).list()));
   expect(modulesListOutput.parse(expected)).toEqual(expected);
   const result = await callSync(f.ports, { workspaceId: f.workspaceId, caller: { kind: "owner", via: null }, chain: [], path: [] }, "modules.list", {});
-  expect(result.output).toEqual(expected);
+  expect(result.output).toEqual({ items: expected, nextCursor: null });
 });

@@ -7,7 +7,7 @@ const paused: ReadonlySet<string> = new Set(PAUSED_MODULE_NAMES);
 export function isModulePaused(name: string): boolean { return paused.has(name); }
 
 export class ModuleUnavailableError extends CallError {
-  readonly reason = "module_paused";
+  override readonly reason = "module_paused";
   constructor(name: string) {
     super("unavailable", `Module ${name} is unavailable: paused pending the owner's boundary decision; source is retained`);
     this.name = "ModuleUnavailableError";

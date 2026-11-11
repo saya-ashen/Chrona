@@ -24,11 +24,21 @@ async function fixture() {
     sandbox: { available: true, isolated: false, startModule() { throw new Error("Reference must not start a module"); } } };
   const workspace = await db.workspace.create({ data: { name: "reference" } });
   const owner: Caller = { kind: "owner", via: null };
-  const call = async (target: string, args: unknown = {}, caller: Caller = owner) => (await callSync(ports, { workspaceId: workspace.id, caller, chain: [], path: [] }, target, args)).output;
+  const call = async (target: string, raw: Record<string, unknown> = {}, caller: Caller = owner) => {
+    const args = { ...raw };
+    if (typeof args.target === "string" && !/^(modules|approvals|settings|secrets|activity|timers)\./.test(args.target)) {
+      const [name, tool] = args.target.split(".");
+      const module = await db.module.findFirst({ where: { workspaceId: workspace.id, name } });
+      args.target = { moduleId: module?.id ?? "absent", tool };
+    }
+    return (await callSync(ports, { workspaceId: workspace.id, caller, chain: [], path: [] }, target, args)).output;
+  };
   return { db, dataDir, ports, workspace, call };
 }
-const manifest = moduleManifestSchema.parse({ name: "target", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["modules.reference", "modules.tools"],
-  tools: [{ name: "read", description: "Read", visibility: ["modules", "owner", "provider"], idempotent: true, parameters: { type: "object", properties: {}, required: [] } }] });
+const manifest = moduleManifestSchema.parse({ name: "target", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["modules.describe"],
+  tools: [{ name: "read", description: "Read", visibility: ["modules", "owner", "provider"], idempotent: true, parameters: { type: "object", properties: {}, required: [] },
+      output: {}
+}] });
 async function active(f: Awaited<ReturnType<typeof fixture>>, name = "target") {
   const module = await f.db.module.create({ data: { workspaceId: f.workspace.id, name, activeHash: "v1" } });
   await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest: { ...manifest, name }, source: "user", status: "approved", intent: {}, report: {} } });
@@ -37,18 +47,18 @@ async function active(f: Awaited<ReturnType<typeof fixture>>, name = "target") {
 
 test("references expose the current public contracts without runtime execution", async () => {
   const f = await fixture();
-  const index = await f.call("modules.reference");
-  expect(index).toEqual(expect.arrayContaining([{ target: "modules.diagnostics", source: { kind: "system", hash: null }, description: expect.any(String) }]));
-  expect(JSON.stringify(index)).not.toContain("inputSchema");
+  const index = (await f.call("modules.describe") as { items: unknown[] }).items;
+  expect(index).toEqual(expect.arrayContaining([expect.objectContaining({ target: "modules.health", description: expect.any(String) })]));
+  expect(JSON.stringify(index)).toContain("inputSchema");
   expect(listSystemModules().find(module => module.name === "modules")!.tools.map(tool => tool.name)).toEqual([
-    "list", "tools", "reference", "diagnostics", "health", "admit-candidates", "source", "submit", "candidate-check", "rollback", "disable", "enable", "remove",
+    "list", "describe", "health", "admit", "source", "submit", "receipt", "enable", "disable", "rollback", "remove", "operation",
   ]);
-  const diagnostics = listSystemModules().find(module => module.name === "modules")!.tools.find(tool => tool.name === "diagnostics")!;
-  expect(await f.call("modules.reference", { target: "modules.diagnostics" })).toMatchObject({ target: "modules.diagnostics",
-    inputSchema: { type: "object", properties: { module: { type: "string" } } }, outputSchema: { type: "array" },
-    admission: { visibility: diagnostics.visibility, uses: "modules.diagnostics" }, contractHash: moduleCallbackContractHash(diagnostics) });
+  const diagnostics = listSystemModules().find(module => module.name === "modules")!.tools.find(tool => tool.name === "health")!;
+  expect(await f.call("modules.describe", { target: "modules.health" })).toMatchObject({ target: "modules.health",
+    inputSchema: { type: "object", properties: { moduleId: { type: "string" } } }, outputSchema: { type: "object" },
+    admission: { visibility: diagnostics.visibility, uses: "modules.health" }, contractHash: moduleCallbackContractHash(diagnostics) });
   for (const target of ["modules.checkout", "modules.propose", "modules.check", "modules.request-group", "modules.settings-get", "modules.settings-set", "modules.catalog", "modules.upstream"]) {
-    await expect(f.call("modules.reference", { target })).rejects.toMatchObject({ code: "not_found" });
+    await expect(f.call("modules.describe", { target })).rejects.toMatchObject({ code: "not_found" });
   }
   expect(await f.db.moduleRun.count()).toBe(0);
   expect(await f.db.run.count()).toBe(0);
@@ -79,7 +89,7 @@ test("app output references preserve original JSON Schema and generated call typ
   const schema = { type: "object", properties: { zeta: { type: "string" }, alpha: { type: "integer" } }, required: ["zeta", "alpha"], additionalProperties: false };
   const tool = { ...manifest.tools[0]!, parameters: { type: "object", properties: { filters: { type: "array", items: { type: "object", properties: { state: { type: "string", enum: ["ready", "done"] }, limit: { type: "number" } }, required: ["state"] } } }, required: ["filters"] }, output: schema };
   await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: module.id, hash: "v1" } }, data: { manifest: moduleManifestSchema.parse({ ...manifest, name: "typed", tools: [tool] }) } });
-  const reference = await f.call("modules.reference", { target: "typed.read" }) as { outputSchema: unknown; inputSchema: { properties: { filters: { items: { additionalProperties: boolean } } } } };
+  const reference = await f.call("modules.describe", { target: "typed.read" }) as { outputSchema: unknown; inputSchema: { properties: { filters: { items: { additionalProperties: boolean } } } } };
   expect(JSON.stringify(reference.outputSchema)).toBe(JSON.stringify(schema));
   expect(reference.inputSchema.properties.filters.items.additionalProperties).toBe(false);
   expect((await callsContracts(f.ports, f.workspace.id))["typed.read"]).toMatchObject({ input: { type: "object", properties: { filters: { type: "array" } } }, output: { type: "object", required: ["zeta", "alpha"] } });
@@ -94,7 +104,7 @@ test("reference hash binds the live tool and ignores documentation and object-ke
   expect(moduleCallbackContractHash({ ...tool, visibility: ["owner"] })).not.toBe(moduleCallbackContractHash(tool));
   expect(moduleCallbackContractHash({ ...tool, output: { type: "string" } })).not.toBe(moduleCallbackContractHash(tool));
   expect(moduleCallbackContractHash({ ...tool, parameters: { ...tool.parameters, required: ["value", "count"] } })).not.toBe(moduleCallbackContractHash(tool));
-  const reference = await f.call("modules.reference", { target: "target.read" }) as { contractHash: string };
+  const reference = await f.call("modules.describe", { target: "target.read" }) as { contractHash: string };
   const origin = { workspaceId: f.workspace.id, caller: { kind: "owner" as const, via: null }, chain: [], path: [] };
   await expect(callSync(f.ports, origin, "target.read", { unexpected: true }, { expectedTarget: { moduleId: module.id, contractHash: reference.contractHash } })).rejects.toMatchObject({ code: "invalid" });
   await expect(callSync(f.ports, origin, "target.read", {}, { expectedTarget: { moduleId: module.id, contractHash: "0".repeat(64) } })).rejects.toMatchObject({ code: "conflict" });
@@ -108,7 +118,7 @@ test.each(["building", "testing", "pending_review", "rejected", "active", "missi
   else if (["paused", "migrating", "no-hash"].includes(state)) await f.db.module.update({ where: { id: module.id }, data: state === "no-hash" ? { activeHash: null } : { status: state } });
   else await f.db.moduleVersion.updateMany({ where: { moduleId: module.id }, data: { status: state } });
   expect((await references(f.ports, f.workspace.id)).some(entry => entry.target === "target.read")).toBe(false);
-  await expect(f.call("modules.reference", { target: "target.read" })).rejects.toMatchObject({ code: "not_found" });
+  await expect(f.call("modules.describe", { target: "target.read" })).rejects.toMatchObject({ code: "not_found" });
   expect(await callsContracts(f.ports, f.workspace.id)).not.toHaveProperty("target.read");
 });
 
@@ -117,12 +127,12 @@ test("discovery stays workspace scoped and honors the current caller admission",
   const other = await f.db.workspace.create({ data: { name: "other" } });
   const outside = await f.db.module.create({ data: { workspaceId: other.id, name: "outside", activeHash: "private" } });
   await f.db.moduleVersion.create({ data: { moduleId: outside.id, hash: "private", manifest: { ...manifest, name: "outside" }, status: "approved", source: "user", intent: {}, report: {} } });
-  expect(await f.call("modules.reference", { target: "target.read" })).toMatchObject({ source: { kind: "module", hash: "v1" }, outputSchema: null });
-  expect(JSON.stringify(await f.call("modules.reference"))).not.toContain("outside.read");
-  await expect(f.call("modules.reference", { target: "outside.read" })).rejects.toMatchObject({ code: "not_found" });
+  expect(await f.call("modules.describe", { target: "target.read" })).toMatchObject({ source: { kind: "module", hash: "v1" }, outputSchema: {} });
+  expect(JSON.stringify(await f.call("modules.describe"))).not.toContain("outside.read");
+  await expect(f.call("modules.describe", { target: "outside.read" })).rejects.toMatchObject({ code: "not_found" });
   const caller: Caller = { kind: "module", module: "target", moduleId: module.id, hash: "v1" };
-  expect(await f.call("modules.reference", { target: "modules.tools" }, caller)).toMatchObject({ target: "modules.tools" });
-  await expect(f.call("modules.reference", { target: "approvals.resolve" }, caller)).rejects.toMatchObject({ code: "not_found" });
+  expect(await f.call("modules.describe", { target: "modules.describe" }, caller)).toMatchObject({ target: "modules.describe" });
+  await expect(f.call("modules.describe", { target: "approvals.resolve" }, caller)).rejects.toMatchObject({ code: "not_found" });
 });
 
 test("private build guidance advertises live discovery and fixed material authoring", () => {
@@ -130,5 +140,5 @@ test("private build guidance advertises live discovery and fixed material author
   const names = new Set(listSystemModules().flatMap(module => module.tools.map(tool => `m_${module.name}_${tool.name.replaceAll("-", "_")}`)));
   expect(BUILD_MODULE_TOOLS.every(name => names.has(name))).toBe(true);
   for (const removed of ["m_modules_checkout", "m_modules_propose", "m_modules_check", "m_modules_request_group", "build_request"]) expect(BUILD_REFERENCE_PROMPT).not.toContain(removed);
-  for (const current of ["modules.reference", "modules.tools", "modules.diagnostics", "modules.submit", "modules.candidate-check", "ordinary", "fixed candidate"]) expect(BUILD_REFERENCE_PROMPT).toContain(current);
+  for (const current of ["modules.describe", "modules.health", "modules.submit", "modules.receipt", "ordinary", "fixed candidate"]) expect(BUILD_REFERENCE_PROMPT).toContain(current);
 });

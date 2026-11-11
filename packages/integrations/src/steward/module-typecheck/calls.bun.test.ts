@@ -127,19 +127,19 @@ test("check generates fresh contracts before checking and preserves diagnostics 
   await mkdir(module);
   await writeFile(join(module, "module.json"), JSON.stringify({ entry: "index.ts" }));
   const contracts: CallContracts = {
-    "app.read": { input: { type: "object", properties: { id: { type: "string" } }, required: ["id"] }, output: { type: "object", properties: { value: { type: "string" } }, required: ["value"] } },
-    "app.impossible": { input: null, output: false },
-    "legacy.read": { input: null, output: null },
-    "opaque.read": { input: true, output: true },
+    "settings.read": { input: { type: "object", properties: { id: { type: "string" } }, required: ["id"] }, output: { type: "object", properties: { value: { type: "string" } }, required: ["value"] } },
+    "settings.impossible": { input: null, output: false },
+    "modules.read": { input: null, output: null },
+    "activity.read": { input: true, output: true },
   };
   await writeFile(join(sdk, "calls.json"), JSON.stringify(contracts));
   await rm(join(sdk, "calls.d.ts"));
   await writeFile(join(module, "index.ts"), `import { chrona } from "chrona";
-const result = await chrona.call("app.read", { id: "x" });
+const result = await chrona.call("settings.read", { id: "x" });
 const value: string = result.value;
-const impossible: never = await chrona.call("app.impossible");
-await chrona.call<{ guessed: true }>("legacy.read");
-await chrona.call<{ guessed: true }>("opaque.read");
+const impossible: never = await chrona.call("settings.impossible");
+await chrona.call<{ guessed: true }>("modules.read");
+await chrona.call<{ guessed: true }>("activity.read");
 throw new Error("module code must never execute");
 `);
   const good = await run("check.ts", [module, sdk], directory);
@@ -149,16 +149,16 @@ throw new Error("module code must never execute");
   expect(await readFile(join(sdk, "calls.d.ts"), "utf8")).toBe(renderCallsDeclaration(contracts));
 
   // A stale declaration must not hide updated calls.json contracts.
-  contracts["app.read"]!.output = { type: "object", properties: { value: { type: "integer" } }, required: ["value"] };
+  contracts["settings.read"]!.output = { type: "object", properties: { value: { type: "integer" } }, required: ["value"] };
   await writeFile(join(sdk, "calls.json"), JSON.stringify(contracts));
   await writeFile(join(module, "index.ts"), `import { chrona } from "chrona";
-const result = await chrona.call("app.read", { id: "x" });
+const result = await chrona.call("settings.read", { id: "x" });
 const value: string = result.value;
 result.missing;
-await chrona.call("app.read", { id: 1 });
-await chrona.call<{ guessed: true }>("app.read");
-await chrona.call<{ guessed: true }>("app.impossible");
-await chrona.call<{ guessed: true }>("legacy.read");
+await chrona.call("settings.read", { id: 1 });
+await chrona.call<{ guessed: true }>("settings.read");
+await chrona.call<{ guessed: true }>("settings.impossible");
+await chrona.call<{ guessed: true }>("modules.read");
 `);
   const bad = await run("check.ts", [module, sdk], directory);
   expect(bad.stderr).toBe("");
@@ -168,8 +168,8 @@ await chrona.call<{ guessed: true }>("legacy.read");
     ["index.ts", 3, 2322], ["index.ts", 4, 2339], ["index.ts", 5, 2769], ["index.ts", 6, 90001], ["index.ts", 7, 90001],
   ]));
   expect(report.errors.filter(error => error.code === 90001).map(error => error.message)).toEqual([
-    "app.read has a declared contract: remove the type argument and use the declared result type",
-    "app.impossible has a declared contract: remove the type argument and use the declared result type",
+    "settings.read has a declared contract: remove the type argument and use the declared result type",
+    "settings.impossible has a declared contract: remove the type argument and use the declared result type",
   ]);
   expect(report.total).toBe(report.errors.length);
   expect(await readFile(join(sdk, "calls.d.ts"), "utf8")).toBe(renderCallsDeclaration(contracts));

@@ -62,10 +62,9 @@ export function syntheticContracts() {
     { name: "required-reversed", tool: { ...base, parameters: { ...base.parameters, required: [...base.parameters.required].reverse() } } },
     { name: "enum-reversed", tool: { ...base, output: { type: "string", enum: ["🕒", "中文", "é"] } } },
     { name: "enum-forward", tool: { ...base, output: { type: "string", enum: ["é", "中文", "🕒"] } } },
-    { name: "undeclared-output", tool: { ...base, output: undefined, idempotent: false } },
   ];
   return cases.map(({ name, tool }) => {
-    const contract = { input: normalizedToolInputSchema(tool), output: tool.output ?? null, visibility: [...tool.visibility].sort(), idempotent: tool.idempotent };
+    const contract = { input: normalizedToolInputSchema(tool), output: tool.output, visibility: [...tool.visibility].sort(), idempotent: tool.idempotent };
     // This is the captured preimage, not the implementation used by the assertion.
     const canonicalJson = JSON.stringify(contract, (_key, item: unknown) => item && typeof item === "object" && !Array.isArray(item)
       ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) : item);

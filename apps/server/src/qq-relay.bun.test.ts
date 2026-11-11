@@ -13,7 +13,7 @@ async function fixture() {
   const runs = new Map<string, { status: string; active: boolean }>(), prompts: Record<string, unknown>[] = [], targets: string[] = [];
   const call = async (target: string, args: Record<string, unknown> = {}): Promise<unknown> => {
     targets.push(target);
-    if (target === "modules.tools") return [];
+    if (target === "modules.describe" || target === "modules.list") return { items: [], nextCursor: null };
     if (target === "agent.context") return { contextId: `context:${args["request-key"]}` };
     if (target === "agent.run") { const runId = `run:${prompts.length}`; prompts.push(args); runs.set(runId, { status: "queued", active: true }); return { runId, ...runs.get(runId) }; }
     if (target === "agent.get") return runs.get(String(args["run-id"]));

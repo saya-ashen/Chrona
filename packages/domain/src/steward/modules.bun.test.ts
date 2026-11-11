@@ -19,7 +19,9 @@ describe("module manifest contract", () => {
     expect(moduleManifestSchema.safeParse({ ...manifest, triggers: [{ id: "mail", inbound: { connector: "mailbox" } }] }).success).toBe(false);
   });
   test.each(["unknown required", "duplicate names"])("rejects tools with %s", kind => {
-    const tool = { name: "lookup", description: "Lookup", parameters: { type: "object", properties: { query: { type: "string" } }, required: kind === "unknown required" ? ["missing"] : ["query"] } };
+    const tool = { name: "lookup", description: "Lookup", parameters: { type: "object", properties: { query: { type: "string" } }, required: kind === "unknown required" ? ["missing"] : ["query"] },
+        output: {}
+    };
     expect(moduleManifestSchema.safeParse({ ...manifest, tools: kind === "duplicate names" ? [tool, tool] : [tool] }).success).toBe(false);
   });
   test.each(["migrate.ts", "migrate_v2.py", "migrate-v2.sh"])("accepts data migration %s", migrate => {
@@ -55,8 +57,8 @@ describe("module manifest contract", () => {
 const notify = { key: "price", level: "now", title: "Price changed", body: "New price" };
 describe("module channel contract", () => {
   test("only routed application calls cross the channel", () => {
-    expect(moduleCallSchema.safeParse({ id: "1", method: "call", params: { target: "notify.send", args: notify, mode: "async", key: "price" } }).success).toBe(true);
-    expect(moduleCallSchema.safeParse({ id: "1", method: "call", params: { target: "agent.complete", args: { prompt: "p", maxOutputTokens: 10 } } }).success).toBe(true);
+    expect(moduleCallSchema.safeParse({ id: "1", method: "call", params: { target: { moduleId: "notify-id", tool: "send" }, args: notify, mode: "async", key: "price" } }).success).toBe(true);
+    expect(moduleCallSchema.safeParse({ id: "1", method: "call", params: { target: { moduleId: "agent-id", tool: "complete" }, args: { prompt: "p", maxOutputTokens: 10 } } }).success).toBe(true);
     for (const method of ["notify", "wakeProvider", "model", "secret"]) expect(moduleCallSchema.safeParse({ id: "1", method, params: {} }).success).toBe(false);
   });
   test("event replies default result and cap it at 256 KiB serialized", () => {

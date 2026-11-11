@@ -8,7 +8,7 @@ const hash = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/);
 const name = z.string().regex(/^[a-z][a-z0-9-]*$/).max(64);
 const member = z.object({ name, moduleId: id, hash, versionId: id, expectedActiveHash: hash.nullable(), materialDigest: z.string().regex(/^[a-f0-9]{64}$/), status: z.enum(["building", "testing", "pending_review", "approved", "rejected"]), selected: z.boolean() }).strict();
 export const deliveryReceiptSchema = z.object({
-  receiptId: id, admissionId: id, requestKey: z.string().trim().min(1).max(120), submitter: z.object({ moduleId: id, hash }).strict(),
+  receiptId: id, admissionId: id, requestKey: z.string().min(1).max(200), submitter: z.object({ moduleId: id, hash }).strict(),
   state: z.enum(["submitted", "pending_approval", "approved", "rejected"]), approvalId: id.nullable(), members: z.array(member).min(1).max(4),
 }).strict().refine(receipt => new Set(receipt.members.map(item => item.moduleId)).size === receipt.members.length && new Set(receipt.members.map(item => item.name)).size === receipt.members.length);
 const pageSchema = z.object({ id: z.string().min(1).max(200), title: z.string().min(1).max(200), href: z.string().max(1000) }).strict();
@@ -46,10 +46,10 @@ const targetsFor = (receipt: ApplicationDelivery["receipt"]): ApplicationDeliver
 const identity = (receipt: ApplicationDelivery["receipt"]) => JSON.stringify([receipt.receiptId, receipt.admissionId, receipt.requestKey, receipt.submitter, receipt.members.map(({ status: _status, selected: _selected, ...item }) => item)]);
 
 /** Only complete persisted results from this Run establish delivery; transcript is display only. */
-type ReceiptSource = { applicationDelivery?: ApplicationDelivery[]; pendingToolResults?: string[]; runId?: string; runRequest?: { tools: string[] } };
+type ReceiptSource = { applicationDelivery?: ApplicationDelivery[]; pendingToolResults?: string[]; runId?: string; runRequest?: { tools: (string | { moduleId: string; tool: string })[] } };
 const resultEvent = z.object({
   kind: z.literal("tool-result"), payload: z.object({ type: z.literal("tool-result"), value: z.object({
-    runId: id, callId: id, target: z.enum(["author.submit", "author.receipt", "modules.submit", "modules.candidate-check"]),
+    runId: id, callId: id, target: z.union([z.enum(["modules.submit", "modules.receipt"]), z.object({ moduleId: id, tool: z.enum(["submit", "receipt"]) }).strict()]),
     moduleId: id, hash, contractHash: z.string().regex(/^[a-f0-9]{64}$/), status: z.enum(["succeeded", "failed", "unknown"]), outputState: z.enum(["complete", "filtered", "omitted"]), output: z.unknown(),
   }).strict() }),
 });
@@ -58,7 +58,7 @@ function completeReceipt(result: z.infer<typeof resultEvent>["payload"]["value"]
   const parsed = deliveryReceiptSchema.safeParse(result.output);
   if (!parsed.success) return;
   const receipt = parsed.data;
-  if (result.target.startsWith("author.") && (result.moduleId !== receipt.submitter.moduleId || result.hash !== receipt.submitter.hash)) return;
+  if (typeof result.target !== "string" && (result.moduleId !== receipt.submitter.moduleId || result.hash !== receipt.submitter.hash)) return;
   return receipt;
 }
 export function captureApplicationDelivery(input: ReceiptSource, events: unknown[]) {
@@ -66,7 +66,7 @@ export function captureApplicationDelivery(input: ReceiptSource, events: unknown
     const parsed = resultEvent.safeParse(event);
     if (!parsed.success) continue;
     const result = parsed.data.payload.value;
-    if (result.runId !== input.runId || !input.runRequest?.tools.includes(result.target)) continue;
+    if (result.runId !== input.runId || !input.runRequest?.tools.some(target => JSON.stringify(target) === JSON.stringify(result.target))) continue;
     const pending = new Set(input.pendingToolResults);
     if (result.status === "unknown") pending.add(result.callId); else pending.delete(result.callId);
     input.pendingToolResults = [...pending];
@@ -98,7 +98,7 @@ async function readHealth(call: Call) {
 async function receiptCheck(call: Call, delivery: ApplicationDelivery) {
   delivery.receiptCheck = "unknown";
   try {
-    const receipt = deliveryReceiptSchema.parse(await call("modules.candidate-check", { receiptId: delivery.receipt.receiptId }));
+    const receipt = deliveryReceiptSchema.parse(await call("modules.receipt", { receiptId: delivery.receipt.receiptId }));
     if (identity(receipt) !== identity(delivery.receipt)) return;
     delivery.receipt = receipt; delivery.receiptCheck = "current";
   } catch { /* Unavailable, denied or malformed exact checks remain unknown. */ }

@@ -13,7 +13,7 @@ import type { ModuleGitFile } from "./module-git";
 import { moduleContext, type BuildReport } from "./module-context";
 import type { StewardPorts } from "./ports";
 
-const selected = ["modules.list", "modules.admit-candidates", "modules.submit", "approvals.resolve", "author.prepare", "author.source", "author.write", "author.submit", "author.receipt"];
+const selected = ["modules.list", "modules.admit", "modules.submit", "approvals.resolve", "author.prepare", "author.source", "author.write", "author.submit", "author.receipt"];
 const input = (value: unknown) => ({ input: JSON.stringify(value) });
 const intent = { changes: ["Install the fixed local conversation proof"], preserves: ["Retain existing application data"] };
 const textFiles = (files: Record<string, string>): ModuleGitFile[] => Object.entries(files).map(([path, text]) => ({ path, bytes: Buffer.from(text) }));
@@ -47,7 +47,7 @@ console.log(${JSON.stringify(`checked immutable ${message}`)});
 
 // The conversation is a real module-origin Agent context. We drive its selected tools deterministically;
 // no Provider/model is registered or started, and no fake wire peer or lifecycle report is installed.
-test("current approved wildcard conversation routes SDK Author material into checked, approved fixed candidates as Author", async () => {
+test("current approved owner conversation routes SDK Author material into checked, approved fixed candidates as Author", async () => {
   const root = await mkdtemp(join(tmpdir(), "chrona-author-conversation-"));
   const previousDatabaseUrl = process.env.DATABASE_URL;
   const databaseUrl = `file:${join(root, "test.db")}`;
@@ -92,11 +92,13 @@ test("current approved wildcard conversation routes SDK Author material into che
     };
     const authorFiles = await snapshotModule(import.meta.dir, "external/author");
     const authorManifest = moduleManifestSchema.parse(JSON.parse(Buffer.from(authorFiles.find(file => file.path === "module.json")!.bytes).toString("utf8")));
-    expect(authorManifest.uses).toEqual(["modules.source", "modules.submit", "modules.candidate-check"]);
+    expect(authorManifest.uses).toEqual(["modules.source", "modules.submit", "modules.receipt"]);
     expect(authorManifest.model).toBeUndefined();
     const author = await seedApproved(authorManifest, authorFiles);
     // A Web-like approved wildcard entry, retaining its actual module identity throughout the Agent run.
-    const entryManifest = moduleManifestSchema.parse({ name: "conversation-entry", entry: "index.ts", tests: ["test.ts"], uses: ["*"], effects: [], tools: [{ name: "observe", description: "Conversation fixture", visibility: ["modules"], parameters: { type: "object", properties: {} }, output: { type: "object" } }] });
+    const entryManifest = moduleManifestSchema.parse({ name: "conversation-entry", entry: "index.ts", tests: ["test.ts"], uses: ["*"], effects: [], tools: [{ name: "observe", description: "Conversation fixture", visibility: ["modules"], parameters: { type: "object", properties: {} }, output: { type: "object" } }],
+        authority: "owner"
+    });
     const entry = await seedApproved(entryManifest, textFiles({ "module.json": JSON.stringify(entryManifest), "index.ts": 'import { on } from "chrona"; on("tool", () => ({ result: {} }));', "test.ts": "export {};" }));
     const baselineManifest = application("proof-alpha");
     const baseline = await seedApproved(baselineManifest, textFiles(applicationFiles(baselineManifest, "approved baseline")));
@@ -111,13 +113,14 @@ test("current approved wildcard conversation routes SDK Author material into che
     const context = (await contextRunTools(ports, run!))!;
     expect(context.caller).toEqual({ ...principal.caller, module: entry.name });
     expect(context.entries.map(item => `${item.module.name}.${item.tool.name}`)).toEqual(selected);
-    const invoke = async (target: string, args: Record<string, unknown>) => {
+    const invoke = async (target: string, raw: Record<string, unknown>) => {
+      const { requestKey, ...args } = raw;
       const tool = context.entries.find(item => `${item.module.name}.${item.tool.name}` === target);
       expect(tool).toBeDefined();
-      return (await callContextTool(ports!, context, tool!.name, args, Date.now() + 30_000)).result;
+      return (await callContextTool(ports!, context, tool!.name, args, { deadline: Date.now() + 30_000, key: requestKey as string | undefined })).result;
     };
     // Discovery occurs through the selected kernel tool, before Author prepares its admission draft.
-    const directory = await invoke("modules.list", {}) as { id: string; name: string; activeHash: string; versions: { hash: string; status: string }[] }[];
+    const directory = (await invoke("modules.list", {}) as { items: { id: string; name: string; activeHash: string; versions: { hash: string; status: string }[] }[] }).items;
     const discovered = directory.find(item => item.name === "author")!;
     expect(discovered).toMatchObject({ id: author.id, activeHash: author.activeHash, status: "active" });
     expect(discovered.versions).toContainEqual(expect.objectContaining({ hash: author.activeHash, status: "approved" }));
@@ -129,14 +132,14 @@ test("current approved wildcard conversation routes SDK Author material into che
     expect(prepared.prompt).toContain("current conversation");
     expect(await db.candidateAdmission.count()).toBe(0);
     expect(await db.moduleVersion.count({ where: { source: "candidate" } })).toBe(0);
-    const admission = await invoke("modules.admit-candidates", prepared.admission) as { admissionId: string };
+    const admission = await invoke("modules.admit", prepared.admission) as { admissionId: string };
     const issuer = { kind: "module" as const, module: entry.name, moduleId: entry.id, hash: entry.activeHash! };
     const grant = (await readCandidateAdmissionIn(moduleContext(ports, workspaceId), db, admission.admissionId));
     expect(grant).toEqual({ input: admissionInput, issuer, receiptId: null });
     // Author has only its narrow kernel contracts; it cannot select the admission tool itself.
     const authorPrincipal = { ...principal, caller: { kind: "module" as const, moduleId: author.id, hash: author.activeHash! } };
-    await expect(selectContextTools(ports, authorPrincipal, ["modules.admit-candidates"])).rejects.toMatchObject({ code: "forbidden" });
-    await expect(selectContextTools(ports, { ...principal, caller: { ...principal.caller, hash: "0".repeat(40) } }, ["modules.admit-candidates"])).rejects.toMatchObject({ code: "forbidden" });
+    await expect(selectContextTools(ports, authorPrincipal, ["modules.admit"])).rejects.toMatchObject({ code: "forbidden" });
+    await expect(selectContextTools(ports, { ...principal, caller: { ...principal.caller, hash: "0".repeat(40) } }, ["modules.admit"])).rejects.toMatchObject({ code: "forbidden" });
 
     const exported = await invoke("author.source", input({ admissionId: admission.admissionId, moduleId: baseline.id, hash: baseline.activeHash, to: "sources/alpha" }));
     expect(exported).toMatchObject({ moduleId: baseline.id, hash: baseline.activeHash, materialDigest: expect.stringMatching(/^[a-f0-9]{64}$/) });
@@ -152,10 +155,10 @@ test("current approved wildcard conversation routes SDK Author material into che
     const submission = { admissionId: admission.admissionId, requestKey: "fixed-submit", items: [{ name: "proof-alpha", dir: "sources/alpha", intent }, { name: "proof-beta", dir: "sources/beta", intent }] };
     // The wildcard entry is the issuer, not the admitted submitter. Author's real SDK identity must win.
     await expect(invoke("modules.submit", submission)).rejects.toMatchObject({ code: "forbidden" });
-    const wrongSubmitterAdmission = await invoke("modules.admit-candidates", { ...admissionInput, requestKey: "wrong-submitter", submitter: { moduleId: entry.id, hash: entry.activeHash } }) as { admissionId: string };
-    await expect(invoke("author.submit", input({ ...submission, admissionId: wrongSubmitterAdmission.admissionId }))).rejects.toMatchObject({ code: "forbidden" });
-    for (const items of [submission.items.slice(0, 1), [submission.items[0]!, { ...submission.items[1]!, name: "unadmitted-target" }]]) {
-      await expect(invoke("author.submit", input({ ...submission, items }))).rejects.toMatchObject({ code: "conflict" });
+    const wrongSubmitterAdmission = await invoke("modules.admit", { ...admissionInput, requestKey: "wrong-submitter", submitter: { moduleId: entry.id, hash: entry.activeHash } }) as { admissionId: string };
+    await expect(invoke("author.submit", input({ ...submission, requestKey: "wrong-submitter-submit", admissionId: wrongSubmitterAdmission.admissionId }))).rejects.toMatchObject({ code: "forbidden" });
+    for (const [index, items] of [submission.items.slice(0, 1), [submission.items[0]!, { ...submission.items[1]!, name: "unadmitted-target" }]].entries()) {
+      await expect(invoke("author.submit", input({ ...submission, requestKey: `invalid-set-${index}`, items }))).rejects.toMatchObject({ code: "conflict" });
     }
     expect(await db.moduleVersion.count({ where: { source: "candidate" } })).toBe(0);
     expect(await db.candidateReceipt.count()).toBe(0);
@@ -213,7 +216,7 @@ test("current approved wildcard conversation routes SDK Author material into che
     expect(approved.members.every(member => member.status === "approved" && member.selected)).toBe(true);
     for (const member of approved.members) expect(await db.module.findUniqueOrThrow({ where: { id: member.moduleId } })).toMatchObject({ status: "active", activeHash: member.hash });
     expect(await db.generation.count({ where: { workspaceId } })).toBe(1);
-    expect(await invoke("author.submit", input(submission))).toEqual(approved);
+    expect(await invoke("author.submit", input(submission))).toEqual(receipt);
     expect(await db.moduleVersion.count({ where: { source: "candidate" } })).toBe(2);
     expect(await db.candidateReceipt.count()).toBe(1);
     const resolution = await db.audit.findFirstOrThrow({ where: { kind: "approval_resolved", subjectId: approval.id } });
@@ -226,13 +229,13 @@ test("current approved wildcard conversation routes SDK Author material into che
       expect(calls.length).toBeGreaterThan(0);
       for (const call of calls) expect(call).toMatchObject({ caller: `module:${entry.id}`, callerModuleId: entry.id, callerHash: entry.activeHash, chain: [], mode: "sync" });
     }
-    for (const tool of ["source", "submit", "candidate-check"]) {
+    for (const tool of ["source", "submit", "receipt"]) {
       const calls = invocations.filter(row => row.target === "modules" && row.tool === tool && row.callerModuleId === author.id);
       expect(calls.some(row => row.status === "succeeded")).toBe(true);
       for (const call of calls) expect(call).toMatchObject({ caller: `module:${author.id}`, callerHash: author.activeHash, chain: ["author"], mode: "sync" });
     }
     expect(invocations.some(row => row.target === "modules" && row.tool === "submit" && row.callerModuleId === author.id && row.status === "failed")).toBe(true);
-    for (const tool of ["list", "admit-candidates"]) expect(invocations.find(row => row.target === "modules" && row.tool === tool && row.status === "succeeded")).toMatchObject({ caller: `module:${entry.id}`, callerModuleId: entry.id, callerHash: entry.activeHash, chain: [] });
+    for (const tool of ["list", "admit"]) expect(invocations.find(row => row.target === "modules" && row.tool === tool && row.status === "succeeded")).toMatchObject({ caller: `module:${entry.id}`, callerModuleId: entry.id, callerHash: entry.activeHash, chain: [] });
     expect(invocations.some(row => row.caller === "owner" || row.caller.startsWith("provider:"))).toBe(false);
     expect(await db.run.count()).toBe(1);
     expect(await db.executionAttempt.count()).toBe(0);

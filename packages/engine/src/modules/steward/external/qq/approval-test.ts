@@ -18,7 +18,7 @@ const relay = createRelay({ publicUrl: null, download: async () => { throw new E
   notify: async () => { throw new Error("Approval replies must not send a separate notice"); },
   call: async (target, args) => {
     calls.push({ target, args });
-    if (target === "approvals.list") return open;
+    if (target === "approvals.list") return { items: open, nextCursor: null };
     if (target === "approvals.resolve" && failure) throw failure;
     return null;
   },

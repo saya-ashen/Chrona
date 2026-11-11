@@ -43,7 +43,7 @@ async function post(url: string, body: Record<string, string>, fetcher: typeof f
 
 function authorizationScopes(approved: ApprovedOAuth, requested: unknown) {
   const scopes = [...new Set(approved.definition.scopes)];
-  if (String(requested ?? "").split(/\s+/).filter(Boolean).some(scope => !scopes.includes(scope))) throw new CallError("invalid", "Scopes must be declared in the approved OAuth definition");
+  if ((Array.isArray(requested) ? requested : []).some(scope => !scopes.includes(scope))) throw new CallError("invalid", "Scopes must be declared in the approved OAuth definition");
   if (!scopes.length || scopes.some(scope => scope.length > 200 || /[^\x21-\x7e]/.test(scope))) throw new CallError("invalid", "scopes must be space-separated scope names");
   return scopes;
 }

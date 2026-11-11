@@ -33,7 +33,7 @@ export async function createRegistrationTest(entry: string, options: { manifest?
   const root = await mkdtemp(join(tmpdir(), "chrona-web-registration-"));
   const key = `chrona-registration-test-${randomUUID()}`;
   const caller = { kind: "module", module: manifest.name, moduleId: options.moduleId ?? `${manifest.name}-id`, hash: options.hash ?? "approved-test-version" };
-  // Web requests modules.tools with audience:user, excluding module-only callbacks.
+  // Web requests modules.describe with audience:user, excluding module-only callbacks.
   const tools = new Map<string, PageTool>(manifest.tools.filter(tool => tool.visibility.some(audience => audience === "owner" || audience === "provider")).map(tool => [tool.name, { inputSchema: normalizedToolInputSchema(tool), moduleId: caller.moduleId, contractHash: moduleCallbackContractHash(tool) }]));
   const pages = createPages({ dataDir: join(root, "web"), modules: async () => [{ id: caller.moduleId, name: caller.module, activeHash: caller.hash, status: "active" }], tools: async module => module === caller.module ? tools : new Map() });
   const calls: Call[] = [];
@@ -42,8 +42,10 @@ export async function createRegistrationTest(entry: string, options: { manifest?
     ModelError,
     on(kind: string, handler: Activated) { if (kind === "activated") activated = handler; },
     chrona: {
+      dependencies: { web: "web" },
       paths: { module: dirname(manifestPath), data: join(root, "app"), content: join(root, "content") },
-      async call(target: string, args: Record<string, unknown> = {}, options?: { mode?: string }) {
+      async call(address: string | { moduleId: string; tool: string }, args: Record<string, unknown> = {}, options?: { mode?: string }) {
+        const target = typeof address === "string" ? address : `${address.moduleId}.${address.tool}`;
         const call: Call = { target, args: structuredClone(args) }; calls.push(call);
         try {
           if (options?.mode && options.mode !== "sync") throw new Error("Registration tests support synchronous SDK calls only");
@@ -55,7 +57,6 @@ export async function createRegistrationTest(entry: string, options: { manifest?
           let parsed: unknown;
           try {
             const result = await pages.tool(tool.name, validated, caller);
-            if (!tool.output) throw new Error(`Missing Web output contract: ${target}`);
             parsed = compileModuleOutput(tool.output).parse(result);
           } catch (error) {
             // Web's handler currently lets plain registration Errors escape. The SDK sends

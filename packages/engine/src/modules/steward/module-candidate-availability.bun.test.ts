@@ -19,7 +19,9 @@ async function fixture(submitterName = "author") {
   const ports = { db, dataDir, publicUrl: null, now: () => new Date("2026-11-08T12:00:00Z") };
   async function app(name: string) {
     const module = await db.module.create({ data: { workspaceId: workspace.id, name, activeHash: hash } });
-    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], uses: ["*"], effects: [] });
+    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], uses: ["*"], effects: [],
+        authority: "owner"
+    });
     await db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest, source: "user", status: "approved", intent: {}, report: {} } });
     return module;
   }

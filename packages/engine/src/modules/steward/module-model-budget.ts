@@ -67,10 +67,11 @@ export async function finishCompletion(ports: StewardPorts, workspaceId: string,
 /** Shares the caller's settlement transaction with a durable gateway result receipt. */
 export async function finishCompletionIn(tx: Prisma.TransactionClient, workspaceId: string, completion: { id: string; result?: { inputTokens: number | null; outputTokens: number | null }; error: ModelError | null; model?: string }, expectedOwner?: CompletionOwner) {
   const { id, result, error, model } = completion;
+  const tokens = { inputTokens: result?.inputTokens ?? null, outputTokens: result?.outputTokens ?? null };
   const where = { id, method: "model", module: { workspaceId }, ...expectedOwner };
   const row = await tx.moduleCall.findFirst({ where });
   if (!row) throw new CallError("not_found", "Model reservation not found");
-  const settled = await tx.moduleCall.updateMany({ where: { ...where, status: "pending" }, data: { status: error ? "failed" : "executed", error } });
+  const settled = await tx.moduleCall.updateMany({ where: { ...where, status: "pending" }, data: { status: error ? "failed" : "executed", error, ...tokens } });
   if (settled.count !== 1) return;
-  await audit(tx, { workspaceId, kind: "module_model_call", actor: "module", subjectId: row.moduleId, details: { callId: id, ...(model ? { model } : {}), inputTokens: result?.inputTokens ?? null, outputTokens: result?.outputTokens ?? null, error } });
+  await audit(tx, { workspaceId, kind: "module_model_call", actor: "module", subjectId: row.moduleId, details: { callId: id, ...(model ? { model } : {}), ...tokens, error } });
 }

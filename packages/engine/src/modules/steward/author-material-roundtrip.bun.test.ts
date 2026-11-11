@@ -18,7 +18,7 @@ const input = (value: unknown) => ({ input: JSON.stringify(value) });
 const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 const textFiles = (files: Record<string, string>): ModuleGitFile[] => Object.entries(files).map(([path, text]) => ({ path, bytes: Buffer.from(text) }));
 const intent = { changes: ["Install the explicitly imported local material"], preserves: ["Retain application data and exact version material"] };
-const selected = ["modules.list", "modules.admit-candidates", "modules.submit", "author.prepare", "author.import", "author.export", "author.source", "author.write", "author.submit", "author.receipt"];
+const selected = ["modules.list", "modules.admit", "modules.submit", "author.prepare", "author.import", "author.export", "author.source", "author.write", "author.submit", "author.receipt"];
 
 /** A real native runtime asset; the authenticated module entry remains the TypeScript SDK. */
 async function workspaceFixture(root: string) {
@@ -126,10 +126,12 @@ test("current Agent imports source and ignored native assets, checks/installs fi
     };
     const authorFiles = await snapshotModule(import.meta.dir, "external/author");
     const authorManifest = moduleManifestSchema.parse(JSON.parse(Buffer.from(authorFiles.find(file => file.path === "module.json")!.bytes).toString("utf8")));
-    expect(authorManifest.uses).toEqual(["modules.source", "modules.submit", "modules.candidate-check"]);
+    expect(authorManifest.uses).toEqual(["modules.source", "modules.submit", "modules.receipt"]);
     expect(authorManifest.model).toBeUndefined();
     const author = await seedApproved(authorManifest, authorFiles);
-    const entryManifest = moduleManifestSchema.parse({ name: "material-conversation", entry: "index.ts", tests: ["test.ts"], uses: ["*"], effects: [], tools: [{ name: "observe", description: "Conversation fixture", visibility: ["modules"], parameters: { type: "object", properties: {} }, output: { type: "object" } }] });
+    const entryManifest = moduleManifestSchema.parse({ name: "material-conversation", entry: "index.ts", tests: ["test.ts"], uses: ["*"], effects: [], tools: [{ name: "observe", description: "Conversation fixture", visibility: ["modules"], parameters: { type: "object", properties: {} }, output: { type: "object" } }],
+        authority: "owner"
+    });
     const entry = await seedApproved(entryManifest, textFiles({ "module.json": JSON.stringify(entryManifest), "index.ts": 'import { on } from "chrona"; on("tool", () => ({ result: {} }));', "test.ts": "export {};" }));
     const principal = { workspaceId, ownerId: "owner", caller: { kind: "module" as const, moduleId: entry.id, hash: entry.activeHash! } };
     const contextAdmission = await admitContextPrimitive(ports, principal, "context", { requestKey: "material-conversation" }) as { contextId: string };
@@ -141,22 +143,23 @@ test("current Agent imports source and ignored native assets, checks/installs fi
       expect(run?.id).toBe(queued.runId);
       const context = (await contextRunTools(ports!, run!))!;
       expect(context.caller).toEqual({ ...principal.caller, module: entry.name });
-      const invoke = async (target: string, args: Record<string, unknown>) => {
+      const invoke = async (target: string, raw: Record<string, unknown>) => {
+        const { requestKey, ...args } = raw;
         const tool = context.entries.find(item => `${item.module.name}.${item.tool.name}` === target);
         expect(tool).toBeDefined();
-        return (await callContextTool(ports!, context, tool!.name, args, Date.now() + 30_000)).result;
+        return (await callContextTool(ports!, context, tool!.name, args, { deadline: Date.now() + 30_000, key: requestKey as string | undefined })).result;
       };
       return { invoke, finish: () => runs.finish(run!.id, { outcome: "finished", sessionId: null, error: null }, { stopEvidence: "never_started" }) };
     };
     let current = await startRound(selected);
     const invoke = (target: string, args: Record<string, unknown>) => current.invoke(target, args);
-    const directory = await invoke("modules.list", {}) as { id: string; name: string; activeHash: string; versions: { hash: string; status: string }[] }[];
+    const directory = (await invoke("modules.list", {}) as { items: { id: string; name: string; activeHash: string; versions: { hash: string; status: string }[] }[] }).items;
     const discovered = directory.find(item => item.name === "author")!;
     expect(discovered).toMatchObject({ id: author.id, activeHash: author.activeHash, status: "active" });
     expect(discovered.versions).toContainEqual(expect.objectContaining({ hash: author.activeHash, status: "approved" }));
     const submitter = { moduleId: discovered.id, hash: discovered.activeHash };
     const authorPrincipal = { ...principal, caller: { kind: "module" as const, moduleId: author.id, hash: author.activeHash! } };
-    await expect(selectContextTools(ports, authorPrincipal, ["modules.admit-candidates"])).rejects.toMatchObject({ code: "forbidden" });
+    await expect(selectContextTools(ports, authorPrincipal, ["modules.admit"])).rejects.toMatchObject({ code: "forbidden" });
     await expect(selectContextTools(ports, { ...principal, caller: { ...principal.caller, hash: "0".repeat(40) } }, ["author.import"])).rejects.toMatchObject({ code: "forbidden" });
 
     const material = await workspaceFixture(root);
@@ -173,7 +176,7 @@ test("current Agent imports source and ignored native assets, checks/installs fi
       const admissionInput = { requestKey, submitter, targets };
       const prepared = await invoke("author.prepare", input({ ...admissionInput, goal: "Install and re-edit the exact imported material in this conversation", intent })) as { admission: typeof admissionInput; prompt: string };
       expect(prepared.admission).toEqual(admissionInput);
-      const admission = await invoke("modules.admit-candidates", prepared.admission) as { admissionId: string };
+      const admission = await invoke("modules.admit", prepared.admission) as { admissionId: string };
       expect((await readCandidateAdmissionIn(moduleContext(ports!, workspaceId), db!, admission.admissionId))).toMatchObject({ input: admissionInput, issuer: { kind: "module", moduleId: entry.id, hash: entry.activeHash }, receiptId: null });
       return admission;
     };
@@ -181,12 +184,12 @@ test("current Agent imports source and ignored native assets, checks/installs fi
     const submission = { admissionId: initial.admissionId, requestKey: "import-submit", items: [{ name: material.manifest.name, dir: "sources/imported", intent }] };
     // The entry issues admission, but only the exact admitted Author identity may submit.
     await expect(invoke("modules.submit", submission)).rejects.toMatchObject({ code: "forbidden" });
-    const wrong = await invoke("modules.admit-candidates", { requestKey: "wrong-submitter", submitter: { moduleId: entry.id, hash: entry.activeHash }, targets: [{ name: material.manifest.name, moduleId: null, expectedActiveHash: null }] }) as { admissionId: string };
-    await expect(invoke("author.submit", input({ ...submission, admissionId: wrong.admissionId }))).rejects.toMatchObject({ code: "forbidden" });
+    const wrong = await invoke("modules.admit", { requestKey: "wrong-submitter", submitter: { moduleId: entry.id, hash: entry.activeHash }, targets: [{ name: material.manifest.name, moduleId: null, expectedActiveHash: null }] }) as { admissionId: string };
+    await expect(invoke("author.submit", input({ ...submission, requestKey: "wrong-admission-submit", admissionId: wrong.admissionId }))).rejects.toMatchObject({ code: "forbidden" });
     // Tamper after import, without changing the record: admission must not yield a candidate or receipt.
     const mutableBinary = join(content, "sources/imported/dist/probe");
     await writeFile(mutableBinary, Buffer.concat([material.binary, Buffer.from("tampered")]));
-    await expect(invoke("author.submit", input(submission))).rejects.toMatchObject({ code: "conflict" });
+    await expect(invoke("author.submit", input({ ...submission, requestKey: "tampered-material" }))).rejects.toMatchObject({ code: "conflict" });
     expect(await db.moduleVersion.count({ where: { source: "candidate" } })).toBe(0);
     expect(await db.candidateReceipt.count()).toBe(0);
     expect((await readCandidateAdmissionIn(moduleContext(ports, workspaceId), db, initial.admissionId)).receiptId).toBeNull();
@@ -230,7 +233,7 @@ test("current Agent imports source and ignored native assets, checks/installs fi
     expect(await readFile(join(installed, "dist/probe"))).toEqual(material.binary);
     expect((await stat(join(installed, "dist/probe"))).mode & 0o111).toBeGreaterThan(0);
     expect(await readFile(join(installed, "message.ts"), "utf8")).toBe(material.files["message.ts"]);
-    expect(await invoke("author.submit", input(submission))).toEqual(approved);
+    expect(await invoke("author.submit", input(submission))).toEqual(receipt);
     // A later conversation round can select the newly installed tool through the actual Agent catalog.
     await current.finish();
     current = await startRound([...selected, "material-roundtrip.read"]);
@@ -275,9 +278,9 @@ test("current Agent imports source and ignored native assets, checks/installs fi
     for (const [path, text] of Object.entries(material.files)) expect(await readFile(join(oldDevelopment, path), "utf8")).toBe(text);
     expect(await readFile(join(oldDevelopment, "dist/probe"))).toEqual(material.binary);
     expect((await stat(join(oldDevelopment, "dist/probe"))).mode & 0o111).toBeGreaterThan(0);
-    const oldReceipt = candidateReceiptSchema.parse(await invoke("author.submit", input(submission)));
+    const oldReceipt = candidateReceiptSchema.parse(await invoke("author.receipt", input({ receiptId: receipt.receiptId })));
     expect(oldReceipt).toMatchObject({ state: "approved", members: [{ hash: first.hash, materialDigest: first.materialDigest, selected: false }] });
-    const secondApproved = candidateReceiptSchema.parse(await invoke("author.submit", input(nextSubmission)));
+    const secondApproved = candidateReceiptSchema.parse(await invoke("author.receipt", input({ receiptId: nextReceipt.receiptId })));
     expect(secondApproved).toMatchObject({ state: "approved", approvalId: null, members: [{ hash: second.hash, selected: true, expectedActiveHash: first.hash }] });
 
     // Corrupt a stored immutable blob only inside this disposable fixture. Both export and the checker fail closed.
@@ -314,7 +317,7 @@ test("current Agent imports source and ignored native assets, checks/installs fi
       expect(calls.length).toBeGreaterThan(0);
       for (const call of calls) expect(call).toMatchObject({ caller: `module:${entry.id}`, callerModuleId: entry.id, callerHash: entry.activeHash, chain: [], mode: "sync" });
     }
-    for (const tool of ["source", "submit", "candidate-check"]) {
+    for (const tool of ["source", "submit", "receipt"]) {
       const calls = invocations.filter(row => row.target === "modules" && row.tool === tool && row.callerModuleId === author.id);
       expect(calls.some(row => row.status === "succeeded")).toBe(true);
       for (const call of calls) expect(call).toMatchObject({ caller: `module:${author.id}`, callerHash: author.activeHash, chain: ["author"], mode: "sync" });

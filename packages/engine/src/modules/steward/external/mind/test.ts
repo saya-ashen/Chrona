@@ -40,7 +40,7 @@ try {
   // First activation cannot register; a subsequent lifecycle delivery retries both pages safely.
   await module.send({ trigger: { kind: "activated", id: "activated", firedAt: now }, now, params: {} });
   await module.send({ trigger: { kind: "activated", id: "activated", firedAt: now }, now, params: {} });
-  const pages = module.calls.filter((call: { params: { target?: string } }) => call.params.target === "web.page-set");
+  const pages = module.calls.filter((call: { params: { target?: string } }) => targetName(call.params.target) === "web.page-set");
   assert.equal(pages.length, 2);
   const agenda = outputs["ui-agenda"].parse(await send("ui-agenda", {}));
   assert.equal(agenda.concerns.length, 0); assert.equal(agenda.runtime.phase, "idle");
@@ -52,12 +52,19 @@ try {
   assert.ok(denied.error);
   outputs["ui-settings"].parse(await send("ui-settings", {}));
   const checked = outputs.check.parse(await send("check", {})); assert.equal(checked.runtime.phase, "running");
-  const starts = module.calls.filter((call: { params: { target?: string } }) => call.params.target === "agent.run"); assert.equal(starts.length, 1);
+  const starts = module.calls.filter((call: { params: { target?: string } }) => targetName(call.params.target) === "agent.run"); assert.equal(starts.length, 1);
   const decisions = outputs.decisions.parse(await send("decisions", { limit: 5 })); assert.equal(decisions.decisions.length, 1);
-  assert.ok(!module.calls.some((call: { params: { target?: string } }) => call.params.target === "notify.send"));
+  assert.ok(!module.calls.some((call: { params: { target?: string } }) => targetName(call.params.target) === "notify.send"));
   console.log("PASS mind: actual SDK entry, absent Web retry, caller boundary, output contracts and one Agent run");
 } finally {
   await module.stop();
   if (previous === undefined) delete process.env.CHRONA_MIND_OFFLINE_STATE; else process.env.CHRONA_MIND_OFFLINE_STATE = previous;
   await rm(directory, { recursive: true, force: true });
+}
+
+function targetName(raw: unknown): string {
+  if (typeof raw === "string") return raw;
+  const target = raw as { moduleId: string; tool: string };
+  const names: Record<string, string> = {};
+  return `${names[target.moduleId] ?? target.moduleId.replace(/-id$/, "")}.${target.tool}`;
 }

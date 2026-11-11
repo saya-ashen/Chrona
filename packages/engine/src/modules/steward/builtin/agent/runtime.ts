@@ -1,3 +1,4 @@
+import type { CallTarget } from "chrona";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { chrona, on, onDisconnect, ModelError } from "chrona";
@@ -42,14 +43,14 @@ const operations = createAgentOperations(provider, chrona.paths.data, input, asy
   await event(callbackId, { kind: "settled", operationId, outcome });
 });
 const policy = createModelPolicy(chrona.paths.data, callId => chrona.call("runtime-callback.agent-admit", { callId, operation: "configure" }), async () => !!provider?.complete && !!(await provider.health()).available);
-const settingsPage = settingsRegistration((target, args) => chrona.call(target, args));
+const settingsPage = settingsRegistration((target, args) => chrona.call(applicationTarget(target), args));
 on("activated", async () => { await settingsPage.activate(); return {}; });
 setInterval(() => void settingsPage.refresh(), 60_000).unref();
-const moduleOperations = createModuleAgentOperations(chrona.paths.data, (target, args) => chrona.call(target, args), async args => {
+const moduleOperations = createModuleAgentOperations(chrona.paths.data, (target, args) => chrona.call(applicationTarget(target), args), async args => {
   if (!provider?.complete) throw new AgentError("unavailable", "Completion unconfigured");
   return provider.complete(args as unknown as Parameters<NonNullable<typeof provider.complete>>[0]);
 }, policy);
-const primitive = createAgentPrimitives((target, args) => chrona.call(target, args), (name, args) => operations.control(name, args), async input => await provider?.transcript?.(input) ?? []);
+const primitive = createAgentPrimitives((target, args) => chrona.call(applicationTarget(target), args), (name, args) => operations.control(name, args), async input => await provider?.transcript?.(input) ?? []);
 async function health() {
   return { name: provider?.name ?? "unconfigured", supportsRunModel: provider?.supportsRunModel ?? false, complete: await policy.ready(), ...await (provider?.health() ?? { available: false, sandboxed: false, error: null }) };
 }
@@ -96,11 +97,11 @@ async function moduleTool(id: string, args: Record<string, unknown>, caller: { k
 on("tool", async trigger => {
   const caller = trigger.caller;
   try {
-    if (trigger.id === "projects") return await projects(trigger.call, caller, trigger.args);
+    if (trigger.id === "work-projects") return await projects(trigger.call, caller, trigger.args);
     if (caller?.kind === "kernel") return { result: await kernelTool(trigger.id, trigger.args.input) };
     if (trigger.id === "configure") return await configure(trigger.call, caller, trigger.args);
     if (caller?.kind !== "module" || !trigger.call?.id) throw new ModelError("forbidden", "Agent tools require an admitted caller");
-    return await moduleTool(trigger.id, trigger.args, caller, trigger.call.id);
+    return await moduleTool(trigger.id.replace(/^work-/, ""), trigger.args, caller, trigger.call.id);
   } catch (error) { throw toolError(error); }
 });
 // Socket loss stops backend work even when Chrona cannot receive the final receipt.
@@ -108,3 +109,9 @@ const stop = () => { void operations.stop().finally(() => process.exit(0)); };
 onDisconnect(stop);
 process.once("SIGTERM", stop);
 process.once("SIGINT", stop);
+
+function applicationTarget(target: string): CallTarget {
+  if (/^(modules|approvals|settings|secrets|activity|timers|runtime-callback|workspace-local)\./.test(target)) return target as CallTarget;
+  const boundary = target.indexOf(".");
+  return { moduleId: chrona.dependencies[target.slice(0, boundary)]!, tool: target.slice(boundary + 1) };
+}

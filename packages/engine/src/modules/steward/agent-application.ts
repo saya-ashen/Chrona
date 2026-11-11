@@ -13,6 +13,7 @@ export async function isAgentApplication(ports: StewardPorts, caller: { moduleId
   return version?.source === "builtin" && version.status === "approved";
 }
 export async function authorizeAgentRequest(ports: StewardPorts, workspaceId: string, name: string, raw: Record<string, unknown>, caller: Caller) {
+  name = name.replace(/^work-/, "");
   if (name === "projects" && caller.kind !== "module") throw new StewardError("forbidden", "Agent projects requires an admitted module caller");
   // Configure is an owner tool; routing and the live Agent callback both check its authority.
   if (name === "configure" && caller.kind === "owner") return;

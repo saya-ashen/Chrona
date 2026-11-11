@@ -40,7 +40,7 @@ export function createRelay({ call, notify, publicUrl, download, conversations }
     replyText: (item: Pick<QqReplyItem, "text" | "attachments" | "sessionId">) => qqReplyText(item, publicUrl, item.sessionId),
     /** The bound owner's decision on one open approval, addressed by an id prefix. */
     async resolveApproval(_binding: QqBinding, decision: ApprovalDecision) {
-      const open = await call("approvals.list", { status: "open" }) as { id: string; title: string }[];
+      const open = await call("approvals.list", { status: "open" }).then(page => (page as { items: unknown }).items) as { id: string; title: string }[];
       const matches = open.filter(approval => approval.id.startsWith(decision.ref));
       if (matches.length !== 1) return matches.length ? "【Chrona】编号对应多条审批，请多写几位。" : "【Chrona】没有找到这条待批准事项，可能已经处理过了。";
       const approval = matches[0]!;

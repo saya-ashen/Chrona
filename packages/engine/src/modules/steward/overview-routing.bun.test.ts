@@ -34,7 +34,9 @@ test("web.today routes through the real web and notify modules without recursion
       await cp(release.codeDir, join(dataDir, "platform/store", release.hash), { recursive: true });
     }
     const entry = await db.module.create({ data: { workspaceId, name: "owner-entry", activeHash: "e".repeat(64) } });
-    await db.moduleVersion.create({ data: { moduleId: entry.id, hash: entry.activeHash!, manifest: moduleManifestSchema.parse({ name: entry.name, entry: "index.ts", keepAlive: true, effects: [], uses: ["*"], tests: ["test.ts"] }), source: "user", status: "approved", intent: {}, report: {} } });
+    await db.moduleVersion.create({ data: { moduleId: entry.id, hash: entry.activeHash!, manifest: moduleManifestSchema.parse({ name: entry.name, entry: "index.ts", keepAlive: true, effects: [], uses: ["*"], tests: ["test.ts"],
+        authority: "owner"
+    }), source: "user", status: "approved", intent: {}, report: {} } });
     const approval = await db.approval.create({ data: { workspaceId, action: "modify_external", title: "更新外部记录", detail: "修改项目记录", preview: "用户决定", payload: { kind: "fixture_external_change" } } });
     await recordApprovalFact(db, approval);
     await recordApprovalFact(db, approval);
@@ -56,11 +58,11 @@ test("web.today routes through the real web and notify modules without recursion
     expect(await db.approval.findUniqueOrThrow({ where: { id: approval.id } })).toMatchObject({ status: "open" });
     expect(await db.moduleInvocation.count({ where: { target: "web", tool: "today", status: "succeeded" } })).toBe(1);
     expect((await callSync(ports, kernelOrigin(workspaceId), "notify.list", {})).output).toMatchObject({ items: expect.arrayContaining([expect.objectContaining({ title: "模块连续失败，已暂停", body: expect.stringContaining("fixture") })]) });
-    await expect(callSync(ports, origin, "notify.lifecycle", { key: "forged", kind: "module-paused", facts: "{}" })).rejects.toMatchObject({ code: "forbidden" });
+    await expect(callSync(ports, origin, "notify.lifecycle", { key: "forged", kind: "module-paused", facts: "{}" })).rejects.toMatchObject({ code: "not_found" });
     await db.module.updateMany({ where: { workspaceId, name: "web" }, data: { status: "paused" } });
     await expect(callSync(ports, origin, "web.today", {})).rejects.toMatchObject({ code: "unavailable" });
     expect((await callSync(ports, origin, "activity.runtime", {})).output).toMatchObject({ provider: { available: false } });
-    await expect(callSync(ports, origin, "notify.approval", { approval: "fake", title: "fake", action: "fake", detail: "", preview: "" })).rejects.toMatchObject({ code: "forbidden" });
+    await expect(callSync(ports, origin, "notify.approval", { approval: "fake", title: "fake", action: "fake", detail: "", preview: "" })).rejects.toMatchObject({ code: "not_found" });
     expect((await callSync(ports, kernelOrigin(workspaceId), "notify.list", {})).output).toMatchObject({ items: expect.arrayContaining([expect.objectContaining({ title: "需要你批准：更新外部记录" })]) });
   } finally { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); }
 }, 60_000);

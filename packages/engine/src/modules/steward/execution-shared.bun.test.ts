@@ -45,7 +45,9 @@ test("real SDK handler typed error crosses supervisor and routed call without me
   const ports: StewardPorts = { db, dataDir, now: () => new Date(), publicUrl: null, sandbox: { ...runtime.health, startModule: runtime.startModule } };
   try {
     const workspace = await db.workspace.create({ data: { name: "typed" } });
-    const manifest = moduleManifestSchema.parse({ name: "typed-error", entry: "index.ts", tests: ["test.ts"], effects: [], tools: [{ name: "fail", description: "Fail", visibility: ["owner"], parameters: { type: "object", properties: {} } }] });
+    const manifest = moduleManifestSchema.parse({ name: "typed-error", entry: "index.ts", tests: ["test.ts"], effects: [], tools: [{ name: "fail", description: "Fail", visibility: ["owner"], parameters: { type: "object", properties: {} },
+        output: {}
+    }] });
     const module = await db.module.create({ data: { workspaceId: workspace.id, name: manifest.name, activeHash: "fixture" } });
     await db.moduleVersion.create({ data: { moduleId: module.id, hash: "fixture", manifest, source: "user", intent: {}, report: {}, status: "approved" } });
     const code = join(dataDir, "platform/store/fixture"); await mkdir(code, { recursive: true });

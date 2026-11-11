@@ -32,7 +32,9 @@ async function offlineResources(dataDir: string, name: string) {
   const root = join(dataDir, "resources"), external = join(root, "external"), dir = join(external, name);
   mkdirSync(dir, { recursive: true });
   cpSync(resolve("packages/integrations/src/steward/module-sdk"), join(root, "module-sdk"), { recursive: true });
-  writeFileSync(join(dir, "module.json"), JSON.stringify({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [], ...(name === "mcp" ? { uses: ["*"] } : {}) }));
+  writeFileSync(join(dir, "module.json"), JSON.stringify({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [], ...(name === "mcp" ? { uses: ["*"],
+      authority: "owner"
+} : {}) }));
   writeFileSync(join(dir, "index.ts"), "// synthetic offline recovery fixture\n");
   writeFileSync(join(dir, "test.ts"), "// checked on restart\n");
   await seedTestModuleRelease(external, name);
@@ -113,7 +115,9 @@ test.each(["web", "notify"])("admin remove requests %s deletion offline and only
   const data = join(f.options.dataDir, "platform", "data", f.module.id);
   const content = join(f.options.dataDir, "platform", "content", f.module.id);
   for (const dir of [data, content]) { mkdirSync(dir, { recursive: true }); writeFileSync(join(dir, "keep.txt"), "valuable"); }
-  await f.db.moduleVersion.updateMany({ where: { moduleId: f.module.id }, data: { manifest: { name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [], uses: ["*"] } } });
+  await f.db.moduleVersion.updateMany({ where: { moduleId: f.module.id }, data: { manifest: { name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [], uses: ["*"],
+      authority: "owner"
+} } });
   try {
     const request = await runAdmin("remove", [name === "web" ? name : f.module.id], f.options) as { status: string; approvalId: string };
     expect(request.status).toBe("pending_approval");

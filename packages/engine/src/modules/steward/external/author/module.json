@@ -7,7 +7,7 @@
   "uses": [
     "modules.source",
     "modules.submit",
-    "modules.candidate-check"
+    "modules.receipt"
   ],
   "effects": [],
   "data": {
@@ -222,7 +222,7 @@
     },
     {
       "name": "read",
-      "description": "Read a UTF-8 source or staged file in a bounded range. Offsets and limit count UTF-16 code units; limit is 1\u20132000. Rejects files over 64 KiB.",
+      "description": "Read a UTF-8 source or staged file in a bounded range. Offsets and limit count UTF-16 code units; limit is 1–2000. Rejects files over 64 KiB.",
       "visibility": [
         "provider",
         "modules",

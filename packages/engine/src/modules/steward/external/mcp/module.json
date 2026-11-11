@@ -5,6 +5,7 @@
   "keepAlive": true,
   "listen": "/api/mcp",
   "effects": [],
+  "authority": "owner",
   "uses": [
     "*",
     "web.page-set"
