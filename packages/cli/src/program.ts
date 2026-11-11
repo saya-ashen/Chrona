@@ -53,6 +53,18 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
     });
   admin.command("legacy <request-file>").description("Export, verify or explicitly delete selected legacy conversations while the service is stopped")
     .action(async (file: string) => { const { adminLegacy } = await import("./admin-legacy"); await adminLegacy(file); });
+  admin.command("git-status <module>").description("Read saved module Git association and local commits without contacting the remote")
+    .action(async (module: string) => { await (await import("./admin-module-git")).runAdminModuleGit({ action: "status", module }); });
+  admin.command("git-associate <module> <repository>").description("Associate an existing module with a GitHub HTTPS repository while the service is stopped")
+    .option("--branch <branch>", "Existing upstream branch", "main")
+    .action(async (module: string, repository: string, input: { branch: string }) => { await (await import("./admin-module-git")).runAdminModuleGit({ action: "associate", module, repository, branch: input.branch }); });
+  admin.command("git-push <module>").description("Explicitly fast-forward the associated remote to one exact local commit while the service is stopped")
+    .requiredOption("--commit <sha>", "Exact local commit (40 lowercase hex characters)")
+    .requiredOption("--expected-remote <sha>", "Expected existing remote branch tip (40 lowercase hex characters)")
+    .action(async (module: string, input: { commit: string; expectedRemote: string }) => {
+      const result = await (await import("./admin-module-git")).runAdminModuleGit({ action: "push", module, ...input });
+      if (result.status === "uncertain") process.exitCode = 1;
+    });
   admin.command("modules").description("List modules and versions").action(async () => { await (await import("./admin")).runAdmin("modules"); });
   admin.command("catalog").description("List official external packages and saved installation receipts").action(async () => { await (await import("./admin")).runAdmin("catalog"); });
   admin.command("install <package>").description("Explicitly install an official external package while the service is stopped")

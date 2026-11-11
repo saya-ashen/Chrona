@@ -42,7 +42,7 @@ async function offlineResources(dataDir: string, name: string) {
 }
 test("admin commands are registered", () => {
   const admin = createProgram().commands.find(c => c.name() === "admin")!;
-  expect(admin.commands.map(c => c.name())).toEqual(["build", "legacy", "modules", "catalog", "install", "diagnostics", "approvals", "rollback", "disable", "remove", "approve", "reject", "secret-set", "secret-remove"]);
+  expect(admin.commands.map(c => c.name())).toEqual(["build", "legacy", "git-status", "git-associate", "git-push", "modules", "catalog", "install", "diagnostics", "approvals", "rollback", "disable", "remove", "approve", "reject", "secret-set", "secret-remove"]);
 });
 test("admin build dispatches the request file through the packaged host", async () => {
   const files: string[] = [];

@@ -18,8 +18,11 @@ import { parseInput, StewardError } from "./errors";
 
 const upstreamSchema = z.object({ repository: z.string().regex(/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\.git)?$/).nullable(), branch: z.string(), commit: z.string().regex(/^[a-f0-9]{40}$/) }).strict();
 export async function recordModuleUpstream(ports: StewardPorts, workspaceId: string, moduleId: string, git: z.infer<typeof upstreamSchema>, db: Prisma.TransactionClient = ports.db) {
-  const details = { repository: git.repository, branch: git.branch, commit: git.commit };
+  const details = upstreamSchema.parse({ repository: git.repository, branch: git.branch, commit: git.commit });
   await db.module.findFirstOrThrow({ where: { id: moduleId, workspaceId }, select: { id: true } });
+  // A release describes its packaged source; it does not replace an owner's remote association.
+  const existing = await db.moduleUpstream.findUnique({ where: { moduleId } });
+  if (existing?.repository) return;
   await db.moduleUpstream.upsert({ where: { moduleId }, create: { moduleId, ...details }, update: details });
 }
 /** Both offline release updates and fetched upstream updates retain local ancestry and use the checked queue. */
@@ -28,7 +31,10 @@ export async function submitMergedCommit(context: ModuleContext, input: { module
   const location = { platform: context.platform, moduleId: module.id };
   const expectedLocal = await getModuleLocalHead(location);
   if (!expectedLocal) throw new StewardError("conflict", "Module has no local Git source; inspect its source before updating");
-  if (input.bundle) await importModuleGitBundle({ ...location, ...input.bundle });
+  if (input.bundle) {
+    const associated = await context.db.moduleUpstream.findUnique({ where: { moduleId: module.id } });
+    await importModuleGitBundle({ ...location, ...input.bundle, ...(associated?.repository ? { repository: null } : {}) });
+  }
   const merged = await mergeModuleUpstream({ ...location, versionId: randomUUID(), upstreamCommit: input.commit });
   const root = await mkdtemp(join(tmpdir(), "chrona-module-merge-"));
   try {

@@ -1,8 +1,6 @@
 # 模块源码与 Git 工作流
 
-2026-11-08 核对：当前锁文件共十二项，新增 Agent；仅 files/events/remind 的 repository 非空，其余九项为 null。这是锁定元数据状态，不是远端实时核验。用户于同日确认下文五个内置应用允许受检定制；旧 M1 全部不可变规则在这五项上被取代。Agent 仍不可普通替换，见[当前架构](architecture.md)。
-
-本文描述当前开发实现，不代表 Chrona 已正式发布或部署。应用的固定提交、完整离线 bundle 和许可通知保存在 `resources/module-git/`，构建默认使用这些固定输入；是否具有可更新的官方来源按当前 lock 的非空 repository 和发布核验结果判断。发布与核验方式详见[模块 Git 种子与官方发布](module-git-release.md)。
+当前发行包含十四个应用来源。Agent 是唯一不可普通替换的内置应用；其余应用通过现有检查与激活流程更新。发行 lock 中的 `repository` 表示该固定发行提交的公开核验结果，实例中的远端关联单独保存在 `ModuleUpstream`，两者不能混为一谈。发布种子流程见[模块 Git 种子与官方发布](module-git-release.md)。
 
 ## 源码、运行版本与数据
 
@@ -20,13 +18,9 @@
 
 新旧源码版本输入兼容 40 / 64 位。`contractHash`、文件 SHA256、内容摘要、补丁摘要和 bundle 校验值仍保持原校验规则，不因源码改用 Git 而改成 40 位。没有数据库迁移，也不重写旧版本标识、审批或 active 身份；验证导入可以补充 Git 来源元数据。
 
-## 五个内置应用可以定制
+## 应用身份与更新
 
-`web`、`mcp`、`files`、`notify`、`events` 保留 `builtin` 来源及删除、重新安装保护，但其真实已存在的身份可以 build、propose、group、activate、update 和 rollback。空工作区中不能抢占这些名字，外部应用不能靠同名或伪造源码来源获得内置身份。
-
-内置登记只负责可信发行资源的首次 Git seed。已有 active 版本（包括停用版本和定制版本）不会因新发行、元数据变化或上游不可达而被自动覆盖或暂停。首次 seed 和受检定制版本从 store 运行；旧 64 位内置版本保留严格匹配其原 hash 的可信资源读取路径。
-
-kernel 系统接口与 `rescue` 仍受保护，不拆成可更新应用。这里没有更改系统权限、凭据、审批或数据迁移规则。
+Agent 保留内置身份及动态替换限制。关联或导出 Git 源码不会解除该限制。普通应用通过源码提交、检查、审批和激活流程更新；Git fetch 或 push 不会切换运行代码。现有应用的本地修改与停用状态不会因远端关联而被覆盖。
 
 ## 取出、编辑、提交、检查
 
@@ -51,9 +45,26 @@ kernel 系统接口与 `rescue` 仍受保护，不拆成可更新应用。这里
 
 同名卸载后重装的外部应用拥有新 `moduleId`，不会继承旧仓库、提交回执或安装身份。
 
+## 关联远端与显式推送
+
+本机所有者可以使用 CLI 关联现有 GitHub HTTPS 仓库。写操作需要先停止使用同一数据目录的服务，并使用该实例的 `CHRONA_DATA_DIR` 与 `DATABASE_URL`。它们不读取 Provider 凭据；推送认证使用本机已登录的 GitHub CLI。
+
+```sh
+chrona admin git-associate notify https://github.com/chrona-core/chrona-module-notify --branch main
+chrona admin git-status notify
+git ls-remote https://github.com/chrona-core/chrona-module-notify refs/heads/main
+chrona admin git-push notify --commit <完整源码提交SHA> --expected-remote <已观察的远端SHA>
+```
+
+关联先验证分支及共同历史，再登记来源。它不改变本地源码分支、审批或活动版本。已有其他来源时拒绝覆盖；关联失败不会冒称成功。状态中的本地提交、活动版本和远端提交分别报告，远端状态需要以命令实际联网检查的结果为准。
+
+`git-status` 仅返回本机保存的状态（`remoteChecked: false`），使用上例 `git ls-remote` 确认远端分支后再填写 `--expected-remote`。推送必须明确选择本地源码历史中的完整提交与预期远端提交，只允许保留远端历史的快进。远端变化、历史分叉或无法确认结果时停止，重新查询后再决定下一步；不强制覆盖、不自动重试。安装、启动、检查和激活均不会自动推送。推送完成仍需核对远端实际提交。
+
+应用离线更新保留已登记的远端关联，不用发行包中 `repository: null` 清除它。同名卸载后重新安装会获得新身份，需要重新关联。没有对应旧仓库的应用不会自动创建仓库。
+
 ## 显式读取和合并上游
 
-`modules.upstream` 使用已登记的可信来源，不接受调用方覆盖 repository、branch、URL 或宿主路径。它的三个 action 为：
+内部 `modules.upstream` 服务使用已登记的可信来源，不接受调用方覆盖 repository、branch、URL 或宿主路径。它的三个内部 action 为（不新增公开内核工具）：
 
 | action | 参数 | 行为 |
 | --- | --- | --- |
@@ -61,27 +72,15 @@ kernel 系统接口与 `rescue` 仍受保护，不拆成可更新应用。这里
 | `fetch` | `moduleId` | 显式获取登记分支的上游候选；保留本地分支和 active 代码 |
 | `merge` | `moduleId`、`commit`、`baseHash`、`requestKey` | 将指定 upstream commit 与本地历史合并，提交同一检查队列 |
 
-先从模块列表取得真实 `moduleId`、`activeHash`，再调用：
-
-```json
-{"action":"status","moduleId":"module-example-id"}
-```
-
-需要在线检查时明确调用 `fetch`。审阅返回的 `fetchedCommit` 后，才能将该 40 位值作为 `commit` 提交 `merge`；`baseHash` 使用当时观察到的 active 40 / 64 位版本，`requestKey` 是本次操作唯一且可复用的回执键。例如下面的两个 hash 必须替换为实际观察值：
-
-```json
-{"action":"merge","moduleId":"module-example-id","commit":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseHash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","requestKey":"reviewed-update-1"}
-```
-
-同一请求的不确定回执使用相同 `requestKey` 查询；不能用同一键换参数。active 已变化、选中 commit 与 upstream ref 不符、合并冲突或没有共同历史时会拒绝，不自动 reset、stash、覆盖或激活。未确认提交的失败操作先检查已有候选和诊断，再决定是否用新键重试。
+这些是内部服务能力，当前公开内核路由不提供 `modules.upstream` 工具。关联与推送使用上面的本机所有者 CLI；源码修改继续走已有 Author 材料和受检提交流程。内部合并仍须绑定所观察的活动版本及幂等请求键；历史分叉或冲突不允许自动覆盖。
 
 发行 catalog 的 `git.repository: null` 明确表示未发布的本地来源。bundle 可用于离线安装，不意味着 GitHub 仓库已存在或在线 fetch 可用；没有已登记 repository 时不会冒称可以联网更新。
 
 ## 离线更新与旧版本
 
-`modules.install` 仍只接受官方 external package 名称、`mode` 和 `requestKey`。首次 `mode: "install"` 从可信 bundle 的精确 commit 安装；已有外部应用的显式 `mode: "update"` 将离线发行候选交给相同的 Git merge / propose / 检查流程，不用发行快照直接覆盖本地定制。五个 builtin 不能通过 install 重装，使用上面的定制及显式上游流程。
+`modules.install` 仍只接受官方 external package 名称、`mode` 和 `requestKey`。首次 `mode: "install"` 从可信 bundle 的精确 commit 安装；已有外部应用的显式 `mode: "update"` 将离线发行候选交给相同的 Git merge / propose / 检查流程，不用发行快照直接覆盖本地定制。Agent 不能通过普通应用安装流程替换。
 
-新安装、提交、导入及上游操作需要可执行的系统 Git。Git 缺失时明确失败；已有 store 中的受检版本与仍有匹配可信资源的 legacy 内置运行不要求先完成源码 Git 导入。启动登记也不会为了跟进新发行而 fetch 或覆盖当前版本。
+新安装、提交、导入及上游操作需要可执行的系统 Git。Git 缺失时明确失败；已有 store 中的受检版本与仍有匹配可信资源的 legacy 内置运行不要求先完成源码 Git 导入。普通应用的启动登记不会为了跟进新发行而 fetch 或覆盖当前版本。Agent 是例外：它由可信发行管理，启动时可按现有停止证明和数据检查规则升级到发行版本，不能通过普通应用流程替换。
 
 旧 64 位记录只有在原有源码能按原摘要规则验证时才可导入 Git；原 hash、审批和 active 身份保持不变。旧内置可能没有 store 源码，源码读取须核对原 hash 对应的可信发行资源。失源或摘要不匹配需要明确诊断，不能取当前新发行或 upstream 冒充旧历史；缺失旧源码也不能被描述为已经迁移成功。
 

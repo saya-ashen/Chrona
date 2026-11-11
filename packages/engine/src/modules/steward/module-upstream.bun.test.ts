@@ -97,3 +97,17 @@ test("legacy active module without Git source is not replaced by an update bundl
   expect(await getModuleLocalHead(f.location)).toBeUndefined();
   expect((await f.ports.db.module.findUniqueOrThrow({ where: { id: f.moduleId } })).activeHash).toBe(legacyHash);
 });
+
+test("offline release updates preserve an owner's remote association and tracking reference", async () => {
+  const f = await fixture(), repository = "https://github.com/chrona-core/chrona-module-fixture";
+  await importModuleGitBundle({ ...f.location, ...f.git, repository });
+  await recordModuleUpstream(f.ports, f.workspaceId, f.moduleId, { ...f.git, repository });
+  const update = await f.update();
+  await recordModuleUpstream(f.ports, f.workspaceId, f.moduleId, update);
+  expect(await f.ports.db.moduleUpstream.findUniqueOrThrow({ where: { moduleId: f.moduleId } })).toMatchObject({ repository, commit: f.git.commit });
+  await submitMergedCommit(f.context, { moduleId: f.moduleId, commit: update.commit, bundle: { ...update, repository: "https://github.com/other/release" }, intent: { changes: ["Offline update"], preserves: [] }, onPrepared: async () => {} });
+  const repo = moduleGitPath(f.context.platform, f.moduleId);
+  expect((await moduleGitCommand(repo, ["config", "--get", "remote.upstream.url"])).toString().trim()).toBe(repository);
+  expect((await moduleGitCommand(repo, ["rev-parse", "refs/remotes/upstream/main"])).toString().trim()).toBe(f.git.commit);
+  expect((await f.ports.db.module.findUniqueOrThrow({ where: { id: f.moduleId } })).activeHash).toBe(f.git.commit);
+});
