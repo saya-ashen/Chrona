@@ -32,7 +32,9 @@ async function installNpm(dir: string, timeoutMs: number, has: (file: string) =>
   if (!has("bun.lock")) return "package.json needs bun.lock: run bun install and submit the lockfile";
   const bun = Bun.which("bun");
   if (!bun) return "bun is not available on this host";
-  const result = await run([bun, "install", "--frozen-lockfile", "--ignore-scripts", "--no-progress"], dir, timeoutMs, processHelper);
+  // Local file: dependencies must not hardlink approved vendor material into node_modules.
+  // Material verification requires single-link files, including after dependency preparation.
+  const result = await run([bun, "install", "--frozen-lockfile", "--ignore-scripts", "--no-progress", "--backend=copyfile"], dir, timeoutMs, processHelper);
   return result.code === 0 ? true : installFailure("bun install --frozen-lockfile", result.output);
 }
 

@@ -108,24 +108,27 @@ async function waitForText(url: string, label: string) {
 }
 
 export async function approveSmokeWeb(baseUrl: string, key: string) {
+  return approveSmokeModule(baseUrl, key, "web");
+}
+async function approveSmokeModule(baseUrl: string, key: string, name: "web" | "pi") {
   const headers = { authorization: `Bearer ${key}`, "content-type": "application/json" };
   const deadline = Date.now() + RUNTIME_TIMEOUT_MS;
   while (Date.now() < deadline) {
     const modules = await waitForJson(`${baseUrl}/api/modules`, "rescue modules", key) as { items: { id: string; name: string; status: string; activeHash: string | null }[] };
-    const web = modules.items.find(module => module.name === "web");
+    const web = modules.items.find(module => module.name === name);
     if (web?.status === "active" && web.activeHash) return;
     const approvals = await waitForJson(`${baseUrl}/api/approvals`, "rescue approvals", key) as { items: { id: string; moduleId: string | null; action: string }[] };
     const candidates = approvals.items.filter(approval => approval.moduleId === web?.id && approval.action === "activate_module");
-    if (candidates.length > 1) throw new Error("Ambiguous Web activation approvals");
+    if (candidates.length > 1) throw new Error(`Ambiguous ${name} activation approvals`);
     if (candidates[0]) {
       const response = await fetch(`${baseUrl}/api/approvals/${candidates[0].id}/resolve`, { method: "POST", headers, body: JSON.stringify({ decision: "approve", scope: "once" }) });
-      if (!response.ok) throw new Error(`Web activation approval failed: ${response.status}`);
+      if (!response.ok) throw new Error(`${name} activation approval failed: ${response.status}`);
       const approval = await response.json() as { status: string };
-      if (approval.status !== "approved") throw new Error(`Web activation approval unresolved: ${approval.status}`);
+      if (approval.status !== "approved") throw new Error(`${name} activation approval unresolved: ${approval.status}`);
     }
     await Bun.sleep(250);
   }
-  throw new Error("Web activation approval was not ready");
+  throw new Error(`${name} activation approval was not ready`);
 }
 
 async function assertRuntimeStarts(binaryPath: string) {
@@ -151,6 +154,8 @@ async function assertRuntimeStarts(binaryPath: string) {
     await waitForJson(`${baseUrl}/health`, "health endpoint");
     // Web is an ordinary owner application; approve its exact first activation through rescue.
     await approveSmokeWeb(`http://127.0.0.1:${rescuePort}`, env.API_KEY!);
+    // Exercise the shipped Provider's real dependency installation and immutable material checks.
+    await approveSmokeModule(`http://127.0.0.1:${rescuePort}`, env.API_KEY!, "pi");
     await waitForText(`${baseUrl}/`, "web index");
     // The page's data API (web module, routed calls): today's overview of the default workspace.
     await waitForJson(`${baseUrl}/api/web/today`, "web today endpoint", env.API_KEY);

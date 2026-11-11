@@ -135,7 +135,7 @@ process.exit(1);
       const result = await createModulePackages().install({ dir: w.dir, packages: [] });
       const command = installer === "bun" ? "bun install --frozen-lockfile" : "uv sync --frozen";
       expect(result).toEqual({ errors: [`${command} failed${cause ? ` (${cause})` : ""}:\n${output}\n`], installed: { npm: false, python: false, packages: {} } });
-      expect(JSON.parse(await readFile(record, "utf8"))).toEqual({ args: installer === "bun" ? ["install", "--frozen-lockfile", "--ignore-scripts", "--no-progress"] : ["sync", "--frozen", "--python", process.execPath, "--no-python-downloads"], cwd: w.dir, secret: null });
+      expect(JSON.parse(await readFile(record, "utf8"))).toEqual({ args: installer === "bun" ? ["install", "--frozen-lockfile", "--ignore-scripts", "--no-progress", "--backend=copyfile"] : ["sync", "--frozen", "--python", process.execPath, "--no-python-downloads"], cwd: w.dir, secret: null });
     } finally {
       if (previous === undefined) delete process.env[key]; else process.env[key] = previous;
       which.mockRestore(); await w.cleanup();
