@@ -45,6 +45,24 @@ test("channel validates calls and event replies, then recovers", async () => {
     expect(f.channel.diagnostics()).toEqual(["Invalid module call", "Invalid module call", "Invalid event reply"]);
   } finally { await f.close(); }
 });
+test("large JSON results pass through the channel and leave it usable", async () => {
+  const f = await fixture();
+  try {
+    const output = { text: "长记录🙂".repeat(100_000) };
+    expect(Buffer.byteLength(JSON.stringify(output))).toBeGreaterThan(1024 * 1024);
+    const response = f.channel.send(event, 2000);
+    const message = await f.next() as { id: string };
+    f.socket.write(JSON.stringify({ id: message.id, result: { result: output } }) + "\n");
+    expect(await response).toEqual({ id: message.id, result: { result: output } });
+    const nextResponse = f.channel.send(event, 1000);
+    const nextMessage = await f.next() as { id: string };
+    f.socket.write(JSON.stringify({ id: nextMessage.id, result: { result: "still serving" } }) + "\n");
+    expect(await nextResponse).toEqual({ id: nextMessage.id, result: { result: "still serving" } });
+    expect(f.channel.connected()).toBe(true);
+    expect(f.channel.diagnostics()).toEqual([]);
+  } finally { await f.close(); }
+});
+
 test.each([true, false])("SDK ping validates protocol without a business event; valid=%s", async valid => {
   const f = await fixture();
   try {

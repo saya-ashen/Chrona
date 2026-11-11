@@ -203,7 +203,7 @@ export const isEntryModule = (manifest: { listen?: string | readonly string[]; a
  * Events of one module are delivered one at a time; calls made meanwhile belong to that event.
  */
 const channelId = z.string().min(1).max(64);
-const moduleResultSchema = z.json().optional().refine(value => value === undefined || new TextEncoder().encode(JSON.stringify(value)).byteLength <= 262_144, "result must serialize to at most 256 KiB");
+const moduleResultSchema = z.json().optional();
 /** Statuses of a routed call: sync calls finish in place; async ones are stored and delivered by Chrona. */
 export const CALL_STATUSES = ["queued", "running", "waiting", "succeeded", "failed", "unknown"] as const;
 /** Who made a call, as Chrona recorded it (never supplied by the caller). `via` names the entry module behind an owner call. */
