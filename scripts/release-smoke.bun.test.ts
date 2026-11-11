@@ -3,11 +3,12 @@ import { chmod, cp, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { buildArtifacts } from "../build/manifest";
-import { assertModuleTypecheck, releaseSmokeEnvironment } from "../build/release-smoke";
+import { approveSmokeWeb, assertModuleTypecheck, releaseSmokeEnvironment } from "../build/release-smoke";
 
 test("release smoke uses isolated credentials and disables real providers", () => {
   const env = releaseSmokeEnvironment("/tmp/smoke/data", "/tmp/smoke/config", {
     API_KEY: "inherited-test-key",
+    CHRONA_CONFIG_FILE: "/must-not-read/config.json",
     CHRONA_STEWARD_AGENT: "pi",
     CHRONA_QQ_APP_ID: "inherited-app",
     CHRONA_QQ_SECRET_FILE: "/must-not-read",
@@ -17,6 +18,7 @@ test("release smoke uses isolated credentials and disables real providers", () =
     CHRONA_PROCESS_HELPER: "/must-not-use-source-guardian",
     CHRONA_SDK: "/must-not-use-source-sdk",
   });
+  expect(env.CHRONA_CONFIG_FILE).toBe("/tmp/smoke/config/config.json");
   expect(env.API_KEY).toBeTruthy();
   expect(env.API_KEY).not.toBe("inherited-test-key");
   expect(env.CHRONA_STEWARD_AGENT).toBe("");
@@ -45,3 +47,31 @@ test("packaged checker uses Web's actual contracts without changing the shipped 
     expect(await Bun.file(join(sdk, "calls.json")).exists()).toBe(false);
   } finally { await rm(root, { recursive: true, force: true }); }
 }, 30_000);
+
+test("release smoke approves only Web when configured active has no activated version", async () => {
+  let approved = false;
+  const requests: string[] = [];
+  const server = Bun.serve({ port: 0, fetch: async request => {
+    expect(request.headers.get("authorization")).toBe("Bearer smoke-key");
+    const path = new URL(request.url).pathname;
+    requests.push(`${request.method} ${path}`);
+    if (path === "/api/modules") return Response.json({ items: [{ id: "web-id", name: "web", status: "active", activeHash: approved ? "web-version" : null }] });
+    if (path === "/api/approvals") return Response.json({ items: [
+      { id: "qq-approval", moduleId: "qq-id", action: "activate_module" },
+      { id: "web-removal", moduleId: "web-id", action: "delete_data" },
+      { id: "web-approval", moduleId: "web-id", action: "activate_module" },
+    ] });
+    if (path === "/api/approvals/web-approval/resolve" && request.method === "POST") {
+      expect(await request.json()).toEqual({ decision: "approve", scope: "once" });
+      approved = true;
+      return Response.json({ status: "approved" });
+    }
+    return new Response(null, { status: 404 });
+  } });
+  try {
+    await approveSmokeWeb(`http://127.0.0.1:${server.port}`, "smoke-key");
+    expect(approved).toBe(true);
+    expect(requests.filter(request => request.startsWith("POST"))).toEqual(["POST /api/approvals/web-approval/resolve"]);
+    expect(requests.at(-1)).toBe("GET /api/modules");
+  } finally { server.stop(true); }
+});

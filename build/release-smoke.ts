@@ -10,7 +10,7 @@ import { buildArtifacts, buildTargets, parseBuildTarget, type BuildTargetName } 
 import { assertElfInterpreterFile } from "./portable-elf";
 
 const ROOT = resolve(import.meta.dirname, "..");
-// The built-in web installs its npm dependencies on first start.
+// Ordinary preinstalled modules run installation checks on first start.
 const RUNTIME_TIMEOUT_MS = 60_000;
 
 async function pathExists(path: string) {
@@ -62,6 +62,7 @@ export function releaseSmokeEnvironment(
     ...inheritedEnvironment,
     CHRONA_DATA_DIR: dataDir,
     CHRONA_CONFIG_DIR: configDir,
+    CHRONA_CONFIG_FILE: join(configDir, "config.json"),
     DATABASE_URL: `file:${join(dataDir, "chrona.db")}`,
     CHRONA_NO_OPEN: "1",
     API_KEY: crypto.randomUUID(),
@@ -106,14 +107,38 @@ async function waitForText(url: string, label: string) {
   throw new Error(`${label} not ready: ${lastError}`);
 }
 
+export async function approveSmokeWeb(baseUrl: string, key: string) {
+  const headers = { authorization: `Bearer ${key}`, "content-type": "application/json" };
+  const deadline = Date.now() + RUNTIME_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const modules = await waitForJson(`${baseUrl}/api/modules`, "rescue modules", key) as { items: { id: string; name: string; status: string; activeHash: string | null }[] };
+    const web = modules.items.find(module => module.name === "web");
+    if (web?.status === "active" && web.activeHash) return;
+    const approvals = await waitForJson(`${baseUrl}/api/approvals`, "rescue approvals", key) as { items: { id: string; moduleId: string | null; action: string }[] };
+    const candidates = approvals.items.filter(approval => approval.moduleId === web?.id && approval.action === "activate_module");
+    if (candidates.length > 1) throw new Error("Ambiguous Web activation approvals");
+    if (candidates[0]) {
+      const response = await fetch(`${baseUrl}/api/approvals/${candidates[0].id}/resolve`, { method: "POST", headers, body: JSON.stringify({ decision: "approve", scope: "once" }) });
+      if (!response.ok) throw new Error(`Web activation approval failed: ${response.status}`);
+      const approval = await response.json() as { status: string };
+      if (approval.status !== "approved") throw new Error(`Web activation approval unresolved: ${approval.status}`);
+    }
+    await Bun.sleep(250);
+  }
+  throw new Error("Web activation approval was not ready");
+}
+
 async function assertRuntimeStarts(binaryPath: string) {
-  const port = await freePort();
+  const port = await freePort(), rescuePort = await freePort();
   const tempRoot = await mkdtemp(join(tmpdir(), "chrona-release-smoke-"));
   const dataDir = join(tempRoot, "data");
   const configDir = join(tempRoot, "config");
 
   const env = releaseSmokeEnvironment(dataDir, configDir);
   env.CHRONA_RESOURCE_DIR = join(dirname(binaryPath), buildArtifacts.resourcesRoot);
+  env.CHRONA_RESCUE_HOST = "127.0.0.1";
+  env.CHRONA_RESCUE_PORT = String(rescuePort);
+  env.RESCUE_KEY = env.API_KEY;
   const proc = Bun.spawn([binaryPath, "start", "--host", "127.0.0.1", "--port", String(port), "--no-open"], {
     cwd: tempRoot,
     env,
@@ -124,7 +149,8 @@ async function assertRuntimeStarts(binaryPath: string) {
   try {
     const baseUrl = `http://127.0.0.1:${port}`;
     await waitForJson(`${baseUrl}/health`, "health endpoint");
-    // The page comes from the built-in web module, which builds at first start.
+    // Web is an ordinary owner application; approve its exact first activation through rescue.
+    await approveSmokeWeb(`http://127.0.0.1:${rescuePort}`, env.API_KEY!);
     await waitForText(`${baseUrl}/`, "web index");
     // The page's data API (web module, routed calls): today's overview of the default workspace.
     await waitForJson(`${baseUrl}/api/web/today`, "web today endpoint", env.API_KEY);
