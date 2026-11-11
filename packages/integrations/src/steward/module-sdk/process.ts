@@ -1,7 +1,8 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { accessSync, constants, statSync } from "node:fs";
 import { constants as osConstants } from "node:os";
-import { isAbsolute } from "node:path";
+import { open } from "node:fs/promises";
+import { dirname, isAbsolute } from "node:path";
 import type { Readable, Writable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { spawnWindowsGuardian } from "./windows-transport";
@@ -28,6 +29,7 @@ export type SupervisedExit = {
   stop: ProcessStopEvidence;
 };
 export type SupervisedProcessOptions = {
+  stopReceipt?: { path: string; generation: string };
   cwd?: string;
   env?: NodeJS.ProcessEnv;
   helperPath?: string;
@@ -76,9 +78,12 @@ export function spawnSupervised(command: string, args: readonly string[] = [], o
   if (options.signal?.aborted) throw options.signal.reason ?? new Error("Process launch aborted");
   const capability = processCapability(options);
   if (!capability.available) throw new ProcessSupervisionUnavailableError(capability.reason!);
+  const receipt = options.stopReceipt;
+  if (receipt && (process.platform !== "linux" || !isAbsolute(receipt.path) || !/^[a-f0-9]{64}$/.test(receipt.generation))) throw new Error("Durable stop receipts require Linux, an absolute path and a unique generation");
+  const receiptArgs = receipt ? ["--receipt", receipt.path, receipt.generation, "--"] : [];
   const spawnOptions = { cwd: options.cwd, env: options.env, detached: true };
   const windows = process.platform === "win32" ? spawnWindowsGuardian(helperLocation(options.helperPath), command, args, spawnOptions) : undefined;
-  const child = windows?.child ?? spawn(helperLocation(options.helperPath), [command, ...args], {
+  const child = windows?.child ?? spawn(helperLocation(options.helperPath), [...receiptArgs, command, ...args], {
     ...spawnOptions, stdio: ["pipe", "pipe", "pipe", "pipe", "pipe"],
   }) as ChildProcessWithoutNullStreams;
   const control = windows?.control ?? child.stdio[3] as Writable | null;
@@ -158,4 +163,21 @@ export function spawnSupervised(command: string, args: readonly string[] = [], o
   });
   if (options.signal?.aborted) stop();
   return { process: child, pid: child.pid, ready, exited, stop, capability };
+}
+
+/** A receipt proves only termination of the original generation, never business success. */
+export async function readStopReceipt(expected: { path: string; generation: string }): Promise<ProcessStopEvidence> {
+  if (process.platform !== "linux" || !/^[a-f0-9]{64}$/.test(expected.generation)) throw new Error("Unsupported stop receipt");
+  const file = await open(expected.path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const stat = await file.stat();
+    if (![stat.isFile(), stat.size <= 512, stat.nlink === 1, (stat.mode & 0o077) === 0, stat.uid === process.getuid?.()].every(Boolean)) throw new Error("Invalid stop receipt storage");
+    const value = JSON.parse(await file.readFile("utf8"));
+    if (![value.version === 1, value.generation === expected.generation, value.state === "stopped", value.scope === "descendants", value.treeClean === true].every(Boolean)) throw new Error("Unconfirmed descendant stop");
+    // A reader may race the guardian's final fsync; establish durability before accepting it.
+    await file.sync();
+    const directory = await open(dirname(expected.path), "r");
+    try { await directory.sync(); } finally { await directory.close(); }
+    return { state: "stopped", scope: "descendants", treeClean: true, reason: "durable-generation-stop" };
+  } finally { await file.close(); }
 }
