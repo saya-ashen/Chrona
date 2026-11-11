@@ -116,10 +116,13 @@ function terminalReason(status: string) {
   return "本次执行失败，处理未完成；执行接口未提供详细原因。";
 }
 type AgentReadPage = { run: { runId: string; status: string; active: boolean }; transcript?: Transcript; interactions: Turn["interactions"]; items: { sequence: number; payload: unknown }[]; nextCursor: string | null; ended: boolean };
+function applyRunView(turn: Turn, run: AgentReadPage["run"]) {
+  if (run.runId !== turn.runId) throw failure("conflict", "Agent read returned another Run");
+  turn.status = run.status; turn.active = run.active || ["queued", "running", "unknown"].includes(run.status);
+  turn.reason = terminalReason(run.status);
+}
 function applyReadPage(turn: Turn, page: AgentReadPage, before?: string) {
-  if (page.run.runId !== turn.runId) throw failure("conflict", "Agent read returned another Run");
-  turn.status = page.run.status; turn.active = page.run.active || ["queued", "running", "unknown"].includes(page.run.status);
-  turn.reason = terminalReason(page.run.status);
+  applyRunView(turn, page.run);
   for (const item of page.items) {
     const payload = item.payload as { type?: string; value?: { phase?: unknown } } | null;
     if (payload?.type === "progress" && typeof payload.value?.phase === "string") turn.phase = payload.value.phase;
@@ -140,7 +143,13 @@ async function readTranscript(call: Call, turn: Turn, before?: string) {
       if (page.nextCursor) turn.cursor = page.nextCursor;
     } while (more);
     return page.transcript !== undefined;
-  } catch { // Preserve the last observed execution evidence until a later read succeeds.
+  } catch {
+    // Normalized reads can fail while fetching the Provider transcript, hiding the durable Run view.
+    // Native reads bypass that fetch. Consume only their Run view; never mix cursors or event streams.
+    try {
+      const page = await call("agent.read", { runId: turn.runId, view: "native", limit: 1 }) as AgentReadPage;
+      applyRunView(turn, page.run);
+    } catch { /* Keep the last observed evidence when neither read is available. */ }
     return false;
   }
 }

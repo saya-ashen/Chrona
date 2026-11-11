@@ -3,19 +3,23 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAgentConversations } from "./conversations";
+import { createAgentConversations as generatedWeb } from "../external/web/agent-conversations";
+import { createAgentConversations as generatedMcp } from "../external/mcp/agent-conversations";
+import { createAgentConversations as generatedQq } from "../external/qq/agent-conversations";
 import { receiptFixture, receiptItem, receiptEvent, healthFixture } from "./delivery-fixture";
 
 type Args = Record<string, unknown>;
 type Run = { contextId: string; runId: string; status: string; active: boolean };
 const directories: string[] = [];
 afterEach(async () => { await Promise.all(directories.splice(0).map(path => rm(path, { recursive: true, force: true }))); });
-async function fixture(source: "web" | "mcp" | "qq" = "web", discovered?: string[], memory = false) {
+async function fixture(source: "web" | "mcp" | "qq" = "web", discovered?: string[], memory = false, create = createAgentConversations) {
   const dataDir = await mkdtemp(join(tmpdir(), "chrona-conversation-boundary-")); directories.push(dataDir);
   const path = join(dataDir, "conversations/state.json");
   const journal = async () => JSON.parse(await readFile(path, "utf8"));
   const calls: { target: string; args: Args; options: { key?: string } }[] = [], runs = new Map<string, Run>(), replies: Args[] = [];
   const admitted = new Map<string, string>();
   let failRun = false, failWrite = false, failStream = false;
+  const reads = { normalizedUnavailable: false, nativeUnavailable: false, nativeRunId: undefined as string | undefined };
   const current = { status: "finished", active: false };
   const stream = { transcript: [{ at: "2026-11-09T00:00:01.000Z", kind: "text", text: "已核对" }] as { at: string; kind: string; text?: string; tool?: string; error?: boolean }[], interactions: [{ id: "question-1", status: "waiting" }], items: [] as { sequence: number; payload: unknown }[], nextCursor: null as string | null };
   let clock = "2026-11-09T00:00:02.000Z";
@@ -43,6 +47,12 @@ async function fixture(source: "web" | "mcp" | "qq" = "web", discovered?: string
     if (target === "modules.health") { if (delivery.unavailable) throw new Error("offline"); return { items: delivery.health, nextCursor: null }; }
     if (target === "agent.read") {
       const run = [...runs.values()].find(run => run.runId === args.runId)!;
+      if (args.view === "native") {
+        expect(args).toEqual({ runId: run.runId, view: "native", limit: 1 });
+        if (reads.nativeUnavailable) throw new Error("native read unavailable");
+        return { run: { ...run, ...current, runId: reads.nativeRunId ?? run.runId }, items: [{ sequence: 1, payload: { type: "progress", value: { phase: "native-must-not-apply" } } }], nextCursor: "native:must-not-persist", interactions: [], ended: !current.active };
+      }
+      if (reads.normalizedUnavailable) throw Object.assign(new Error("Provider response exceeds its retention bound"), { code: "invalid" });
       const page = { ...stream, run: { ...run, ...current }, ended: !current.active };
       if (failStream) { failStream = false; return { ...page, transcript: undefined }; }
       return page;
@@ -51,8 +61,8 @@ async function fixture(source: "web" | "mcp" | "qq" = "web", discovered?: string
     if (target === "agent.stop") return { ...current, runId: args.runId, contextId: "context-1", stopConfirmed: !current.active };
     throw new Error(`Unexpected call: ${target}`);
   };
-  const restart = () => createAgentConversations({ source, dataDir, call, ...(discovered === undefined ? { tools: [] } : {}), reply: event => { replies.push(event); }, now: () => new Date(clock), deliveryPages: async () => { if (delivery.unavailable) throw new Error("offline"); return delivery.pages; } });
-  return { path, journal, calls, runs, replies, restart, current, stream, delivery, advance: () => { clock = new Date(Date.parse(clock) + 2000).toISOString(); }, loseRunResponse: () => { failRun = true; }, loseWriteResponse: () => { failWrite = true; }, loseStreamResponse: () => { failStream = true; } };
+  const restart = () => create({ source, dataDir, call, ...(discovered === undefined ? { tools: [] } : {}), reply: event => { replies.push(event); }, now: () => new Date(clock), deliveryPages: async () => { if (delivery.unavailable) throw new Error("offline"); return delivery.pages; } });
+  return { path, journal, calls, runs, replies, restart, current, stream, reads, delivery, advance: () => { clock = new Date(Date.parse(clock) + 2000).toISOString(); }, loseRunResponse: () => { failRun = true; }, loseWriteResponse: () => { failWrite = true; }, loseStreamResponse: () => { failStream = true; } };
 }
 
 for (const source of ["web", "qq", "mcp"] as const) test(`${source}: foreground sends preserve private context, replay identity and persisted replies`, async () => {
@@ -283,6 +293,60 @@ test("a transcript read failure cannot hide terminal failure and a later refresh
   expect(refreshed.progress).toBe("已核对");
   expect((await f.journal()).sessions[0].turns[0].streamPending).toBe(false);
   expect(f.runs.size).toBe(1);
+});
+
+for (const [implementation, source, create] of [["canonical", "web", createAgentConversations], ["generated Web", "web", generatedWeb], ["generated MCP", "mcp", generatedMcp], ["generated QQ", "qq", generatedQq]] as const)
+for (const status of ["failed", "timed_out", "provider_unavailable", "cancelled", "finished", "unknown", "running", "queued"]) test(`${implementation}: throwing normalized read reconciles ${status} from durable native Run evidence only`, async () => {
+  const f = await fixture(source, undefined, false, create), app = f.restart();
+  const sent = await app.send({ text: "检查", requestKey: "original" });
+  f.current.status = "running"; f.current.active = true;
+  f.stream.items = [{ sequence: 323, payload: { type: "progress", value: { phase: "thinking" } } }];
+  f.stream.nextCursor = "normalized:323";
+  await app.poll();
+  const active = ["queued", "running", "unknown"].includes(status), canContinue = !active && status !== "finished";
+  // Even a false active flag must not make unknown or running safe to resume.
+  f.current.status = status; f.current.active = false;
+  f.reads.normalizedUnavailable = true;
+  const observed = await f.restart().execution(sent.sessionId);
+  expect(observed).toMatchObject({ status, active, canContinue, replyPending: !active });
+  const saved = (await f.journal()).sessions[0].turns[0];
+  expect(saved).toMatchObject({ status, active, streamPending: true, cursor: "normalized:323", phase: "thinking" });
+  expect(saved.transcript).toEqual(f.stream.transcript);
+  expect(saved.interactions).toEqual(f.stream.interactions);
+  const messages = await f.restart().messages(sent.sessionId);
+  if (active || status === "finished") expect(messages).toHaveLength(1);
+  else expect(messages.at(-1)?.execution).toMatchObject({ status, active: false, canContinue: true, replyPending: true });
+  await f.restart().poll();
+  expect(f.calls.filter(call => call.target === "agent.run")).toHaveLength(1);
+  expect(f.calls.some(call => ["agent.stop", "agent.write", "agent.native"].includes(call.target))).toBe(false);
+  f.reads.normalizedUnavailable = false;
+  f.stream.items = []; f.stream.nextCursor = null;
+  f.stream.transcript.push({ at: "2026-11-09T00:00:03.000Z", kind: "text", text: "后续核对" });
+  const refreshed = await f.restart().execution(sent.sessionId);
+  expect(refreshed?.replyPending).toBe(false);
+  expect(f.calls.filter(call => call.target === "agent.read").at(-1)?.args).toEqual({ runId: sent.runId, cursor: "normalized:323", limit: 100 });
+  expect((await f.journal()).sessions[0].turns[0].transcript.at(-1).text).toBe("后续核对");
+});
+
+for (const nativeFailure of ["unavailable", "wrong-run"] as const) for (const status of ["running", "unknown", "failed"]) test(`${nativeFailure} native fallback preserves last observed ${status} evidence`, async () => {
+  const f = await fixture(), app = f.restart();
+  const sent = await app.send({ text: "检查", requestKey: "original" });
+  f.current.status = status; f.current.active = status !== "failed";
+  await app.poll();
+  const previous = (await f.journal()).sessions[0].turns[0];
+  f.current.status = "finished"; f.current.active = false;
+  f.reads.normalizedUnavailable = true;
+  f.reads.nativeUnavailable = nativeFailure === "unavailable";
+  f.reads.nativeRunId = nativeFailure === "wrong-run" ? "foreign-run" : undefined;
+  // Force a refresh even for an already published terminal reply.
+  previous.streamPending = true;
+  const state = await f.journal(); state.sessions[0].turns[0] = previous;
+  await writeFile(f.path, JSON.stringify(state));
+  expect(await f.restart().execution(sent.sessionId)).toMatchObject({ status, active: status !== "failed", canContinue: status === "failed" });
+  expect((await f.journal()).sessions[0].turns[0]).toMatchObject({ status, active: status !== "failed", transcript: previous.transcript, interactions: previous.interactions, streamPending: true });
+  await f.restart().poll();
+  expect(f.calls.filter(call => call.target === "agent.run")).toHaveLength(1);
+  expect(f.calls.some(call => ["agent.stop", "agent.write"].includes(call.target))).toBe(false);
 });
 
 test("finished status cannot publish cached process text before the final reply can be read", async () => {

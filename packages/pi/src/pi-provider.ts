@@ -118,7 +118,7 @@ class PiRun {
       try { await this.detail?.close(result.outcome === "finished" ? "completed" : "failed"); }
       catch { error = "Execution detail is incomplete; recover the final snapshot"; }
       try { await this.raw?.close(); }
-      catch { error = "Pi raw event stream is incomplete"; }
+      catch (cause) { error = cause instanceof Error ? this.redact(cause.message) : "Pi raw event stream is incomplete"; }
       this.complete(error ? { ...result, outcome: "failed", error } : result);
     })();
   }
@@ -324,7 +324,7 @@ class PiRun {
   start(config: PiLaunchConfig) {
     this.secrets = [this.input.token, ...Object.entries(piEnvironment(config)).flatMap(([key, value]) => key.endsWith("API_KEY") && value ? [value] : [])];
     const events = this.input.events;
-    if (events?.raw) this.raw = new PiRawRecords(events.raw.bind(events), this.secrets, () => this.stop("failed", "Pi raw event stream is incomplete"));
+    if (events?.raw) this.raw = new PiRawRecords(events.raw.bind(events), this.secrets, message => this.stop("failed", message));
     const input = events ? { ...this.input, events: { ...events, usage: async (value: Parameters<typeof events.usage>[0]) => { this.detail?.emit({ type: "usage", input: value.input, output: value.output }); await events.usage(value); } } } : this.input;
     this.events = new PiEvents(input, this.secrets, record => this.writeUi(record), message => { void this.abortWith("failed", message).catch(() => {}); });
     if (this.input.execution && this.input.detail) {

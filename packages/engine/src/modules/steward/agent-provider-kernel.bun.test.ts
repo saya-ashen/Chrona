@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
-import { moduleManifestSchema, type AgentProviderRegistration, type ProviderRunInput } from "@chrona/contracts/steward";
+import { moduleManifestSchema, type AgentProviderRegistration, type ProviderRunInput, type ProviderTranscriptItem } from "@chrona/contracts/steward";
 import { agent } from "./system/agent";
 import { registerAgentProvider } from "./agent-provider";
 import { startLocalProvider } from "./local-runtime";
@@ -33,6 +33,7 @@ async function fixture() {
   const workspaceId = (await db.workspace.create({ data: { name: "kernel launch tests" } })).id;
   const requests: { name: string; args: Record<string, unknown> }[] = [];
   let nativeFails = false, stopped = false, confirmStop = true;
+  let transcript: ProviderTranscriptItem[] = [];
   const peer = testModuleProcess(async event => {
     if (event.trigger.kind !== "tool") return {};
     const { id: name, args } = event.trigger;
@@ -44,7 +45,7 @@ async function fixture() {
     }
     if (name === "abort" && confirmStop) stopped = true;
     if (name === "status") return { result: { operationId: args.operationId, outcome: stopped ? { outcome: "finished", sessionId: null, error: null } : null, failure: false } };
-    if (name === "transcript") return { result: [] };
+    if (name === "transcript") return { result: transcript };
     if (name === "complete") return { result: { text: "bounded completion", inputTokens: 2, outputTokens: 3 } };
     return { result: {} };
   });
@@ -72,7 +73,7 @@ async function fixture() {
     const input: ProviderRunInput = { runId, token: claimed!.token, lane: row.lane as "background", cwd: row.cwd, sessionDir: join(dataDir, "sessions", row.sessionId!, ".chrona", "sessions"), sessionId: null, prompt: row.prompt, systemPrompt: "system", resources: "configured", deadline: row.deadlineAt };
     return input;
   }
-  return { db, ports, workspaceId, backendCaller, caller, installCaller, invoke, run, claim, requests, failNative: () => { nativeFails = true; }, unconfirmedStop: () => { confirmStop = false; } };
+  return { db, ports, workspaceId, backendCaller, caller, installCaller, invoke, run, claim, requests, setTranscript: (value: ProviderTranscriptItem[]) => { transcript = value; }, failNative: () => { nativeFails = true; }, unconfirmedStop: () => { confirmStop = false; } };
 }
 
 test("kernel boots without a provider and reports explicit unavailability", async () => {
@@ -80,6 +81,20 @@ test("kernel boots without a provider and reports explicit unavailability", asyn
   expect(await createRegisteredProviderClient(() => f.ports).health()).toMatchObject({ available: false });
   await expect(f.run("unconfigured")).rejects.toMatchObject({ code: "unavailable" });
   expect(await f.db.run.count()).toBe(0);
+});
+
+test("normalized reads retain development transcripts larger than a native reply bound", async () => {
+  const f = await fixture();
+  await registerAgentProvider(f.ports, f.workspaceId, f.backendCaller, declaration);
+  const admitted = await f.run("large-transcript");
+  const text = "开发记录".repeat(18_000);
+  f.setTranscript([{ at: new Date().toISOString(), kind: "result", tool: "read", text, error: false }]);
+  const output = await f.invoke("read", { runId: admitted.runId }) as { run: { runId: string; status: string }; transcript: ProviderTranscriptItem[] };
+  expect(Buffer.byteLength(JSON.stringify(output.transcript))).toBeGreaterThan(65_536);
+  expect(output.transcript).toHaveLength(1);
+  expect(output.transcript[0]).toMatchObject({ kind: "result", text });
+  expect(output.run).toMatchObject({ runId: admitted.runId, status: "queued" });
+  await f.invoke("stop", { runId: admitted.runId }, "stop-large-transcript");
 });
 
 test("native retries through the public gateway ignore JSON object order and preserve array order", async () => {

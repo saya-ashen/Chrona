@@ -68,32 +68,39 @@ export function piRunInput(input: ProviderRunInput, options: PiProviderOptions):
   return { ...input, ...(model === undefined ? {} : { model: model as string }) };
 }
 
-/** Serialized raw records with a reserved explicit gap on any retention loss. */
+/** Bounded, serialized raw records. Retention gaps are recoverable; sink failures stop the Run. */
 export class PiRawRecords {
-  private queue: { event: RecordValue; bytes: number }[] = [];
+  private queue: { event: RecordValue; bytes: number; originalBytes: number }[] = [];
   private bytes = 0;
   private draining: Promise<void> | undefined;
-  private failure = false;
+  private failure: "sink_error" | "sink_timeout" | undefined;
   private stalled = false;
   private gap: { reason: string; records: number; originalBytes: number } | undefined;
-  constructor(private append: (record: RecordValue) => Promise<void>, private secrets: string[], private fail: () => void, private timeoutMs = 1000) {}
+  // Local callback acknowledgements may include a database transaction. A slow
+  // acknowledgement is not a failed model turn; a wedged sink is still bounded.
+  constructor(private append: (record: RecordValue) => Promise<void>, private secrets: string[], private fail: (message: string) => void, private timeoutMs = 30_000) {}
   receive(value: RecordValue) {
     let event: RecordValue, originalBytes = 0, bytes: number;
     try {
       originalBytes = Buffer.byteLength(JSON.stringify(value));
       event = safeRecord(value, this.secrets);
       bytes = Buffer.byteLength(JSON.stringify(event));
-    } catch { this.lose("too_large", originalBytes); return; }
-    if (this.failure || bytes > 256 * 1024 || this.queue.length >= 256 || this.bytes + bytes > 1024 * 1024) {
-      this.lose(bytes > 256 * 1024 ? "too_large" : "backpressure", bytes); return;
+    } catch { this.lose("too_large", originalBytes); this.drain(); return; }
+    // The byte bound includes the in-flight record. Reserve the gap separately,
+    // and admit later records only after that gap has taken its place in order.
+    if (this.failure || this.gap || bytes > 1024 * 1024 || this.queue.length >= 256 || this.bytes + bytes > 1024 * 1024) {
+      this.lose(this.failure ?? (bytes > 1024 * 1024 ? "too_large" : "backpressure"), originalBytes);
+    } else {
+      this.queue.push({ event, bytes, originalBytes }); this.bytes += bytes;
     }
-    this.queue.push({ event, bytes }); this.bytes += bytes;
     this.drain();
   }
-  private lose(reason: string, bytes: number) {
+  private lose(reason: string, bytes: number, records = 1) {
     this.gap ??= { reason, records: 0, originalBytes: 0 };
-    this.gap.records++; this.gap.originalBytes += bytes;
-    if (!this.failure) { this.failure = true; this.fail(); }
+    this.gap.records += records; this.gap.originalBytes += bytes;
+  }
+  private incomplete() {
+    return new Error(`Pi raw event stream is incomplete (${this.failure}; ${this.gap?.records ?? 0} records, ${this.gap?.originalBytes ?? 0} bytes not acknowledged)`);
   }
   private async write(event: RecordValue): Promise<void> {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -104,25 +111,35 @@ export class PiRawRecords {
       ]);
     } finally { clearTimeout(timer); }
   }
+  private failSink(item: { originalBytes: number } | undefined, gap: { originalBytes: number; records: number } | undefined) {
+    this.failure = this.stalled ? "sink_timeout" : "sink_error";
+    // A rejected gap still represents its original records. Merge it with any
+    // loss that arrived while its acknowledgement was pending.
+    this.lose(this.failure, gap?.originalBytes ?? item!.originalBytes, gap?.records ?? 1);
+    for (const queued of this.queue.splice(0)) this.lose(this.failure, queued.originalBytes);
+    this.bytes = 0;
+    this.fail(this.incomplete().message);
+  }
   private drain() {
-    if (this.draining) return;
+    if (this.draining || this.failure) return;
     this.draining = (async () => {
-      while (this.queue.length) {
-        const { event, bytes } = this.queue.shift()!;
-        try { await this.write(event); }
-        catch { this.lose(this.stalled ? "sink_timeout" : "sink_error", bytes); }
-        this.bytes -= bytes;
-        // A timed-out callback is still pending. Do not invoke it concurrently or replay it.
-        if (this.stalled) { for (const item of this.queue.splice(0)) this.lose("sink_timeout", item.bytes); this.bytes = 0; }
+      while (this.queue.length || this.gap) {
+        const item = this.queue.shift();
+        const gap = item ? undefined : this.gap;
+        if (gap) this.gap = undefined;
+        try { await this.write(item?.event ?? { type: "chrona_raw_gap", ...gap }); }
+        catch { this.failSink(item, gap); return; }
+        this.bytes -= item?.bytes ?? 0;
       }
-    })().finally(() => { this.draining = undefined; if (this.queue.length) this.drain(); });
+    })().finally(() => { this.draining = undefined; if (this.queue.length || this.gap) this.drain(); });
   }
   async close() {
     while (this.draining) await this.draining;
-    if (this.gap && !this.stalled) {
+    // A timed-out callback is still pending. Never invoke it concurrently or replay it.
+    if (this.failure && this.gap && !this.stalled) {
       try { await this.write({ type: "chrona_raw_gap", ...this.gap }); }
-      catch { this.failure = true; }
+      catch { /* The outcome still carries the sanitized cause and loss counts. */ }
     }
-    if (this.failure) throw new Error("Pi raw event stream is incomplete");
+    if (this.failure) throw this.incomplete();
   }
 }

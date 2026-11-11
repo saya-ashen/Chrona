@@ -40,7 +40,9 @@ async function read(ports: StewardPorts, principal: ModulePrincipal, args: Retur
     if (declaration.endpoints.transcript) {
       try {
         const raw = await callProviderEndpoint(ports, principal.workspaceId, binding, "transcript", { sessionDir: join(run.cwd, ".chrona", "sessions"), limit: args.limit });
-        transcript = runtimeTranscriptSchema.parse(maskProviderPayload(runtimeTranscriptSchema.parse(raw)));
+        // A normalized conversation is a collection of messages, not a native RPC reply.
+        // Keep its complete bounded transcript below the 32 MiB module transport envelope.
+        transcript = runtimeTranscriptSchema.parse(maskProviderPayload(runtimeTranscriptSchema.parse(raw), [], 16 * 1024 * 1024));
       } catch (error) {
         // Retained Run records remain readable while optional live transcript delivery is unavailable.
         if (!(error instanceof CallError) || !["unavailable", "not_found", "unknown", "forbidden", "conflict"].includes(error.code)) throw error;
