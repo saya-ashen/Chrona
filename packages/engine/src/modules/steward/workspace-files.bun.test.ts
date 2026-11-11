@@ -49,10 +49,25 @@ test("Agent input reads only the receipt's originating application, not arbitrar
     await expect(readRunContent(f.ports, f.workspaceId, "foreign", "web/image.png")).rejects.toMatchObject({ code: "forbidden" });
     await expect(readRunContent(f.ports, "foreign-workspace", f.moduleId, "web/image.png")).rejects.toMatchObject({ code: "forbidden" });
     await expect(readRunContent(f.ports, f.workspaceId, f.moduleId, "coding/image.png")).rejects.toMatchObject({ code: "forbidden" });
-    for (const ref of ["chat/old.txt", "web/../private", "web/a/../../private"]) expect(contentRefSchema.safeParse(ref).success).toBe(false);
+    expect(contentRefSchema.safeParse("chat/attachments/selected.png").success).toBe(true);
+    await expect(readRunContent(f.ports, f.workspaceId, f.moduleId, "chat/old.txt")).rejects.toMatchObject({ code: "forbidden" });
+    for (const ref of ["web/../private", "web/a/../../private"]) expect(contentRefSchema.safeParse(ref).success).toBe(false);
     await writeFile(join(f.root, "secret"), "outside");
     await symlink(join(f.root, "secret"), join(f.content, "escape"));
     await expect(readRunContent(f.ports, f.workspaceId, f.moduleId, "web/escape")).rejects.toMatchObject({ code: "forbidden" });
+  } finally { await f.close(); }
+});
+
+test("an ordinary Chat application reads its own content without reviving shared attachments", async () => {
+  const f = await fixture();
+  try {
+    const chat = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "chat", status: "active", activeHash: "chat-approved" } });
+    const own = join(f.root, "platform/content", chat.id);
+    await mkdir(own, { recursive: true });
+    await writeFile(join(own, "selected.txt"), "selected Chat bytes");
+    expect((await readRunContent(f.ports, f.workspaceId, chat.id, "chat/selected.txt")).bytes.toString()).toBe("selected Chat bytes");
+    await expect(readRunContent(f.ports, f.workspaceId, f.moduleId, "chat/selected.txt")).rejects.toMatchObject({ code: "forbidden" });
+    expect(await Bun.file(join(f.root, "content/chat/selected.txt")).exists()).toBe(false);
   } finally { await f.close(); }
 });
 
