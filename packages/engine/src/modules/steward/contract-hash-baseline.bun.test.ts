@@ -8,6 +8,7 @@ import migration from "../../../../contracts/fixtures/contract-hash-kernel-app-m
 import api from "../../../../contracts/fixtures/contract-hash-kernel-api.json";
 import journey from "../../../../contracts/fixtures/contract-hash-steward-journey.json";
 import providerRegistration from "../../../../contracts/fixtures/contract-hash-provider-registration.json";
+import transcriptPages from "../../../../contracts/fixtures/contract-hash-pi-transcript-pages.json";
 import agentTools from "../../../../contracts/fixtures/agent-tools.json";
 import cases from "../../../../contracts/fixtures/contract-hash-cases.json";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
@@ -66,7 +67,7 @@ test("all tool hashes preserve the baseline except explicitly enumerated plan ch
     expect(change.after).toMatch(/^[a-f0-9]{64}$/);
     expected[change.target] = change.after;
   }
-  for (const change of providerRegistration.changes) {
+  for (const change of [...providerRegistration.changes, ...transcriptPages.changes]) {
     expect(change.target).toMatch(/^(agent|pi)\./);
     expect((expected as Record<string, string | null>)[change.target] ?? null).toBe(change.before);
     expect(change.reason.length).toBeGreaterThan(20);

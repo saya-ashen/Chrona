@@ -3,6 +3,7 @@ import { mock } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ProviderRunInput } from "@chrona/contracts/steward";
+import { piTranscriptPage, PI_TRANSCRIPT_MAX_BYTES } from "../../../../../../pi/src/pi-transcript";
 
 type Trigger = { id: string; args: Record<string, unknown>; caller?: { kind: string }; call?: { id: string } };
 let tool!: (value: Trigger) => Promise<{ result: unknown }>, activated!: () => Promise<unknown>, disconnect!: () => void;
@@ -13,7 +14,7 @@ class ModelError extends Error { constructor(readonly code: string, message: str
 mock.module("chrona", () => ({ ModelError, chrona: { paths: { data }, dependencies: { web: "web-module-id" }, async call(target: unknown, args: Record<string, unknown>) { calls.push({ target, args }); return {}; } },
   on(name: string, callback: typeof tool & typeof activated) { if (name === "tool") tool = callback; if (name === "activated") activated = callback; }, onDisconnect(callback: () => void) { disconnect = callback; },
 }));
-mock.module("@chrona/pi", () => ({ PI_MODEL_ENVIRONMENT_KEYS: ["OPENAI_API_KEY"], createPiProvider(options: Record<string, unknown>) { configurations.push(options); return {
+mock.module("@chrona/pi", () => ({ piTranscriptPage, PI_TRANSCRIPT_MAX_BYTES, PI_MODEL_ENVIRONMENT_KEYS: ["OPENAI_API_KEY"], createPiProvider(options: Record<string, unknown>) { configurations.push(options); return {
   name: "pi", supportsRunModel: true, async health() { return { available: true, sandboxed: false, error: null }; },
   start(input: ProviderRunInput) { starts++; runs.push(input); return { done: new Promise(resolve => { finish = resolve; }), async inject() {}, async abort() {}, async native(request: Record<string, unknown>) { return { type: "response", request, instance: starts }; } }; },
 }; } }));

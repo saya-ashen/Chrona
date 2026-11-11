@@ -19,8 +19,8 @@ export function providerSnapshot(value: unknown): ProviderSnapshot {
   const { contracts } = z.object({ contracts: z.record(z.string(), z.string()) }).parse(value);
   return { ...declaration, contracts };
 }
-async function declaredProvider(tx: Prisma.TransactionClient, workspaceId: string, moduleId: string, hash: string, declaration: ProviderDeclaration) {
-  const module = await tx.module.findFirst({ where: { id: moduleId, workspaceId, activeHash: hash, status: "active", executionFenceAt: null } });
+async function declaredProvider(tx: Prisma.TransactionClient, workspaceId: string, { moduleId, hash }: Pick<ProviderBinding, "moduleId" | "hash">, declaration: ProviderDeclaration, allowFenced = false) {
+  const module = await tx.module.findFirst({ where: { id: moduleId, workspaceId, activeHash: hash, status: "active", ...(allowFenced ? {} : { executionFenceAt: null }) } });
   const version = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash } } });
   if (!module || version?.status !== "approved") throw new CallError("forbidden", "Provider registration requires its approved active module");
   assertModuleAvailable(module.name);
@@ -43,8 +43,11 @@ async function declaredProvider(tx: Prisma.TransactionClient, workspaceId: strin
   return { ...declaration, contracts } satisfies ProviderSnapshot;
 }
 export async function assertProviderBinding(tx: Prisma.TransactionClient, workspaceId: string, binding: ProviderBinding) {
+  return checkProviderBinding(tx, workspaceId, binding);
+}
+async function checkProviderBinding(tx: Prisma.TransactionClient, workspaceId: string, binding: ProviderBinding, allowFenced = false) {
   const snapshot = providerSnapshot(binding.declaration);
-  const current = await declaredProvider(tx, workspaceId, binding.moduleId, binding.hash, snapshot);
+  const current = await declaredProvider(tx, workspaceId, binding, snapshot, allowFenced);
   if (providerDigest(current) !== providerDigest(snapshot) || providerDigest([binding.moduleId, binding.hash, snapshot]) !== binding.revision) throw new CallError("conflict", "Admitted provider identity or endpoint contract changed");
   return snapshot;
 }
@@ -53,7 +56,7 @@ export async function registerAgentProvider(ports: StewardPorts, workspaceId: st
   const declaration = agentRegisterSchema.parse(raw);
   const row = await ports.db.$transaction(async tx => {
     await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${workspaceId}`;
-    const snapshot = await declaredProvider(tx, workspaceId, caller.moduleId, caller.hash, declaration);
+    const snapshot = await declaredProvider(tx, workspaceId, caller, declaration);
     const prior = await tx.agentProvider.findUnique({ where: { workspaceId_id: { workspaceId, id: declaration.id } } });
     if (prior && prior.moduleId !== caller.moduleId) throw new CallError("conflict", "Provider id is registered by another module");
     const data = { moduleId: caller.moduleId, hash: caller.hash, revision: providerDigest([caller.moduleId, caller.hash, snapshot]), declaration: snapshot as Prisma.InputJsonValue, updatedAt: ports.now() };
@@ -92,8 +95,15 @@ export async function selectAgentProvider(ports: StewardPorts, workspaceId: stri
   if (candidates.length !== 1) throw new CallError("conflict", "Select a providerId when multiple providers are available");
   return candidates[0]!;
 }
+/** A drain fence closes admission, but must leave the original operation observable and stoppable. */
+async function boundProviderControl(tx: Prisma.TransactionClient, workspaceId: string, binding: ProviderBinding, endpoint: keyof ProviderDeclaration["endpoints"], args: Record<string, unknown>) {
+  if (!["status", "abort", "release"].includes(endpoint) || typeof args.operationId !== "string" || Object.keys(args).length !== 1) return false;
+  const admitted = await tx.agentRunProvider.findFirst({ where: { runId: args.operationId, providerId: binding.providerId, moduleId: binding.moduleId, hash: binding.hash, revision: binding.revision, run: { workspaceId, providerLaunch: { isNot: null } } } });
+  return admitted !== null && providerDigest(admitted.declaration) === providerDigest(binding.declaration);
+}
 export async function callProviderEndpoint<T>(ports: StewardPorts, workspaceId: string, binding: ProviderBinding, endpoint: keyof ProviderDeclaration["endpoints"], args: Record<string, unknown>, key?: string): Promise<T> {
-  const snapshot = await assertProviderBinding(ports.db, workspaceId, binding), tool = snapshot.endpoints[endpoint];
+  const allowFenced = await boundProviderControl(ports.db, workspaceId, binding, endpoint, args);
+  const snapshot = await checkProviderBinding(ports.db, workspaceId, binding, allowFenced), tool = snapshot.endpoints[endpoint];
   if (!tool) throw new CallError("unavailable", `Provider ${endpoint} is unsupported`);
   return (await callSync(ports, kernelOrigin(workspaceId), { moduleId: binding.moduleId, tool }, args, { key, private: true, expectedHash: binding.hash, expectedTarget: { moduleId: binding.moduleId, contractHash: snapshot.contracts[tool]! } })).output as T;
 }

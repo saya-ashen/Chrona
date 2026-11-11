@@ -23,6 +23,14 @@ export type ContextCommand = {
 };
 type CommandReceipt = Prisma.AgentCommandGetPayload<Record<string, never>>;
 
+/** A lifecycle fence may block new work, but not cancellation of this exact version's own admitted Run. */
+export async function assertAgentInterruptPrincipal(tx: Prisma.TransactionClient, principal: ModulePrincipal, runId: string) {
+  const { workspaceId, caller } = principal;
+  const module = await tx.module.findFirst({ where: { workspaceId, id: caller.moduleId, activeHash: caller.hash, status: "active", versions: { some: { hash: caller.hash, status: "approved" } } }, select: { id: true } });
+  if (!module) throw new CallError("forbidden", "Agent stop caller is no longer its approved active module");
+  await ownedRun(tx, principal, runId);
+}
+
 async function replayReceipt(tx: Prisma.TransactionClient, receipt: CommandReceipt, command: ContextCommand) {
   const { principal, name, args, settle, settledOutput } = command;
   if (receipt.hash !== principal.caller.hash) throw new CallError("forbidden", "Agent command belongs to another module version");
@@ -124,7 +132,8 @@ export async function executeContextCommand(ports: StewardPorts, tx: Prisma.Tran
   const { principal, name, args, settle } = command;
   const { workspaceId } = principal;
   await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${workspaceId}`;
-  await assertExecutionPrincipal(tx, principal);
+  if (name === "interrupt") await assertAgentInterruptPrincipal(tx, principal, String(args.runId));
+  else await assertExecutionPrincipal(tx, principal);
   const key = `agent-command:${contextDigest([workspaceId, principal.caller.moduleId, name, args.requestKey])}`;
   const hash = contextRequestDigest(args), previous = await tx.agentCommand.findUnique({ where: { id: key } });
   if (previous) return replayReceipt(tx, previous, command);

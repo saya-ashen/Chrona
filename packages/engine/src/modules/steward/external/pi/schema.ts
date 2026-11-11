@@ -7,6 +7,10 @@ export const completionInput = z.object({
   maxOutputTokens: z.number().int().min(1).max(32_000), timeoutMs: z.number().int().min(1).max(600_000).default(120_000),
 }).strict();
 export const runOptionsSchema = z.object({ model: modelSchema.optional(), thinking: z.enum(THINKING_LEVELS).optional() }).strict();
+export const transcriptPageSchema = z.object({
+  items: runtimeTranscriptSchema, nextCursor: z.string().max(16384).nullable(),
+  gaps: z.array(z.object({ file: z.string().max(8192), offset: z.number().int().nonnegative(), bytes: z.number().int().nonnegative(), reason: z.enum(["record_too_large", "item_too_large"]), item: z.number().int().nonnegative().optional() }).strict()).max(300),
+}).strict();
 export const toolSchemas = {
   health: [z.object({}).strict(), runtimeHealthSchema],
   start: [runtimeStartSchema.extend({ callbacks: z.string().uuid() }), runtimeOperationSchema],
@@ -14,7 +18,7 @@ export const toolSchemas = {
   inject: [runtimeOperationSchema.extend({ message: z.string().max(2 * 1024 * 1024), images: runtimeStartSchema.shape.images }), z.object({ accepted: z.literal(true) }).strict()],
   abort: [runtimeOperationSchema, z.object({ requested: z.literal(true) }).strict()],
   release: [runtimeOperationSchema, z.object({ released: z.literal(true) }).strict()],
-  transcript: [z.object({ sessionDir: z.string().min(1).max(8192), limit: z.number().int().min(1).max(300) }).strict(), runtimeTranscriptSchema],
+  transcript: [z.object({ sessionDir: z.string().min(1).max(8192), limit: z.number().int().min(1).max(300), page: z.literal(true).optional(), cursor: z.string().min(1).max(16384).optional() }).strict().refine(value => !value.cursor || value.page === true), z.union([runtimeTranscriptSchema, transcriptPageSchema])],
   native: [providerNativeInput, providerNativeOutput],
   complete: [completionInput, runtimeOperationSchema],
   configure: [configureInput, configureOutput], models: [modelsInput, modelsOutput],

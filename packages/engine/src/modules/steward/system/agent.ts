@@ -7,6 +7,7 @@ import { CallError } from "../module-call-error";
 import { json } from "./shared";
 import { assertExecutionPrincipal } from "../execution-principal";
 import { admitContextPrimitive, ownedRun, view, type ModulePrincipal } from "../agent-context";
+import { assertAgentInterruptPrincipal } from "../agent-context-admission";
 import { contextInteractions } from "../agent-context-read";
 import { callProviderEndpoint, listAgentProviders, registerAgentProvider, runProviderBinding, providerSnapshot } from "../agent-provider";
 import { maskProviderPayload } from "../agent-provider-redaction";
@@ -62,7 +63,7 @@ export const agent: SystemModule = {
     if (name === "providers") return json(await listAgentProviders(ports, workspaceId, kernelAgentInputs.providers.parse(raw)));
     if (caller.kind !== "module") throw new CallError("forbidden", "Agent Runs require their actual module caller");
     const principal = { workspaceId, ownerId: "owner", caller } satisfies ModulePrincipal;
-    await assertExecutionPrincipal(ports.db, principal);
+    if (name !== "stop") await assertExecutionPrincipal(ports.db, principal);
     if (name === "read") return json(await read(ports, principal, kernelAgentInputs.read.parse(raw)));
     if (!call?.key) throw new CallError("invalid", "Agent commands require a call key");
     if (name === "run") {
@@ -88,10 +89,10 @@ export const agent: SystemModule = {
     }
     if (name === "stop") {
       const args = kernelAgentInputs.stop.parse(raw), command = { ...args, requestKey: call.key };
+      await assertAgentInterruptPrincipal(ports.db, principal, args.runId);
       const admission = await admitContextPrimitive(ports, principal, "interrupt", command) as { perform: boolean };
       if (admission.perform) {
-        const binding = await runProviderBinding(ports, workspaceId, args.runId);
-        const handle = liveRuns.get(args.runId);
+        const binding = await runProviderBinding(ports, workspaceId, args.runId), handle = liveRuns.get(args.runId);
         if (handle) await handle.abort();
         else if (await ports.db.providerLaunch.findUnique({ where: { runId: args.runId } })) await callProviderEndpoint(ports, workspaceId, binding, "abort", { operationId: args.runId }, `provider-stop:${args.runId}:${call.key}`);
         await admitContextPrimitive(ports, principal, "interrupt", command, true);

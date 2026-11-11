@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { providerAnswerSchema, runtimeStartSchema, runtimeEventSchema, type RuntimeEvent, type ProviderRunInput, type ProviderAdapter } from "@chrona/contracts/steward";
-import type { PiProviderOptions } from "@chrona/pi";
+import { piTranscriptPage, PI_TRANSCRIPT_MAX_BYTES, type PiProviderOptions } from "@chrona/pi";
+import { Buffer } from "node:buffer";
 import { createConfiguration, launchConfiguration, type ThinkingLevel } from "./configuration";
 import { createPiOperations, PiError } from "./operations";
 import type { PrepareCompletion } from "./completions";
@@ -78,9 +79,11 @@ export function createPiApplication({ data, options, createProvider, call }: App
         return { name: "pi", supportsRunModel: true, complete: false, available: false, sandboxed: false, error: "Pi configuration or host bridge is unavailable" };
       }
     }
+    const request = args as { sessionDir: string; limit: number; page?: true; cursor?: string };
+    if (request.page) return piTranscriptPage(request);
     const provider = createProvider((await configuration.snapshot()).options);
     if (!provider.transcript) throw new PiError("unavailable", "Pi transcript unavailable");
-    return provider.transcript(args as { sessionDir: string; limit: number });
+    return provider.transcript(request);
   }
   async function handle(name: string, raw: unknown, caller?: { kind: string }, callId?: string) {
     if (!isTool(name)) throw new PiError("not_found", "Pi tool not found");
@@ -93,7 +96,10 @@ export function createPiApplication({ data, options, createProvider, call }: App
     else if (name === "complete") result = await operations.complete(args);
     else if (["status", "inject", "abort", "release", "native"].includes(name)) result = await operations.control(name, args as { operationId: string });
     else result = await inspect(name as "health" | "transcript", args);
-    return toolSchemas[name][1].parse(result);
+    const parsed = toolSchemas[name][1].parse(result);
+    // Enforce the bound before the SDK frames a reply, including adapter results.
+    if (name === "transcript" && Buffer.byteLength(JSON.stringify(parsed)) > PI_TRANSCRIPT_MAX_BYTES) throw Object.assign(new Error("Pi transcript exceeds its reply bound"), { code: "too_large" });
+    return parsed;
   }
   async function activate() { await registration.activate(); await settings.activate(); return {}; }
   async function refreshSettings() { await registration.refresh(); await settings.refresh(); }
@@ -111,7 +117,8 @@ export function publicError(error: unknown): { code: string; message: string } {
     const messages = {
       invalid: "Invalid Pi settings or native request",
       unsupported: "Pi native request cannot replace the bound session, model or bridge, or bypass Run admission",
-      too_large: "Pi native response exceeds its bound; the full response was not returned",
+      too_large: "Pi response exceeds its bound; transcript callers can request page:true and follow nextCursor",
+      cursor_expired: "Pi transcript cursor expired; start a new page request",
       unavailable: "Pi backend or native handle is unavailable",
     };
     if (typeof error.code === "string" && Object.hasOwn(messages, error.code)) return { code: error.code, message: messages[error.code as keyof typeof messages] };

@@ -43,9 +43,14 @@ export async function pauseIn(context: ModuleContext, tx: Prisma.TransactionClie
 async function resumeIn(context: ModuleContext, tx: Prisma.TransactionClient, moduleId: string, source: string) {
   const module = await requireModule(context, tx, moduleId), result = { moduleId, status: "active" as const };
   assertModuleOperation(module, "enable");
-  if (module.status === "active") return result;
-  if (module.status !== "paused" || !module.activeHash) throw new StewardError("conflict", "Module is not paused");
-  await tx.module.update({ where: { id: moduleId }, data: { status: "active", activationId: randomUUID(), executionFenceAt: null } });
+  if (module.status === "active" && !module.executionFenceAt) return result;
+  if ((module.status !== "paused" && module.status !== "active") || !module.activeHash) throw new StewardError("conflict", "Module is not paused");
+  if (module.executionFenceAt) {
+    // A failed pause can leave an active module fenced. Only confirmed drain permits reopening it.
+    await assertExecutionModuleIdle(tx, moduleId);
+    if (!await tx.moduleVersion.findFirst({ where: { moduleId, hash: module.activeHash, status: "approved" } })) throw new StewardError("conflict", "Module version is not approved");
+  }
+  await tx.module.update({ where: { id: moduleId }, data: { status: "active", ...(module.status === "paused" ? { activationId: randomUUID() } : {}), executionFenceAt: null } });
   await recordStatus(context, tx, moduleId, "module_enabled", { source });
   return result;
 }
@@ -55,8 +60,8 @@ export async function requestStatus(context: ModuleContext, moduleId: string, st
   const module = await requireModule(context, context.db, moduleId);
   if (status === "active") assertModuleOperation(module, "enable");
   if (!module.activeHash) throw new StewardError("conflict", "Module has no active version");
-  if (module.status === status) return { moduleId, status };
-  if (status === "active" && module.status !== "paused") throw new StewardError("conflict", "Module is not paused");
+  if (module.status === status && !(status === "active" && module.executionFenceAt)) return { moduleId, status };
+  if (status === "active" && module.status !== "paused" && module.status !== "active") throw new StewardError("conflict", "Module is not paused");
   if (status === "paused") await fenceExecutionModule(context.ports, context.workspaceId, moduleId);
   return context.db.$transaction(async tx => {
     const result = await setStatusIn(context, tx, moduleId, status, { source: "chrona", reason });

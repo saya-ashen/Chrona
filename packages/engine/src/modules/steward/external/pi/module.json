@@ -518,6 +518,12 @@
           },
           "limit": {
             "type": "number"
+          },
+          "page": {
+            "type": "boolean"
+          },
+          "cursor": {
+            "type": "string"
           }
         },
         "required": [
@@ -526,8 +532,71 @@
         ]
       },
       "output": {
-        "type": "array",
-        "items": {}
+        "anyOf": [
+          {
+            "type": "array",
+            "items": {}
+          },
+          {
+            "type": "object",
+            "required": [
+              "items",
+              "nextCursor",
+              "gaps"
+            ],
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {}
+              },
+              "nextCursor": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "gaps": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "file",
+                    "offset",
+                    "bytes",
+                    "reason"
+                  ],
+                  "properties": {
+                    "file": {
+                      "type": "string"
+                    },
+                    "offset": {
+                      "type": "integer"
+                    },
+                    "bytes": {
+                      "type": "integer"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "record_too_large",
+                        "item_too_large"
+                      ]
+                    },
+                    "item": {
+                      "type": "integer"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
       }
     },
     {
