@@ -46,7 +46,7 @@ export function checkSettingsSpec() {
   assert.match(JSON.stringify(settingsSpec({ ...state, apps: [{ ...app, status: "paused" }] })), /恢复后/);
   assert.match(JSON.stringify(settingsSpec({ apps: [], pages: [] })), /还没有安装应用/);
   assert.match(JSON.stringify(settingsSpec({ settingsView: { settings: { timezone: "UTC" } } })), /尚未启用模型调用额度/);
-  assert.deepEqual(settingsData, { settingsView: { tool: "settings" }, pages: { tool: "pages", refresh: 5 }, apps: { tool: "modules", refresh: 5 } });
+  assert.deepEqual(settingsData, { settingsView: { tool: "settings" }, pages: { tool: "pages", refresh: 30 }, apps: { tool: "modules", refresh: 5 } });
   const overview = { app: { ...app, origin: "external", capabilities: {}, health: {} } };
   for (const tab of ["overview", "settings", "tools"]) {
     const detail = detailSpec({ overview, pages }, { id: app.id, tab, session: "" });
