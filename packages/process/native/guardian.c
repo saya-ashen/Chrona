@@ -11,6 +11,8 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -26,6 +28,29 @@ static void pause_ms(void) {
 
 int main(int argc, char **argv) {
   if (argc < 2 || fcntl(3, F_GETFD) < 0 || fcntl(4, F_GETFD) < 0) return 125;
+  int receipt = -1, receipt_dir = -1;
+  const char *generation = NULL;
+  if (argc > 1 && strcmp(argv[1], "--receipt") == 0) {
+#ifndef __linux__
+    return 125;
+#else
+    if (argc < 6 || strlen(argv[3]) != 64) return 125;
+    for (int i = 0; i < 64; i++) if (!((argv[3][i] >= 'a' && argv[3][i] <= 'f') || (argv[3][i] >= '0' && argv[3][i] <= '9'))) return 125;
+    char *parent = strdup(argv[2]);
+    char *slash = strrchr(parent, '/');
+    if (!slash) { free(parent); return 125; }
+    *slash = 0;
+    receipt_dir = open(parent, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+    free(parent);
+    if (receipt_dir < 0) return 125;
+    receipt = open(argv[2], O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0600);
+    if (receipt < 0 || fsync(receipt_dir) < 0) return 125;
+    fcntl(receipt, F_SETFD, FD_CLOEXEC);
+    fcntl(receipt_dir, F_SETFD, FD_CLOEXEC);
+    generation = argv[3];
+    argv += 4; argc -= 4;
+#endif
+  }
   signal(SIGPIPE, SIG_IGN);
   /* An ignored SIGCHLD can survive exec and would invalidate WNOWAIT/PID pinning. */
   signal(SIGCHLD, SIG_DFL);
@@ -49,6 +74,8 @@ int main(int argc, char **argv) {
   pid_t task = fork();
   if (task < 0) return 125;
   if (task == 0) {
+    if (receipt >= 0) close(receipt);
+    if (receipt_dir >= 0) close(receipt_dir);
     close(3);
     close(4);
     signal(SIGPIPE, SIG_DFL);
@@ -122,6 +149,11 @@ int main(int argc, char **argv) {
 #endif
     pause_ms();
   }
+  if (receipt >= 0 && descendants_stopped) {
+    if (dprintf(receipt, "{\"version\":1,\"generation\":\"%s\",\"state\":\"stopped\",\"scope\":\"descendants\",\"treeClean\":true}\n", generation) < 0 || fsync(receipt) < 0 || fsync(receipt_dir) < 0) return 125;
+  }
+  if (receipt >= 0) close(receipt);
+  if (receipt_dir >= 0) close(receipt_dir);
   dprintf(4, "{\"event\":\"exit\",\"code\":%d,\"signal\":%d,\"reason\":\"%s\",\"groupStopped\":%s,\"descendantsStopped\":%s,\"observedExit\":%s}\n",
     code, sig, reason, signalled && empty ? "true" : "false", descendants_stopped ? "true" : "false", observed ? "true" : "false");
   return code >= 0 ? code : 128 + sig;

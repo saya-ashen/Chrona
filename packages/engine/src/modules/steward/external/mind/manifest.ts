@@ -29,6 +29,7 @@ function parameters(raw: Record<string, unknown>) {
   return result;
 }
 const descriptions: Record<Tool, string> = {
+  "ui-sources": "Owner: read or replace up to four Files source paths (one per line). Reads at most 2000 characters per file; exact Files identity and read contract are bound at configuration. Empty text pauses source reads.",
   agenda: "Mind reasoning only: read private concerns and suggestions with cursor pagination. Responses fit 230 KiB encoded including the result wrapper; follow nextCursor until limited is false. Refresh after a cursor conflict.",
   "ui-agenda": "Owner: private agenda with cursor pagination. Responses fit 230 KiB encoded including result. Follow nextCursor while limited; refresh after records change.",
   "ui-dismiss": "Owner: dismiss exactly one pending suggestion by id with a stable request-key. No operation selector or caller identity arguments.",
@@ -43,7 +44,7 @@ const descriptions: Record<Tool, string> = {
 export function buildManifest() {
   return {
     name: "mind", description: "Evidence-driven personal follow-up: private concerns and projects, exact source associations, bounded daily suggestions and restart-safe Agent reasoning.",
-    entry: "index.ts", keepAlive: true, activated: true, effects: [], uses: ["agent.context", "agent.run", "agent.get", "agent.stream", "web.page-set", "notify.send", "mind.agenda", "mind.propose", "mind.report"],
+    entry: "index.ts", keepAlive: true, activated: true, effects: [], uses: ["modules.describe", "files.read", "timers.list", "timers.set", "timers.cancel", "agent.context", "agent.run", "agent.get", "agent.stream", "web.page-set", "notify.send", "mind.agenda", "mind.propose", "mind.report"],
     data: { schema: 1 }, tests: ["test.ts"],
     tools: (Object.keys(inputs) as Tool[]).map(name => ({
       name, description: descriptions[name], visibility: ["signal", "agenda", "propose", "report"].includes(name) ? ["modules"] : ["owner"],

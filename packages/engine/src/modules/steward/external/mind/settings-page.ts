@@ -14,11 +14,19 @@ const notices = mutationNotice("/saveStatus");
 
 export const SETTINGS_PAGE = {
   id: "settings", title: "持续关注设置", layout: "document" as const, purpose: "settings" as const,
-  data: { policy: { tool: "ui-settings", args: {} } },
+  data: { policy: { tool: "ui-settings", args: {} }, sources: { tool: "ui-sources", args: {} } },
   spec: {
-    root: "settings", state: { saveStatus: "" },
+    root: "settings", state: { saveStatus: "", sourceStatus: "" },
     elements: {
-      settings: node("Stack", { gap: "lg" }, ["help", "unavailable", "form", "pending", "unknown", "saved"]),
+      settings: node("Stack", { gap: "lg" }, ["help", "unavailable", "form", "pending", "unknown", "saved", "sources"]),
+      sources: node("Card", { title: "关注文档变化" }, ["sourceHelp", "sourceErrors", "sourcePaths", "sourceSave", "sourcePending", "sourceUnknown", "sourceSaved"]),
+      sourceHelp: node("Text", { text: "填写 Files 中的文档路径，每行一份，最多四份。保存会替换当前来源；留空可停止读取。启用主动检查后定期查看变化，仅接受不超过 2000 字符的完整文本。" }),
+      sourceErrors: { ...node("Text", { text: state("/sources/errors") }), visible: state("/sources/errors") },
+      sourcePaths: node("Textarea", { label: "文档路径", name: "source-paths", value: bind("/sources/paths"), disabled: locked("/sourceStatus") }),
+      sourceSave: { ...node("Button", { label: "替换关注文档", disabled: locked("/sourceStatus") }), on: { press: mutation("ui-sources", { paths: state("/sources/paths") }, "/sourceStatus", "/sources") } },
+      sourcePending: mutationNotice("/sourceStatus").pending,
+      sourceUnknown: mutationNotice("/sourceStatus").unknown,
+      sourceSaved: { ...node("Alert", { title: "关注文档已更新", type: "success" }), visible: { $state: "/sourceStatus", eq: "saved" } },
       help: node("Text", { text: "设置检查频率、每日主动处理上限和免打扰时间。保存设置后，应用按自己的安排检查关注。" }),
       unavailable: { ...node("Text", { text: "正在读取设置；若读取失败，请重新打开设置页。", variant: "muted" }), visible: { $state: "/policy", not: true } },
       form: { ...node("Card", { title: "检查与打扰偏好" }, ["enabled", ...fields.map(([name]) => name), "quietHelp", "save"]), visible: state("/policy") },

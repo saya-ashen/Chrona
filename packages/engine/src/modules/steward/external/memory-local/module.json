@@ -93,6 +93,12 @@
             "properties": {
               "retained": {
                 "const": false
+              },
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "corrected_source"
+                ]
               }
             },
             "additionalProperties": false
@@ -233,6 +239,35 @@
                     },
                     "score": {
                       "type": "number"
+                    },
+                    "source": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "correction": {
+                      "anyOf": [
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "source": {
+                              "type": "string"
+                            },
+                            "at": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "source",
+                            "at"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
                     }
                   },
                   "additionalProperties": false
@@ -452,6 +487,132 @@
             "additionalProperties": false
           }
         ]
+      }
+    },
+    {
+      "name": "correct-preference",
+      "description": "Owner: correct an explicit preference by id and expected-text from preferences. Keeps its identity and creation source; replaces the active text. A stale edit fails. This does not rewrite conversation memories.",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "required": [
+          "id",
+          "expected-text",
+          "text"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "expected-text": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "output": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": [
+              "id",
+              "text",
+              "topic",
+              "origin",
+              "createdAt",
+              "lastUsedAt"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "topic": {
+                "type": "string",
+                "enum": [
+                  "general",
+                  "ui"
+                ]
+              },
+              "origin": {
+                "const": "said"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "lastUsedAt": {
+                "type": "null"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "ignored"
+            ],
+            "properties": {
+              "ignored": {
+                "const": "no caller"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "correct-memory",
+      "description": "Owner corrects one raw memory with expected current content. Durable supersession prevents exact old content from being retained again.",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": false,
+      "parameters": {
+        "type": "object",
+        "required": [
+          "id",
+          "expected-content",
+          "content"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "expected-content": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          }
+        }
+      },
+      "output": {
+        "type": "object",
+        "required": [
+          "id",
+          "source",
+          "at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
       }
     }
   ],

@@ -123,6 +123,7 @@ test("telemetry cannot crowd a live question or the latest usage out of the proj
   const f = await fixture(), result = f.channel.events.question(question(), f.controller.signal), request = await waiting();
   const usage = { scope: "session", input: 10, output: 20, cacheRead: 0, cacheWrite: 0, total: 30, cost: 0, contextTokens: null, contextWindow: null };
   await db.runEvent.createMany({ data: Array.from({ length: 450 }, (_, index) => ({ runId: f.run.id, sequence: index + 1, kind: "usage", payload: { type: "usage", value: { ...usage, total: index + 30 } } })) });
+  await db.runEvent.createMany({ data: Array.from({ length: 401 }, (_, index) => ({ runId: f.run.id, sequence: index + 451, kind: "progress", payload: { type: "progress", value: { phase: "reading", tool: null } } })) });
   const projected = (await api.provider.list())[0]!;
   expect(projected.interactions[0]?.id).toBe(request.id); expect(projected.usage?.total).toBe(479);
   await api.provider.answer(request.id, { decision: "cancel" }); expect(await result).toEqual({ decision: "cancel" });

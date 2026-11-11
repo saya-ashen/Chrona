@@ -14,8 +14,12 @@ await mkdir(directory, { recursive: true, mode: 0o700 });
 await writeFile(join(directory, "retained-private-note"), "nonempty copied-data fixture", { mode: 0o600 });
 const previous = process.env.CHRONA_MIND_OFFLINE_STATE;
 process.env.CHRONA_MIND_OFFLINE_STATE = directory;
+let scheduled: { id: string; revision: string; status: string; schedule: unknown } | null = null;
 const module = await startModule("offline-entry.ts", { stubs: {
   "web.page-set": () => ({ ok: true }),
+  "timers.list": () => ({ items: scheduled ? [scheduled] : [], nextCursor: null }),
+  "timers.set": (args: Record<string, unknown>) => { scheduled = { id: "mind-review", revision: "sdk-revision", status: "active", schedule: args.schedule }; return scheduled; },
+  "timers.cancel": () => { if (scheduled) scheduled.status = "cancelled"; return { cancelled: true }; },
   "agent.get": () => ({ contextId: "context-sdk", runId: "run-sdk", status: "running", active: true }),
   "agent.context": () => ({ contextId: "context-sdk" }),
   "agent.run": () => ({ contextId: "context-sdk", runId: "run-sdk", status: "running", active: true }),
@@ -51,6 +55,12 @@ try {
   const denied = await module.send({ trigger: { kind: "tool", id: "agenda", firedAt: now, args: {}, caller: { kind: "module", module: "source", moduleId: "source-id", hash: "fixture" } }, now, params: {} });
   assert.ok(denied.error);
   outputs["ui-settings"].parse(await send("ui-settings", {}));
+  await send("ui-settings", { enabled: true });
+  assert.equal((scheduled as { status: string } | null)?.status, "active");
+  const fired = await module.send({ trigger: { kind: "timer", id: "mind-review", timerId: "fixture-timer", timerRevision: "sdk-revision", eventId: "fixture-event", scheduledAt: now, firedAt: now, payload: {} }, now, params: {} });
+  assert.ok(!fired.error);
+  await send("ui-settings", { enabled: false });
+  assert.equal((scheduled as { status: string } | null)?.status, "cancelled");
   const checked = outputs.check.parse(await send("check", {})); assert.equal(checked.runtime.phase, "running");
   const starts = module.calls.filter((call: { params: { target?: string } }) => targetName(call.params.target) === "agent.run"); assert.equal(starts.length, 1);
   const decisions = outputs.decisions.parse(await send("decisions", { limit: 5 })); assert.equal(decisions.decisions.length, 1);

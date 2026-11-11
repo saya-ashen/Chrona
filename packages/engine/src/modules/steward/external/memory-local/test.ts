@@ -17,9 +17,17 @@ try {
   const found = await ok("recall", { query: "okx 自动", limit: 5 });
   assert.equal(found.items[0].id, id);
   assert.match(found.items[0].content, /okx/);
+  assert.equal(found.items[0].source, "owner:mcp");
+  assert.equal(found.items[0].correction, null);
   assert.equal((await ok("recall", { query: "concise replies" })).items.length, 1);
   assert.equal(module.calls.filter((call: { params: { target: string } }) => targetName(call.params.target) === "secrets.get").length, 1);
   assert.equal(module.calls.some((call: { params: { target: string } }) => targetName(call.params.target) === "provider.complete"), false);
+  assert.ok("error" in await tool("correct-memory", { id, "expected-content": found.items[0].content, content: "更正后的 okx 偏好" }, { kind: "provider", runId: "r1" }));
+  await ok("correct-memory", { id, "expected-content": found.items[0].content, content: "更正后的 okx 偏好" });
+  const corrected = (await ok("recall", { query: "okx" })).items[0];
+  assert.equal(corrected.content, "更正后的 okx 偏好");
+  assert.deepEqual(corrected.correction, { source: "owner:mcp", at: "2026-10-27T12:00:00.000Z" });
+  assert.ok("error" in await tool("retain", { content: found.items[0].content }));
   assert.equal((await ok("forget", { id })).forgotten, true);
   assert.equal((await ok("recall", { query: "okx 自动" })).items.length, 0);
   // The router and SDK supply real module/owner/Provider identities; kernel proxy calls are gone.
@@ -29,6 +37,14 @@ try {
   for (const [toolId, args] of [["recall", { query: "okx" }], ["retain", { content: "unauthorized" }], ["forget", { id }]] as const) {
     assert.ok("error" in await tool(toolId, args, { kind: "kernel" }));
   }
+  const snapshot = { session: { id: "conversation-1", source: "forged" }, messages: [{ direction: "in", text: "zirconium old preference", at: "2026-10-27T11:00:00Z" }], now: "2026-10-27T12:00:00Z", autoRecall: true, autoRetain: true, ending: true, recalled: false, retainedThrough: null };
+  const entry = { kind: "module", module: "web", moduleId: "web-id", hash: "web-hash" };
+  assert.equal((await tool("conversation-retain", { snapshot: JSON.stringify(snapshot) }, entry)).result.result.retained, true);
+  const remembered = (await ok("recall", { query: "zirconium" })).items[0];
+  assert.equal(remembered.source, "conversation:web:web-id:conversation-1");
+  await ok("correct-memory", { id: remembered.id, "expected-content": remembered.content, content: "zirconium corrected preference" });
+  snapshot.messages.push({ direction: "out", text: "more context", at: "2026-10-27T11:01:00Z" });
+  assert.deepEqual((await tool("conversation-retain", { snapshot: JSON.stringify(snapshot) }, entry)).result.result, { retained: false, reason: "corrected_source" });
   const preference = await ok("remember", { text: "使用中文简短回复", topic: "ui" });
   assert.equal((await ok("preferences", {}))[0].id, preference.id);
   assert.equal((await ok("forget", { id: preference.id })).forgotten, true);

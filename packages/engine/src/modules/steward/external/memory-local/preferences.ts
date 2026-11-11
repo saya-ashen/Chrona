@@ -18,18 +18,35 @@ export function preferences(dataDir: string) {
     await mkdir(dataDir, { recursive: true });
     await writeFile(`${file}.next`, JSON.stringify(items), { mode: 0o600 }); await rename(`${file}.next`, file);
   }
+  let tail: Promise<unknown> = Promise.resolve();
+  function mutate<T>(work: () => Promise<T>): Promise<T> {
+    const result = tail.then(work); tail = result.catch(() => {}); return result;
+  }
   return {
     list,
-    async remember(text: string, topic: "general" | "ui", at: string) {
+    remember(text: string, topic: "general" | "ui", at: string) {
+      return mutate(async () => {
       const items = await list(), prior = items.find(item => item.text === text && item.topic === topic);
       if (prior) return prior;
       const item: Preference = { id: `preference:${randomUUID()}`, text, topic, origin: "said", createdAt: at, lastUsedAt: null };
       items.unshift(item); await save(items); return item;
+      });
     },
-    async forget(id: string) {
+    correct(id: string, expectedText: string, text: string) {
+      return mutate(async () => {
+        const items = await list(), item = items.find(row => row.id === id);
+        if (!item) throw new Error("Preference not found");
+        if (item.text === text) return item;
+        if (item.text !== expectedText) throw new Error("Preference changed; read current preferences before correcting");
+        item.text = text; await save(items); return item;
+      });
+    },
+    forget(id: string) {
+      return mutate(async () => {
       const items = await list(), remaining = items.filter(item => item.id !== id);
       if (remaining.length === items.length) throw new Error("Preference not found");
       await save(remaining); return { forgotten: true };
+      });
     },
   };
 }

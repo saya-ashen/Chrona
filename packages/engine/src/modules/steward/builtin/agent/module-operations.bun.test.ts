@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { createModuleAgentOperations } from "./module-operations";
 const policy = { async select(_tier: string, limits: { maxOutputTokens: number; eventTimeoutMs: number }, tokens: number) { return { model: "fake/model", thinking: "high" as const, maxOutputTokens: Math.min(tokens, limits.maxOutputTokens), timeoutMs: Math.min(1000, limits.eventTimeoutMs) }; } };
@@ -44,5 +44,55 @@ test("an in-flight completion after Agent restart reports unknown and cannot be 
     expect(await restarted.handle("completion", { "operation-id": started.operationId }, caller, "poll")).toEqual({ result: null, failure: false, unknown: true });
     await expect(restarted.handle("complete", request, caller, "replay")).rejects.toThrow("unknown");
     expect(starts).toBe(1);
+  } finally { await rm(data, { recursive: true, force: true }); }
+});
+
+test("polling a durable completion repairs a lost settlement without another paid call", async () => {
+  const data = await mkdtemp("/tmp/chrona-agent-settle-"); let starts = 0, lost = true;
+  const settled: unknown[] = [];
+  const call = async (target: string, args: Record<string, unknown>) => {
+    if (target.endsWith("agent-admit")) return reservation;
+    if (lost) throw new Error("reply lost");
+    settled.push(args); return null;
+  };
+  const complete = async () => { starts++; return { text: "answer", inputTokens: 2, outputTokens: 3 }; };
+  try {
+    const first = createModuleAgentOperations(data, call, complete, policy);
+    const started = await first.handle("complete", request, caller, "call") as { operationId: string };
+    const args = { "operation-id": started.operationId };
+    for (let i = 0; i < 100; i++) {
+      try { await first.handle("completion", args, caller, "poll"); } catch { break; }
+      await Bun.sleep(5);
+    }
+    lost = false;
+    const restarted = createModuleAgentOperations(data, call, complete, policy);
+    expect(await restarted.handle("completion", args, caller, "poll")).toMatchObject({ result: { text: "answer" }, failure: false });
+    expect(settled).toContainEqual({ reservationId: "reservation", result: { text: "answer", inputTokens: 2, outputTokens: 3 }, failed: false });
+    expect(starts).toBe(1);
+  } finally { await rm(data, { recursive: true, force: true }); }
+});
+
+test("failed outcome persistence cannot settle a completion or authorize replay after restart", async () => {
+  const data = await mkdtemp("/tmp/chrona-agent-durability-");
+  let starts = 0, settlements = 0;
+  const result = Promise.withResolvers<{ text: string; inputTokens: number | null; outputTokens: number | null }>();
+  const call = async (target: string) => { if (target.endsWith("agent-admit")) return reservation; settlements++; return null; };
+  const complete = async () => { starts++; return result.promise; };
+  try {
+    const first = createModuleAgentOperations(data, call, complete, policy);
+    const started = await first.handle("complete", request, caller, "call") as { operationId: string };
+    await mkdir(`${data}/module-operations/${started.operationId}.json.pending`);
+    result.resolve({ text: "answer whose receipt cannot commit", inputTokens: 2, outputTokens: 3 });
+    let failed = false;
+    for (let i = 0; i < 100; i++) {
+      try { await first.handle("completion", { "operation-id": started.operationId }, caller, "poll"); }
+      catch (error) { expect(String(error)).toContain("unknown"); failed = true; break; }
+      await Bun.sleep(5);
+    }
+    expect(failed).toBe(true);
+    const restarted = createModuleAgentOperations(data, call, complete, policy);
+    expect(await restarted.handle("completion", { "operation-id": started.operationId }, caller, "poll")).toEqual({ result: null, failure: false, unknown: true });
+    await expect(restarted.handle("complete", request, caller, "repeat")).rejects.toThrow("unknown");
+    expect(starts).toBe(1); expect(settlements).toBe(0);
   } finally { await rm(data, { recursive: true, force: true }); }
 });

@@ -4,7 +4,7 @@
 
 ## 一个业务入口，两种传输
 
-无界面的普通可选应用 `coding` 管理共享业务；普通可选应用 `coding-web`、编辑器及未来 Electron 只消费协议。`coding-web` 不拥有 Agent 执行。当前仅 Mind、Remind 整应用暂停；旧 Editor 应用已退役并移除，见[退役记录](editor-retirement.md)。这里的编辑器指仓库外客户端，不是旧 Editor 服务应用。
+无界面的普通可选应用 `coding` 管理共享业务；普通可选应用 `coding-web`、编辑器及未来 Electron 只消费协议。`coding-web` 不拥有 Agent 执行。当前仅 Remind 整应用暂停；Mind 是默认关闭自动检查的可选应用；旧 Editor 应用已退役并移除，见[退役记录](editor-retirement.md)。这里的编辑器指仓库外客户端，不是旧 Editor 服务应用。
 
 | 传输 | 请求 | 成功返回 |
 | --- | --- | --- |

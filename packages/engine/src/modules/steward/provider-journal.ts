@@ -41,10 +41,10 @@ export async function providerRuns(ctx: RecordContext, { sessionId, ids }: { ses
   const runs = [...new Map([...active, ...recent].map(run => [run.id, run])).values()];
   return Promise.all(runs.map(async run => {
     const [latest, requested] = await Promise.all([
-      db.runEvent.findMany({ where: { runId: run.id }, orderBy: { sequence: "desc" }, take: 400 }),
+      Promise.all(["progress", "usage", "resources"].map(kind => db.runEvent.findFirst({ where: { runId: run.id, kind }, orderBy: { sequence: "desc" } }))),
       db.runInteraction.findMany({ where: { runId: run.id }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: 12 }),
     ]);
-    const records = latest.reverse();
+    const records = latest.filter(row => row !== null);
     const questions = requested.flatMap(row => { const parsed = providerInteractionSchema.safeParse(row.request); return parsed.success ? [parsed.data] : []; });
     const alive = providerRunActive(run, connected(run.id) && !run.cancelRequestedAt, now());
     const interactions = questions.map(question => {

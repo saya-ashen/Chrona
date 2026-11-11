@@ -81,18 +81,21 @@ function finalize(state: State, decision: Decision, status: string, now: string)
   state.feedback = state.feedback.filter(row => Date.parse(now) - Date.parse(row.at) <= 30 * DAY).slice(-1024);
   if (state.settings.notifyEnabled && result.feedback.userVisible && !result.feedback.unavailable) decision.notification = { key: `${decision.id}:notify`, status: "pending", body: result.summary.slice(0, 800) };
 }
+function reviewDue(state: State, now: string, manual: boolean) {
+  return manual || state.settings.enabled && (!state.runtime.nextCheckAt || Date.parse(state.runtime.nextCheckAt) <= Date.parse(now));
+}
 /** This is a timer/reconciler, never a second execution queue. Agent owns execution and its receipts. */
 export class MindRuntime {
   private busy = false;
   constructor(readonly store: MindStore, private readonly call: Call) {}
-  async tick(now = new Date().toISOString(), manual = false) {
+  async tick(now = new Date().toISOString(), manual = false, reconcileOnly = false) {
     if (this.busy) return { runtime: runtimeView(await this.store.read()) };
     this.busy = true;
     try {
       const state = await this.store.read();
       const outstanding = state.decisions.find(d => d.id === state.runtime.currentDecisionId);
       if (outstanding) await this.reconcile(outstanding, now);
-      else if (manual || state.settings.enabled && (!state.runtime.nextCheckAt || Date.parse(state.runtime.nextCheckAt) <= Date.parse(now))) {
+      else if (!reconcileOnly && reviewDue(state, now, manual)) {
         const selected = await this.store.update(current => {
           current.runtime.lastCheckAt = now;
           current.runtime.nextCheckAt = new Date(Date.parse(now) + current.settings.intervalMinutes * 60_000).toISOString();

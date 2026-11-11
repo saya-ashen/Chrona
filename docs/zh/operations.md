@@ -10,7 +10,7 @@
 
 ## 此前应用状态（2026-11-09，仅作运维背景）
 
-Agent 是唯一不可变内置应用；Web、Notify、QQ、Author 是普通默认预装应用。Coding 是无界面的普通可选服务，coding-web 是独立可选客户端；使用[客户端协议](coding-peer-clients-protocol.md)和[实施记录](coding-peer-clients-implementation.md)。旧 Editor 应用及安装入口已退役移除，见[退役记录](editor-retirement.md)。仅 Mind、Remind 整应用暂停并保留源码；memory-local 仅暂停定时整理。Editor 清理没有更新现有 3112 部署，下方历史升级和验收不证明清理版本已经部署。
+Agent 是唯一不可变内置应用；Web、Notify、QQ、Author 是普通默认预装应用。Coding 是无界面的普通可选服务，coding-web 是独立可选客户端；使用[客户端协议](coding-peer-clients-protocol.md)和[实施记录](coding-peer-clients-implementation.md)。旧 Editor 应用及安装入口已退役移除，见[退役记录](editor-retirement.md)。Remind 整应用暂停并保留源码；Mind 是普通可选应用，自动检查与通知默认关闭；memory-local 仅暂停定时整理。Editor 清理没有更新现有 3112 部署，下方历史升级和验收不证明清理版本已经部署。
 
 ## 历史最小内核与本地升级（2026-11-08）
 

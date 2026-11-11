@@ -24,8 +24,8 @@ async function usage(ports: StewardPorts, workspaceId: string, args: Record<stri
       const identities = new Set([...usage.map(row => row.moduleId), ...wakes.map(row => row.targetModuleId)]);
       const items = [...identities].map(moduleId => {
         const triggered = wakes.filter(row => row.targetModuleId === moduleId && localDayKey(row.createdAt, timezone) === date);
-        const spent = usage.find(row => row.moduleId === moduleId) ?? { module: triggered[0]?.target ?? "removed", calls: 0, inputTokens: 0, outputTokens: 0 };
-        return { moduleId, module: modules.find(row => row.id === moduleId)?.name ?? spent.module, calls: spent.calls, inputTokens: spent.inputTokens, outputTokens: spent.outputTokens, wakes: triggered.length, date, timezone };
+        const spent = usage.find(row => row.moduleId === moduleId) ?? { module: triggered[0]?.target ?? "removed", calls: 0, inputTokens: 0, outputTokens: 0, unreportedCalls: 0 };
+        return { moduleId, module: modules.find(row => row.id === moduleId)?.name ?? spent.module, calls: spent.calls, inputTokens: spent.inputTokens, outputTokens: spent.outputTokens, unreportedCalls: spent.unreportedCalls, wakes: triggered.length, date, timezone };
       });
       return json(apiPage(items, args, `usage:${workspaceId}:${date}`, row => row.moduleId ?? row.module));
 }

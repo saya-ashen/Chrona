@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { accessSync, chmodSync, constants, cpSync, existsSync, mkdirSync, realpathSync, rmSync, statSync } from "node:fs";
 import { basename, delimiter, dirname, extname, join, parse, resolve } from "node:path";
 import { processCapability, requireDescendantStop, spawnSupervised, type ProcessStopEvidence } from "@chrona/process";
@@ -60,7 +61,7 @@ function moduleCommand(code: string, entry: ModuleEntry, typecheck: string): { p
     argv: [...declared.argv, ...(declared.preload ? ["--preload", join(typecheck, declared.preload)] : []), moduleEntryFile(code, entry)] };
 }
 function moduleEnvironment(dirs: ModuleDirs, sdkEnabled: boolean, interpreter: string, sdk: string, helper: string): Record<string, string> {
-  const excluded = new Set(["CHRONA_SOCKET", "CHRONA_HTTP_SOCKET", "CHRONA_IPC_ENDPOINT", "CHRONA_IPC_TOKEN"]);
+  const excluded = new Set(["CHRONA_SOCKET", "CHRONA_HTTP_SOCKET", "CHRONA_IPC_ENDPOINT", "CHRONA_IPC_TOKEN", "CHRONA_HOST_GENERATION"]);
   const extra = Object.fromEntries(Object.entries(dirs.env ?? {}).filter(([key]) => /^CHRONA_[A-Z_]+$/.test(key) && !excluded.has(key)));
   // Desktop connection paths come only from the host session, never module extras.
   const hostKeys = ["HOME", ...(process.platform === "win32" ? ["SystemRoot", "WINDIR", "TEMP", "TMP", "USERPROFILE", "PATHEXT"]
@@ -71,6 +72,15 @@ function moduleEnvironment(dirs: ModuleDirs, sdkEnabled: boolean, interpreter: s
     ...(dirs.contentDir ? { CHRONA_CONTENT: dirs.contentDir } : {}),
     ...(dirs.ipcEndpoint ? { CHRONA_IPC_ENDPOINT: dirs.ipcEndpoint, CHRONA_IPC_TOKEN: dirs.ipcToken! } : {}),
     ...(sdkEnabled ? { CHRONA_SDK: sdk } : {}) };
+}
+/** Bind trusted Agent launch identity to the outer guardian, not the Provider child. */
+function agentHostReceipt(dirs: ModuleDirs, data: string, env: Record<string, string>) {
+  if (process.platform !== "linux" || !dirs.env?.CHRONA_AGENT_CONFIGURATION) return undefined;
+  const generation = randomBytes(32).toString("hex");
+  const receipts = join(data, ".host-stops");
+  mkdirSync(receipts, { recursive: true, mode: 0o700 });
+  env.CHRONA_HOST_GENERATION = generation;
+  return { path: join(receipts, generation + ".json"), generation };
 }
 /** Trusted local processes retain OS permissions; routed declarations govern only Chrona calls. */
 export function createScriptSandbox({ executionMode = "trusted-local", dataDir, timeoutMs = 60_000, maxOutputBytes = 64 * 1024, moduleSdk = fileURLToPath(new URL("./module-sdk", import.meta.url)), moduleTypecheck = fileURLToPath(new URL("./module-typecheck", import.meta.url)), processHelper }: {
@@ -92,7 +102,8 @@ export function createScriptSandbox({ executionMode = "trusted-local", dataDir, 
     if (command.sdk) env.CHRONA_SDK_LOADER = join(moduleTypecheck, "chrona-sdk-loader.ts");
     const supervision = processCapability({ helperPath: processHelper });
     if (!supervision.available || supervision.scope !== "descendants") throw new Error(supervision.reason ?? "Full descendant supervision is not verified for this platform");
-    return spawnSupervised(interpreter, command.argv, { cwd: code, env, helperPath: processHelper });
+    const stopReceipt = agentHostReceipt(dirs, data, env);
+    return spawnSupervised(interpreter, command.argv, { cwd: code, env, helperPath: processHelper, stopReceipt });
   }
   const supervision = processCapability({ helperPath: processHelper });
   return {

@@ -22,8 +22,9 @@ export function settingsSpec(state: Record<string, unknown>) {
       ...(!current ? [b.text("尚未启用模型调用额度；应用配置模型后仍需启用内核额度。", "muted")] : []),
       b.node("NotificationSettings", { settings: { timezone: settings.timezone }, section: "budget" }),
       b.node("ModuleModelSettings", { settings: { timezone: settings.timezone, moduleModel: current }, section: "caps" }),
-      b.heading("今日用量"),
-      b.list((settings.modelUsage ?? []).map(row => b.stack([b.text(`${row.module}：${row.calls} 次`), b.text(`输入 ${row.inputTokens} / 输出 ${row.outputTokens} token${current?.moduleDailyCalls?.[row.module] !== undefined ? ` · 上限 ${current.moduleDailyCalls[row.module]}` : ""}`, "muted")])), "今天还没有模块调用模型。"),
+      b.heading("今日应用模型调用用量"),
+      b.text("这里只统计应用通过受控补全接口报告的用量，不包含全部 Agent / Provider 会话；未报告用量不能当作零成本。", "muted"),
+      b.list((settings.modelUsage ?? []).map(row => b.stack([b.text(`${row.module}：${row.calls} 次`), b.text(`已报告输入 ${row.inputTokens} / 输出 ${row.outputTokens} token · ${row.unreportedCalls ?? "未知"} 次用量未完整报告${current?.moduleDailyCalls?.[row.module] !== undefined ? ` · 上限 ${current.moduleDailyCalls[row.module]}` : ""}`, "muted")])), "今天还没有模块调用模型。"),
     ] : [b.text("加载中……正在读取内核设置。", "muted")]),
     section("应用设置", appRows),
   ]);

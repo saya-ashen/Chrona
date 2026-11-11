@@ -9,10 +9,11 @@ import { resetEnvCacheForTests } from "../../../../../apps/server/src/config/env
 import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";
 import { moduleSupervisor } from "./module-supervisor";
 import { testDb } from "./test-db";
+import { drainTimers } from "./timers";
 
 type Args = Record<string, unknown>;
 type PageRef = { module: string; id: string; revision: string };
-async function fixture() {
+async function fixture(withFiles = false) {
   const db = testDb({ injectedAgent: false });
   const rows = await db.$queryRawUnsafe<{ name: string; file: string }[]>("PRAGMA database_list");
   const database = rows.find(row => row.name === "main")?.file;
@@ -72,6 +73,7 @@ async function fixture() {
       return app;
     }
     const web = await install("web", join(import.meta.dir, "external/web"));
+    const files = withFiles ? await install("files", join(import.meta.dir, "external/files")) : null;
     const mind = await install("mind", join(import.meta.dir, "external/mind"));
     const sender = await install("evidence-source");
     const otherSender = await install("other-source");
@@ -97,7 +99,7 @@ async function fixture() {
       return { module: value.module, id: value.id, revision: value.revision };
     }
     const privateFile = join(root, "platform/data", mind.id, "mind-v1.json");
-    return { db, root, runtime, web, mind, sender, otherSender, request, call, activate, page, privateFile, close };
+    return { db, root, runtime, web, mind, files, sender, otherSender, request, call, activate, page, privateFile, close };
   } catch (error) { await close(); throw error; }
 }
 let current: Awaited<ReturnType<typeof fixture>> | undefined;
@@ -202,5 +204,32 @@ test("Mind activation registers its main and settings pages with current contrac
   const refreshed = await f.page("settings");
   expect(refreshed.revision).not.toBe(settings.revision);
   expect(await f.call("mind.ui-settings")).toMatchObject({ enabled: false, intervalMinutes: 30 });
+  expect(await f.db.run.count()).toBe(0);
+}, 30_000);
+
+test("Mind timer observes an actual Files tool through pinned SDK contracts without launching reasoning during quiet hours", async () => {
+  const f = current = await fixture(true);
+  await f.activate(f.web);
+  await f.activate(f.mind);
+  await f.call("files.write", { path: "reports/status.txt", content: "First observation" });
+  const configured = await f.call("mind.ui-sources", { paths: "reports/status.txt" });
+  expect(configured.sources[0]).toMatchObject({ path: "reports/status.txt", moduleId: f.files!.id });
+  await f.call("mind.ui-settings", { enabled: true, timezone: "UTC", "daily-time": "23:59" });
+  async function fire(minute: string) {
+    const now = new Date(`2026-11-11T00:${minute}:00.000Z`);
+    f.runtime.ports.now = () => now;
+    await f.db.schedule.updateMany({ where: { moduleId: f.mind.id, mode: "timer", status: "active" }, data: { nextAt: now } });
+    await drainTimers(f.runtime.ports, f.mind.workspaceId);
+    const deliveries = await f.db.moduleInvocation.findMany({ where: { targetModuleId: f.mind.id, mode: "timer" } });
+    expect(deliveries.every(row => row.status === "succeeded")).toBe(true);
+    return JSON.parse(await readFile(f.privateFile, "utf8"));
+  }
+  expect((await fire("01")).signals).toMatchObject([{ source: "files", moduleId: f.files!.id, text: "First observation" }]);
+  expect((await fire("02")).signals).toHaveLength(1);
+  await f.call("files.write", { path: "reports/status.txt", content: "Changed observation" });
+  expect((await fire("03")).signals.at(-1)).toMatchObject({ text: "Changed observation" });
+  await f.call("mind.ui-settings", { enabled: false });
+  await f.call("files.write", { path: "reports/status.txt", content: "Paused observation" });
+  expect((await fire("04")).signals).toHaveLength(2);
   expect(await f.db.run.count()).toBe(0);
 }, 30_000);

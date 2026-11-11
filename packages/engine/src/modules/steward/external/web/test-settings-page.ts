@@ -37,7 +37,10 @@ export function checkSettingsSpec() {
   assert.match(text, /上限 0/);
   assert.deepEqual(nodes.find(node => node.type === "RunTimeoutSettings")!.props, { settings: { timezone: "UTC", runTimeoutMinutes: null } });
   assert.deepEqual(nodes.filter(node => ["NotificationSettings", "ModuleModelSettings"].includes(node.type)).map(node => node.props.section), ["budget", "caps"]);
-  for (const removed of ["Agent", "通知设置", "旧偏好", "preference-forget", "autoRecall", "memory-local"]) assert.ok(!text.includes(removed), removed);
+  assert.ok(!nodes.some(node => node.type === "AgentSettings"));
+  assert.match(text, /今日应用模型调用用量/);
+  assert.match(text, /已报告输入/);
+  for (const removed of ["通知设置", "旧偏好", "preference-forget", "autoRecall", "memory-local"]) assert.ok(!text.includes(removed), removed);
   assert.match(JSON.stringify(settingsSpec({ ...state, pages: [] })), /尚未登记/);
   assert.match(JSON.stringify(settingsSpec({ ...state, pages: undefined })), /正在读取应用设置入口/);
   assert.match(JSON.stringify(settingsSpec({ ...state, apps: [{ ...app, status: "paused" }] })), /恢复后/);

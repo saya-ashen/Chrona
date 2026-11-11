@@ -99,6 +99,11 @@ function report(state: State, args: z.infer<typeof inputs.report>, caller: Calle
 }
 export class MindService {
   constructor(readonly store: MindStore) {}
+  /** Only the local Files adapter calls this after a successful identity/contract-pinned read. */
+  observeFile(state: State, observation: { moduleId: string; path: string; version: string; text: string }, now: string) {
+    const { moduleId, path, version, text } = observation;
+    return ingest(state, inputs.signal.parse({ "request-key": `file:${digest([moduleId, path, version])}`, "event-id": digest([path, version, now]), event: "file.changed", ref: path, version, text, "occurred-at": now }), { kind: "module", module: "files", moduleId, hash: "read-contract" }, now);
+  }
   // eslint-disable-next-line complexity -- This dispatcher deliberately makes each public tool's actual-caller policy explicit.
   async tool(name: Tool, raw: unknown, caller: Caller | undefined, now: string, admittedOwner = false): Promise<unknown> {
     const args = inputs[name].parse(raw);

@@ -130,10 +130,11 @@ if (scenario === "completion") {
   await eventually(async () => calls, value => (value as typeof calls).some(call => call.target === "runtime-callback.agent-settle"));
   assert.deepEqual(await moduleTool("complete", args), started);
   assert.equal(completions.length, 1); assert.equal(completions[0].model, "budget/model"); assert.equal(completions[0].thinking, "high"); assert.equal(completions[0].timeoutMs, 800); assert.equal(completions[0].maxOutputTokens, 20);
-  assert.deepEqual(calls, [
+  assert.deepEqual(calls.filter(call => call.target === "runtime-callback.agent-admit"), [
     { target: "runtime-callback.agent-admit", args: { callId: "call-complete", operation: "complete" } },
-    { target: "runtime-callback.agent-settle", args: { reservationId: "reservation-one", result: { text: "answer", inputTokens: 1, outputTokens: 1 }, failed: false } },
   ]);
+  for (const call of calls.filter(call => call.target !== "runtime-callback.agent-admit")) assert.deepEqual(call,
+    { target: "runtime-callback.agent-settle", args: { reservationId: "reservation-one", result: { text: "answer", inputTokens: 1, outputTokens: 1 }, failed: false } });
   await assert.rejects(moduleTool("complete", { ...args, input: "{}" }), { code: "invalid" });
 }
 

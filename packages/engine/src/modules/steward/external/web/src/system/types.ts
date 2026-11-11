@@ -9,6 +9,6 @@ export type GlobalSettings = {
   timezone: string;
   runTimeoutMinutes?: number | null;
   moduleModel?: KernelModelCaps | null;
-  modelUsage?: { module: string; calls: number; inputTokens: number; outputTokens: number }[];
+  modelUsage?: { module: string; calls: number; inputTokens: number; outputTokens: number; unreportedCalls?: number }[];
 };
 export type SettingsView = { settings: GlobalSettings };

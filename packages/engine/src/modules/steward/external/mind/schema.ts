@@ -69,9 +69,12 @@ export const receiptResultSchema = z.union([
   z.object({ accepted: z.literal(true), reportId: z.string().length(64), decisionId: id, pendingVerification: z.literal(true) }).strict(),
 ]);
 const receiptSchema = z.object({ scope: z.string().min(1).max(300), key, digest: z.string().length(64), result: receiptResultSchema, at: time }).strict();
-export const runtimeSchema = z.object({ nextCheckAt: time.nullable(), lastCheckAt: time.nullable(), lastDailyDate: z.string().max(10).nullable(), currentDecisionId: id.nullable(), lastError: z.string().max(500).nullable() }).strict();
+export const runtimeSchema = z.object({ nextCheckAt: time.nullable(), lastCheckAt: time.nullable(), lastDailyDate: z.string().max(10).nullable(), currentDecisionId: id.nullable(), lastError: z.string().max(500).nullable(), wakeError: z.string().max(500).nullable().default(null) }).strict();
 const signalTombstoneSchema = z.object({ moduleId: id, eventId: id, digest: z.string().length(64), signalId: id }).strict();
+export const sourcesSchema = z.array(z.object({ path: z.string().min(1).max(128), moduleId: id, contractHash: z.string().regex(/^[a-f0-9]{64}$/), version: z.string().nullable(), error: z.string().max(300).nullable() }).strict()).max(4);
+export const sourceInput = z.object({ paths: z.string().max(1000).optional() }).strict();
 export const stateSchema = z.object({
+  sources: sourcesSchema.default([]).optional(),
   schema: z.literal(1), revision: z.number().int().nonnegative(), settings: settingsSchema,
   concerns: z.array(concernSchema).max(200), proposals: z.array(proposalSchema).max(64), signals: z.array(signalSchema).max(512),
   decisions: z.array(decisionSchema).max(256), feedback: z.array(feedbackSchema).max(1024), receipts: z.array(receiptSchema).max(2048), runtime: runtimeSchema,
@@ -101,12 +104,13 @@ export const stateSchema = z.object({
   }
 });
 export function freshState(): z.infer<typeof stateSchema> {
-  return { schema: 1, revision: 0, settings: { ...DEFAULT_SETTINGS }, concerns: [], proposals: [], signals: [], signalTombstones: [], decisions: [], feedback: [], receipts: [], runtime: { nextCheckAt: null, lastCheckAt: null, lastDailyDate: null, currentDecisionId: null, lastError: null } };
+  return { schema: 1, revision: 0, settings: { ...DEFAULT_SETTINGS }, concerns: [], proposals: [], signals: [], signalTombstones: [], decisions: [], feedback: [], receipts: [], runtime: { nextCheckAt: null, lastCheckAt: null, lastDailyDate: null, currentDecisionId: null, lastError: null, wakeError: null } };
 }
 const clearTime = z.union([time, z.literal("")]);
 // Web Input values are decimal strings. Direct local callers may also supply a number.
 const scalarInteger = (schema: z.ZodNumber) => z.union([schema, z.string().min(1).max(3).regex(/^\d+$/).transform(Number).pipe(schema)]);
 export const inputs = {
+  "ui-sources": sourceInput,
   agenda: z.object({ cursor: z.string().max(80).optional(), limit: z.number().int().min(1).max(100).optional() }).strict(),
   "ui-agenda": z.object({ cursor: z.string().max(80).optional(), limit: z.number().int().min(1).max(100).optional() }).strict(),
   decisions: z.object({ cursor: z.string().max(80).optional(), limit: z.number().int().min(1).max(100).optional() }).strict(),
@@ -136,6 +140,7 @@ const paginationSchema = { cursor: z.string().max(80).nullable(), nextCursor: z.
 const agendaOutputSchema = z.object({ concerns: z.array(concernSchema).max(200), proposals: z.array(proposalSchema).max(64), runtime: publicRuntimeSchema, stats: statsSchema, ...paginationSchema }).strict();
 const publicDecisionSchema = decisionSchema.pick({ id: true, at: true, kind: true, concernIds: true, signalIds: true, revisions: true, sourceKinds: true, phase: true, contextId: true, runId: true, tools: true, report: true, finishedAt: true, error: true, interactions: true, notification: true });
 export const outputs = {
+  "ui-sources": z.object({ sources: sourcesSchema, paths: z.string(), errors: z.string() }).strict(),
   agenda: agendaOutputSchema,
   "ui-agenda": agendaOutputSchema,
   decisions: z.object({ decisions: z.array(publicDecisionSchema).max(100), ...paginationSchema }).strict(),

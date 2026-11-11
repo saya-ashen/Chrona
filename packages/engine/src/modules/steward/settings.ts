@@ -40,12 +40,12 @@ export async function modelUsage(db: StewardPorts["db"], workspaceId: string, se
   const timezone = budgetTimezone(settings), day = localDayKey(at, timezone), since = new Date(at.getTime() - 48 * 3600_000);
   const today = (row: { createdAt: Date }) => localDayKey(row.createdAt, timezone) === day;
   const calls = (await db.moduleCall.findMany({ where: { OR: [{ workspaceId }, { module: { workspaceId } }], method: "model", status: { not: "rejected" }, createdAt: { gte: since, lte: at } }, select: { id: true, createdAt: true, moduleName: true, inputTokens: true, outputTokens: true, accountingModuleId: true, moduleId: true, module: { select: { name: true } } } })).filter(today);
-  const usage = new Map<string, { module: string; moduleId: string | null; calls: number; inputTokens: number; outputTokens: number }>();
+  const usage = new Map<string, { module: string; moduleId: string | null; calls: number; inputTokens: number; outputTokens: number; unreportedCalls: number }>();
   for (const call of calls) {
     const moduleName = call.moduleName ?? call.module?.name ?? "removed";
     const moduleId = call.accountingModuleId ?? call.moduleId, identity = moduleId ?? `removed:${moduleName}`;
-    const row = usage.get(identity) ?? { module: moduleName, moduleId, calls: 0, inputTokens: 0, outputTokens: 0 };
-    row.calls++; row.inputTokens += call.inputTokens ?? 0; row.outputTokens += call.outputTokens ?? 0;
+    const row = usage.get(identity) ?? { module: moduleName, moduleId, calls: 0, inputTokens: 0, outputTokens: 0, unreportedCalls: 0 };
+    row.calls++; if (call.inputTokens === null || call.outputTokens === null) row.unreportedCalls++; row.inputTokens += call.inputTokens ?? 0; row.outputTokens += call.outputTokens ?? 0;
     usage.set(identity, row);
   }
   return [...usage.values()].sort((a, b) => a.module.localeCompare(b.module));

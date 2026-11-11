@@ -9,6 +9,8 @@
 | [产品目标](zh/steward-goals.md) | 为什么做、用户价值与真实使用验收；最高产品依据 |
 | [内核 API 目标规范](zh/kernel-api-design.md) | 公开合同设计及相对原实现的变化；未冻结 |
 | [内核 API 实施记录](zh/kernel-api-implementation.md) | 当前实现、自动检查及未覆盖范围 |
+| [API 消费者验收](zh/kernel-api-acceptance.md) | 独立 HTTP/SDK 验收、覆盖边界和冻结门槛 |
+| [持续关注与恢复](zh/continuous-steward-journey.md) | timer、来源、记忆纠正、恢复与用量的实施证据及未完成项 |
 | [当前架构](zh/architecture.md) | 当前源码边界、所有权和代码地图 |
 | [现有边界盘点](zh/kernel-permanent-boundary-contract.md) | 前一阶段工具与边界盘点；新版接口见 API 规范与实施记录 |
 | [开发路线](zh/development-roadmap.md) | 待推进工作及证据入口，不重复阶段流水账 |

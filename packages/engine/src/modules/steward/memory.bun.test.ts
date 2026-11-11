@@ -171,7 +171,10 @@ test("memory-local SDK accepts direct callers and rejects kernel/lifecycle owner
 });
 test("memory-local declares direct audiences and entry memory selection is private app configuration", async () => {
   const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(import.meta.dir, "external/memory-local/module.json"), "utf8")));
-  for (const tool of manifest.tools) expect(tool.visibility).toEqual(tool.name.startsWith("conversation-") ? ["modules"] : ["modules", "owner", "provider"]);
+  for (const tool of manifest.tools) {
+    const expected: typeof tool.visibility = tool.name.startsWith("conversation-") ? ["modules"] : tool.name.startsWith("correct-") ? ["owner"] : ["modules", "owner", "provider"];
+    expect(tool.visibility).toEqual(expected);
+  }
   for (const app of ["external/web", "external/qq"]) {
     const entry = moduleManifestSchema.parse(JSON.parse(await readFile(join(import.meta.dir, app, "module.json"), "utf8")));
     expect(entry).not.toHaveProperty("settings");

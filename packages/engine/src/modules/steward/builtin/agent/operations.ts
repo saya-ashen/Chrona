@@ -1,12 +1,14 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
+import { writeAgentJournal } from "./journal";
+import { currentHostGeneration, hostStopped } from "./host-recovery";
 import { join } from "node:path";
 import { z } from "zod";
 import type { ProviderAdapter, ProviderRunInput } from "@chrona/contracts/steward";
 import { runtimeStartSchema, runtimeOutcomeSchema } from "@chrona/contracts/steward";
 
 type Outcome = Awaited<ReturnType<ProviderAdapter["start"]>["done"]>;
-type Row = { digest: string; outcome?: Outcome; failure?: boolean; handle?: ReturnType<ProviderAdapter["start"]> };
+type Row = { digest: string; hostGeneration?: string; outcome?: Outcome; failure?: boolean; handle?: ReturnType<ProviderAdapter["start"]> };
 export class AgentError extends Error {
   constructor(readonly code: "conflict" | "unknown" | "not_found" | "capacity" | "unavailable" | "invalid", message: string) { super(message); }
 }
@@ -16,13 +18,21 @@ export function createAgentOperations(provider: ProviderAdapter | undefined, dat
   const path = (id: string) => join(data, "operations", createHash("sha256").update(id).digest("hex") + ".json");
   async function owned(id: string) {
     const live = rows.get(id);
-    if (live) return live;
-    let saved: { digest: string; outcome?: Outcome };
-    try { saved = z.object({ digest: z.string().regex(/^[a-f0-9]{64}$/), outcome: runtimeOutcomeSchema.optional() }).strict().parse(JSON.parse(await readFile(path(id), "utf8"))); }
+    if (live) { await recover(id, live); return live; }
+    let saved: { digest: string; hostGeneration?: string; outcome?: Outcome };
+    try { saved = z.object({ digest: z.string().regex(/^[a-f0-9]{64}$/), hostGeneration: z.string().regex(/^[a-f0-9]{64}$/).optional(), outcome: runtimeOutcomeSchema.optional() }).strict().parse(JSON.parse(await readFile(path(id), "utf8"))); }
     catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") throw new AgentError("not_found", "Agent operation not found"); throw error; }
-    const row: Row = { digest: saved.digest, ...(saved.outcome ? { outcome: saved.outcome } : { failure: true }) };
+    const row: Row = { digest: saved.digest, hostGeneration: saved.hostGeneration, ...(saved.outcome ? { outcome: saved.outcome } : { failure: true }) };
     rows.set(id, row);
+    await recover(id, row);
     return row;
+  }
+  async function recover(id: string, row: Row) {
+    if (row.handle || row.outcome || !row.hostGeneration || !await hostStopped(data, row.hostGeneration)) return;
+    const outcome: Outcome = { outcome: "failed", sessionId: null, error: "Agent host exited; its descendants are confirmed stopped. External effects remain unconfirmed; the operation was not replayed." };
+    await writeAgentJournal(path(id), { digest: row.digest, hostGeneration: row.hostGeneration, outcome });
+    row.outcome = outcome;
+    row.failure = false;
   }
   async function start(raw: unknown) {
     if (!provider) throw new AgentError("unavailable", "Agent backend unconfigured");
@@ -37,15 +47,15 @@ export function createAgentOperations(provider: ProviderAdapter | undefined, dat
     }
     if (rows.size >= 64) throw new AgentError("capacity", "Agent operations full");
     await mkdir(join(data, "operations"), { recursive: true, mode: 0o700 });
-    await writeFile(path(id), JSON.stringify({ digest }), { flag: "wx", mode: 0o600 });
-    const row: Row = { digest };
+    const hostGeneration = currentHostGeneration();
+    await writeAgentJournal(path(id), { digest, hostGeneration }, true);
+    const row: Row = { digest, hostGeneration };
     rows.set(id, row);
     try { row.handle = provider.start(input(request)); }
     catch { row.failure = true; throw new AgentError("unknown", "Agent launch remains unconfirmed"); }
     void row.handle.done.then(async outcome => {
       const checked = runtimeOutcomeSchema.parse(outcome);
-      await writeFile(path(id) + ".pending", JSON.stringify({ digest, outcome: checked }), { mode: 0o600 });
-      await rename(path(id) + ".pending", path(id));
+      await writeAgentJournal(path(id), { digest, hostGeneration, outcome: checked });
       row.outcome = checked;
       // The durable receipt remains authoritative if the wake event cannot be delivered.
       if (request.callbacks) await settled?.(id, request.callbacks, checked).catch(() => {});

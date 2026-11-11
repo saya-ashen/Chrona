@@ -17,7 +17,7 @@ Chrona 是单一 owner 的个人工具：用户自然交流，Agent 选择方法
 | 普通应用 | 业务策略、会话、提示词、记忆、内容、配置、页面、通知和交付；预装不授予权力 |
 | 私有宿主 | `runtime-callback`、`workspace-local` 是内部执行边界，不是第三类应用或公开发现目标 |
 
-当前只公开 `modules / approvals / settings / secrets / activity`。Agent 工具属于应用；不存在公开 schedules、projects、history、chat、provider、executions、content 或 memory。完整工具清单只在[边界盘点](kernel-permanent-boundary-contract.md)维护；源码和生成合同确定实际可调用面。
+当前只公开 `modules / approvals / settings / secrets / activity / timers`。Agent 工具属于应用；不存在公开 schedules、projects、history、chat、provider、executions、content 或 memory。完整工具清单在[API 规范](kernel-api-design.md)维护；源码和生成合同确定实际可调用面。
 
 Web、Notify、QQ、Author 是普通默认预装应用；可选应用通过受控生命周期安装。初始化不覆盖已有选择、不自动补装删除应用。Remind 仍暂停并保留材料；Mind 是普通可选应用，Editor 已退役。具体适配和验收见[普通应用迁移](application-migration.md)，Mind 的本地部署及版本限制见[实施记录](mind-implementation.md)。
 

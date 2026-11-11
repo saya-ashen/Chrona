@@ -137,6 +137,15 @@ test("reservation rejects a module or event from another durable owner", async (
   expect(await f.db.moduleCall.count()).toBe(0);
 });
 
+test("unreported usage remains explicit while only first settlement counts", async () => {
+  const f = await fixture();
+  const reservation = await f.reserve();
+  expect(await modelUsage(f.db, f.workspace.id, f.workspace.settings, f.now)).toMatchObject([{ calls: 1, unreportedCalls: 1 }]);
+  await finishCompletion(f.ports, f.workspace.id, { id: reservation.id, result: { inputTokens: 0, outputTokens: 0 }, error: null });
+  await finishCompletion(f.ports, f.workspace.id, { id: reservation.id, result: { inputTokens: 100, outputTokens: 100 }, error: null });
+  expect(await modelUsage(f.db, f.workspace.id, f.workspace.settings, f.now)).toMatchObject([{ calls: 1, inputTokens: 0, outputTokens: 0, unreportedCalls: 0 }]);
+});
+
 test("reported token usage survives audit retention", async () => {
   const f = await fixture();
   const reservation = await f.reserve();

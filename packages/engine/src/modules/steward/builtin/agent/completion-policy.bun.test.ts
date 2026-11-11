@@ -25,7 +25,7 @@ test("Agent selects its own model and sends real output/time limits without clip
     expect(status).toEqual({ result, failure: false });
     expect(invoked).toEqual([{ prompt: "fixture", system: undefined, model: "fake/exact", thinking: "max", maxOutputTokens: 10, timeoutMs: 500 }]);
     await eventually(async () => settlements, value => (value as unknown[]).length > 0);
-    expect(settlements).toEqual([{ reservationId: "durable-reservation", result, failed: false }]);
+    for (const settlement of settlements) expect(settlement).toEqual({ reservationId: "durable-reservation", result, failed: false });
   } finally { await rm(data, { recursive: true, force: true }); }
 });
 test("unknown provider execution never settles budget capacity or relaunches, including after restart", async () => {

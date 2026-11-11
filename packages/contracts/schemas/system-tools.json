@@ -682,6 +682,11 @@
               "outputTokens": {
                 "type": "number"
               },
+              "unreportedCalls": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
               "wakes": {
                 "type": "number"
               },
@@ -698,6 +703,7 @@
               "calls",
               "inputTokens",
               "outputTokens",
+              "unreportedCalls",
               "wakes",
               "date",
               "timezone"

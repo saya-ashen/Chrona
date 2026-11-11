@@ -6,6 +6,11 @@
   "activated": true,
   "effects": [],
   "uses": [
+    "modules.describe",
+    "files.read",
+    "timers.list",
+    "timers.set",
+    "timers.cancel",
     "agent.context",
     "agent.run",
     "agent.get",
@@ -23,6 +28,88 @@
     "test.ts"
   ],
   "tools": [
+    {
+      "name": "ui-sources",
+      "description": "Owner: read or replace up to four Files source paths (one per line). Reads at most 2000 characters per file; exact Files identity and read contract are bound at configuration. Empty text pauses source reads.",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": true,
+      "sideEffects": [
+        "Writes bounded private application state; suggestions grant no permission."
+      ],
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "paths": {
+            "type": "string",
+            "description": "maxLength: 1000"
+          }
+        }
+      },
+      "output": {
+        "type": "object",
+        "required": [
+          "sources",
+          "paths",
+          "errors"
+        ],
+        "properties": {
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "path",
+                "moduleId",
+                "contractHash",
+                "version",
+                "error"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "moduleId": {
+                  "type": "string"
+                },
+                "contractHash": {
+                  "type": "string"
+                },
+                "version": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "error": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "paths": {
+            "type": "string"
+          },
+          "errors": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
     {
       "name": "agenda",
       "description": "Mind reasoning only: read private concerns and suggestions with cursor pagination. Responses fit 230 KiB encoded including the result wrapper; follow nextCursor until limited is false. Refresh after a cursor conflict.",
@@ -397,6 +484,7 @@
               "lastDailyDate",
               "currentDecisionId",
               "lastError",
+              "wakeError",
               "phase",
               "runId",
               "interactions"
@@ -443,6 +531,16 @@
                 ]
               },
               "lastError": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "wakeError": {
                 "anyOf": [
                   {
                     "type": "string"
@@ -934,6 +1032,7 @@
               "lastDailyDate",
               "currentDecisionId",
               "lastError",
+              "wakeError",
               "phase",
               "runId",
               "interactions"
@@ -980,6 +1079,16 @@
                 ]
               },
               "lastError": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "wakeError": {
                 "anyOf": [
                   {
                     "type": "string"
@@ -2238,6 +2347,7 @@
               "lastDailyDate",
               "currentDecisionId",
               "lastError",
+              "wakeError",
               "phase",
               "runId",
               "interactions"
@@ -2284,6 +2394,16 @@
                 ]
               },
               "lastError": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "wakeError": {
                 "anyOf": [
                   {
                     "type": "string"

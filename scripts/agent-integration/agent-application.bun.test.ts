@@ -184,3 +184,26 @@ test("completion wake references are scoped to the exact operation, workspace an
     await expect(deliver(workspace.id)).rejects.toMatchObject({ code: "not_found" });
   } finally { callback.release(); await db.$disconnect(); await rm(root, { recursive: true, force: true }); }
 });
+
+test.skipIf(process.platform !== "linux")("real Agent host loss recovers the original operation from native descendant proof", async () => {
+  const f = await fixture();
+  try {
+    const handle = await startLocalProvider(f.ports, f.workspaceId, f.input);
+    const done = handle.done.catch(() => null);
+    let pid = 0;
+    for (let i = 0; i < 150 && !pid; i++) { try { pid = Number(await readFile(join(f.input.cwd, "pi.pid"), "utf8")); } catch { await Bun.sleep(20); } }
+    expect(pid).toBeGreaterThan(0);
+    const parent = async (id: number) => Number((await readFile(`/proc/${id}/status`, "utf8")).match(/^PPid:\s+(\d+)/m)?.[1]);
+    const guardian = await parent(pid), agent = await parent(guardian);
+    expect(agent).toBeGreaterThan(0);
+    process.kill(agent, "SIGKILL");
+    await done;
+    let status: { outcome: unknown; failure: boolean } | undefined;
+    for (let i = 0; i < 100; i++) {
+      try { status = await runtimeCall(f.ports, f.workspaceId, "agent.status", { operationId: f.input.runId }); if (status?.outcome) break; } catch { /* wait for original guardian cleanup and SDK restart */ }
+      await Bun.sleep(30);
+    }
+    expect(status).toMatchObject({ outcome: { outcome: "failed" }, failure: false });
+    expect(() => process.kill(pid, 0)).toThrow();
+  } finally { await f.close(); }
+}, 20000);

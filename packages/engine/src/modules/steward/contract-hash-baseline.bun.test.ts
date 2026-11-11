@@ -6,6 +6,7 @@ import additions from "../../../../contracts/fixtures/contract-hash-additions.js
 import mainMerge from "../../../../contracts/fixtures/contract-hash-main-merge.json";
 import migration from "../../../../contracts/fixtures/contract-hash-kernel-app-migration.json";
 import api from "../../../../contracts/fixtures/contract-hash-kernel-api.json";
+import journey from "../../../../contracts/fixtures/contract-hash-steward-journey.json";
 import agentTools from "../../../../contracts/fixtures/agent-tools.json";
 import cases from "../../../../contracts/fixtures/contract-hash-cases.json";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
@@ -53,6 +54,16 @@ test("all tool hashes preserve the baseline except explicitly enumerated plan ch
     expect(change.reason.length).toBeGreaterThan(20);
     if (change.after === null) delete expected[change.target];
     else expected[change.target] = change.after;
+  }
+  expect(journey.changes.map(change => change.target)).toEqual([
+    "activity.usage", "files.read", "memory-local.conversation-retain", "memory-local.correct-memory", "memory-local.correct-preference", "memory-local.recall",
+    "mind.agenda", "mind.check", "mind.ui-agenda", "mind.ui-sources",
+  ]);
+  for (const change of journey.changes) {
+    expect((expected as Record<string, string | null>)[change.target] ?? null).toBe(change.before);
+    expect(change.reason.length).toBeGreaterThan(20);
+    expect(change.after).toMatch(/^[a-f0-9]{64}$/);
+    expected[change.target] = change.after;
   }
   expect(current).toEqual(expected);
   expect([...new Set(Object.keys(hashes).map(target => target.split(".")[0]))].sort()).toEqual([
