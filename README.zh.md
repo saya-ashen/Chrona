@@ -41,6 +41,8 @@ bun run dev
 
 打包版本使用 `chrona start --no-open`，源码不使用 watch 模式启动时用 `bun run server:start`。
 
+网页首次打开可设置登录密码，之后用密码登录，并在「设置 → 登录密码」中修改。已有 `API_KEY` 的实例须先用原访问授权完成首次设置。详见[网页登录密码](docs/zh/operations.md#网页登录密码)。
+
 ## 配置
 
 在服务环境中设置，修改后重启：

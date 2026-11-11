@@ -1,6 +1,8 @@
 // Chrona's shell: authentication, router and one SSE connection. All pages render through /pages.js.
-// Data comes from /api/web through routed calls for the user (v2-8); requests carry the user's key.
-const KEY = "chrona.accessKey"; // the same key the previous web app stored
+// Normal API and SSE requests use the server's HttpOnly session cookie.
+const KEY = "chrona.accessKey"; // Read only to migrate an existing first-password setup authorization.
+let bootstrapKey = localStorage.getItem(KEY) ?? "", authStatus = null;
+let loginParams = { name: "login", mode: "error", message: "正在读取登录状态……" };
 const main = document.getElementById("main");
 const header = document.querySelector("body > header");
 const nav = header.querySelector("nav");
@@ -27,13 +29,12 @@ function activeNavigation() {
 }
 
 class Unauthorized extends Error {}
-const auth = () => { const key = localStorage.getItem(KEY); return key ? { authorization: `Bearer ${key}` } : {}; };
 
 async function request(url, { method = "GET", body, raw = false } = {}) {
   const currentSession = session;
-  const response = await fetch(url, { method, headers: { ...auth(), ...(body !== undefined ? { "content-type": "application/json" } : {}) }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
+  const response = await fetch(url, { method, credentials: "same-origin", headers: { ...(body !== undefined ? { "content-type": "application/json" } : {}) }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
   if (response.status === 401) {
-    if (authenticated && currentSession === session) await login("密钥不正确，请重新输入。");
+    if (authenticated && currentSession === session) await login("登录已过期，请重新登录。");
     throw new Unauthorized();
   }
   if (!response.ok) {
@@ -47,14 +48,15 @@ const web = (path, options) => request(`/api/web${path}`, options);
 // A module tool, through the page's data API (Chrona checks what this page may call).
 const tool = (target, args = {}) => web("/call", { method: "POST", body: { target, args } });
 
-// Replies to web conversations, pushed over SSE. fetch (not EventSource) so the request carries the key.
+// Replies to web conversations, pushed over a cookie-authenticated SSE fetch.
 const replyListeners = new Set();
 async function listen(signal) {
+  const currentSession = session;
   while (!signal.aborted) {
     try {
-      const response = await fetch("/api/web/events", { signal, headers: { ...auth(), accept: "text/event-stream" } });
+      const response = await fetch("/api/web/events", { signal, credentials: "same-origin", headers: { accept: "text/event-stream" } });
       if (response.status === 401) {
-        if (!signal.aborted) await login("密钥不正确，请重新输入。");
+        if (!signal.aborted && currentSession === session) await login("登录已过期，请重新登录。");
         return;
       }
       const reader = response.body.getReader(), decoder = new TextDecoder();
@@ -75,13 +77,13 @@ async function listen(signal) {
   }
 }
 
-function login(message) {
+function login(message, mode = authStatus?.passwordSet ? "login" : authStatus?.canSetup ? "setup" : "bootstrap") {
   authenticated = false; session++; navigation++;
-  localStorage.removeItem(KEY);
+  loginParams = { name: "login", message, mode };
   stream?.abort(); stream = null;
   unmountPage?.(); unmountPage = null;
   shellState();
-  return systemPage({ name: "login", message });
+  return systemPage(loginParams);
 }
 
 // ------------------------------------------------------------ app pages --
@@ -104,7 +106,7 @@ async function systemPage(params, version = navigation) {
   shellState();
   unmountPage?.();
   main.replaceChildren();
-  unmountPage = mountSystem(main, params, { web, tool, subscribe: listener => { replyListeners.add(listener); return () => replyListeners.delete(listener); }, login: async key => { localStorage.setItem(KEY, key); await start(); } }, (path, replace) => go(path, replace));
+  unmountPage = mountSystem(main, params, { web, tool, subscribe: listener => { replyListeners.add(listener); return () => replyListeners.delete(listener); }, auth: systemAuth }, (path, replace) => go(path, replace));
 }
 const pageHref = page => `/p/${encodeURIComponent(page.module)}/${encodeURIComponent(page.id)}`;
 async function pageLinks() {
@@ -126,7 +128,7 @@ async function pageLinks() {
 
 // ----------------------------------------------------------------- router --
 async function route() {
-  if (!authenticated) { await login(); return; }
+  if (!authenticated) { await systemPage(loginParams); return; }
   const version = ++navigation;
   const url = new URL(location.href), parts = url.pathname.split("/").filter(Boolean);
   unmountPage?.(); unmountPage = null;
@@ -144,8 +146,8 @@ async function route() {
     else await systemPage({ name: "today" });
   } catch (error) {
     if (version !== navigation) return;
-    if (error instanceof Unauthorized) await login("密钥不正确，请重新输入。");
-    else await systemPage({ name: "error", message: error.message }, version);
+    if (error instanceof Unauthorized) return; // request() already handles a 401 from the current session.
+    await systemPage({ name: "error", message: error.message }, version);
   }
 }
 function go(path, replace = false) {
@@ -158,14 +160,66 @@ document.addEventListener("click", event => {
   event.preventDefault(); go(link.getAttribute("href"));
 });
 addEventListener("popstate", () => void route());
-document.getElementById("logout").addEventListener("click", () => void login());
+document.getElementById("logout").addEventListener("click", async event => {
+  const button = event.currentTarget;
+  button.disabled = true;
+  try { await authRequest("/logout", { method: "POST", body: {} }); await login(); }
+  catch (error) { await systemPage({ name: "error", message: `退出登录失败：${error.message}` }); }
+  finally { button.disabled = false; }
+});
 
+function clearBootstrapKey() {
+  bootstrapKey = "";
+  localStorage.removeItem(KEY);
+}
+async function authRequest(path, { method = "GET", body } = {}) {
+  const bearer = authStatus?.passwordSet === false && bootstrapKey && (path === "/status" || path === "/setup");
+  const response = await fetch(`/api/auth${path}`, { method, credentials: "same-origin", headers: { ...(bearer ? { authorization: `Bearer ${bootstrapKey}` } : {}), ...(body !== undefined ? { "content-type": "application/json" } : {}) }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    const messages = { 400: "密码长度应为 10–256 个字符。", 401: path === "/password" ? "当前密码不正确或登录已过期，请重试或重新登录。" : "密码不正确，请重试。", 403: "需要原访问授权才能设置首个密码。", 409: "登录密码已设置，请重新读取登录状态。", 429: "尝试次数过多，请稍后重试。" };
+    throw new Error(messages[response.status] || error.message || error.error || error.code || `登录服务请求失败（${response.status}）`);
+  }
+  return response.status === 204 ? null : response.json();
+}
+async function systemAuth(path, options = {}) {
+  if (path === "/status") {
+    if (typeof options.accessKey === "string" && authStatus?.passwordSet === false) bootstrapKey = options.accessKey.trim();
+    return start();
+  }
+  if (!["/login", "/setup", "/password"].includes(path)) throw new Error("未知登录操作");
+  const currentSession = session, result = await authRequest(path, options);
+  if (currentSession !== session) return result;
+  if (path === "/setup") clearBootstrapKey();
+  if (path === "/password") {
+    // A password change rotates the current cookie. Ignore 401s from requests using the previous session.
+    session++;
+    stream?.abort(); stream = new AbortController(); void listen(stream.signal);
+  } else await start();
+  return result;
+}
+function readStatus(value) {
+  if (!value || ["passwordSet", "authenticated", "canSetup"].some(key => typeof value[key] !== "boolean")) throw new Error("登录状态响应无效，请重试。");
+  if (value.passwordSet) clearBootstrapKey();
+  return value;
+}
 async function start() {
-  if (!localStorage.getItem(KEY)) { await login(); return; }
   const currentSession = ++session;
-  try { await web("/today"); }
-  catch (error) { if (error instanceof Unauthorized) { if (currentSession === session) await login("密钥不正确，请重新输入。"); return; } }
-  if (currentSession !== session) return;
+  try {
+    // Learn whether a password exists before sending any saved bootstrap authorization.
+    let status = await authRequest("/status");
+    if (currentSession !== session) return;
+    authStatus = readStatus(status);
+    if (!authStatus.passwordSet && bootstrapKey) {
+      status = await authRequest("/status");
+      if (currentSession !== session) return;
+      authStatus = readStatus(status);
+    }
+  } catch (error) {
+    if (currentSession === session) await login(`认证状态读取失败：${error.message}`, "error");
+    return;
+  }
+  if (!authStatus.passwordSet || !authStatus.authenticated) { await login(); return; }
   authenticated = true;
   shellState();
   if (!stream) { stream = new AbortController(); void listen(stream.signal); }

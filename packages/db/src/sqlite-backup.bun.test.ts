@@ -38,6 +38,7 @@ describe("SQLite backup and restore", () => {
         ["platform/data/app/state.json", '{"count":1}'],
         ["sessions/session/notes.md", "session notes"],
         ["secrets/email.json", "test-secret"],
+        ["secrets/browser-auth/state.json", '{"version":1,"passwordHash":"fixture-hash","sessions":[]}'],
         ["qq-bot/binding.json", '{"userId":"test-owner"}'],
       ] as const;
       for (const [path, content] of files) {
@@ -57,6 +58,7 @@ describe("SQLite backup and restore", () => {
       for (const [path, content] of files) expect(readFileSync(join(data, path), "utf8")).toBe(content);
       for (const root of ["platform", "sessions", "secrets", "qq-bot"]) expect(existsSync(join(data, root, "stale.md"))).toBe(false);
       expect(statSync(join(data, "secrets", "email.json")).mode & 0o777).toBe(0o600);
+      expect(statSync(join(data, "secrets/browser-auth/state.json")).mode & 0o777).toBe(0o600);
       expect(statSync(join(data, "platform/store/app/version/check.sh")).mode & 0o777).toBe(0o700);
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });

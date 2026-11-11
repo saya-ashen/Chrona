@@ -2,10 +2,12 @@ import { timingSafeEqual } from "node:crypto";
 import type { MiddlewareHandler } from "hono";
 import { getApiMessages, getPreferredLocale } from "@chrona/i18n";
 import { readEnv } from "../config/env";
+import { isBrowserAuthSameOrigin, type createBrowserAuth } from "../browser-auth";
 
 const SKIP_PATHS = ["/api/health", "/health"];
 
 type ApiKeyAuthOptions = {
+  browserAuth?: Pick<Awaited<ReturnType<typeof createBrowserAuth>>, "passwordSet" | "authenticate">;
   /**
    * Exempts an endpoint that owns a distinct, narrower authentication contract.
    * The caller must mount its endpoint-specific authentication after this middleware.
@@ -28,33 +30,31 @@ export function isLocalOwnerAuthorized(authorization: string | undefined) {
   return matchesApiKey(authorization?.startsWith("Bearer ") ? authorization.slice(7) : null, expected);
 }
 
+function skipsOwnerAuth(path: string, method: string, options: ApiKeyAuthOptions) {
+  return method === "OPTIONS" || SKIP_PATHS.includes(path) || options.isExempt?.(path, method);
+}
+function matchesBearer(authorization: string | undefined, expectedKey: string | undefined) {
+  return Boolean(expectedKey && matchesApiKey(authorization?.startsWith("Bearer ") ? authorization.slice(7) : null, expectedKey));
+}
+
 export function apiKeyAuth(
   options: ApiKeyAuthOptions = {},
 ): MiddlewareHandler {
   const expectedKey = readEnv().API_KEY;
 
-  if (!expectedKey) {
+  if (!expectedKey && !options.browserAuth) {
     return async (_c, next) => next();
   }
 
   return async (c, next) => {
-    if (
-      SKIP_PATHS.includes(c.req.path)
-      || options.isExempt?.(c.req.path, c.req.method)
-    ) {
+    if (skipsOwnerAuth(c.req.path, c.req.method, options)) return next();
+    if (matchesBearer(c.req.header("authorization"), expectedKey)) return next();
+
+    if (options.browserAuth?.authenticate(c.req.raw)) {
+      if (!isBrowserAuthSameOrigin(c.req.raw)) return c.json({ error: "Same-origin request required" }, 403);
       return next();
     }
-
-    if (c.req.method === "OPTIONS") {
-      return next();
-    }
-
-    const authHeader = c.req.header("authorization");
-    const providedKey = authHeader?.startsWith("Bearer ")
-      ? authHeader.slice(7)
-      : null;
-
-    if (matchesApiKey(providedKey, expectedKey)) return next();
+    if (!expectedKey && !options.browserAuth?.passwordSet()) return next();
 
     const messages = getApiMessages(getPreferredLocale(c.req.header("accept-language")));
     return c.json({ error: messages.unauthorized }, 401);

@@ -87,8 +87,8 @@ async function checkAdapter() {
   await call("$web.answer", { id: "q", answer: { decision: "submit", value: false } });
   await call("$web.cancel", { id: "r" });
   await call("$web.feedback", { id: "n", feedback: "useful" });
-  await call("$web.login", { key: " fixture " });
-  assert.deepEqual(mapped, [["/today"], ["/runs"], ["/modules"], ["/approvals/a%2Fb/resolve", { method: "POST", body: { decision: "deny" } }], ["/interactions/q/answer", { method: "POST", body: { decision: "submit", value: false } }], ["/runs/r/cancel", { method: "POST", body: {} }], ["notify.feedback", { id: "n", feedback: "useful" }], ["login", "fixture"]]);
+  await call("$web.login", { password: " fixture " });
+  assert.deepEqual(mapped, [["/today"], ["/runs"], ["/modules"], ["/approvals/a%2Fb/resolve", { method: "POST", body: { decision: "deny" } }], ["/interactions/q/answer", { method: "POST", body: { decision: "submit", value: false } }], ["/runs/r/cancel", { method: "POST", body: {} }], ["notify.feedback", { id: "n", feedback: "useful" }], ["login", " fixture "]]);
   mapped.length = 0;
   await call("$web.system-apps", {});
   await call("$web.activity", {});
@@ -184,7 +184,7 @@ function checkDisplayAndReach() {
   }
   assert.match(localTime("2026-11-04T09:00:00Z"), /2026.*11.*04/);
   assert.equal(Object.keys(loginSpec().elements).length, 3);
-  for (const type of ["AppSettings", "PackageInstall", "AppRemoval", "ChatStream", "NotificationSettings", "BuildSettings", "ModuleModelSettings", "RunTimeoutSettings", "Approval", "Question", "SystemAction", "ActivityMore", "LoginForm", "SettingsForm", "ToolContract", "ToolForm", "ModelCap", "Credentials", "DiagnosticRefresh", "MemoryPanel", "SessionWork"]) {
+  for (const type of ["AppSettings", "PackageInstall", "AppRemoval", "ChatStream", "NotificationSettings", "BuildSettings", "ModuleModelSettings", "RunTimeoutSettings", "Approval", "Question", "SystemAction", "ActivityMore", "LoginForm", "LoginPasswordSettings", "SettingsForm", "ToolContract", "ToolForm", "ModelCap", "Credentials", "DiagnosticRefresh", "MemoryPanel", "SessionWork"]) {
     assert.ok(pageErrors({ spec: { root: "x", elements: { x: { type, props: {}, children: [] } } } }, new Map(), "files").length);
   }
   const escaped = { root: "x", elements: { x: { type: "Button", props: { label: "x" }, children: [], on: { press: { action: "call", params: { tool: "$web.resolve" } } } } } };

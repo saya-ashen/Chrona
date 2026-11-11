@@ -32,7 +32,7 @@ export function checkSettingsSpec() {
     // Stale application projections must not restore application forms.
     memory: { provider: "memory-local" }, notifications: { dailyCap: 5 } }, agent: { ready: true }, preferences: [{ id: "p", text: "旧偏好" }] }, apps: [app], pages };
   const spec = settingsSpec(state), nodes = Object.values(spec.elements), text = JSON.stringify(spec);
-  assert.deepEqual(nodes.filter(node => node.type === "Card").map(node => node.props.title), ["内核", "应用设置"]);
+  assert.deepEqual(nodes.filter(node => node.type === "Card").map(node => node.props.title), ["登录密码", "内核", "应用设置"]);
   assert.ok(nodes.some(node => node.type === "Link" && node.props.href === "/apps/app%2F1?tab=settings"));
   assert.match(text, /上限 0/);
   assert.deepEqual(nodes.find(node => node.type === "RunTimeoutSettings")!.props, { settings: { timezone: "UTC", runTimeoutMinutes: null } });

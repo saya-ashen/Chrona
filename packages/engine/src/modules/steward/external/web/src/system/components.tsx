@@ -9,6 +9,7 @@ import type { Approval as ApprovalData, Interaction } from "./today";
 import { useAction } from "./action";
 import { NotificationSettings, ModuleModelSettings, RunTimeoutSettings } from "./settings-forms";
 import { ChatStream } from "./chat-stream";
+import { LoginForm, LoginPasswordSettings } from "./password-forms";
 
 type Args = Record<string, unknown>;
 export function SystemAction({ props }: { props: { label: string; tool: string; args: Args; confirm?: string } }) {
@@ -76,12 +77,6 @@ export function Question({ props: { interaction } }: { props: { interaction: Int
     <div className="row">{choices}<button type="button" disabled={action.pending} onClick={() => send({ decision: "cancel" })}>不回答</button></div>
     {action.error ? <p role="alert" className="error">{action.error}</p> : null}</div>;
 }
-export function LoginForm() {
-  const action = useAction(), [key, setKey] = useState("");
-  return <form onSubmit={event => { event.preventDefault(); void action.act(async () => { await action.call("login", { key }); }); }}>
-    <div className="row"><input aria-label="访问密钥" name="key" type="password" autoComplete="current-password" required value={key} onChange={event => setKey(event.target.value)} /><button className="primary" disabled={action.pending}>保存</button></div>
-    {action.error ? <p role="alert" className="error">{action.error}</p> : null}</form>;
-}
 export function ActivityMore({ props }: { props: { module: string } }) {
   const action = useAction(), store = useStateStore();
   return <div><button type="button" disabled={action.pending} onClick={() => void action.act(async () => {
@@ -93,5 +88,5 @@ export function ActivityMore({ props }: { props: { module: string } }) {
 function component<P>(Render: (value: { props: P }) => ReactNode) {
   return ({ element }: ComponentRenderProps<P>) => <Render props={element.props} />;
 }
-export const systemComponents = { AppRemoval: component(AppRemoval), ChatStream: component(ChatStream), NotificationSettings: component(NotificationSettings), ModuleModelSettings: component(ModuleModelSettings), RunTimeoutSettings: component(RunTimeoutSettings), Approval: component(Approval), Question: component(Question), SystemAction: component(SystemAction), ActivityMore: component(ActivityMore), LoginForm,
+export const systemComponents = { AppRemoval: component(AppRemoval), ChatStream: component(ChatStream), NotificationSettings: component(NotificationSettings), ModuleModelSettings: component(ModuleModelSettings), RunTimeoutSettings: component(RunTimeoutSettings), Approval: component(Approval), Question: component(Question), SystemAction: component(SystemAction), ActivityMore: component(ActivityMore), LoginForm: component(LoginForm), LoginPasswordSettings,
   ToolForm: component(ToolForm), ToolContract: component(ToolContract), Credentials: component(Credentials), DiagnosticRefresh: component(DiagnosticRefresh), MemoryPanel, SessionWork: component(SessionWork) };

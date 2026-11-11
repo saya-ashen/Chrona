@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import puppeteer, { type Page as BrowserPage } from "puppeteer-core";
+import puppeteer, { type BrowserContext, type Page as BrowserPage } from "puppeteer-core";
 import { expandComponents } from "./composition";
 
 const directory = import.meta.dir;
@@ -40,21 +40,57 @@ function registered(id: string) {
   } };
   return { module: "fixture", moduleId: "fixture-id", ...(id === "preferences" ? { purpose: "settings" } : {}), id, title: id, revision: 1, layout: id === "workspace" ? "workspace" : "document", data: {}, spec: expandComponents(id === "workspace" ? workspaceSpec : documentSpec, { "fixture:Document": { props: { type: "object", properties: { title: { type: "string" } }, required: ["title"], additionalProperties: false }, slots: ["default"], spec: { root: "doc", elements: { doc: { type: "Stack", props: {}, children: ["title", "$slot:default"] }, title: { type: "Heading", props: { text: { $prop: "title" } } } } } } }, "fixture") };
 }
+const initialPassword = "fixture-password", changedPassword = "changed-password";
+let password: string | null = initialPassword, canSetup = true, statusFailure = false;
+let nextSession = 0;
+const sessions = new Set<string>();
+const authRequests: { endpoint: string; body: Record<string, unknown>; authorization: string | null }[] = [];
+const webRequests: { endpoint: string; cookie: string | null; authorization: string | null }[] = [];
 let expired = false, delayed: (() => void) | undefined, delayedUnauthorized: (() => void) | undefined;
 type ScopedCall = { target: string; page?: { module: string; id: string; revision: number } };
 const calls: ScopedCall[] = [];
 const unexpected: string[] = [];
 const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
-  // eslint-disable-next-line complexity -- The mock routes mirror the public HTTP boundary in one place.
+  // eslint-disable-next-line complexity, max-statements -- The mock routes mirror the public HTTP boundary in one place.
   async fetch(request) {
   const url = new URL(request.url), path = url.pathname;
   const json = (value: unknown, status = 200) => Response.json(value, { status });
   if (path === "/app.js") return new Response(app, { headers: { "content-type": "text/javascript" } });
   if (path === "/pages.js") return new Response(pages, { headers: { "content-type": "text/javascript" } });
   if (path === "/style.css") return new Response(style, { headers: { "content-type": "text/css" } });
+  const sessionId = request.headers.get("cookie")?.match(/(?:^|; )fixture_session=([^;]+)/)?.[1];
+  const authenticated = !!sessionId && sessions.has(sessionId) && !expired;
+  const authStatus = () => ({ passwordSet: password !== null, authenticated, canSetup: password === null && (canSetup || request.headers.get("authorization") === "Bearer fixture-key") });
+  const sessionResponse = () => {
+    const id = `session-${++nextSession}`; sessions.add(id);
+    return Response.json({ ok: true }, { headers: { "set-cookie": `fixture_session=${id}; HttpOnly; SameSite=Strict; Path=/` } });
+  };
+  if (path.startsWith("/api/auth/")) {
+    const endpoint = path.slice("/api/auth".length), body = request.method === "POST" ? await request.json() as Record<string, unknown> : {};
+    authRequests.push({ endpoint, body, authorization: request.headers.get("authorization") });
+    if (endpoint === "/status" && request.method === "GET") return statusFailure ? json({ message: "认证状态读取失败" }, 503) : json(authStatus());
+    if (endpoint === "/logout" && request.method === "POST") {
+      if (sessionId) sessions.delete(sessionId);
+      return Response.json({ ok: true }, { headers: { "set-cookie": "fixture_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0" } });
+    }
+    if (endpoint === "/login" && request.method === "POST") return password !== null && body.password === password ? sessionResponse() : json({ message: "密码不正确" }, 401);
+    if (endpoint === "/setup" && request.method === "POST") {
+      if (!authStatus().canSetup) return json({ message: "需要原访问授权" }, 403);
+      if (typeof body.password !== "string" || body.password.length < 10 || body.password.length > 256) return json({ message: "密码长度应为 10–256 个字符" }, 400);
+      password = body.password; return sessionResponse();
+    }
+    if (endpoint === "/password" && request.method === "POST") {
+      if (!authenticated || body.currentPassword !== password) return json({ message: "当前密码不正确" }, 401);
+      if (typeof body.password !== "string" || body.password.length < 10 || body.password.length > 256) return json({ message: "密码长度应为 10–256 个字符" }, 400);
+      password = body.password; sessions.clear();
+      return sessionResponse();
+    }
+    unexpected.push(`${request.method} ${path}`); return json({ message: "Unexpected auth request" }, 500);
+  }
   if (!path.startsWith("/api/web")) return new Response(index, { headers: { "content-type": "text/html", "content-security-policy": csp } });
-  if (expired || request.headers.get("authorization") !== "Bearer fixture-key") return json({ message: "Unauthorized" }, 401);
   const endpoint = path.slice("/api/web".length);
+  webRequests.push({ endpoint, cookie: request.headers.get("cookie"), authorization: request.headers.get("authorization") });
+  if (!authenticated) return json({ message: "Unauthorized" }, 401);
   if (endpoint === "/events") return new Response(new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode(": connected\n\n")); } }), { headers: { "content-type": "text/event-stream" } });
   if (endpoint === "/pages") return json(links);
   if (endpoint === "/pages/fixture/slow") { await new Promise<void>(resolve => { delayed = resolve; }); return json(registered("workspace")); }
@@ -77,7 +113,8 @@ assert(chrome, "Set CHRONA_TEST_CHROME to a Chrome/Chromium executable");
 const browser = await puppeteer.launch({ executablePath: chrome, headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
 const failures: string[] = [], checks: string[] = [];
 async function text(page: BrowserPage, value: string) {
-  await page.waitForFunction(expected => document.querySelector("main")?.textContent.includes(expected), {}, value);
+  try { await page.waitForFunction(expected => document.querySelector("main")?.textContent.includes(expected), {}, value); }
+  catch (error) { throw new Error(`Expected ${value}; visible: ${await page.$eval("main", main => main.textContent)}`, { cause: error }); }
 }
 async function capture(page: BrowserPage, name: string) {
   const output = process.env.CHRONA_SHELL_SCREENSHOTS;
@@ -106,21 +143,156 @@ async function geometry(page: BrowserPage, workspace: boolean, label: string) {
   checks.push(label);
   return result;
 }
+async function fill(page: BrowserPage, name: string, value: string) {
+  const selector = `input[name="${name}"]`;
+  await page.waitForSelector(selector);
+  await page.waitForFunction(selector => !document.querySelector<HTMLInputElement>(selector)?.disabled, {}, selector);
+  await page.focus(selector); await page.keyboard.down("Control"); await page.keyboard.press("A"); await page.keyboard.up("Control"); await page.keyboard.press("Backspace");
+  await page.type(selector, value);
+}
+async function submitPassword(page: BrowserPage) {
+  await page.$eval('input[name="password"]', input => (input as HTMLInputElement).form!.requestSubmit());
+}
+async function signIn(page: BrowserPage, value: string) {
+  await fill(page, "password", value); await submitPassword(page); await text(page, "没有待处理的事项");
+}
+async function noStoredCredentials(page: BrowserPage) {
+  assert.deepEqual(await page.evaluate(() => Object.entries(localStorage).filter(([key, value]) => /password|accessKey/i.test(key) || ["fixture-key", "fixture-password", "changed-password"].includes(value))), []);
+  assert.equal(await page.evaluate(() => document.cookie.includes("fixture_session")), false, "session cookie is HttpOnly");
+}
+async function failedStatus() {
+  // A failed status request must leave the browser in the unauthenticated shell.
+  const context = await browser.createBrowserContext(), page = await context.newPage();
+  statusFailure = true;
+  const webCount = webRequests.length;
+  await page.goto(server.url.href + "today"); await text(page, "认证状态读取失败");
+  assert.equal(await page.$eval("body", body => body.className), "web-shell-login");
+  assert.equal(webRequests.length, webCount, "failed auth status cannot start protected requests");
+  statusFailure = false;
+  await page.click("main button"); await page.waitForSelector('input[name="password"]');
+  assert.equal(await page.$eval("body", body => body.className), "web-shell-login");
+  assert.equal(webRequests.length, webCount, "retry loads login without issuing protected requests");
+  await page.evaluate(() => localStorage.setItem("chrona.accessKey", "fixture-key"));
+  const statusStart = authRequests.length;
+  await page.reload(); await page.waitForSelector('input[name="password"]'); await noStoredCredentials(page);
+  assert(authRequests.slice(statusStart).every(request => request.authorization === null), "an existing password removes the legacy key without sending it");
+  await context.close(); checks.push("status failure stays unauthenticated and supports retry");
+
+}
+async function firstSetup() {
+  // First setup validates confirmation/length before creating a cookie session.
+  password = null; canSetup = true; sessions.clear();
+  const setupContext = await browser.createBrowserContext(), setup = await setupContext.newPage();
+  await setup.goto(server.url.href + "today"); await setup.waitForSelector('input[name="confirmPassword"]');
+  for (const name of ["password", "confirmPassword"]) {
+    assert.equal(await setup.$eval(`input[name="${name}"]`, input => (input as HTMLInputElement).autocomplete), "new-password");
+  }
+  assert.equal(await setup.$eval('input[name="password"]', input => (input as HTMLInputElement).minLength), 10);
+  assert.equal(await setup.$eval('input[name="password"]', input => (input as HTMLInputElement).maxLength), 256);
+  const setupCount = () => authRequests.filter(request => request.endpoint === "/setup").length;
+  const beforeSetup = setupCount();
+  await fill(setup, "password", "short"); await fill(setup, "confirmPassword", "short"); await submitPassword(setup);
+  assert.equal(await setup.$eval('input[name="password"]', input => (input as HTMLInputElement).checkValidity()), false);
+  assert.equal(setupCount(), beforeSetup, "short password is rejected before setup request");
+  await setup.$$eval('input[type="password"]', inputs => { for (const input of inputs) (input as HTMLInputElement).value = "x".repeat(257); });
+  await submitPassword(setup); await text(setup, "10–256");
+  assert.equal(setupCount(), beforeSetup, "overlong password is rejected before setup request");
+  await fill(setup, "password", initialPassword); await fill(setup, "confirmPassword", "different-password"); await submitPassword(setup);
+  await text(setup, "一致"); assert.equal(setupCount(), beforeSetup, "mismatched confirmation is rejected before setup request");
+  await fill(setup, "confirmPassword", initialPassword); await submitPassword(setup); await text(setup, "没有待处理的事项");
+  await noStoredCredentials(setup); await setupContext.close(); checks.push("first password setup and validation");
+
+}
+async function bootstrapMigration() {
+  // A remote bootstrap needs the original access authorization; migrate a saved key only for auth setup.
+  password = null; canSetup = false; sessions.clear();
+  const migrationContext = await browser.createBrowserContext(), migration = await migrationContext.newPage();
+  await migration.goto(server.url.href + "today"); await migration.waitForSelector('input[name="accessKey"]');
+  await text(migration, "原访问授权");
+  assert.equal(await migration.$eval("body", body => body.className), "web-shell-login");
+  await fill(migration, "accessKey", "fixture-key");
+  await migration.$eval('input[name="accessKey"]', input => (input as HTMLInputElement).form!.requestSubmit());
+  await migration.waitForSelector('input[name="confirmPassword"]');
+  await noStoredCredentials(migration);
+  await migration.reload(); await migration.waitForSelector('input[name="accessKey"]');
+  checks.push("manually supplied bootstrap authorization is used only in memory");
+  await migration.evaluate(() => localStorage.setItem("chrona.accessKey", "fixture-key"));
+  const migrationStart = authRequests.length;
+  await migration.reload(); await migration.waitForSelector('input[name="confirmPassword"]');
+  await fill(migration, "password", initialPassword); await fill(migration, "confirmPassword", initialPassword); await submitPassword(migration);
+  await text(migration, "没有待处理的事项"); await noStoredCredentials(migration);
+  assert(authRequests.slice(migrationStart).some(request => request.endpoint === "/setup" && request.authorization === "Bearer fixture-key"), "saved key authorizes initial setup");
+  await migration.reload(); await text(migration, "没有待处理的事项"); await noStoredCredentials(migration);
+  checks.push("remote setup requires authorization and migrates saved bootstrap key");
+
+  return { migrationContext, migration };
+}
+async function changePassword(migration: BrowserPage) {
+  // A second browser session is revoked on password change, while the submitting session remains usable.
+  const otherContext = await browser.createBrowserContext(), other = await otherContext.newPage();
+  await other.goto(server.url.href + "today"); await signIn(other, initialPassword);
+  await navigate(migration, "/settings", "登录密码");
+  const previousCookie = (await migration.browserContext().cookies()).find(item => item.name === "fixture_session")!.value;
+  assert.equal(await migration.$eval('input[name="currentPassword"]', input => (input as HTMLInputElement).autocomplete), "current-password");
+  assert.equal(await migration.$eval('input[name="password"]', input => (input as HTMLInputElement).autocomplete), "new-password");
+  await fill(migration, "currentPassword", initialPassword); await fill(migration, "password", changedPassword); await fill(migration, "confirmPassword", "different-password");
+  const changesBefore = authRequests.filter(request => request.endpoint === "/password").length;
+  await submitPassword(migration); await text(migration, "一致");
+  assert.equal(authRequests.filter(request => request.endpoint === "/password").length, changesBefore);
+  await fill(migration, "confirmPassword", changedPassword);
+  await fill(migration, "currentPassword", "wrong-password");
+  await submitPassword(migration); await text(migration, "当前密码不正确");
+  assert.equal(await migration.$eval("body", body => body.classList.contains("web-shell-app")), true, "wrong current password stays in Settings");
+  assert.equal(await migration.$eval('input[name="password"]', input => (input as HTMLInputElement).value), changedPassword, "failed change preserves the draft");
+  await fill(migration, "currentPassword", initialPassword);
+  const changed = migration.waitForResponse(response => response.url().endsWith("/api/auth/password") && response.status() === 200);
+  await submitPassword(migration); await changed; await text(migration, "登录密码已更新");
+  assert.deepEqual(await migration.$$eval('input[type="password"]', inputs => inputs.map(input => (input as HTMLInputElement).value)), ["", "", ""], "successful change clears every password field");
+  assert.notEqual((await migration.browserContext().cookies()).find(item => item.name === "fixture_session")!.value, previousCookie, "password change accepts the replacement cookie");
+  await navigate(migration, "/today", "没有待处理的事项"); await noStoredCredentials(migration);
+  await other.reload(); await other.waitForSelector('input[name="password"]'); await text(other, "登录");
+  await fill(other, "password", initialPassword); await submitPassword(other); await text(other, "密码不正确");
+  await signIn(other, changedPassword); await noStoredCredentials(other);
+  checks.push("password change revokes other sessions and retains current session");
+
+  await otherContext.close();
+}
+async function logoutCookie(migrationContext: BrowserContext, migration: BrowserPage) {
+  const cookie = (await migrationContext.cookies()).find(item => item.name === "fixture_session");
+  assert(cookie, "setup created a session cookie");
+  const logout = migration.waitForResponse(response => response.url().endsWith("/api/auth/logout") && response.request().method() === "POST");
+  await migration.click("#logout"); assert.equal((await logout).status(), 200); await migration.waitForSelector('input[name="password"]');
+  assert.equal((await migrationContext.cookies()).some(item => item.name === "fixture_session"), false);
+  const replay = await fetch(new URL("api/web/today", server.url), { headers: { cookie: `fixture_session=${cookie.value}` } });
+  assert.equal(replay.status, 401, "logout invalidates the server session as well as its cookie");
+  await migration.reload(); await migration.waitForSelector('input[name="password"]');
+  assert.equal(await migration.$eval("body", body => body.className), "web-shell-login");
+  checks.push("logout POST invalidates server session and cookie");
+  await migrationContext.close();
+  password = initialPassword; canSetup = true; sessions.clear();
+}
 try {
+  await failedStatus();
+  await firstSetup();
+  const { migrationContext, migration } = await bootstrapMigration();
+  await changePassword(migration);
+  await logoutCookie(migrationContext, migration);
   for (const [width, height] of [[1440, 900], [1024, 768], [390, 844]]) {
     const page = await browser.newPage();
     page.on("pageerror", error => failures.push(String(error)));
     page.on("console", message => { if (message.type() === "error" && message.text().includes("Content Security Policy")) failures.push(message.text()); });
     await page.setViewport({ width: width!, height: height! });
     await page.goto(server.url.href + "today");
-    await page.waitForSelector('input[name="key"]');
+    await page.waitForSelector('input[name="password"]');
+    await text(page, "登录");
+    assert.equal(await page.$eval('input[name="password"]', input => (input as HTMLInputElement).autocomplete), "current-password");
     assert(await page.$eval("body", body => body.classList.contains("web-shell-login")));
     assert(await page.$eval("header nav", nav => (nav as HTMLElement).hidden));
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${width}: login has no horizontal overflow`);
-    await page.type('input[name="key"]', "wrong-key"); await page.click('form button.primary');
-    await text(page, "密钥不正确");
-    await page.$eval('input[name="key"]', input => { (input as HTMLInputElement).value = ""; });
-    await page.type('input[name="key"]', "fixture-key"); await page.click('form button.primary');
+    await page.type('input[name="password"]', "wrong-password"); await page.click('form button.primary');
+    await text(page, "密码不正确");
+    await page.$eval('input[name="password"]', input => { (input as HTMLInputElement).value = ""; });
+    await page.type('input[name="password"]', initialPassword); await page.click('form button.primary');
     await text(page, "没有待处理的事项");
     const today = await geometry(page, false, `${width}: Today`);
     await page.waitForSelector('header a[data-page]');
@@ -166,7 +338,7 @@ try {
     assert.equal((await geometry(page, false, `${width}: dark settings`)).bg, dark.bg);
     await navigate(page, "/p/fixture/broken", "受控页面故障");
     await geometry(page, false, `${width}: system error shell`);
-    await page.click("#logout"); await page.waitForSelector('input[name="key"]');
+    await page.click("#logout"); await page.waitForSelector('input[name="password"]');
     assert.equal(await page.$$eval("header a[data-page]", nodes => nodes.length), 0);
     assert.equal(await page.$eval("body", body => body.className), "web-shell-login");
     await page.close();
@@ -176,7 +348,7 @@ try {
   page.on("pageerror", error => failures.push(String(error)));
     page.on("console", message => { if (message.type() === "error" && message.text().includes("Content Security Policy")) failures.push(message.text()); });
   await page.goto(server.url.href);
-  await page.evaluate(() => localStorage.setItem("chrona.accessKey", "fixture-key")); await page.reload(); await text(page, "没有待处理的事项");
+  await signIn(page, initialPassword);
   await page.evaluate(() => { const a = document.createElement("a"); a.href = "/p/fixture/slow"; document.body.append(a); a.click(); a.remove(); });
   await page.waitForResponse(response => response.url().endsWith("/api/web/pages"));
   await navigate(page, "/settings", "保存内核额度");
@@ -187,25 +359,29 @@ try {
   links.push({ module: "fixture", moduleId: "fixture-id", id: "added", title: "动态应用" });
   await navigate(page, "/p/fixture/added", "文档应用内容");
   await page.waitForSelector('header a[href="/p/fixture/added"][aria-current="page"]'); checks.push("dynamic registered link becomes active");
-  expired = true; await navigate(page, "/today", "密钥不正确");
+  expired = true; await navigate(page, "/today", "登录");
   assert.equal(await page.$eval("body", body => body.className), "web-shell-login");
   assert.equal(await page.$$eval("header a[data-page]", nodes => nodes.length), 0); checks.push("401 clears authenticated shell and app links");
-  expired = false; await page.type('input[name="key"]', "fixture-key"); await page.click('form button.primary'); await text(page, "没有待处理的事项");
+  expired = false; await page.type('input[name="password"]', initialPassword); await page.click('form button.primary'); await text(page, "没有待处理的事项");
   await page.waitForSelector('header a[data-page]'); checks.push("relogin restores shell and links");
   await page.evaluate(() => { const a = document.createElement("a"); a.href = "/p/fixture/old-session"; document.body.append(a); a.click(); a.remove(); });
   await page.waitForResponse(response => response.url().endsWith("/api/web/pages"));
-  await page.click("#logout"); await page.waitForSelector('input[name="key"]');
+  await page.click("#logout"); await page.waitForSelector('input[name="password"]');
   await page.evaluate(() => history.replaceState(null, "", "/today"));
-  await page.type('input[name="key"]', "fixture-key"); await page.click('form button.primary');
+  await page.type('input[name="password"]', initialPassword); await page.click('form button.primary');
   await text(page, "没有待处理的事项");
   assert(delayedUnauthorized, "old session request started");
   const oldResponse = page.waitForResponse(response => response.url().endsWith("/api/web/pages/fixture/old-session") && response.status() === 401);
   delayedUnauthorized(); await oldResponse;
   await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
   assert(await page.$eval("body", body => body.classList.contains("web-shell-app")));
-  assert.equal(await page.evaluate(() => localStorage.getItem("chrona.accessKey")), "fixture-key");
+  assert.equal(await page.evaluate(() => localStorage.getItem("chrona.accessKey")), null);
   await text(page, "没有待处理的事项"); checks.push("old session 401 cannot clear a new login");
   assert(calls.some(call => call.target === "fixture.ping" && call.page?.module === "fixture" && call.page.id === "document" && call.page.revision === 1), "registered calls retain module/page scope");
+  assert(webRequests.some(request => request.endpoint === "/events" && request.cookie), "SSE uses the session cookie");
+  assert(webRequests.every(request => request.authorization === null), "normal Web API and SSE never send bootstrap bearer credentials");
+  assert(authRequests.every(request => !request.authorization || ["/status", "/setup"].includes(request.endpoint)), "bootstrap bearer is limited to status/setup");
+  assert(authRequests.filter(request => request.endpoint === "/logout").every(request => Object.keys(request.body).length === 0), "logout sends an empty JSON object");
   assert.deepEqual(unexpected, []); assert.deepEqual(failures, []);
   console.log(JSON.stringify({ passed: checks.length, checks }, null, 2));
 } finally { await browser.close(); server.stop(true); }

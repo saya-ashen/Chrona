@@ -9,6 +9,7 @@ import { createRemoteExecutionRouter, isRemoteExecutionDevicePath, isRemoteExecu
 import { completeOAuth, OAUTH_CALLBACK_PATH } from "@chrona/engine";
 import { createLogger } from "@chrona/logging";
 import { apiKeyAuth } from "./middleware/auth";
+import { createBrowserAuth } from "./browser-auth";
 import { isTrustedRequestOrigin, readEnv, resolveAllowedOrigins } from "./config/env";
 
 import type { ServerBindings } from "./request-peer";
@@ -76,6 +77,8 @@ export async function createServerApp(options: { steward?: StewardRuntime } = {}
   await steward.initialize();
   const api = createApiRouter({ steward });
   const allowedOrigins = getAllowedOrigins();
+  const browserAuth = await createBrowserAuth({ dataDir: steward.ports.dataDir, apiKey: readEnv().API_KEY });
+  app.route("/api/auth", browserAuth.router);
 
   app.use("/api/*", async (c, next) => {
     const origin = c.req.header("origin");
@@ -98,7 +101,7 @@ export async function createServerApp(options: { steward?: StewardRuntime } = {}
     if (isRemoteExecutionOwnerPath(c.req.path, c.req.method) && !readEnv().API_KEY?.trim()) return c.json({ code: "REMOTE_EXECUTION_OWNER_AUTH_UNCONFIGURED" }, 503);
     await next();
   });
-  app.use("/api/*", apiKeyAuth({ isExempt: (path, method) => isStewardAgentPath(path, method) || isRemoteExecutionDevicePath(path, method) }));
+  app.use("/api/*", apiKeyAuth({ browserAuth, isExempt: (path, method) => isStewardAgentPath(path, method) || isRemoteExecutionDevicePath(path, method) }));
   app.route("/", createRemoteExecutionRouter(steward.ports));
   app.use(
     "/api/*",

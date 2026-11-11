@@ -15,6 +15,7 @@ export function settingsSpec(state: Record<string, unknown>) {
   }), "还没有安装应用。"));
   const settings = view?.settings, current = settings?.moduleModel;
   const spec = b.finish("设置", [
+    section("登录密码", [b.node("LoginPasswordSettings", {})]),
     section("内核", settings ? [
       b.heading("任务时限"),
       b.node("RunTimeoutSettings", { settings: { timezone: settings.timezone, runTimeoutMinutes: settings.runTimeoutMinutes } }),

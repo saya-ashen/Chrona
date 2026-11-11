@@ -6,13 +6,19 @@ export type SystemHost = {
   web: (path: string, options?: { method?: string; body?: unknown; raw?: boolean }) => Promise<unknown>;
   subscribe?: Subscribe;
   tool: (target: string, args: Args) => Promise<unknown>;
-  login: (key: string) => Promise<void>;
+  /** Paths are relative to /api/auth; credentials must never enter the Web module proxy. */
+  auth?: (path: string, options?: { method?: string; body?: unknown; accessKey?: string }) => Promise<unknown>;
+  login?: (password: string) => Promise<void>;
 };
 
 /** Created only by mountSystem; registered pages receive their original module-scoped deps. */
 export function systemCall(host: SystemHost) {
   const post = (path: string, body: unknown) => host.web(path, { method: "POST", body });
   const id = (args: Args) => encodeURIComponent(String(args.id ?? ""));
+  const auth = (path: string, options?: Parameters<NonNullable<SystemHost["auth"]>>[1]) => {
+    if (!host.auth) throw new Error("当前页面无法访问登录服务，请刷新页面。");
+    return host.auth(path, options);
+  };
   const actions: Record<string, (args: Args) => Promise<unknown>> = {
     overview: args => host.web(`/modules/${id(args)}/overview`).catch((error: Error) => { if (/not found/i.test(error.message)) return { app: null }; throw error; }),
     tools: args => host.web(`/tools?query=${encodeURIComponent(String(args.query ?? ""))}${args.audience === "user" ? "&audience=user" : ""}`),
@@ -50,7 +56,10 @@ export function systemCall(host: SystemHost) {
     answer: args => post(`/interactions/${id(args)}/answer`, args.answer),
     cancel: args => post(`/runs/${id(args)}/cancel`, {}),
     feedback: args => host.tool("notify.feedback", { id: args.id, feedback: args.feedback }),
-    login: args => host.login(String(args.key ?? "").trim()),
+    "auth-status": args => auth("/status", typeof args.accessKey === "string" ? { accessKey: args.accessKey } : undefined),
+    "auth-setup": args => auth("/setup", { method: "POST", body: { password: args.password } }),
+    "auth-password": args => auth("/password", { method: "POST", body: { currentPassword: args.currentPassword, password: args.password } }),
+    login: args => host.auth ? auth("/login", { method: "POST", body: { password: args.password } }) : host.login ? host.login(String(args.password ?? "")) : Promise.reject(new Error("当前页面无法访问登录服务，请刷新页面。")),
   };
   return async (target: string, args: Args): Promise<unknown> => {
     const name = target.slice(5), action = target.startsWith("$web.") && Object.hasOwn(actions, name) ? actions[name] : undefined;

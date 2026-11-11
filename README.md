@@ -41,6 +41,8 @@ Open `http://127.0.0.1:3101`; `bun run dev` starts Hono in watch mode and serves
 
 The packaged application uses `chrona start --no-open`. For source startup without watch mode use `bun run server:start`.
 
+Set a browser login password on first opening the web app, then sign in with that password and change it in Settings. An existing instance with `API_KEY` requires its original access authorization for initial password setup. See [browser login passwords](docs/zh/operations.md#网页登录密码).
+
 ## Configuration
 
 Set these in the server environment, then restart:

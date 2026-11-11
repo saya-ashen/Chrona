@@ -51,6 +51,7 @@
     "src/pages-loading.browser-test.tsx",
     "src/pages.css",
     "src/pages.tsx",
+    "src/password-forms.bun.test.tsx",
     "src/registered-page.ts",
     "src/schema-config.ts",
     "src/settings-inline.browser.test.tsx",
@@ -73,6 +74,7 @@
     "src/system/login.ts",
     "src/system/model-settings.ts",
     "src/system/page.ts",
+    "src/system/password-forms.tsx",
     "src/system/registered-pages.ts",
     "src/system/runtime.ts",
     "src/system/settings-forms.tsx",
@@ -102,7 +104,7 @@
   "artifacts": [
     {
       "path": "pages.js",
-      "sha256": "429b3e31b6d99d66db2c1b8cbe90d0a3fdd1e49980d0684dff5aadc2ad2a2481",
+      "sha256": "828714e16623eb7f12d385ec3c3da320bc0079210d4c1c197882029d6c0dd47a",
       "executable": false
     },
     {

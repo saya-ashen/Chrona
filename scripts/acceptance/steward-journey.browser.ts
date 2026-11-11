@@ -1,7 +1,10 @@
 // Run: bun scripts/acceptance/steward-journey.browser.ts
 // Isolated HTTP/browser integration: no running Chrona service, database or model calls.
 import assert from "node:assert/strict";
-import { mkdir } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { Hono } from "hono";
+import { createBrowserAuth } from "../../apps/server/src/browser-auth";
 import { join, resolve } from "node:path";
 import puppeteer, { type Page as BrowserPage } from "puppeteer-core";
 import { expandComponents } from "../../packages/engine/src/modules/steward/external/web/composition";
@@ -53,6 +56,11 @@ let expired = false, delayed: (() => void) | undefined, delayedUnauthorized: (()
 type ScopedCall = { target: string; page?: { module: string; id: string; revision: number } };
 const calls: ScopedCall[] = [];
 const unexpected: string[] = [];
+const authDirectory = await mkdtemp(join(tmpdir(), "chrona-journey-auth-"));
+const auth = await createBrowserAuth({ dataDir: authDirectory, apiKey: "fixture-key" });
+const authRouter = new Hono().route("/api/auth", auth.router);
+const setup = await authRouter.request("http://fixture/api/auth/setup", { method: "POST", headers: { authorization: "Bearer fixture-key", "content-type": "application/json" }, body: JSON.stringify({ password: "fixture-password-1" }) });
+assert.equal(setup.status, 200);
 const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
   // eslint-disable-next-line complexity -- The mock routes mirror the public HTTP boundary in one place.
   async fetch(request) {
@@ -61,8 +69,9 @@ const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
   if (path === "/app.js") return new Response(app, { headers: { "content-type": "text/javascript" } });
   if (path === "/pages.js") return new Response(pages, { headers: { "content-type": "text/javascript" } });
   if (path === "/style.css") return new Response(style, { headers: { "content-type": "text/css" } });
+  if (path.startsWith("/api/auth/")) return authRouter.fetch(request);
   if (!path.startsWith("/api/web")) return new Response(index, { headers: { "content-type": "text/html", "content-security-policy": csp } });
-  if (expired || request.headers.get("authorization") !== "Bearer fixture-key") return json({ message: "Unauthorized" }, 401);
+  if (expired || !auth.authenticate(request)) return json({ message: "Unauthorized" }, 401);
   const endpoint = path.slice("/api/web".length);
   if (endpoint === "/events") return new Response(new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode(": connected\n\n")); } }), { headers: { "content-type": "text/event-stream" } });
   if (endpoint === "/pages") return json(links);
@@ -122,14 +131,14 @@ try {
     page.on("console", message => { if (message.type() === "error" && message.text().includes("Content Security Policy")) failures.push(message.text()); });
     await page.setViewport({ width: width!, height: height! });
     await page.goto(server.url.href + "today");
-    await page.waitForSelector('input[name="key"]');
+    await page.waitForSelector('input[name="password"]');
     assert(await page.$eval("body", body => body.classList.contains("web-shell-login")));
     assert(await page.$eval("header nav", nav => (nav as HTMLElement).hidden));
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${width}: login has no horizontal overflow`);
-    await page.type('input[name="key"]', "wrong-key"); await page.click('form button.primary');
-    await text(page, "密钥不正确");
-    await page.$eval('input[name="key"]', input => { (input as HTMLInputElement).value = ""; });
-    await page.type('input[name="key"]', "fixture-key"); await page.click('form button.primary');
+    await page.type('input[name="password"]', "wrong-password"); await page.click('form button.primary');
+    await page.waitForSelector('[role="alert"]');
+    await page.$eval('input[name="password"]', input => { (input as HTMLInputElement).value = ""; });
+    await page.type('input[name="password"]', "fixture-password-1"); await page.click('form button.primary');
     await text(page, "没有待处理的事项");
     const today = await geometry(page, false, `${width}: Today`);
     await page.waitForSelector('header a[data-page]');
@@ -185,7 +194,7 @@ try {
     assert.equal((await geometry(page, false, `${width}: dark settings`)).bg, dark.bg);
     await navigate(page, "/p/fixture/broken", "受控页面故障");
     await geometry(page, false, `${width}: system error shell`);
-    await page.click("#logout"); await page.waitForSelector('input[name="key"]');
+    await page.click("#logout"); await page.waitForSelector('input[name="password"]');
     assert.equal(await page.$$eval("header a[data-page]", nodes => nodes.length), 0);
     assert.equal(await page.$eval("body", body => body.className), "web-shell-login");
     await page.close();
@@ -195,7 +204,8 @@ try {
   page.on("pageerror", error => failures.push(String(error)));
     page.on("console", message => { if (message.type() === "error" && message.text().includes("Content Security Policy")) failures.push(message.text()); });
   await page.goto(server.url.href);
-  await page.evaluate(() => localStorage.setItem("chrona.accessKey", "fixture-key")); await page.reload(); await text(page, "没有待处理的事项");
+  await page.waitForSelector('input[name="password"]');
+  await page.type('input[name="password"]', "fixture-password-1"); await page.click('form button.primary'); await text(page, "没有待处理的事项");
   await page.evaluate(() => { const a = document.createElement("a"); a.href = "/p/fixture/slow"; document.body.append(a); a.click(); a.remove(); });
   await page.waitForResponse(response => response.url().endsWith("/api/web/pages"));
   await navigate(page, "/settings", "保存内核额度");
@@ -206,25 +216,43 @@ try {
   links.push({ module: "fixture", moduleId: "fixture-id", id: "added", title: "动态应用" });
   await navigate(page, "/p/fixture/added", "文档应用内容");
   await page.waitForSelector('header a[href="/p/fixture/added"][aria-current="page"]'); checks.push("dynamic registered link becomes active");
-  expired = true; await navigate(page, "/today", "密钥不正确");
+  expired = true; await navigate(page, "/today", "登录");
   assert.equal(await page.$eval("body", body => body.className), "web-shell-login");
   assert.equal(await page.$$eval("header a[data-page]", nodes => nodes.length), 0); checks.push("401 clears authenticated shell and app links");
-  expired = false; await page.type('input[name="key"]', "fixture-key"); await page.click('form button.primary'); await text(page, "没有待处理的事项");
+  expired = false; await page.type('input[name="password"]', "fixture-password-1"); await page.click('form button.primary'); await text(page, "没有待处理的事项");
   await page.waitForSelector('header a[data-page]'); checks.push("relogin restores shell and links");
   await page.evaluate(() => { const a = document.createElement("a"); a.href = "/p/fixture/old-session"; document.body.append(a); a.click(); a.remove(); });
   await page.waitForResponse(response => response.url().endsWith("/api/web/pages"));
-  await page.click("#logout"); await page.waitForSelector('input[name="key"]');
+  await page.click("#logout"); await page.waitForSelector('input[name="password"]');
   await page.evaluate(() => history.replaceState(null, "", "/today"));
-  await page.type('input[name="key"]', "fixture-key"); await page.click('form button.primary');
+  await page.type('input[name="password"]', "fixture-password-1"); await page.click('form button.primary');
   await text(page, "没有待处理的事项");
   assert(delayedUnauthorized, "old session request started");
   const oldResponse = page.waitForResponse(response => response.url().endsWith("/api/web/pages/fixture/old-session") && response.status() === 401);
   delayedUnauthorized(); await oldResponse;
   await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
   assert(await page.$eval("body", body => body.classList.contains("web-shell-app")));
-  assert.equal(await page.evaluate(() => localStorage.getItem("chrona.accessKey")), "fixture-key");
+  assert.equal(await page.evaluate(() => localStorage.getItem("chrona.accessKey")), null);
   await text(page, "没有待处理的事项"); checks.push("old session 401 cannot clear a new login");
+  // Exercise the real password router and forms together, including cookie rotation across browsers.
+  const otherContext = await browser.createBrowserContext(), other = await otherContext.newPage();
+  try {
+    await other.goto(server.url.href + "today"); await other.waitForSelector('input[name="password"]');
+    await other.type('input[name="password"]', "fixture-password-1"); await other.click('form button.primary');
+    await text(other, "没有待处理的事项");
+    await navigate(page, "/settings", "登录密码");
+    await page.type('input[name="currentPassword"]', "fixture-password-1");
+    await page.type('input[name="password"]', "fixture-password-2");
+    await page.type('input[name="confirmPassword"]', "fixture-password-2");
+    await page.evaluate(() => Array.from(document.querySelectorAll<HTMLButtonElement>("main button")).find(button => button.textContent === "更新登录密码")?.click());
+    await page.waitForSelector('form [role="status"]');
+    await text(page, "登录密码已更新");
+    assert.equal(await page.evaluate(async () => (await fetch("/api/web/today")).status), 200, "replacement cookie keeps submitting browser authorized");
+    assert.equal(await other.evaluate(async () => (await fetch("/api/web/today")).status), 401, "password change revokes another browser's real server session");
+    assert.deepEqual(await page.$$eval('input[type="password"]', inputs => inputs.map(input => (input as HTMLInputElement).value)), ["", "", ""], "successful change clears password fields");
+    checks.push("real password change rotates current cookie and revokes another browser");
+  } finally { await otherContext.close(); }
   assert(calls.some(call => call.target === "fixture.ping" && call.page?.module === "fixture" && call.page.id === "document" && call.page.revision === 1), "registered calls retain module/page scope");
   assert.deepEqual(unexpected, []); assert.deepEqual(failures, []);
   console.log(JSON.stringify({ passed: checks.length, checks }, null, 2));
-} finally { await browser.close(); server.stop(true); }
+} finally { await browser.close(); server.stop(true); await rm(authDirectory, { recursive: true, force: true }); }
