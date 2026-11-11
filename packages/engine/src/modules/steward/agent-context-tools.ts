@@ -20,7 +20,8 @@ export async function selectContextTools(ports: StewardPorts, principal: Executi
     const entry = entries.find(entry => typeof target === "string" ? `${entry.module.name}.${entry.tool.name}` === target : entry.module.id === target.moduleId && entry.tool.name === target.tool);
     if (!entry) throw new CallError("not_found", `Agent tool ${target} not found`);
     if (!await admitted(ports.db, caller, entry.tool, principal.workspaceId)) throw new CallError("forbidden", `Agent caller cannot use ${target}`);
-    selected.push(entry);
+    // Explicit Run selections must be callable without workspace focus or tool search.
+    selected.push({ ...entry, direct: true });
   }
   return { caller, entries: selected, catalog: selected.map(catalogEntry), runId: undefined as string | undefined, workspaceId: principal.workspaceId };
 }
