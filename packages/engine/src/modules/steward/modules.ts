@@ -97,7 +97,10 @@ async function list(context: ModuleContext) {
     runs: { take: 5, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { id: true, hash: true, triggerId: true, firedAt: true, exitCode: true, error: true, createdAt: true } },
   } });
   const pointers = rows.filter(row => row.activeHash).map(row => ({ moduleId: row.id, hash: row.activeHash! }));
-  const activeVersions = pointers.length ? await db.moduleVersion.findMany({ where: { OR: pointers }, select: { moduleId: true, manifest: true } }) : [];
+  const activeVersions = [];
+  for (let offset = 0; offset < pointers.length; offset += 200) {
+    activeVersions.push(...await db.moduleVersion.findMany({ where: { OR: pointers.slice(offset, offset + 200) }, select: { moduleId: true, manifest: true } }));
+  }
   const byModule = new Map(activeVersions.map(version => [version.moduleId, version]));
   return Promise.all(rows.map(async ({ versions, runs, ...row }) => {
     const active = byModule.get(row.id) ?? null;

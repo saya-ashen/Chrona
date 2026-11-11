@@ -180,3 +180,14 @@ test("discovery batches current versions and reads caller authority once per req
     expect(await systemModules.handle({ ...context, workspaceId: (await f.db.workspace.create({ data: { name: "foreign" } })).id }, "describe", {})).toMatchObject({ items: [] });
   }
 });
+
+
+test("discovery batches more than SQLite expression depth without admitting rejected versions", async () => {
+  const f = await fixture();
+  const rows = Array.from({ length: 1001 }, (_, index) => ({ id: crypto.randomUUID(), workspaceId: f.workspace.id, name: `scale-${index}`, activeHash: "v1" }));
+  await f.db.module.createMany({ data: rows });
+  await f.db.moduleVersion.createMany({ data: rows.map((row, index) => ({ moduleId: row.id, hash: "v1", manifest: { ...manifest, name: row.name }, source: "user", status: index === 1000 ? "rejected" : "approved", intent: {}, report: {} })) });
+  const result = await references(f.ports, f.workspace.id);
+  expect(result.filter(entry => entry.target.startsWith("scale-")).length).toBe(1000);
+  expect(result.some(entry => entry.target === "scale-1000.read")).toBe(false);
+});

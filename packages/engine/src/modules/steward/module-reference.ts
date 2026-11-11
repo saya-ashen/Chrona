@@ -18,7 +18,10 @@ type Reference = { target: string; source: { kind: "system" | "module"; hash: st
 export async function activeModuleReferences(ports: StewardPorts, workspaceId: string) {
   const modules = (await ports.db.module.findMany({ where: { workspaceId, status: "active", activeHash: { not: null } }, orderBy: { name: "asc" }, select: { id: true, name: true, activeHash: true } })).filter(module => !isModulePaused(module.name));
   if (!modules.length) return [];
-  const versions = await ports.db.moduleVersion.findMany({ where: { status: "approved", OR: modules.map(module => ({ moduleId: module.id, hash: module.activeHash! })) }, select: { moduleId: true, hash: true, manifest: true } });
+  const versions = [];
+  for (let offset = 0; offset < modules.length; offset += 200) {
+    versions.push(...await ports.db.moduleVersion.findMany({ where: { status: "approved", OR: modules.slice(offset, offset + 200).map(module => ({ moduleId: module.id, hash: module.activeHash! })) }, select: { moduleId: true, hash: true, manifest: true } }));
+  }
   const byModule = new Map(versions.map(version => [version.moduleId, version]));
   return modules.flatMap(module => {
     const version = byModule.get(module.id), manifest = moduleManifestSchema.safeParse(version?.manifest).data;
