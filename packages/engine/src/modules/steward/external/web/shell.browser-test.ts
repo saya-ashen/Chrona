@@ -323,8 +323,10 @@ try {
     await geometry(page, false, `${width}: registered document`);
     await capture(page, `document-${width}`);
     assert.equal(await page.$eval('main a[aria-label="应用设置"]', a => a.getAttribute("href")), "/apps/fixture-id?tab=settings");
+    const navigationReads = webRequests.filter(request => request.endpoint === "/pages").length;
     await page.evaluate(() => Array.from(document.querySelectorAll("main button")).find(button => button.textContent === "调用应用操作")?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-    await page.waitForFunction(() => !document.querySelector("main button[disabled]"));
+    await text(page, "已完成");
+    assert.equal(webRequests.filter(request => request.endpoint === "/pages").length, navigationReads, "application POST does not rediscover navigation");
     await navigate(page, "/p/fixture/workspace", "工作区内容");
     await page.waitForSelector("textarea");
     await geometry(page, true, `${width}: registered workspace`);
@@ -349,14 +351,17 @@ try {
     page.on("console", message => { if (message.type() === "error" && message.text().includes("Content Security Policy")) failures.push(message.text()); });
   await page.goto(server.url.href);
   await signIn(page, initialPassword);
+  const slowRequest = page.waitForRequest(request => request.url().endsWith("/api/web/pages/fixture/slow"));
   await page.evaluate(() => { const a = document.createElement("a"); a.href = "/p/fixture/slow"; document.body.append(a); a.click(); a.remove(); });
-  await page.waitForResponse(response => response.url().endsWith("/api/web/pages"));
+  await slowRequest;
   await navigate(page, "/settings", "保存内核额度");
   assert(delayed, "slow page request started"); delayed();
   await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
   assert(await page.$eval("body", body => !body.classList.contains("web-shell-workspace")));
   await text(page, "保存内核额度"); checks.push("stale route response ignored");
   links.push({ module: "fixture", moduleId: "fixture-id", id: "added", title: "动态应用" });
+  // Advance the navigation display refresh window without a real 30-second wait.
+  await page.evaluate(() => { const now = Date.now; Date.now = () => now() + 31000; });
   await navigate(page, "/p/fixture/added", "文档应用内容");
   await page.waitForSelector('header a[href="/p/fixture/added"][aria-current="page"]'); checks.push("dynamic registered link becomes active");
   expired = true; await navigate(page, "/today", "登录");
@@ -364,8 +369,9 @@ try {
   assert.equal(await page.$$eval("header a[data-page]", nodes => nodes.length), 0); checks.push("401 clears authenticated shell and app links");
   expired = false; await page.type('input[name="password"]', initialPassword); await page.click('form button.primary'); await text(page, "没有待处理的事项");
   await page.waitForSelector('header a[data-page]'); checks.push("relogin restores shell and links");
+  const oldRequest = page.waitForRequest(request => request.url().endsWith("/api/web/pages/fixture/old-session"));
   await page.evaluate(() => { const a = document.createElement("a"); a.href = "/p/fixture/old-session"; document.body.append(a); a.click(); a.remove(); });
-  await page.waitForResponse(response => response.url().endsWith("/api/web/pages"));
+  await oldRequest;
   await page.click("#logout"); await page.waitForSelector('input[name="password"]');
   await page.evaluate(() => history.replaceState(null, "", "/today"));
   await page.type('input[name="password"]', initialPassword); await page.click('form button.primary');

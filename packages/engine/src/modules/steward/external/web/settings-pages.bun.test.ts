@@ -75,3 +75,19 @@ test("settings preserve active-owner and pinned-tool checks across pause, contra
   expect(await pages.get("fixture", input.id)).toBeNull();
   await expect(pages.tool("page-set", input, caller)).rejects.toMatchObject({ code: "conflict" });
 });
+
+test("one inventory reuses each app discovery, and subsequent reads revalidate changed pins", async () => {
+  const { deps, caller, input, tools } = await fixture();
+  let reads = 0;
+  const pages = createPages({ ...deps, tools: async () => { reads++; return tools; } });
+  await pages.tool("page-set", input, caller);
+  await pages.tool("page-set", { ...input, id: "main", purpose: undefined }, caller);
+  reads = 0;
+  expect(await pages.list()).toHaveLength(2);
+  expect(reads).toBe(1);
+  tools.set("read", { ...tools.get("read")!, contractHash: "b".repeat(64) });
+  expect(await pages.list()).toEqual([]);
+  expect(reads).toBe(2);
+  await expect(pages.get("fixture", "main")).rejects.toMatchObject({ code: "conflict" });
+  expect(reads).toBe(3);
+});

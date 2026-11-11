@@ -1,0 +1,16 @@
+{
+  "changes": [
+    {
+      "target": "web.component-set",
+      "before": "54adad42517ed87a7b2e0b119d3ab1e5386a5b2780de369fa6c43bce3cd9e8df",
+      "after": "f2231abb6326059f99cb2a15b2f84ff96610c2742f135b6fc05668922882c396",
+      "reason": "Expose same-document CSS, inherited theme variables and activated registration guidance in input schema descriptions; validation shapes are unchanged."
+    },
+    {
+      "target": "web.page-set",
+      "before": "70d84321364f2fa0336bf5d1ec72531b2f0583597f649457c38c46c35145da1e",
+      "after": "14f072c912a2a997ff16f43c9cbf978b1a439d853207bf402f9a8c6e6edb8d2d",
+      "reason": "Explain document/workspace layout sizing in the published layout parameter description; accepted layout values and behavior remain unchanged."
+    }
+  ]
+}

@@ -2,7 +2,7 @@ import { builder } from "./spec";
 import type { SettingsView } from "./types";
 import { settingsHref, settingsPageForApp, settingsUnavailable, type PageOwner, type RegisteredPage } from "./registered-pages";
 export type { GlobalSettings, SettingsView } from "./types";
-export const settingsData = { settingsView: { tool: "settings" }, pages: { tool: "pages", refresh: 5 }, apps: { tool: "modules", refresh: 5 } };
+export const settingsData = { settingsView: { tool: "settings" }, pages: { tool: "pages", refresh: 30 }, apps: { tool: "modules", refresh: 5 } };
 export function settingsSpec(state: Record<string, unknown>) {
   const b = builder(), view = state.settingsView as SettingsView | undefined;
   const section = (title: string, children: string[]) => b.node("Card", { title }, children);

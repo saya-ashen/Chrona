@@ -23,6 +23,9 @@ if (typeof globalThis.Bun === "undefined") {
 function createAdapter() {
   return guardSqliteAdapter(new PrismaBunSqlite({
     url: resolveSqliteAdapterUrl(DATABASE_URL),
+    // Keep committed receipts durable while avoiding rollback-journal fsyncs on
+    // every routed call. Configure every adapter connection, including reopen.
+    wal: { enabled: true, synchronous: "FULL", busyTimeout: 5000 },
   }));
 }
 

@@ -226,11 +226,11 @@ export function createPages(deps: Deps) {
     if (kept.length !== all.length) await save(kept);
     return { modules, pages: kept };
   }
-  async function validatedTools(page: Page, modules: ModuleState[]) {
+  async function validatedTools(page: Page, modules: ModuleState[], readTools = deps.tools) {
     assertPageIdentity(page);
     const owner = modules.find(item => item.id === page.moduleId);
     if (!owner || owner.status !== "active" || !owner.activeHash) throw Object.assign(new Error("应用已暂停或不可用，请先恢复应用"), { code: "conflict" });
-    const current = await deps.tools(page.module);
+    const current = await readTools(page.module);
     for (const [name, contract] of Object.entries(page.contracts)) {
       const tool = current.get(name);
       if (!tool || tool.moduleId !== owner.id || tool.contractHash !== contract) throw stalePage();
@@ -272,8 +272,15 @@ export function createPages(deps: Deps) {
     /** Navigation includes only usable pages. Pages of apps that are gone are dropped. */
     list() { return exclusive(async () => {
       const { modules, pages } = await knownPages(), available: Page[] = [];
+      // Reuse discovery only within this serialized inventory read. The next
+      // read must observe current identities, visibility and contract hashes.
+      const tools = new Map<string, ReturnType<Deps["tools"]>>();
+      const readTools: Deps["tools"] = module => {
+        if (!tools.has(module)) tools.set(module, deps.tools(module));
+        return tools.get(module)!;
+      };
       for (const page of pages) {
-        try { await validatedTools(page, modules); }
+        try { await validatedTools(page, modules, readTools); }
         catch (error) { if ((error as { code?: string }).code === "conflict") continue; throw error; }
         available.push(page);
       }
@@ -305,7 +312,7 @@ function references(spec: Spec, sources: Record<string, Source>) {
   return [...names];
 }
 
-/** Under the 16 KiB tool result limit: component props as JSON Schema, events, and how data and `call` work. */
+/** Component props as JSON Schema, events, and how data and `call` work. */
 export function describeCatalog() {
   return {
     catalog: CATALOG_VERSION,
@@ -315,6 +322,10 @@ export function describeCatalog() {
       ...(definition.slots?.length ? { children: true, slots: definition.slots } : {}),
     }])),
     rules: [
+      "UI guide: complete activated JS/CSS example and verification procedure ship in Web version material UI-DEVELOPMENT.md (obtain the exact approved source through Author). Prefer shared declarative catalog components/templates; use executable components for browser APIs such as files/audio. Composer uses on.submit; WorkspaceHeader.statusTone is app-supplied.",
+      "Theme/CSS: same document, no iframe/Shadow DOM/style isolation. Inherit --fg text, --bg page, --card panel, --muted secondary text, --line border, --accent emphasis; --foreground/--background do not exist. Shell also owns --rail, --selection and --workspace-tint/--workspace-add/--workspace-remove. prefers-color-scheme:dark changes inherited values. Pair foreground/background; do not assume white on accent works in dark mode. Scope every selector under an app-specific root class; never change body/:root or global tags. Host header is sticky/flex/padded; section has border/padding/margin. Prefer scoped divs or explicitly override these properties under your root. Scope keyframes too; clean listeners, observers, media and own object URLs on destroy.",
+      "Layout: document centers max-width 64rem with desktop 36px 32px padding (mobile 24px 16px); workspace removes main width/padding but retains shell navigation. Shared Workspace computes remaining visual viewport height from its top (minimum 240px) and tracks resize. layout alone does not size arbitrary executable roots. Prefer Workspace; never hardcode 900px or assume 100vh excludes navigation. Use min-width/min-height:0 and a deliberate overflow:auto region.",
+      "Verification: registration-test.ts/build.ts --registration-test-only builds a portable helper in a Chrona checkout; it validates real activated registrations with a mocked SDK, not kernel activation or browser rendering. Isolated component tests do not prove host CSS compatibility. After approved activation, verify actual host page moduleId/hash/revision and test light/dark at 1440x900,1024x768,390x844; inspect contrast, global header/section collisions, navigation, scroll/focus/cleanup and no mobile horizontal overflow. Record browser evidence separately; Web tools do not automate a browser. Full example and state checklist: UI-DEVELOPMENT.md.",
       "page-set {id, title, purpose?: settings, layout?: document|workspace, components?, data?, content?: {tool}, spec}: spec is a json-render spec {root, elements:{key:{type, props, children:[keys], slots?:{name:[keys]}, on?}}}. Workspace accepts slots.sidebar alongside default children.",
       "purpose: settings marks the app-owned settings page. At most one per app; updating the same id replaces it. Omit purpose for ordinary pages. Settings navigation uses this metadata, never a tool or page id convention.",
       "components: {app:Name:{props:{type:object,properties:{name:JSONSchema},required?:[names],additionalProperties:false},events?:[names],slots?:[names],spec:{root,elements}}}. Use {$prop:name} for a passed prop, {$event:name} for a caller event binding, and child key $slot:name for supplied children. Here app is a placeholder for your actual module name (e.g. music:Card); definitions belong to this page revision, expand before tool checks, and cannot contain scripts or private state. Max 16 definitions, 8 nesting levels, 300 expanded nodes.",

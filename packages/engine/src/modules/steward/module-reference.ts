@@ -1,7 +1,8 @@
 import { moduleToolContract } from "./module-tool-contract";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
-import { admitted, listSystemModules, moduleCallbackContractHash, type Caller, type SystemTool, type Tool } from "./module-calls";
+import { listSystemModules, moduleCallbackContractHash, type Caller, type SystemTool, type Tool } from "./module-calls";
+import { discoveryAdmission } from "./module-call-admission";
 import { StewardError } from "./errors";
 import { isModulePaused } from "./module-availability";
 
@@ -13,18 +14,37 @@ Author with the ordinary application's source and editing tools. Inspect install
 Native nested objects and arrays remain JSON values; string parameters remain strings unless their contract explicitly requires JSON text. Every public tool declares outputSchema. Missing sideEffects/errors/examples metadata is unspecified. Examples are contract fixtures, never live calls. Use the available local type-checking and offline tests, with test doubles matching the declared contracts. Inspect changes and preserve the exact base before submission; reading a reference never grants permissions or approval.`;
 
 type Reference = { target: string; source: { kind: "system" | "module"; hash: string | null }; tool: SystemTool | Tool };
+/** Batch only current approved versions, without loading historical manifests or runtime evidence. */
+export async function activeModuleReferences(ports: StewardPorts, workspaceId: string) {
+  const modules = (await ports.db.module.findMany({ where: { workspaceId, status: "active", activeHash: { not: null } }, orderBy: { name: "asc" }, select: { id: true, name: true, activeHash: true } })).filter(module => !isModulePaused(module.name));
+  if (!modules.length) return [];
+  const versions = await ports.db.moduleVersion.findMany({ where: { status: "approved", OR: modules.map(module => ({ moduleId: module.id, hash: module.activeHash! })) }, select: { moduleId: true, hash: true, manifest: true } });
+  const byModule = new Map(versions.map(version => [version.moduleId, version]));
+  return modules.flatMap(module => {
+    const version = byModule.get(module.id), manifest = moduleManifestSchema.safeParse(version?.manifest).data;
+    if (!manifest || version?.hash !== module.activeHash) return [];
+    return manifest.tools.map(tool => ({ target: `${module.name}.${tool.name}`, source: { kind: "module" as const, hash: module.activeHash! }, moduleId: module.id, tool }));
+  });
+}
 export async function references(ports: StewardPorts, workspaceId: string): Promise<Reference[]> {
-  const found: Reference[] = listSystemModules().flatMap(module => module.tools.map(tool => ({ target: `${module.name}.${tool.name}`, source: { kind: "system" as const, hash: null }, tool })));
-  const modules = await ports.db.module.findMany({ where: { workspaceId, status: "active", activeHash: { not: null } }, orderBy: { name: "asc" } });
-  for (const module of modules) {
-    if (isModulePaused(module.name)) continue;
-    const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } });
-    if (version?.status !== "approved") continue;
-    const manifest = moduleManifestSchema.safeParse(version.manifest);
-    if (!manifest.success) continue;
-    for (const tool of manifest.data.tools) found.push({ target: `${module.name}.${tool.name}`, source: { kind: "module", hash: module.activeHash }, tool });
+  return [...listSystemModules().flatMap(module => module.tools.map(tool => ({ target: `${module.name}.${tool.name}`, source: { kind: "system" as const, hash: null }, tool }))), ...await activeModuleReferences(ports, workspaceId)];
+}
+
+async function exactReference(ports: StewardPorts, workspaceId: string, target: string): Promise<Reference | undefined> {
+  const separator = target.indexOf("."), name = target.slice(0, separator), toolName = target.slice(separator + 1);
+  if (separator < 1) return;
+  const system = listSystemModules().find(module => module.name === name);
+  if (system) {
+    const tool = system.tools.find(tool => tool.name === toolName);
+    return tool ? { target, source: { kind: "system", hash: null }, tool } : undefined;
   }
-  return found;
+  if (isModulePaused(name)) return;
+  const module = await ports.db.module.findFirst({ where: { workspaceId, name, status: "active", activeHash: { not: null } }, select: { id: true, activeHash: true } });
+  if (!module?.activeHash) return;
+  const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } }, select: { status: true, manifest: true } });
+  if (version?.status !== "approved") return;
+  const tool = moduleManifestSchema.safeParse(version.manifest).data?.tools.find(tool => tool.name === toolName);
+  return tool ? { target, source: { kind: "module", hash: module.activeHash }, tool } : undefined;
 }
 
 function retryDescription(idempotent: boolean) {
@@ -39,13 +59,12 @@ function referenceContract(target: string, { tool, source }: Reference) {
 }
 /** Code metadata only: never call a handler, inspect settings, read incidents or start a module. */
 export async function interfaceReference(ports: StewardPorts, workspaceId: string, target?: string, caller?: Caller) {
-  const declared = await references(ports, workspaceId);
-  const entries: Reference[] = [];
-  for (const entry of declared) if (!caller || await admitted(ports.db, caller, entry.tool, workspaceId)) entries.push(entry);
+  const canRead = caller ? await discoveryAdmission(ports.db, caller, workspaceId) : () => true;
+  if (target) {
+    const entry = await exactReference(ports, workspaceId, target);
+    if (!entry || !canRead(entry.tool)) throw new StewardError("not_found", "Interface reference not found");
+    return { ...referenceContract(target, entry), contractHash: moduleCallbackContractHash(entry.tool) };
+  }
   // The index names interfaces; contracts come one target at a time (all of them overflowed the Provider's tool result).
-  if (!target) return entries.map(({ target, source, tool }) => ({ target, source, description: tool.description }));
-  const entry = entries.find(item => item.target === target);
-  if (!entry) throw new StewardError("not_found", "Interface reference not found");
-  const contract = referenceContract(target, entry);
-  return { ...contract, contractHash: moduleCallbackContractHash(entry.tool) };
+  return (await references(ports, workspaceId)).filter(entry => canRead(entry.tool)).map(({ target, source, tool }) => ({ target, source, description: tool.description }));
 }

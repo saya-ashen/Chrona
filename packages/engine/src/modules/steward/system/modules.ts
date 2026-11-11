@@ -5,10 +5,8 @@ import { routedTargetName } from "../module-calls";
 import type { RoutedTarget } from "@chrona/contracts/steward";
 import { moduleToolContract } from "../module-tool-contract";
 import { publicSystemTools } from "./tool-contract-declarations";
-import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { createModules } from "../modules";
-import { isModulePaused } from "../module-availability";
-import { admitted } from "../module-call-admission";
+import { discoveryAdmission } from "../module-call-admission";
 import { CallError } from "../module-call-error";
 import { listSystemModules } from "../module-registry";
 import { moduleCallbackContractHash, normalizedToolInputSchema } from "../module-tool-contract";
@@ -16,34 +14,26 @@ import type { Caller, Json, Tool } from "../module-call-types";
 import type { SystemModule } from "../module-system-types";
 import type { SystemTool } from "../module-system-tool-types";
 import { admitCandidates, candidateSource, submitCandidates, checkCandidates } from "../module-candidates";
-import { interfaceReference } from "../module-reference";
+import { activeModuleReferences, interfaceReference } from "../module-reference";
 import type { StewardPorts } from "../ports";
 import { json, requireOwner } from "./shared";
 
-type ToolSearchOptions = { workspaceId: string; caller: Caller; words: string[]; userTools: boolean };
-const searchMatch = async (ports: StewardPorts, { workspaceId, caller, words }: ToolSearchOptions, target: string, candidate: SystemTool | Tool) => words.every(word => `${target} ${candidate.description}`.toLowerCase().includes(word)) && await admitted(ports.db, caller, candidate, workspaceId);
+type ToolSearchOptions = { workspaceId: string; canRead: (tool: SystemTool | Tool) => boolean; words: string[]; userTools: boolean };
+const searchMatch = ({ canRead, words, userTools }: ToolSearchOptions, target: string, candidate: SystemTool | Tool) => (!userTools || candidate.visibility.some(audience => audience === "owner" || audience === "provider")) && words.every(word => `${target} ${candidate.description}`.toLowerCase().includes(word)) && canRead(candidate);
 type ToolSearchResult = { moduleId?: string; hash?: string; contractHash?: string; target: string; description: string; inputSchema: Record<string, unknown>; outputSchema: Json | null; examples: Json[] | null; sideEffects: string[] | null; errors: Json[] | null; retry: string; idempotent: boolean };
 function searchSystemResult(target: string, candidate: SystemTool): ToolSearchResult { return { target, description: candidate.description, inputSchema: moduleToolContract(candidate).input, outputSchema: moduleToolContract(candidate).output as Json | null, examples: (candidate as { examples?: Json[] }).examples ?? null, sideEffects: "sideEffects" in candidate ? (candidate as { sideEffects?: string[] }).sideEffects ?? null : null, errors: "errors" in candidate ? (candidate as { errors?: Json[] }).errors ?? null : null, retry: candidate.idempotent ? "May be redelivered after an unknown async outcome; target declares idempotent." : "Unknown async outcomes are not redelivered automatically.", idempotent: candidate.idempotent }; }
 function searchModuleResult(target: string, candidate: Tool): ToolSearchResult { return { target, description: candidate.description, inputSchema: normalizedToolInputSchema(candidate), outputSchema: candidate.output, examples: candidate.examples ? candidate.examples as unknown as Json[] : null, sideEffects: candidate.sideEffects ?? null, errors: candidate.errors ? candidate.errors as unknown as Json[] : null, retry: candidate.idempotent ? "May be redelivered after an unknown async outcome; target declares idempotent." : "Unknown async outcomes are not redelivered automatically.", idempotent: candidate.idempotent }; }
 async function searchActiveModuleTools(ports: StewardPorts, options: ToolSearchOptions, found: ToolSearchResult[]) {
-  const { workspaceId } = options;
-  for (const module of await ports.db.module.findMany({ where: { workspaceId, status: "active", activeHash: { not: null } }, orderBy: { name: "asc" } })) {
-    if (isModulePaused(module.name)) continue;
-    const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } });
-    if (version?.status !== "approved") continue;
-    for (const candidate of moduleManifestSchema.safeParse(version.manifest).data?.tools ?? []) {
-      if (options.userTools && !candidate.visibility.some(audience => audience === "owner" || audience === "provider")) continue;
-      const target = `${module.name}.${candidate.name}`;
-      if (await searchMatch(ports, options, target, candidate)) found.push({ ...searchModuleResult(target, candidate), moduleId: module.id, hash: module.activeHash!, contractHash: moduleCallbackContractHash(candidate) }); }
+  for (const { target, tool, moduleId, source } of await activeModuleReferences(ports, options.workspaceId)) {
+    if (searchMatch(options, target, tool)) found.push({ ...searchModuleResult(target, tool), moduleId, hash: source.hash, contractHash: moduleCallbackContractHash(tool) });
   }
 }
 async function toolSearch(ports: StewardPorts, workspaceId: string, caller: Caller, query: unknown, userTools = false) {
   const words = String(query ?? "").toLowerCase().split(/\s+/).filter(Boolean), found: ToolSearchResult[] = [];
-  const options = { workspaceId, caller, words, userTools };
+  const options = { workspaceId, canRead: await discoveryAdmission(ports.db, caller, workspaceId), words, userTools };
   for (const system of listSystemModules()) for (const candidate of system.tools) {
     const target = `${system.name}.${candidate.name}`;
-    if (userTools && !candidate.visibility.some(audience => audience === "owner" || audience === "provider")) continue;
-    if (await searchMatch(ports, options, target, candidate)) found.push(searchSystemResult(target, candidate));
+    if (searchMatch(options, target, candidate)) found.push(searchSystemResult(target, candidate));
   }
   await searchActiveModuleTools(ports, options, found);
   return found;

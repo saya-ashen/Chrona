@@ -41,7 +41,6 @@ async function request(url, { method = "GET", body, raw = false } = {}) {
     const error = await response.json().catch(() => ({}));
     throw new Error(error.message || error.code || `请求失败（${response.status}）`);
   }
-  if (method === "POST" && currentSession === session) void pageLinks();
   return raw ? response.blob() : response.json();
 }
 const web = (path, options) => request(`/api/web${path}`, options);
@@ -109,13 +108,26 @@ async function systemPage(params, version = navigation) {
   unmountPage = mountSystem(main, params, { web, tool, subscribe: listener => { replyListeners.add(listener); return () => replyListeners.delete(listener); }, auth: systemAuth }, (path, replace) => go(path, replace));
 }
 const pageHref = page => `/p/${encodeURIComponent(page.module)}/${encodeURIComponent(page.id)}`;
-async function pageLinks() {
+let linksPending = null, linksSession = -1, linksReadAt = 0;
+function pageLinks() {
   if (!authenticated) return;
-  const currentSession = session, requestId = ++linksRequest;
+  if (linksSession === session && linksPending) return linksPending;
+  if (linksSession === session && Date.now() - linksReadAt < 30000) return;
+  linksSession = session;
+  const requestId = ++linksRequest;
+  linksPending = readPageLinks(requestId).finally(() => { if (requestId === linksRequest) linksPending = null; });
+  return linksPending;
+}
+// Navigation is a display snapshot. Page loads and calls validate identity and
+// contracts on the server independently of this refresh interval.
+setInterval(() => { if (!document.hidden) void pageLinks(); }, 30000);
+async function readPageLinks(requestId) {
+  const currentSession = session;
   const apps = nav.querySelector('a[href="/apps"]');
   let pages;
   try { pages = await web("/pages"); } catch { return; }
   if (!authenticated || currentSession !== session || requestId !== linksRequest) return;
+  linksReadAt = Date.now();
   nav.querySelectorAll("a[data-page]").forEach(link => link.remove());
   for (const page of pages.filter(page => page.purpose !== "settings")) {
     const link = document.createElement("a");

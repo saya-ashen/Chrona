@@ -265,7 +265,7 @@
     },
     {
       "name": "component-set",
-      "description": "Register a trusted same-page component for this app and active version. Supply self-contained ESM with default mount, optional CSS, strict props, events, slots and own tools. Use the returned type verbatim in spec.elements (for example music:Player for the caller app music); app is a placeholder, not a literal prefix. Trusted JavaScript runs without isolation; re-register pages after replacement.",
+      "description": "Register trusted same-page ESM for the active caller. No CSS isolation: scope selectors under an app root; inherit --fg/--bg/--card (not --foreground/--background). Host header/section rules affect components. Call web.catalog for theme/layout/testing rules; complete activated JS/CSS example ships in Web source UI-DEVELOPMENT.md. Use returned type verbatim, then re-register pages. Prefer shared declarative components unless browser APIs are needed.",
       "visibility": [
         "modules"
       ],
@@ -278,10 +278,11 @@
           },
           "javascript": {
             "type": "string",
-            "description": "Self-contained browser ESM with default export mount(element, {props, emit(event), call(tool,args), children?}); returns cleanup or {update?,destroy?}. Imports are unsupported. Runs trusted in the authenticated browser origin."
+            "description": "Self-contained ESM without imports. Default synchronous mount(element,{props,emit,call,children?,slots?}) returns cleanup or {update?,destroy?}, not Promise. Trusted same-origin code; release listeners/media/URLs on destroy. Activated example: source UI-DEVELOPMENT.md; rules: web.catalog."
           },
           "css": {
-            "type": "string"
+            "type": "string",
+            "description": "Same-document CSS, no isolation. Scope all selectors under an app root; host header/section styles enter components. Pair --fg with --card/--bg; dark mode uses prefers-color-scheme. No global body/:root/tag rules. Full collision/theme rules: web.catalog and source UI-DEVELOPMENT.md."
           },
           "props": {
             "type": "object",
@@ -334,7 +335,22 @@
           "revision"
         ],
         "additionalProperties": false
-      }
+      },
+      "examples": [
+        {
+          "description": "Minimal same-page scoped panel; use returned type in page-set. Complete activated registration and cleanup example: UI-DEVELOPMENT.md.",
+          "args": {
+            "name": "Player",
+            "javascript": "export default function mount(element){const root=document.createElement('div');root.className='music-panel';root.textContent='音乐';element.append(root);return ()=>root.remove();}",
+            "css": ".music-panel { color:var(--fg); background:var(--card); min-width:0; overflow-wrap:anywhere; }",
+            "props": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            }
+          }
+        }
+      ]
     },
     {
       "name": "component-remove",
@@ -385,7 +401,7 @@
         ],
         "additionalProperties": false
       },
-      "description": "Register or replace a caller-owned page on every activation. Declarative components expand before catalog/tool checks; layout controls content. For executable elements use the exact type returned by component-set, including the actual caller module prefix. Web validates props, events and slots, pins component revision and active app hash, and adds declared own tools to page contract pins. Response extensions are keyed by full component type.",
+      "description": "Register a caller-owned page on every activation. Prefer shared catalog components or declarative templates; use exact component-set returned type for browser controls. layout controls content, shell/theme stay Web-owned. Call web.catalog for theme, CSS collision, height and validation rules; full activated example: version source UI-DEVELOPMENT.md. Props/events/slots, active hash, revision and declared own tool contracts are checked and pinned.",
       "visibility": [
         "modules"
       ],
@@ -406,7 +422,7 @@
               "document",
               "workspace"
             ],
-            "description": "Content layout; global navigation and theme remain Web-owned."
+            "description": "document: centered max-width 64rem and padding; workspace: full main width without padding, still inside host navigation. Only shared Workspace computes remaining viewport height; arbitrary components must size themselves. Avoid fixed 900px/100vh assumptions. See web.catalog and UI-DEVELOPMENT.md."
           },
           "components": {
             "type": "object",
@@ -556,7 +572,7 @@
         ],
         "additionalProperties": false
       },
-      "description": "Components, props and rules for page specs (json-render version included).",
+      "description": "Discover shared component props/events and UI development rules: theme variables, same-page CSS collisions/scoping, document/workspace height and registration versus host-browser validation. Full activated JS/CSS example and checklist ship in Web version source UI-DEVELOPMENT.md; obtain exact source via Author.",
       "visibility": [
         "modules",
         "provider"

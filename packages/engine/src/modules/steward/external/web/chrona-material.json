@@ -99,12 +99,13 @@
     "today.bun.test.ts",
     "today.ts",
     "tsconfig.json",
+    "UI-DEVELOPMENT.md",
     "workspace-catalog.bun.test.ts"
   ],
   "artifacts": [
     {
       "path": "pages.js",
-      "sha256": "828714e16623eb7f12d385ec3c3da320bc0079210d4c1c197882029d6c0dd47a",
+      "sha256": "560bdf93f21f033bb8b01185a687423c325c5a076c2bb60cda3b4a4be030082e",
       "executable": false
     },
     {

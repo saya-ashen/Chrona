@@ -9,6 +9,7 @@ import api from "../../../../contracts/fixtures/contract-hash-kernel-api.json";
 import journey from "../../../../contracts/fixtures/contract-hash-steward-journey.json";
 import providerRegistration from "../../../../contracts/fixtures/contract-hash-provider-registration.json";
 import transcriptPages from "../../../../contracts/fixtures/contract-hash-pi-transcript-pages.json";
+import webGuidance from "../../../../contracts/fixtures/contract-hash-web-ui-guidance.json";
 import agentTools from "../../../../contracts/fixtures/agent-tools.json";
 import cases from "../../../../contracts/fixtures/contract-hash-cases.json";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
@@ -73,6 +74,11 @@ test("all tool hashes preserve the baseline except explicitly enumerated plan ch
     expect(change.reason.length).toBeGreaterThan(20);
     if (change.after === null) delete expected[change.target];
     else expected[change.target] = change.after;
+  }
+  for (const change of webGuidance.changes) {
+    expect(expected[change.target]).toBe(change.before);
+    expect(change.reason.length).toBeGreaterThan(20);
+    expected[change.target] = change.after;
   }
   expect(current).toEqual(expected);
   expect([...new Set(Object.keys(hashes).map(target => target.split(".")[0]))].sort()).toEqual([

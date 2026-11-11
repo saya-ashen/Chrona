@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { modules as systemModules } from "./system/modules";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -141,4 +142,41 @@ test("private build guidance advertises live discovery and fixed material author
   expect(BUILD_MODULE_TOOLS.every(name => names.has(name))).toBe(true);
   for (const removed of ["m_modules_checkout", "m_modules_propose", "m_modules_check", "m_modules_request_group", "build_request"]) expect(BUILD_REFERENCE_PROMPT).not.toContain(removed);
   for (const current of ["modules.describe", "modules.health", "modules.submit", "modules.receipt", "ordinary", "fixed candidate"]) expect(BUILD_REFERENCE_PROMPT).toContain(current);
+});
+
+test("exact references do not enumerate unrelated modules or manifests", async () => {
+  const f = await fixture(); await active(f);
+  const reads: string[] = [];
+  const db = f.db.$extends({ query: { $allModels: { async $allOperations({ model, operation, args, query }) { reads.push(`${model}.${operation}`); return query(args); } } } });
+  const ports = { ...f.ports, db } as StewardPorts;
+  {
+    expect(await interfaceReference(ports, f.workspace.id, "modules.list")).toMatchObject({ target: "modules.list", contractHash: expect.any(String) });
+    expect(await interfaceReference(ports, f.workspace.id, "target.read")).toMatchObject({ source: { hash: "v1" }, outputSchema: {} });
+    expect(reads).toEqual(["Module.findFirst", "ModuleVersion.findUnique"]);
+  }
+});
+
+test("discovery batches current versions and reads caller authority once per request, never across requests", async () => {
+  const f = await fixture(), module = await active(f);
+  const caller: Caller = { kind: "module", module: "target", moduleId: module.id, hash: "v1" };
+  const reads: string[] = [];
+  const db = f.db.$extends({ query: { $allModels: { async $allOperations({ model, operation, args, query }) { reads.push(`${model}.${operation}`); return query(args); } } } });
+  const context = { ports: { ...f.ports, db } as StewardPorts, workspaceId: f.workspace.id, caller, chain: [], path: [] };
+  const discover = () => systemModules.handle(context, "describe", { limit: 100 });
+  {
+    expect(JSON.stringify(await discover())).toContain('"tool":"read"');
+    expect(reads).toEqual(["Module.findFirst", "Module.findMany", "ModuleVersion.findMany"]);
+    await f.db.module.update({ where: { id: module.id }, data: { status: "paused" } });
+    expect(await discover()).toMatchObject({ items: [] });
+    await expect(interfaceReference(f.ports, f.workspace.id, "modules.describe", caller)).rejects.toMatchObject({ code: "not_found" });
+    await f.db.module.update({ where: { id: module.id }, data: { status: "active", activeHash: "v2" } });
+    expect(await discover()).toMatchObject({ items: [] });
+    await f.db.module.update({ where: { id: module.id }, data: { activeHash: "v1" } });
+    await f.db.moduleVersion.updateMany({ where: { moduleId: module.id }, data: { status: "rejected" } });
+    expect(await discover()).toMatchObject({ items: [] });
+    await f.db.moduleVersion.updateMany({ where: { moduleId: module.id }, data: { status: "approved" } });
+    expect(await interfaceReference(f.ports, f.workspace.id, "modules.describe", caller)).toMatchObject({ target: "modules.describe" });
+    await expect(interfaceReference(f.ports, f.workspace.id, "approvals.resolve", caller)).rejects.toMatchObject({ code: "not_found" });
+    expect(await systemModules.handle({ ...context, workspaceId: (await f.db.workspace.create({ data: { name: "foreign" } })).id }, "describe", {})).toMatchObject({ items: [] });
+  }
 });

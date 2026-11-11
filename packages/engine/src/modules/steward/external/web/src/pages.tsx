@@ -188,7 +188,8 @@ function PageContent({ page, deps, system, embedded, retry }: PageViewProps) {
   const [store] = useState(() => createStateStore({ ...(page.spec.state ?? {}) }));
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [loadedAt, setLoadedAt] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<"initial" | "refresh" | null>(null);
+  const ready = useRef(new Set<string>());
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   const currentRegistry = useMemo(() => system ? systemRegistry : { ...registry, ...executableRegistry(page, deps) }, [system, page, deps]);
   const spec = system ? system.spec(state) : page.spec;
@@ -197,23 +198,26 @@ function PageContent({ page, deps, system, embedded, retry }: PageViewProps) {
   // Each source is read when the page opens, when the state its arguments use changes, and every `refresh` seconds.
   useEffect(() => {
     const last = new Map<string, string>(), timers: ReturnType<typeof setInterval>[] = [];
-    let stopped = false, pending = 0;
-    setLoading(false);
+    let stopped = false, pending = 0, initial = 0;
+    setLoading(null);
     // eslint-disable-next-line complexity -- Preserve source deduplication, stale-response checks and feedback ordering in one request lifecycle.
     const read = async (key: string, source: Source, force = false) => {
       const args = (resolve(source.args ?? {}, store) ?? {}) as Args, signature = JSON.stringify(args);
       if (!force && last.get(key) === signature) return;
       last.set(key, signature);
       if ((page.needs?.[key] ?? []).some(name => args[name] === undefined || args[name] === null || args[name] === "")) return;
-      pending++; setLoading(true);
+      const firstRead = !ready.current.has(key);
+      pending++; if (firstRead) initial++;
+      setLoading(initial ? "initial" : "refresh");
       try {
         const result = await deps.call(target(source.tool), args), failed = failure(result);
         if (stopped || last.get(key) !== signature) return;
         if (failed) { setFeedback({ failed: true, text: failed, source: key }); return; }
+        ready.current.add(key);
         store.set(`/${key}`, result);
         setFeedback(current => current?.source === key ? null : current);
       } catch (error) { if (!stopped && last.get(key) === signature) setFeedback({ failed: true, text: `读取失败：${(error as Error).message}`, source: key }); }
-      finally { pending--; if (!stopped && pending === 0) setLoading(false); }
+      finally { pending--; if (firstRead) initial--; if (!stopped) setLoading(pending ? initial ? "initial" : "refresh" : null); }
     };
     const all = (force: boolean) => { for (const [key, source] of Object.entries(page.data)) void read(key, source, force); };
     all(true);
@@ -253,7 +257,7 @@ function PageContent({ page, deps, system, embedded, retry }: PageViewProps) {
   return <JSONUIProvider registry={currentRegistry} store={store} handlers={handlers} navigate={(...args) => { if (active.current) deps.navigate(...args); }}>
     <div className={system ? "registered-page system-page" : "registered-page"}>
       {!system ? <RegisteredHeading page={page} embedded={embedded} /> : null}
-      {loading ? <p role="status" aria-live="polite" className="page-loading muted">正在读取应用数据……</p> : null}
+      {loading ? <p role="status" aria-live="polite" className="page-loading muted">{loading === "initial" ? "正在读取应用数据……" : "正在刷新应用数据……"}</p> : null}
       {feedback ? <p role="status" className={`page-feedback ${feedback.failed ? "error" : "muted"}`}>{feedback.text}{feedback.failed && retry ? <button type="button" onClick={retry}>重新读取设置</button> : null}</p> : null}
       <SystemContext.Provider value={systemContext}><ImageContext.Provider value={{ page, deps }}><Renderer spec={spec} registry={currentRegistry} fallback={fallback} /></ImageContext.Provider></SystemContext.Provider>
     </div>

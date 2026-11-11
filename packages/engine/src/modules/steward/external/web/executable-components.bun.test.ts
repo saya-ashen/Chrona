@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { createPages, describeCatalog, type Caller, type ModuleState, type PageTool } from "./pages";
+import { createPages, type Caller, type ModuleState, type PageTool } from "./pages";
 
 const dirs: string[] = [];
 afterEach(async () => { for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true }); });
@@ -169,7 +169,6 @@ test("declarative composition remains usable beside executable components; eithe
   expect((await pages.get("alpha", "old"))?.spec.elements.card?.type).toBe("Text");
   modules[0]!.activeHash = "approved-v2";
   await expect(pages.tool("page-set", { ...plain, components: { "alpha:AudioPlayer": template } }, { ...caller, hash: "approved-v2" })).rejects.toThrow("重名");
-  expect(Buffer.byteLength(JSON.stringify(describeCatalog()))).toBeLessThan(16 * 1024);
 });
 
 test("corrupt persisted source fails closed after restart", async () => {

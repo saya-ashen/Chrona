@@ -208,8 +208,12 @@ async function moduleCall(body: Args) {
   if (body.page && typeof body.page === "object") {
     const ref = body.page as { module: string; id: string; revision: string }, page = await pages.get(ref.module, ref.id);
     if (!page || page.revision !== ref.revision || !target.startsWith(`${page.module}.`) || !Object.hasOwn(page.contracts, target.slice(page.module.length + 1))) throw Object.assign(new Error("页面或工具已变化，请重新打开页面"), { code: "conflict" });
-    const tool = await userTool(target);
-    return invokeUserTool(target, args, tool, { moduleId: page.moduleId, contractHash: page.contracts[target.slice(page.module.length + 1)]! });
+    const expectedTarget = { moduleId: page.moduleId, contractHash: page.contracts[target.slice(page.module.length + 1)]! };
+    // pages.get already validated current user-visible contracts. The routed
+    // call rechecks admission and this pin atomically; local settings still
+    // need their in-process input/output validation below.
+    if (!ownSettings.has(target)) return applicationCall(target, args, { expectedTarget });
+    return invokeUserTool(target, args, await userTool(target), expectedTarget);
   }
   const tool = await userTool(target);
   return invokeUserTool(target, args, tool, tool.moduleId && tool.contractHash ? { moduleId: tool.moduleId, contractHash: tool.contractHash } : undefined);
