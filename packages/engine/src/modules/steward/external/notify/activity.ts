@@ -1,6 +1,6 @@
 export type Activity = { id: string; at: string; kind: string; module: string | null; text: string; session?: { id: string; source: "reflect" | "build" } };
 type Row = { id: string; at: string; kind: string; subject: string | null; module: string | null; hash: string | null; approvalTitle: string | null; details: Record<string, unknown> };
-type Records = { rows: Row[]; before: string | null };
+type Records = { items: Row[]; nextCursor: string | null };
 type Call = (target: string, args: Record<string, unknown>) => Promise<unknown>;
 const SOURCES: Record<string, string> = { web: "网页", qq: "QQ", mcp: "MCP", cli: "命令行", rescue: "救援控制台", entry: "其他应用" };
 const SETTINGS: Record<string, string> = { notifications: "通知", moduleModel: "模块模型", builds: "构建" };
@@ -97,13 +97,14 @@ function aggregate(rows: Row[]) {
 /** Notify owns activity wording, incident grouping and the bounded scan policy. Audits stay immutable in the kernel. */
 export async function activityView(call: Call, { module, before, limit = 50 }: { module?: string; before?: string; limit?: number }) {
   const take = Math.min(Math.max(limit, 1), 100), rows: Row[] = [];
-  let cursor = before, items: Activity[] = [];
-  for (let page = 0; page < 10 && items.length < take; page++) {
-    const batch = await call("activity.records", { ...(cursor ? { before: cursor } : {}) }) as Records;
-    rows.push(...batch.rows);
+  // applicationCall completes the kernel's forward-only pages. Keep newest-first
+  // presentation and Notify's timestamp pagination here, out of kernel arguments.
+  const records = await call("activity.records", { limit: 100 }) as Records;
+  const recent = records.items.filter(row => !before || row.at < before).reverse().slice(0, 2000);
+  let items: Activity[] = [];
+  for (let offset = 0; offset < recent.length && items.length < take; offset += 200) {
+    rows.push(...recent.slice(offset, offset + 200));
     items = aggregate(rows).filter(item => !module || item.module === module).slice(0, take);
-    if (!batch.before) break;
-    cursor = batch.before;
   }
   return { items, before: items.length === take ? items.at(-1)!.at : null };
 }

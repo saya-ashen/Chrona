@@ -19,10 +19,28 @@ const kernel = { kind: "kernel" };
 // Delivery ticks use the wall clock. Events must stay due regardless of polling count or time of day.
 const now = () => new Date(Date.now() - 1000).toISOString();
 const tool = (id: string, args: Record<string, unknown>, caller: unknown = kernel) => module.send({ trigger: { kind: "tool", id, firedAt: now(), args, caller }, now: now(), params: {} });
+// The kernel returns ascending cursor pages; the client completes them before Notify presents history.
+const records = Array.from({ length: 101 }, (_, i) => ({ id: `activity-${i}`, at: new Date(Date.parse("2026-11-01T00:00:00Z") + i * 1000).toISOString(),
+  kind: "module_enabled", subject: "notify-id", module: "notify", hash: null, approvalTitle: null, details: { source: "cli" } }));
+const recordCalls: Record<string, unknown>[] = [];
+function activityRecords(args: Record<string, unknown>) {
+  recordCalls.push(args);
+  assert.deepEqual(args, { limit: 100, ...(args.cursor ? { cursor: "opaque-next-records-page" } : {}) });
+  return args.cursor ? { items: records.slice(100), nextCursor: null } : { items: records.slice(0, 100), nextCursor: "opaque-next-records-page" };
+}
 const deliveries = () => (module.calls as Call[]).filter(call => call.method === "call" && targetName(call.params.target) === "qq.deliver");
 async function until(condition: () => boolean) { for (let i = 0; i < 200 && !condition(); i++) await new Promise(resolve => setTimeout(resolve, 10)); assert.ok(condition()); }
 try {
-  module = await startModule("index.ts", { stubs: { "modules.list": () => ({ items: directory.modules, nextCursor: null }), "modules.describe": () => ({ items: directory.tools, nextCursor: null }), "activity.facts": () => ({ revision: "test", facts: [] }), "activity.withdrawals": () => ({ withdrawn: [] }) } });
+  module = await startModule("index.ts", { stubs: { "modules.list": () => ({ items: directory.modules, nextCursor: null }), "modules.describe": () => ({ items: directory.tools, nextCursor: null }), "activity.records": activityRecords, "activity.facts": () => ({ revision: "test", facts: [] }), "activity.withdrawals": () => ({ withdrawn: [] }) } });
+  const activity = (await tool("activity", { limit: 2 })).result.result;
+  assert.deepEqual(activity.items.map((item: { id: string }) => item.id), ["activity-100", "activity-99"]);
+  assert.equal(activity.items[0].text, "你在命令行恢复了 notify");
+  assert.equal(activity.before, records[99]!.at);
+  assert.deepEqual(recordCalls, [{ limit: 100 }, { limit: 100, cursor: "opaque-next-records-page" }]);
+  const older = (await tool("activity", { before: activity.before, limit: 2 })).result.result;
+  assert.deepEqual(older.items.map((item: { id: string }) => item.id), ["activity-98", "activity-97"]);
+  assert.deepEqual((await tool("activity", { module: "missing" })).result.result, { items: [], before: null });
+  assert.deepEqual((await tool("activity", { before: records[0]!.at })).result.result, { items: [], before: null });
   // Explicit preferences in the fixture only; existing settings and their timestamps stay untouched.
   assert.deepEqual((await tool("settings", { settings: JSON.stringify({ dailyCap: 5, quietHours: null, timezone: "UTC", digestAt: "00:00" }) })).result.result.settings,
     { dailyCap: 5, quietHours: null, timezone: "UTC", digestAt: "00:00" });

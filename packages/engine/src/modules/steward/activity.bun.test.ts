@@ -1,9 +1,18 @@
 import { afterEach, expect, test } from "bun:test";
 import { activityRecords, activityRecordsOutput } from "./activity";
 import { activityView } from "./external/notify/activity";
+import { registerSystemModules } from "./system-modules";
+import { callSync, kernelOrigin } from "./module-calls";
 const listActivity = (ports: StewardPorts, workspaceId: string, args: Parameters<typeof activityView>[1]) => activityView(async (target, input) => {
   expect(target).toBe("activity.records");
-  return activityRecordsOutput.parse(await activityRecords(ports, workspaceId, input));
+  registerSystemModules();
+  const owner = { ...kernelOrigin(workspaceId), caller: { kind: "owner" as const, via: null } };
+  const page = (await callSync(ports, owner, target, input)).output as { items: unknown[]; nextCursor: string | null };
+  while (page.nextCursor) {
+    const next = (await callSync(ports, owner, target, { ...input, cursor: page.nextCursor })).output as typeof page;
+    page.items.push(...next.items); page.nextCursor = next.nextCursor;
+  }
+  return page;
 }, args);
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
