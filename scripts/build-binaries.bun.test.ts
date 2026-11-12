@@ -147,8 +147,11 @@ test("fixed module seeds preserve paused source materials and regenerate active 
       expect(buildArtifacts.moduleGit.modules).toContainEqual(module);
       expect(lock.modules.find(module => module.name === name)?.bundle).toBe(`${name}.bundle`);
       expect(await Bun.file(join(resourcesRoot, "module-git", `${name}.bundle`)).exists()).toBe(true);
-      expect(OPTIONAL_EXTERNAL_MODULE_NAMES).toContain(name);
-      expect(PREINSTALLED_MODULE_NAMES).not.toContain(name);
+      if (name === "mind") expect(PREINSTALLED_MODULE_NAMES as readonly string[]).toContain(name);
+      else {
+        expect(OPTIONAL_EXTERNAL_MODULE_NAMES as readonly string[]).toContain(name);
+        expect(PREINSTALLED_MODULE_NAMES as readonly string[]).not.toContain(name);
+      }
       expect(BUILTIN_MODULE_NAMES).not.toContain(name);
     }
     expect(await readFile(join(resourcesRoot, "external/coding/contract.js"), "utf8")).toBe(codingContract);
