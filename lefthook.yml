@@ -1,4 +1,4 @@
 pre-push:
   commands:
-    local-ci:
-      run: bun run ci:local
+    types:
+      run: systemd-run --user --scope --quiet -p MemoryMax=10G -E NODE_OPTIONS=--max-old-space-size=6144 bun run typecheck
