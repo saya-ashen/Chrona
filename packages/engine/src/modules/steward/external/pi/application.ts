@@ -3,7 +3,7 @@ import { z } from "zod";
 import { providerAnswerSchema, runtimeStartSchema, runtimeEventSchema, type RuntimeEvent, type ProviderRunInput, type ProviderAdapter } from "@chrona/contracts/steward";
 import { piTranscriptPage, PI_TRANSCRIPT_MAX_BYTES, piCompletionUnavailable, piLaunchConfig, type PiProviderOptions } from "@chrona/pi";
 import { Buffer } from "node:buffer";
-import { createConfiguration, launchConfiguration, type ThinkingLevel } from "./configuration";
+import { createConfiguration, launchConfiguration, type ConfigurationSnapshot, type ThinkingLevel } from "./configuration";
 import { createPiOperations, PiError } from "./operations";
 import type { PrepareCompletion } from "./completions";
 import { toolSchemas, isTool, runOptionsSchema, type ToolName } from "./schema";
@@ -22,6 +22,14 @@ function authorize(name: ToolName, caller: { kind: string } | undefined, callId:
     // A live call receipt is mandatory; no privileged agent-admit callback exists.
     if (!callId || !caller || !["owner", "module"].includes(caller.kind)) throw new PiError("forbidden", "Pi configuration requires an admitted owner call");
   } else if (caller?.kind !== "kernel") throw new PiError("forbidden", "Pi execution endpoints require the kernel");
+}
+async function completionReady(snapshot: ConfigurationSnapshot, provider: ProviderAdapter): Promise<boolean> {
+  const unavailable = await piCompletionUnavailable(piLaunchConfig(snapshot.options));
+  const complete = !!provider.complete && !!snapshot.effective.model && unavailable === null;
+  if (!complete && snapshot.effective.model) {
+    console.error(JSON.stringify({ component: "pi", event: "completion_unavailable", error: String(unavailable ?? "Pi provider completion is unavailable").slice(0, 300) }));
+  }
+  return complete;
 }
 export function createPiApplication({ data, options, createProvider, call }: ApplicationInput) {
   const configuration = createConfiguration(data, options);
@@ -74,11 +82,7 @@ export function createPiApplication({ data, options, createProvider, call }: App
     if (name === "health") {
       try {
         const snapshot = await configuration.snapshot(), provider = createProvider(snapshot.options);
-        const unavailable = await piCompletionUnavailable(piLaunchConfig(snapshot.options));
-        const complete = !!provider.complete && !!snapshot.effective.model && unavailable === null;
-        if (!complete && snapshot.effective.model) {
-          console.error(JSON.stringify({ component: "pi", event: "completion_unavailable", error: String(unavailable ?? "Pi provider completion is unavailable").slice(0, 300) }));
-        }
+        const complete = await completionReady(snapshot, provider);
         return { name: "pi", supportsRunModel: provider.supportsRunModel ?? false, complete, ...await provider.health() };
       } catch (error) {
         // Callers get a fixed reason (host configuration may be private); the operator log gets the real one.

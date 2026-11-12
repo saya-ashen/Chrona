@@ -127,7 +127,9 @@ function runPiProcess(config: ReturnType<typeof piLaunchConfig>, input: PiComple
     process.stdin.end(input.prompt);
   });
 }
-async function work(config: ReturnType<typeof piLaunchConfig>, input: PiCompletionInput, state: CompletionState, isExpired: () => boolean): Promise<PiCompletionResult> {
+async function work(
+  config: ReturnType<typeof piLaunchConfig>, input: PiCompletionInput, state: CompletionState, isExpired: () => boolean,
+): Promise<PiCompletionResult> {
   const unavailable = await piCompletionUnavailable(config);
   if (unavailable) throw Object.assign(failure("provider_error"), { reason: unavailable });
   if (isExpired()) throw failure("timeout");
@@ -171,7 +173,8 @@ export function createPiCompletion(options: PiProviderOptions) {
         workPromise = work(config, input, state, isExpired),
       ]);
     } catch (error) {
-      console.error(JSON.stringify({ component: "pi-completion", event: "completion_failed", error: String((error as { reason?: string })?.reason ?? (error as Error)?.message ?? error).slice(0, 500) }));
+      const reason = (error as { reason?: unknown }).reason;
+      console.error(JSON.stringify({ component: "pi-completion", event: "completion_failed", error: String(reason ?? error).slice(0, 500) }));
       // This evidence reaches the caller only if finally confirms tree closure.
       // A rejected closed promise overrides it and leaves the operation unknown.
       throw Object.assign(failure(input.signal?.aborted ? "cancelled" : timeoutError(error, isExpired) ? "timeout" : "provider_error"), { stopped: true });
