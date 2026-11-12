@@ -96,9 +96,8 @@ test("output capture follows the real origin recipient, hides bytes and rejects 
     expect(file).toMatchObject({ name: "answer.txt", size: 23 });
     expect(file.ref).toStartWith("web/outputs/");
     expect(await readFile(join(f.content, file.ref.slice(4)), "utf8")).toBe("recipient private bytes");
-    const calls = await f.db.moduleInvocation.findMany();
-    expect(calls).toHaveLength(1);
-    expect(calls[0]).toMatchObject({ args: {}, output: null });
+    // Keyless unrecorded capture keeps no ledger row, so neither path nor bytes are stored.
+    expect(await f.db.moduleInvocation.count()).toBe(0);
     await f.db.run.update({ where: { id: run.id }, data: { sessionId: null } });
     await expect(runtimeCall(f.ports, f.workspaceId, "workspace-local.capture-file", { runId: run.id, path: "answer.txt" })).rejects.toMatchObject({ code: "forbidden" });
     const other = await f.db.workspace.create({ data: { name: "other" } });

@@ -37,12 +37,22 @@ const restarted = createQqBotHandler({ state: createQqBotState(paths.data, appId
 await restarted.onMessage(incoming); assert.equal(chats.length, 2);
 let reservations = 0;
 const passive = createQqPassiveReplies(async () => { reservations++; throw new Error("network uncertain"); }, () => now.getTime());
-for (let i = 0; i < 4; i++) await passive(incoming, "reply").catch(() => {});
+for (let i = 0; i < 4; i++) await assert.rejects(passive(incoming, "reply"));
 assert.equal(await passive(incoming, "reply"), false); assert.equal(reservations, 4);
 
 const calls: any[] = [], notices: any[] = [];
-const routedCall = async (target: string, args: Record<string, unknown>) => { calls.push({ target, args }); if (target === "agent.read") return { run: { runId: "qq-run", contextId: "qq-context", status: "running", active: true }, items: [], nextCursor: null, ended: false, transcript: [], interactions: [] }; if (target === "agent.run") return { contextId: "qq-context", runId: "qq-run", status: "queued", active: true }; if (target === "modules.describe" || target === "modules.list") return { items: [], nextCursor: null }; if (target === "qq.settings") return { provider: null, autoRecall: true, autoRetain: true }; if (target === "approvals.list") return { items: [{ id: "abcdef12-0000", title: "approval" }], nextCursor: null }; return {}; };
-const conversations = createQqConversations({ dataDir: paths.data, contentDir: paths.content, call: routedCall, binding: async () => binding, deliver: async () => {} });
+const routedCall = async (target: string, args: Record<string, unknown>) => {
+  calls.push({ target, args });
+  if (target === "agent.read") return { run: { runId: "qq-run", contextId: "qq-context", status: "running", active: true }, items: [], nextCursor: null, ended: false, transcript: [], interactions: [] };
+  if (target === "agent.run") return { contextId: "qq-context", runId: "qq-run", status: "queued", active: true };
+  if (target === "modules.describe" || target === "modules.list") return { items: [], nextCursor: null };
+  if (target === "qq.settings") return { provider: null, autoRecall: true, autoRetain: true };
+  if (target === "approvals.list") return { items: [{ id: "abcdef12-0000", title: "approval" }], nextCursor: null };
+  return {};
+};
+const conversations = createQqConversations({
+  dataDir: paths.data, contentDir: paths.content, call: routedCall, binding: async () => binding, deliver: async () => {},
+});
 const relay = createRelay({ conversations, publicUrl: null, download: async a => ({ name: a.name, mime: "image/png", bytes: new Uint8Array([1]) }), notify: async args => { notices.push(args); }, call: routedCall });
 const parsed = parseC2cEvent({ id: "picture", author: { user_openid: "owner" }, content: "", timestamp: now.toISOString(), attachments: [{ url: "https://gchat.qpic.cn/image", filename: "image.png", content_type: "image/png" }] })!;
 assert.equal(parsed.attachments?.length, 1);

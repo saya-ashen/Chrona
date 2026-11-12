@@ -158,9 +158,8 @@ test.each([299, 300, 301, 800])("%i-character incident reasons satisfy routed he
   // Exercise another legitimate routed request after both diagnostic outputs were validated.
   const next = await callSync(f.ports, origin, "modules.describe", { query: "modules.health" });
   expect(next.output).toMatchObject({ items: expect.arrayContaining([expect.objectContaining({ target: "modules.health" })]) });
-  const invocations = await f.db.moduleInvocation.findMany({ where: { id: { in: [healthCall.callId, diagnosticsCall.callId, next.callId] } } });
-  expect(invocations).toHaveLength(3);
-  expect(invocations.every(item => item.status === "succeeded")).toBe(true);
+  // Keyless reads leave no ledger rows.
+  expect(await f.db.moduleInvocation.count({ where: { id: { in: [healthCall.callId, diagnosticsCall.callId, next.callId] } } })).toBe(0);
 });
 
 test("long incident summaries redact credentials before clipping and retain detailed redacted evidence", async () => {

@@ -44,7 +44,8 @@ test("real external Pi SDK process: controls stay responsive, callback identitie
     expect(JSON.stringify(invocations)).not.toContain("private-agent");
     const runs = await f.ports.db.moduleRun.findMany({ where: { moduleId: f.module.id } });
     expect(runs.length).toBeGreaterThan(0); expect(JSON.stringify(runs)).not.toContain("private-agent");
-    expect(invocations.some(row => row.target === "runtime-callback" && row.callerModuleId === f.module.id)).toBe(true);
+    // Stream callbacks reached the run (progress above) without leaving ledger rows.
+    expect(invocations.some(row => row.target === "runtime-callback")).toBe(false);
     await expect(callSync(f.ports, { ...kernelOrigin(f.workspaceId), caller: { kind: "module", module: "other", moduleId: f.module.id, hash: "different" } }, "runtime-callback.event", { callbackId: crypto.randomUUID(), event: { kind: "progress", value: { phase: "reading", tool: null } } })).rejects.toMatchObject({ code: "forbidden" });
   } finally { await f.close(); }
 }, 20000);
@@ -71,8 +72,8 @@ test("real external Pi SDK callbacks reach derived ports when the supervisor own
     expect(outcome.error ?? "").not.toContain("detail is incomplete");
     expect(details).toContainEqual(expect.objectContaining({ payload: { type: "state", status: "failed", cancelRequested: false, stopConfirmed: true } }));
     const callbacks = await f.ports.db.moduleInvocation.findMany({ where: { target: "runtime-callback", tool: "event" } });
-    expect(callbacks.length).toBeGreaterThan(0);
-    expect(callbacks.every(row => row.callerModuleId === f.module.id && row.status === "succeeded")).toBe(true);
+    // The state detail above proves the callbacks were delivered; they keep no ledger rows.
+    expect(callbacks).toHaveLength(0);
   } finally { await f.close(); }
 }, 20000);
 
