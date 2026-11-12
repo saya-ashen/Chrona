@@ -94,19 +94,19 @@ function waitsOn(graph: Map<string, string[]>, from: string, to: string, seen = 
  * (the target's events are serial, so it could never answer). Unknown outcomes are reported, never retried.
  */
 type SyncInvocation = { ports: StewardPorts; origin: CallOrigin; resolved: Target; target: string; args: Record<string, unknown>; chain: string[]; path: string[]; now: Date; key?: string; activationId?: string | null; privateTransport?: boolean };
-async function invokeSystemSync({ ports, origin, resolved, args, rowId, rowKey, finish, quiet }: SyncInvocation & { rowId: string; rowKey?: string; finish: (data: Prisma.ModuleInvocationUpdateInput) => Promise<unknown>; quiet: boolean }) {
+async function invokeSystemSync({ ports, origin, resolved, args, rowId, rowKey, finish, quiet }: SyncInvocation & { rowId: string; rowKey?: string; finish?: (data: Prisma.ModuleInvocationUpdateInput) => Promise<unknown>; quiet: boolean }) {
   // In-process: no event queue to wait on, so no deadlock to guard against.
   try {
     const output = await resolved.system!.handle({ ports, workspaceId: origin.workspaceId, caller: origin.caller, run: origin.run, deadline: origin.deadline, call: { id: rowId, key: rowKey, mode: "sync" } }, resolved.tool.name, args);
     const schema = (resolved.tool as SystemTool).output;
     if (resolved.module.id.startsWith("local:") && schema && !schema.safeParse(output).success) throw new CallError("failed", "Local capability output contract mismatch");
     checkSystemOutput(`${resolved.module.name}.${resolved.tool.name}`, resolved.tool as SystemTool, output);
-    await finish({ status: "succeeded", output: output as Prisma.InputJsonValue });
+    await finish?.({ status: "succeeded", output: output as Prisma.InputJsonValue });
     return { callId: rowId, output };
   } catch (error) {
     const failure = resolved.module.id.startsWith("local:") && !(error instanceof CallError) && !(error instanceof StewardError)
       ? new CallError("failed", "Local capability failed") : systemError(error);
-    await finish(systemFailureData(failure, quiet));
+    await finish?.(systemFailureData(failure, quiet));
     throw failure;
   }
 }
@@ -215,6 +215,9 @@ export async function callSync(ports: StewardPorts, origin: CallOrigin, requeste
   assertRoutedIdentity(requestedTarget, resolved);
   assertProviderHash(resolved.module.activeHash, expectedHash);
   const args = validArgs(resolved.tool, raw), now = ports.now(), quiet = privateTransport || unrecorded(resolved);
+  if (!key && unrecorded(resolved)) {
+    return invokeSystemSync({ ports, origin, resolved, target, args, chain, path, now, rowId: randomUUID(), quiet });
+  }
   const row = await createSyncInvocation({ ports, origin, resolved, target, args, chain, path, now, key }, { requestedTarget, digest, quiet });
   if ("existing" in row) {
     const existing = row.existing!;

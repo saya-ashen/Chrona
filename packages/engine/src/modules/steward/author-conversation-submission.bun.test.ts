@@ -235,11 +235,12 @@ test("current approved owner conversation routes SDK Author material into checke
       for (const call of calls) expect(call).toMatchObject({ caller: `module:${author.id}`, callerHash: author.activeHash, chain: ["author"], mode: "sync" });
     }
     expect(invocations.some(row => row.target === "modules" && row.tool === "submit" && row.callerModuleId === author.id && row.status === "failed")).toBe(true);
-    for (const tool of ["list", "admit"]) expect(invocations.find(row => row.target === "modules" && row.tool === tool && row.status === "succeeded")).toMatchObject({ caller: `module:${entry.id}`, callerModuleId: entry.id, callerHash: entry.activeHash, chain: [] });
+    expect(invocations.some(row => row.target === "modules" && row.tool === "list")).toBe(false);
+    expect(invocations.find(row => row.target === "modules" && row.tool === "admit" && row.status === "succeeded")).toMatchObject({ caller: `module:${entry.id}`, callerModuleId: entry.id, callerHash: entry.activeHash, chain: [] });
     expect(invocations.some(row => row.caller === "owner" || row.caller.startsWith("provider:"))).toBe(false);
     expect(await db.run.count()).toBe(1);
     expect(await db.executionAttempt.count()).toBe(0);
-    expect(await db.moduleCall.count({ where: { moduleId: author.id, status: "executed", method: "call" } })).toBeGreaterThan(0);
+    expect(await db.moduleCall.count({ where: { method: "call", status: { not: "rejected" } } })).toBe(0);
     await createRuns(ports, workspaceId).finish(run!.id, { outcome: "finished", sessionId: null, error: null }, { stopEvidence: "never_started" });
   } finally {
     try { await stopSupervisor?.(); }

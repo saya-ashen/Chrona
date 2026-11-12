@@ -27,8 +27,8 @@ const failed = (id: string, error: unknown): Reply => error instanceof CallError
   ? { id, error: { code: publicCallError(error.code), reason: error.reason ?? publicCallReason(error.code), message: error.message.slice(0, 500) } }
   : { id, error: { code: "failed", message: "Module call failed" } };
 
-/** Auxiliary diagnostics must never change a committed route result or prevent async delivery. */
-async function recordRoutedCall(ports: StewardPorts, data: Prisma.ModuleCallUncheckedCreateInput) {
+/** Rejected-call diagnostics must never replace the original routing error. */
+async function recordRejectedCall(ports: StewardPorts, data: Prisma.ModuleCallUncheckedCreateInput) {
   try { await ports.db.moduleCall.create({ data }); }
   catch {
     // Database errors can include arguments, outputs and SQL. Emit only kernel-bound identity.
@@ -38,27 +38,23 @@ async function recordRoutedCall(ports: StewardPorts, data: Prisma.ModuleCallUnch
 
 /** Routed calls: the router checks visibility, records the real caller and refuses waits on itself. */
 async function routedCall(ports: StewardPorts, scope: CallScope, call: Extract<ModuleCall, { method: "call" }>): Promise<Reply> {
-  const { args, mode, key, reply, timeoutMs, expectedTarget } = call.params, target = call.params.target, now = ports.now();
-  const record = { moduleId: scope.moduleId, hash: scope.hash, moduleRunId: scope.moduleRunId, eventKey: scope.eventKey, method: "call", createdAt: now };
+  const { args, mode, key, reply, timeoutMs, expectedTarget } = call.params, target = call.params.target;
   try {
     if (target === EXECUTION_DELIVERY_CARRIER) {
       if (mode !== "sync") throw new CallError("invalid", "Execution delivery carrier requires a synchronous call");
       const output = z.json().parse(await callExecutionDeliveryCarrier(ports, scope, args));
-      await recordRoutedCall(ports, { ...record, key: JSON.stringify(target), status: "executed" });
       return { id: call.id, result: { output } };
     }
     if (mode === "sync") {
       const result = await callSync(ports, originOf(scope), target, args, { timeoutMs, expectedTarget, key });
-      await recordRoutedCall(ports, { ...record, key: result.callId, status: "executed" });
       return { id: call.id, result: { output: result.output } };
     }
     // The caller owns its keys (derive them from what is being done): a repeat after a crash returns the same call.
     const queued = await enqueueCall({ tx: ports.db, ports, origin: originOf(scope), target, raw: args }, { key: key!, reply, expectedTarget });
-    await recordRoutedCall(ports, { ...record, key: queued.callId, status: queued.duplicate ? "duplicate" : "executed" });
     if (!queued.duplicate) void drainCalls(ports, scope.workspaceId).catch(() => {});
     return { id: call.id, result: queued };
   } catch (error) {
-    await recordRoutedCall(ports, { ...record, key: JSON.stringify(target), status: error instanceof CallError && error.code !== "unknown" ? "rejected" : "failed", error: error instanceof CallError ? error.code : "internal" });
+    if (error instanceof CallError && error.code !== "unknown") await recordRejectedCall(ports, { moduleId: scope.moduleId, hash: scope.hash, moduleRunId: scope.moduleRunId, eventKey: scope.eventKey, method: "call", createdAt: ports.now(), key: JSON.stringify(target), status: "rejected", error: error.code });
     return failed(call.id, error);
   }
 }

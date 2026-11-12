@@ -47,7 +47,8 @@ async function activatedPiRegistration(ports: StewardPorts, workspaceId: string,
     throw new Error(`Pi activation did not register its actual release: ${JSON.stringify(runs)}`);
   }
   for (let i = 0; i < 150; i++) {
-    if (await ports.db.moduleInvocation.findFirst({ where: { callerModuleId: moduleId, target: "agent", tool: "register", status: "succeeded" } })) return registration;
+    // Keyless agent.register leaves no ledger row; the finished activated handler proves it returned.
+    if (await ports.db.moduleRun.findFirst({ where: { moduleId, hash, triggerId: "activated", exitCode: 0 } })) return registration;
     await Bun.sleep(20);
   }
   throw new Error("Pi registered its row but activated agent.register never returned; inspect recursive provider health delivery during registration");

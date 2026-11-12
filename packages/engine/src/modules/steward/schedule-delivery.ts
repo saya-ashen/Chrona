@@ -13,15 +13,15 @@ const MAX_ATTEMPTS = 6;
 type Row = Prisma.ModuleInvocationGetPayload<object>;
 type Settled = "queued" | "succeeded" | "failed" | "unknown" | "cancelled";
 
-async function settle(ports: StewardPorts, row: Row, token: string, now: Date, outcome: { status: Settled; error: string | null; effects?: number }) {
-  const { status, error, effects = 0 } = outcome, occurrence = row.args as unknown as Occurrence;
+async function settle(ports: StewardPorts, row: Row, token: string, now: Date, outcome: { status: Settled; error: string | null }) {
+  const { status, error } = outcome, occurrence = row.args as unknown as Occurrence;
   await ports.db.$transaction(async tx => {
     const changed = await tx.moduleInvocation.updateMany({ where: { id: row.id, status: "running", leaseToken: token }, data: { status, error, leaseToken: null, leaseUntil: null, finishedAt: status === "queued" ? null : ports.now(), nextAttemptAt: status === "queued" ? new Date(now.getTime() + Math.min(3600_000, 30_000 * 2 ** row.attempts)) : null } });
     if (!changed.count) return;
     if (status === "failed" || status === "unknown") await notifyLifecycle(tx, ports, row.workspaceId, `schedule-delivery:${row.id}`, { kind: "schedule-failed", target: row.target, status, error });
     const delay = Date.parse(occurrence.claimedAt) - Date.parse(occurrence.firedAt);
     await tx.schedule.updateMany({ where: { id: occurrence.scheduleId, lastAt: new Date(occurrence.claimedAt) }, data: {
-      lastResult: `Module exit ${status === "succeeded" ? 0 : -1}; effects ${effects}; delay ${delay}ms${error ? `; ${error}` : ""}`.slice(0, 2000),
+      lastResult: `Module exit ${status === "succeeded" ? 0 : -1}; delay ${delay}ms${error ? `; ${error}` : ""}`.slice(0, 2000),
       failures: status === "succeeded" ? 0 : { increment: 1 },
     } });
   });
@@ -52,15 +52,14 @@ async function deliver(ports: StewardPorts, row: Row, now: Date) {
   const { db } = ports, token = randomUUID(), occurrence = row.args as unknown as Occurrence;
   const claimed = await db.moduleInvocation.updateMany({ where: { id: row.id, status: "queued" }, data: { status: "running", attempts: { increment: 1 }, leaseToken: token, leaseUntil: new Date(now.getTime() + 660_000) } });
   if (!claimed.count) return;
-  const done = (status: Settled, error: string | null, effects?: number) => settle(ports, row, token, now, { status, error, effects });
+  const done = (status: Settled, error: string | null) => settle(ports, row, token, now, { status, error });
   const unavailable = (reason: string) => done(row.attempts + 1 < MAX_ATTEMPTS ? "queued" : "failed", reason);
   try {
     const target = await blocked(db, row, occurrence);
     if (target.blocked) return target.status === "unavailable" ? unavailable(target.reason) : done(target.status, target.reason);
     const { module, schedule } = target, triggerId = occurrence.triggerId ?? `s-${schedule.id}`;
     await moduleSupervisor(ports).deliver(module.id, module.hash, { trigger: { id: triggerId, kind: "schedule", firedAt: occurrence.firedAt, ...(occurrence.payload !== null ? { scheduleId: schedule.id, payload: occurrence.payload as Record<string, unknown> } : {}) }, now: now.toISOString(), params: {} }, { activationId: occurrence.activationId });
-    const effects = await db.moduleCall.count({ where: { moduleId: module.id, hash: module.hash, eventKey: `${triggerId}:${occurrence.firedAt}` } });
-    await done("succeeded", null, effects);
+    await done("succeeded", null);
   } catch (cause) {
     const error = String(cause instanceof Error ? cause.message : cause).slice(0, 1800), stage = (cause as { stage?: DeliveryStage } | null)?.stage;
     if (stage === "unavailable") await unavailable(error);

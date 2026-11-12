@@ -77,8 +77,7 @@ test("generic server authenticates the real Pi capability while actual SDK/fake 
     expect(outcome).toMatchObject({ outcome: "failed" });
     expect(details).toContainEqual(expect.objectContaining({ payload: { type: "state", status: "failed", cancelRequested: false, stopConfirmed: true } }));
     const callbacks = await f.db.moduleInvocation.findMany({ where: { target: "runtime-callback", tool: "event" } });
-    expect(callbacks.length).toBeGreaterThan(0);
-    expect(callbacks.every(row => row.callerModuleId === f.module.id && row.status === "succeeded")).toBe(true);
+    expect(callbacks).toEqual([]);
     expect(JSON.stringify(await f.db.moduleInvocation.findMany())).not.toContain("private-agent");
     await f.db.run.update({ where: { id: f.input.runId }, data: { status: "finished" } });
     expect((await f.request("/catalog", { headers: f.headers })).status).toBe(401);

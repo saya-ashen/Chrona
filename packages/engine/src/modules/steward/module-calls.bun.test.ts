@@ -44,6 +44,36 @@ async function fixture(handlers: { alpha: Handler; beta: Handler }) {
 }
 const output = (reply: unknown) => (reply as { result: { result: unknown } }).result.result;
 
+test("keyless unrecorded system reads return results and failures without touching invocation storage", async () => {
+  registerSystemModules();
+  const f = await fixture({ alpha: async () => ({}), beta: async () => ({}) });
+  const guarded = new Proxy(f.db, { get(db, property, receiver) {
+    if (property === "moduleInvocation") throw new Error("Keyless read touched invocation storage");
+    return Reflect.get(db, property, receiver);
+  } });
+  const ports = { ...f.ports, db: guarded }, origin = { ...kernelOrigin(f.workspace.id), caller: { kind: "owner" as const, via: null } };
+  const first = await callSync(ports, origin, "modules.list", {});
+  expect(first).toMatchObject({ callId: expect.any(String), output: { items: expect.arrayContaining([expect.objectContaining({ id: f.alpha.id })]) } });
+  expect((await callSync(ports, origin, "modules.list", {})).callId).not.toBe(first.callId);
+  await expect(callSync(ports, origin, "modules.health", { moduleId: "missing" })).rejects.toMatchObject({ code: "not_found" });
+  await expect(callSync(ports, origin, "modules.list", { unexpected: true })).rejects.toMatchObject({ code: "invalid" });
+  await expect(callSync(ports, origin, "modules.list", {}, { expectedTarget: { moduleId: "reinstalled", contractHash: "f".repeat(64) } })).rejects.toMatchObject({ code: "conflict" });
+  expect(await f.db.moduleInvocation.count()).toBe(0);
+  expect(await f.db.runEvent.count({ where: { kind: "tool-result" } })).toBe(0);
+});
+
+test("keyed unrecorded system reads retain finished receipts and deduplicate", async () => {
+  registerSystemModules();
+  const f = await fixture({ alpha: async () => ({}), beta: async () => ({}) });
+  const origin = { ...kernelOrigin(f.workspace.id), caller: { kind: "owner" as const, via: null } };
+  const first = await callSync(f.ports, origin, "modules.list", {}, { key: "read-once" });
+  expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: first.callId } })).toMatchObject({ targetIdentity: "system:modules", tool: "list", mode: "sync", key: "read-once", status: "succeeded", finishedAt: f.ports.now() });
+  await f.db.module.create({ data: { workspaceId: f.workspace.id, name: "later" } });
+  expect(await callSync(f.ports, origin, "modules.list", {}, { key: "read-once" })).toEqual(first);
+  await expect(callSync(f.ports, origin, "modules.list", { limit: 1 }, { key: "read-once" })).rejects.toMatchObject({ code: "conflict" });
+  expect(await f.db.moduleInvocation.count()).toBe(1);
+});
+
 test("shipped files capability examples match its input and output contracts", async () => {
   const raw = JSON.parse(await readFile(new URL("./external/files/module.json", import.meta.url), "utf8"));
   const manifest = moduleManifestSchema.parse(raw);
@@ -279,7 +309,7 @@ test("A calls B through Chrona: B sees the real caller and the call is recorded"
   });
   expect(output(await f.fire())).toMatchObject({ result: { output: { echo: "hi", caller: { kind: "module", module: "alpha", moduleId: f.alpha.id, hash: "alpha-v1" } } } });
   expect(await f.db.moduleInvocation.findFirstOrThrow()).toMatchObject({ caller: `module:${f.alpha.id}`, callerModuleId: f.alpha.id, target: "beta", tool: "echo", mode: "sync", status: "succeeded", chain: ["alpha"] });
-  expect(await f.db.moduleCall.findFirstOrThrow({ where: { moduleId: f.alpha.id } })).toMatchObject({ method: "call", status: "executed" });
+  expect(await f.db.moduleCall.count({ where: { method: "call", status: { not: "rejected" } } })).toBe(0);
 });
 
 test("declared app outputs fail synchronously with callee diagnostics and no lifecycle incident", async () => {
@@ -495,6 +525,7 @@ test("approved owner authority reaches owner and modules tools but not kernel-on
   expect(results["beta.hidden"]).toMatchObject({ result: { output: { tool: "hidden" } } });
   expect(results["beta.echo"]).toMatchObject({ result: { output: { tool: "echo" } } });
   expect(results["beta.private"]).toMatchObject({ error: { code: "forbidden" } });
+  expect(await f.db.moduleCall.findMany({ where: { method: "call" }, select: { status: true, error: true } })).toEqual([{ status: "rejected", error: "forbidden" }]);
   // Discovery uses the same visibility rule, independent of declared target contracts.
   expect((results["modules.describe"]!.result!.output as { items: { target: { moduleId: string; tool: string } | string }[] }).items.flatMap(entry => typeof entry.target !== "string" && entry.target.moduleId === f.beta.id ? [`beta.${entry.target.tool}`] : [])).toEqual(["beta.again", "beta.bounce", "beta.crash", "beta.echo", "beta.hidden", "beta.unlisted"]);
 });

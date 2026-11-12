@@ -325,7 +325,7 @@ test("current Agent imports source and ignored native assets, checks/installs fi
     expect(invocations.some(row => row.caller === "owner" || row.caller.startsWith("provider:"))).toBe(false);
     expect(await db.run.count()).toBe(2);
     expect(await db.executionAttempt.count()).toBe(0);
-    expect(await db.moduleCall.count({ where: { moduleId: author.id, status: "executed", method: "call" } })).toBeGreaterThan(0);
+    expect(await db.moduleCall.count({ where: { method: "call", status: { not: "rejected" } } })).toBe(0);
     await current.finish();
   } finally {
     try { await stopSupervisor?.(); }

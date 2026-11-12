@@ -70,7 +70,7 @@ test("approved module executes a routed tool without a Provider Run and scopes n
   await callsSettled(f.ports);
   expect((await notices(f.db)).map(row => row.body)).toEqual([notify.body, notify.body]);
   expect(await f.db.moduleInvocation.count({ where: { target: "notify", tool: "send", status: "succeeded" } })).toBe(2);
-  expect((await f.db.moduleCall.findMany()).map(row => row.status)).toEqual(["executed", "executed"]);
+  expect(await f.db.moduleCall.count({ where: { method: "call", status: { not: "rejected" } } })).toBe(0);
 });
 
 test.each(["json", "schema", "exit", "timeout", "throw"])("routed module failure %s is bounded, counted, and pauses after three failures", async kind => {

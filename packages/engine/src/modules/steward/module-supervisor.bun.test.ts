@@ -425,7 +425,7 @@ test("stop aggregates every unknown owner while still stopping healthy modules",
   expect(f.pending()).toEqual([]);
 });
 
-test("events are serial and calls without uses are executed and recorded", async () => {
+test("events are serial and calls without uses retain their delivery receipts", async () => {
   let active = 0, maximum = 0;
   const f = await fixture({ uses: [], handler: async (_event, call) => {
     maximum = Math.max(maximum, ++active);
@@ -436,8 +436,7 @@ test("events are serial and calls without uses are executed and recorded", async
   const replies = await Promise.all([f.deliver(), f.deliver()]);
   expect(maximum).toBe(1); expect(f.processes).toHaveLength(1);
   expect(replies[0]).toMatchObject({ result: { result: { result: { status: "queued", duplicate: false } } } });
-  expect(await f.db.moduleCall.findMany()).toHaveLength(2);
-  expect(await f.db.moduleCall.findFirstOrThrow()).toMatchObject({ method: "call", status: "executed", error: null, moduleRunId: expect.any(String) });
+  expect(await f.db.moduleCall.count({ where: { method: "call", status: { not: "rejected" } } })).toBe(0);
 });
 test("duplicate keys return duplicate and a different event does not swallow the next notification", async () => {
   // Keys scoped to the event, as the SDK shorthands send them.
@@ -453,7 +452,7 @@ test("duplicate keys return duplicate and a different event does not swallow the
   await callsSettled(f.ports);
   expect((await notices(f.db)).length).toBe(2);
   expect(await f.db.moduleInvocation.count({ where: { target: "notify", tool: "send", status: "succeeded", attempts: 1 } })).toBe(2);
-  expect(await f.db.moduleCall.count()).toBe(3);
+  expect(await f.db.moduleCall.count({ where: { method: "call", status: { not: "rejected" } } })).toBe(0);
 });
 
 test("crash evidence is attributed, backoff cannot be bypassed, and reconnect remains unverified until a real call succeeds", async () => {

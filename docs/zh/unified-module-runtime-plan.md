@@ -141,7 +141,7 @@ V1 直接实现最终本机结构，不为保持中间状态可用添加桥接�
 - `local-workspace.ts` 负责本机 prepare/release、项目规则、成果捕获／读取和 receipt-first cleanup。物理准备在数据库写事务外完成；锁只通过受治理 release 释放。Run／attempt 授权与停止状态仍由内核验证。
 - `local-content.ts` 负责本机附件 put/read/capture 与受权内容引用读取；调用者显式传递当前 workspace；现有文件边界和大小限制由宿主执行。平台 SQLite、版本／迁移副本和受信启动状态不依赖内容模块。
 - V1 初始实现的本机能力采用受信任进程内投递。2026-11-07 后续拆分已把 `agent` 移为真实内置 SDK/socket 应用，内部持有 Pi 进程控制与回执；内核通过短请求调用并保留授权与治理。`runtime-callback`、workspace/content 能力暂保持进程内。详见 [Agent 内置应用](agent-builtin-application.md)。未新增远端传输，也不宣称现有设备协议已成为通用宿主。
-- 模型正文、run token、附件字节、问答正文和宿主路径使用 unrecorded 通道；通用 Invocation 只保存有界元数据和错误类别。未确认的启动／最终结果记录 unknown；适配器异常正文被替换，模型 timeout 保留可判定类别。
+- 模型正文、run token、附件字节、问答正文和宿主路径使用 unrecorded 通道；带 key 的调用及需保留执行证据的调用，其通用 Invocation 只保存有界元数据和错误类别；列入系统处理器 `unrecorded` 的无 key 同步调用（包括 `runtime-callback.event`）不再创建 Invocation 或 Run tool-result。未确认的启动／最终结果记录 unknown；适配器异常正文被替换，模型 timeout 保留可判定类别。
 - 本机能力所有工具声明输入与输出 schema；local 输出不符在生产环境同样拒绝，不仅记录警告。附件读取使用有界 buffer 与 no-follow 文件描述符；外部符号链接、目录逃逸、超量和增长超限拒绝。
 - 首轮开发验证（2026-11-07，最终收口复验见下）：`bun run typecheck`、`bun run lint`、`bun run check:boundaries` 通过；新增能力与 Run 鉴权文件单独 ESLint `--max-warnings 0` 通过。扩展定向 **113 pass / 0 fail / 710 assertions**；完整 Bun **1445 pass / 7 skip / 0 fail**；API **64 pass / 3 skip / 0 fail**。类型／lint／边界保留既有 doctor 复杂度和跨包测试警告，没有新增错误或 lint 债务。
 - Linux x64 真正编译二进制，打包发行资源与 11 个既有模块种子，ELF 校验、发行内模块类型检查以及隔离 fresh SQLite 的真实启动／HTTP smoke 均通过，`runtime: true`。制品：`/tmp/chrona-local-v1-release-UJy6P4/chrona-linux-x64`。未调用真实模型、QQ 或私人账户，未修改生产数据／服务。没有 schema 变更；未对真实用户库进行迁移。

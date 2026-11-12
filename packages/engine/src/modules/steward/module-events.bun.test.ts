@@ -39,6 +39,6 @@ on('tool', async event => { if (event.id === 'increment') { count++; const key =
   await callsSettled(ports);
   expect(await db.moduleRun.count({ where: { moduleId: module.id, error: null, exitCode: 0 } })).toBe(2);
   expect(await db.moduleInvocation.findFirstOrThrow({ where: { target: "notify", tool: "send" } })).toMatchObject({ status: "succeeded", output: { id: expect.any(String), status: "queued", duplicate: false } });
-  expect(await db.moduleCall.count({ where: { status: "executed" } })).toBe(1);
+  expect(await db.moduleCall.count({ where: { method: "call", status: { not: "rejected" } } })).toBe(0);
   expect((await notices(db)).length).toBe(1);
 });

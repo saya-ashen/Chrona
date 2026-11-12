@@ -94,7 +94,7 @@ test("Provider event callbacks are routed and absent from stored payloads", asyn
     expect(await ask()).toEqual({ decision: "submit", value: true }); expect(progress).toBe(true);
     await handle.abort(); await handle.done;
     const rows = await f.ports.db.moduleInvocation.findMany({ where: { target: "runtime-callback" } });
-    expect(rows).toHaveLength(3); // Progress, question, and the actual settled outcome.
+    expect(rows).toHaveLength(3); // Keyed progress, question, and the actual settled outcome retain their receipts.
     expect(rows.every(row => JSON.stringify(row.args) === "{}" && row.output === null)).toBe(true);
     expect(JSON.stringify(rows)).not.toContain("private question");
   } finally { completed.resolve(finished); await f.close(); }
@@ -126,6 +126,7 @@ test("callbacks require the admitted provider, workspace, runtime scope and exac
     callback.release();
     await expect(callSync(f.ports, origin, "runtime-callback.event", args)).rejects.toMatchObject({ code: "not_found" });
     expect(delivered).toBe(1);
+    expect(await f.ports.db.moduleInvocation.count({ where: { target: "runtime-callback" } })).toBe(0);
   } finally { release?.(); await f.close(); }
 });
 

@@ -119,7 +119,7 @@ test("success returns result, runs sandbox with scoped input and deduplicates sh
   const f = await fixture(), args = { query: "hello", count: 2, unread: true, folder: "inbox" };
   expect(await f.call(args)).toEqual({ result: { found: 3 } });
   expect(await f.call(args)).toEqual({ result: { found: 3 } });
-  expect((await f.db.moduleCall.findMany({ where: { moduleId: f.module.id } })).map(call => call.status).sort()).toEqual(["duplicate", "executed"]);
+  expect(await f.db.moduleCall.count({ where: { moduleId: f.module.id, method: "call", status: { not: "rejected" } } })).toBe(0);
   expect(f.calls[0]).toMatchObject({ codeDir: join(f.ports.dataDir, "platform/store/hash"), dataDir: join(f.ports.dataDir, "platform/data", f.module.id), entry: "index.ts", network: true, timeoutMs: RUN_LIMITS.jobTimeoutMs, maxOutputBytes: RUN_LIMITS.jobOutputBytes,
     input: { trigger: { id: "find-mail", kind: "tool", firedAt: f.ports.now().toISOString(), args, caller: { kind: "provider", runId: expect.any(String) }, call: { id: expect.any(String), key: null, attempt: 1, chain: [] } }, now: f.ports.now().toISOString(), params: { limit: 3 } } });
   expect((await notices(f.db)).length).toBe(1);

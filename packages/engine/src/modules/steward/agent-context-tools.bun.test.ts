@@ -7,6 +7,7 @@ import { moduleManifestSchema, runToolResultSchema } from "@chrona/contracts/ste
 import { admitContextPrimitive } from "./agent-context";
 import { callContextTool, contextRunTools, selectContextTools } from "./agent-context-tools";
 import { callSync, kernelOrigin } from "./module-calls";
+import { registerSystemModules } from "./system-modules";
 import { moduleSupervisor } from "./module-supervisor";
 import { testModuleProcess } from "./module-test-process";
 import { createRuns } from "./runs";
@@ -22,7 +23,8 @@ const tool = (name: string, visibility = ["modules"]) => ({ name, description: n
 const targets = ["context-origin.observe", "context-origin.self", "context-origin.bounce", "context-peer.back"];
 
 /** Real admission, Run claim, router and supervisor; the wire peer only replaces application handlers. */
-async function fixture() {
+async function fixture(selectedTargets = targets) {
+  registerSystemModules();
   const db = testDb({ injectedAgent: false }), dataDir = await mkdtemp(join(tmpdir(), "chrona-context-entry-"));
   const databases = await db.$queryRawUnsafe<{ name: string; file: string }[]>("PRAGMA database_list");
   const database = databases.find(row => row.name === "main")!.file;
@@ -47,12 +49,21 @@ async function fixture() {
   }
   const principal = { workspaceId, ownerId: "owner", caller: { kind: "module" as const, moduleId: origin.id, hash: origin.activeHash! } };
   const admitted = await admitContextPrimitive(ports, principal, "context", { requestKey: "context" }) as { contextId: string };
-  await admitContextPrimitive(ports, principal, "run", { requestKey: "run", contextId: admitted.contextId, lane: "background", prompt: "offline", tools: targets, content: [] });
+  await admitContextPrimitive(ports, principal, "run", { requestKey: "run", contextId: admitted.contextId, lane: "background", prompt: "offline", tools: selectedTargets, content: [] });
   const run = (await createRuns(ports, workspaceId).claimNext("background"))!;
   const context = (await contextRunTools(ports, run))!;
   const invoke = (name: string, candidate = context) => callContextTool(ports, candidate, name, {}, { deadline: Date.now() + 5000 });
   return { db, ports, workspaceId, origin, other, run, context, principal, invoke };
 }
+
+test("keyless system reads in an admitted Run return live results without invocation or tool-result rows", async () => {
+  const f = await fixture(["modules.list"]);
+  const before = await f.db.runEvent.count({ where: { runId: f.run.id, kind: "tool-result" } });
+  const reply = await f.invoke("m_modules_list");
+  expect(reply).toMatchObject({ result: { items: expect.arrayContaining([expect.objectContaining({ id: f.origin.id })]) } });
+  expect(await f.db.moduleInvocation.count({ where: { target: "modules", tool: "list" } })).toBe(0);
+  expect(await f.db.runEvent.count({ where: { runId: f.run.id, kind: "tool-result" } })).toBe(before);
+});
 
 test("detached entry preserves the original principal for self-owned and cross-module tools", async () => {
   const f = await fixture();

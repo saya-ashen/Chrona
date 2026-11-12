@@ -97,9 +97,9 @@ test("approved removal stays done after restart and same-name reinstall without 
   expect(await callStatus(f.ports, f.owner, { target, key })).toMatchObject({ status: "succeeded", output: receipt });
 });
 
-test.each(["sync", "async"] as const)("%s successful write survives real ModuleCall insert failure with sanitized diagnostics", async mode => {
+test.each(["sync", "async"] as const)("%s keyed write commits its receipt without attempting routed-call diagnostics", async mode => {
   const f = await fixture(), app = await f.app("entry", "owner");
-  // Fail the auxiliary insert only, after the settings transaction and invocation receipt commit.
+  // Fail any unexpected routed-call insert; successful routes must not attempt one.
   await f.db.$executeRawUnsafe(`CREATE TRIGGER fail_route_log BEFORE INSERT ON "ModuleCall" WHEN NEW.method = 'call' BEGIN SELECT RAISE(FAIL, 'private-database-error-payload'); END`);
   const diagnostic = spyOn(console, "error").mockImplementation(() => {});
   cleanup.push(() => { diagnostic.mockRestore(); });
@@ -119,12 +119,20 @@ test.each(["sync", "async"] as const)("%s successful write survives real ModuleC
   await callsSettled(f.ports);
   expect(await f.db.audit.count({ where: { workspaceId: f.workspace.id, kind: "settings_updated" } })).toBe(1);
   expect(await f.db.moduleInvocation.count({ where: { workspaceId: f.workspace.id, target: "settings", tool: "update", key } })).toBe(1);
-  expect(diagnostic).toHaveBeenCalledTimes(2);
-  const expected = { component: "module-effects", event: "module_call.persist_failed", moduleId: app.row.id, method: "call", status: "executed" };
-  expect(diagnostic.mock.calls.map(call => JSON.parse(String(call[0])))).toEqual([expected, { ...expected, status: mode === "sync" ? "executed" : "duplicate" }]);
-  expect(JSON.stringify(diagnostic.mock.calls)).not.toContain("private-");
+  expect(diagnostic).not.toHaveBeenCalled();
 });
 
+test("rejected-call diagnostics preserve the routing error when their insert fails", async () => {
+  const f = await fixture(), app = await f.app("entry", "owner");
+  await f.db.$executeRawUnsafe(`CREATE TRIGGER fail_route_log BEFORE INSERT ON "ModuleCall" WHEN NEW.method = 'call' BEGIN SELECT RAISE(FAIL, 'private-database-error-payload'); END`);
+  const diagnostic = spyOn(console, "error").mockImplementation(() => {});
+  cleanup.push(() => { diagnostic.mockRestore(); });
+  const request = moduleCallSchema.parse({ id: "invalid", method: "call", params: { target: "settings.update", args: { unexpected: "private-argument" }, mode: "sync" } });
+  expect(await handleModuleCall(f.ports, app.scope, request)).toMatchObject({ error: { code: "invalid" } });
+  expect(diagnostic).toHaveBeenCalledTimes(1);
+  expect(JSON.parse(String(diagnostic.mock.calls[0]![0]))).toEqual({ component: "module-effects", event: "module_call.persist_failed", moduleId: app.row.id, method: "call", status: "rejected" });
+  expect(JSON.stringify(diagnostic.mock.calls)).not.toContain("private-");
+});
 
 test("a confirmed rollback operation remains terminal after later version changes and DB reopen", async () => {
   const f = await fixture(), app = await f.app("rollback-target");
