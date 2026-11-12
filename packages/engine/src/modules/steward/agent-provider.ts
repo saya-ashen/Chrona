@@ -66,14 +66,25 @@ export async function registerAgentProvider(ports: StewardPorts, workspaceId: st
   // into that same serialized module would wait for this registration to finish.
   return providerView(ports, workspaceId, { ...row, providerId: row.id }, false);
 }
+const lastAvailabilityError = new Map<string, string | null>();
+/** Health is polled often; log only transitions so the reason is visible without flooding the journal. */
+function logAvailabilityChange(key: string, provider: string, error: string | null) {
+  if (lastAvailabilityError.get(key) === error) return;
+  lastAvailabilityError.set(key, error);
+  console.error(JSON.stringify({ component: "agent-provider", event: error === null ? "provider_available" : "provider_unavailable", provider, ...(error === null ? {} : { error }) }));
+}
 export async function providerView(ports: StewardPorts, workspaceId: string, binding: ProviderBinding, observeHealth = true) {
   const snapshot = providerSnapshot(binding.declaration);
-  let available = false;
+  let available = false, error: string | null = null;
   try {
     if (!observeHealth) throw new CallError("unavailable", "Provider health has not been observed");
     const health = runtimeHealthSchema.parse(await callProviderEndpoint(ports, workspaceId, binding, "health", {}));
-    available = health.available;
-  } catch { /* An installed registration remains discoverable while its module is unavailable. */ }
+    available = health.available; error = health.available ? null : health.error ?? "unavailable without a reason";
+  } catch (failure) {
+    // An installed registration remains discoverable while its module is unavailable.
+    if (observeHealth) error = String((failure as Error)?.message ?? failure).slice(0, 300);
+  }
+  logAvailabilityChange(`${workspaceId}:${binding.moduleId}`, snapshot.id, error);
   const { contracts: _contracts, ...declaration } = snapshot;
   return { ...declaration, moduleId: binding.moduleId, hash: binding.hash, revision: binding.revision, available };
 }

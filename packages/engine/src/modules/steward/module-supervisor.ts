@@ -184,11 +184,15 @@ class ModuleSupervisor {
     if (version.status !== "approved") throw new Error("Provider module version is not approved");
     // A name or manifest alone never grants host configuration. The installed code
     // must be the exact verified release shipped by this host, including its Git seed.
+    let reason: string;
     try {
       const release = await resolveExternalRelease(ports, module.name, instance.hash);
-      if (!release.git || release.hash !== instance.hash || JSON.stringify(release.manifest) !== JSON.stringify(instance.manifest)) return undefined;
-      return host;
-    } catch { return undefined; }
+      if (release.git && release.hash === instance.hash && JSON.stringify(release.manifest) === JSON.stringify(instance.manifest)) return host;
+      reason = `installed ${instance.hash.slice(0, 12)} is not this release's trusted ${String(release.hash).slice(0, 12)}; run \`chrona admin install ${module.name} update <key>\``;
+    } catch (error) { reason = String((error as Error)?.message ?? error).slice(0, 300); }
+    // Without this line the provider just reports "unavailable" with no trace of why.
+    console.error(JSON.stringify({ component: "module-supervisor", event: "provider_host_withheld", module: module.name, reason }));
+    return undefined;
   }
   private async bindings(workspaceId: string) {
     return Object.fromEntries((await this.ports.db.module.findMany({ where: { workspaceId, status: "active", activeHash: { not: null } }, select: { id: true, name: true } })).map(row => [row.name, row.id]));

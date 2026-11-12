@@ -75,7 +75,9 @@ export function createPiApplication({ data, options, createProvider, call }: App
       try {
         const snapshot = await configuration.snapshot(), provider = createProvider(snapshot.options);
         return { name: "pi", supportsRunModel: provider.supportsRunModel ?? false, complete: !!provider.complete && !!snapshot.effective.model, ...await provider.health() };
-      } catch {
+      } catch (error) {
+        // Callers get a fixed reason (host configuration may be private); the operator log gets the real one.
+        console.error(JSON.stringify({ component: "pi", event: "health_unavailable", error: String((error as Error)?.message ?? error).slice(0, 300) }));
         return { name: "pi", supportsRunModel: true, complete: false, available: false, sandboxed: false, error: "Pi configuration or host bridge is unavailable" };
       }
     }
