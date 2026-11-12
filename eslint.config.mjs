@@ -106,6 +106,30 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    // Golden principles (AGENTS.md "失败与诊断"). Warnings: the lint ratchet blocks any increase per changed file.
+    files: ["apps/**/*.ts", "packages/**/*.ts", "scripts/**/*.ts"],
+    ignores: ["**/*.test.ts", "**/__tests__/**", "**/*.fixture.ts", "**/generated/**", "**/vendor/**"],
+    rules: {
+      // Line-count limits alone reward cramming a function onto one line.
+      "max-len": ["warn", { code: 160, ignoreStrings: true, ignoreTemplateLiterals: true, ignoreRegExpLiterals: true, ignoreUrls: true }],
+      "no-restricted-syntax": [
+        "warn",
+        {
+          selector: "CatchClause > BlockStatement[body.length=0]",
+          message: "Empty catch hides the failure: rethrow, or log one line with the reason.",
+        },
+        {
+          selector: "CatchClause > BlockStatement[body.length=1] > ReturnStatement:matches([argument=null], [argument.type='Literal'][argument.value=null], [argument.name='undefined'], [argument.value=false])",
+          message: "A catch that only returns null/undefined/false erases the reason: log it or rethrow.",
+        },
+        {
+          selector: "CallExpression[callee.property.name='catch'] > ArrowFunctionExpression:matches([body.type='BlockStatement'][body.body.length=0], [body.name='undefined'], [body.type='Literal'][body.value=null])",
+          message: ".catch(() => {}) drops the error: log one line with the reason, or let it propagate.",
+        },
+      ],
+    },
+  },
+  {
     files: [
       "apps/**/*.ts",
       "apps/**/*.tsx",
