@@ -160,15 +160,6 @@ test("receiver governance cannot reach another receiver or successor device gene
   expect(await foreignCall({ operation: "retention", key: "foreign-only" })).toEqual({ safeToDelete: true, pendingDeliveryIds: [], pendingControlKeys: [] });
 });
 
-test("bounded governance storage reserves revoke capacity and preserves replay at the limit", async () => {
-  const f = await fixture();
-  const before = await f.reconcile();
-  await f.db.audit.createMany({ data: Array.from({ length: 895 }, (_, index) => ({ id: `quota-${index}`, workspaceId: f.who.workspaceId, actorKey: `execution-receiver:${executionDigest(f.who)}`, kind: "execution_governance_receipt", subjectId: f.who.moduleId, details: {} })) });
-  await expect(f.reconcile({ key: "over-quota", snapshotId: "over-quota" })).rejects.toMatchObject({ code: "capacity" });
-  expect(await f.reconcile()).toEqual(before);
-  expect(await f.call({ operation: "revoke", key: "reserved-revoke", ...f.subject, reason: "quota" })).toMatchObject({ revoked: true });
-});
-
 async function actualApp() {
   const f = await fixture(), root = await mkdtemp(join(tmpdir(), "s5-native-app-governance-"));
   let fault: (point: string) => void = () => {};

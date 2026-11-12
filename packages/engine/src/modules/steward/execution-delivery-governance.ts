@@ -119,9 +119,6 @@ export function createExecutionDeliveryGovernance(ports: StewardPorts) {
         if (details.requestDigest !== digest) throw new CallError("conflict", "Governance receipt key contains different content");
         return details.receipt;
       }
-      const kinds = [receiptKind, reconcileKind], control = input.operation === "revoke" || input.operation === "cancel";
-      // Reconciliation/status traffic cannot consume the reserve for durable fences.
-      if (await tx.audit.count({ where: { actorKey: actor(who), kind: { in: kinds } } }) >= (control ? 1024 : 896) || await tx.audit.count({ where: { kind: { in: kinds } } }) >= (control ? 4096 : 3840)) throw new CallError("capacity", "Governance receipt storage limit exceeded");
       const now = ports.now();
       const receipt = await executeIn(ports, tx, who, input, now);
       const details = { requestDigest: digest, payload: input, receipt };
