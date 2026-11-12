@@ -150,7 +150,12 @@ async function readTranscript(call: Call, turn: Turn, before?: string) {
     try {
       const page = await call("agent.read", { runId: turn.runId, view: "native", limit: 1 }) as AgentReadPage;
       applyRunView(turn, page.run);
-    } catch { /* Keep the last observed evidence when neither read is available. */ }
+    } catch (error) {
+      // A Run that is gone or no longer ours never comes back; stop polling it every second.
+      if (!["not_found", "forbidden"].includes((error as { code?: unknown }).code as string)) return false;
+      turn.status = "failed"; turn.active = false; turn.reason = "这次处理的运行记录已不存在，无法继续读取结果。";
+      return true;
+    }
     return false;
   }
 }

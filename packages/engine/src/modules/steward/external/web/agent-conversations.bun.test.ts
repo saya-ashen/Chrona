@@ -28,7 +28,7 @@ async function fixture() {
     receiptRead: undefined as (() => Promise<void>) | undefined,
   };
   let clock = Date.parse("2026-11-09T00:00:05.000Z");
-  const stream = { status: "finished", active: false, result: "succeeded", transcript: true, loseAdmission: false, loseWrite: false, includeReceipt: true, extraUnknown: false };
+  const stream = { status: "finished", active: false, result: "succeeded", transcript: true, loseAdmission: false, loseWrite: false, includeReceipt: true, extraUnknown: false, gone: false };
   const call = async (target: string, args: Args = {}, options?: { key?: string }): Promise<unknown> => {
     calls.push({ target, args });
     if (target === "web.settings") return { provider: null, autoRecall: false, autoRetain: false };
@@ -40,6 +40,7 @@ async function fixture() {
     }
     if (target === "agent.write") { if (stream.loseWrite) throw new Error("write response lost"); return { accepted: true }; }
     if (target === "agent.read") {
+      if (stream.gone) throw Object.assign(new Error("Run not found"), { code: "not_found" });
       const event = receiptEvent(String(args.runId));
       if (stream.result === "unknown") Object.assign(event.payload.value, { status: "unknown", outputState: "omitted", output: null });
       const items = stream.includeReceipt ? [event] : [];
@@ -234,4 +235,18 @@ test("snapshot reads and background polls never replay unknown admission or supp
   await expect(f.restart().send(supplemental)).rejects.toMatchObject({ code: "unknown" });
   expect(f.count("agent.write")).toBe(1);
   expect(f.count("agent.run")).toBe(2);
+});
+
+test("a Run that no longer exists ends its turn instead of being polled forever", async () => {
+  const f = await fixture(), app = f.restart();
+  Object.assign(f.stream, { status: "running", active: true });
+  await app.send({ text: "你好", requestKey: "gone" });
+  f.stream.gone = true;
+  await app.poll();
+  const reads = f.count("agent.read");
+  await app.poll(); await app.poll();
+  expect(f.count("agent.read")).toBe(reads);
+  const turn = (await f.journal()).sessions[0].turns[0];
+  expect(turn).toMatchObject({ status: "failed", active: false });
+  expect(turn.reason).toContain("不存在");
 });

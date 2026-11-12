@@ -67,6 +67,8 @@ export const modules: SystemModule = {
   name: "modules",
   description: "Installed identity, reachable contracts, fixed candidate receipts and governed lifecycle.",
   tools: publicSystemTools.modules,
+  // Pure reads: replaying them is harmless, so the ledger keeps no arguments or results.
+  unrecorded: ["list", "describe", "health", "receipt"],
   async handle(context, name, args) {
     const { ports, workspaceId, caller, call } = context;
     const api = createModules(ports, workspaceId);
