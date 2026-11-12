@@ -17,12 +17,11 @@ export type { SystemTool, SystemModule } from "./module-system-types";
 import { isAgentContextEntry } from "./agent-context-entry";
 import { admitted } from "./module-call-admission";
 export { admitted } from "./module-call-admission";
-import { moduleCallbackContractHash } from "./module-tool-contract";
 export { moduleCallbackContractHash, normalizedToolInputSchema, validateToolArgs, moduleToolExampleError } from "./module-tool-contract";
 import { isModulePaused } from "./module-availability";
 export { registerLocalModule, registerSystemModule, listSystemModules, listLocalModules } from "./module-registry";
 
-import type { Caller, Json, CallOrigin, Tool } from "./module-call-types";
+import type { Caller, Json, CallOrigin } from "./module-call-types";
 export type { Caller, Json, CallOrigin, Tool } from "./module-call-types";
 type Db = StewardPorts["db"] | Prisma.TransactionClient;
 import { CallError, publicCallError, publicCallReason } from "./module-call-error";
@@ -177,7 +176,7 @@ function createSyncInvocation({ ports, origin, resolved, args, path, now, key }:
     if (key) { const existing = await previousCall(tx, origin, requestedTarget, key); if (existing) return { existing }; }
     return { created: await tx.moduleInvocation.create({ data: { workspaceId: origin.workspaceId, caller: callerKey(origin.caller), ...callerIdentity(origin.caller),
     ...(isAgentContextEntry(ports, origin) ? { runId: origin.run!.executionRunId } : {}),
-    target: resolved.module.name, targetIdentity: resolved.module.id, tool: resolved.tool.name, args: (quiet ? {} : args) as Prisma.InputJsonValue, key: key ?? randomUUID(), requestDigest: digest, targetBound: true, targetModuleId: resolved.module.id, targetHash: resolved.module.activeHash, targetContractHash: resolved.module.id.startsWith("local:") ? null : moduleCallbackContractHash(resolved.tool as Tool | SystemTool), chain: path, mode: "sync", idempotent: resolved.tool.idempotent, status: "running", attempts: 1, createdAt: now } }) };
+    target: resolved.module.name, targetIdentity: resolved.module.id, tool: resolved.tool.name, args: (quiet ? {} : args) as Prisma.InputJsonValue, key: key ?? randomUUID(), requestDigest: digest, targetBound: true, targetModuleId: resolved.module.id, targetHash: resolved.module.activeHash, targetContractHash: null, chain: path, mode: "sync", idempotent: resolved.tool.idempotent, status: "running", attempts: 1, createdAt: now } }) };
   });
 }
 async function executeSyncInvocation({ ports, origin, resolved, target, args, chain, path, now, key, rowId, quiet, timeoutMs, privateTransport }: SyncInvocation & { rowId: string; quiet: boolean; timeoutMs?: number }) {
@@ -255,7 +254,7 @@ function checkDuplicateTarget(binding: { targetModuleId: string | null; targetCo
   if (!expectedTarget) return;
   const parsed = expectedModuleTargetSchema.safeParse(expectedTarget);
   if (!parsed.success) throw new CallError("invalid", "Invalid expected target identity");
-  if (binding.targetModuleId !== parsed.data.moduleId || binding.targetContractHash !== parsed.data.contractHash) throw new CallError("conflict", "Duplicate key belongs to a different registered target");
+  if (binding.targetModuleId !== parsed.data.moduleId) throw new CallError("conflict", "Duplicate key belongs to a different registered target");
 }
 function duplicateEnqueuedCall(existing: Row, origin: CallOrigin, digest: string, expectedTarget?: ExpectedModuleTarget): EnqueuedCall {
   if (existing.requestDigest !== digest) throw new CallError("conflict", "Call key was already used with different arguments");
@@ -375,7 +374,7 @@ export async function runDueCalls(ports: StewardPorts, workspaceId: string) {
   const { db } = ports, now = ports.now();
   for (const row of await db.moduleInvocation.findMany({ where: { workspaceId, mode: "async", status: "running", leaseUntil: { lte: now } } })) {
     // Chrona stopped or lost the delivery mid-flight: the target may have acted.
-    const identityBound = row.targetBound && row.targetModuleId !== null && row.targetContractHash !== null;
+    const identityBound = row.targetBound && row.targetModuleId !== null;
     await db.moduleInvocation.updateMany({ where: { id: row.id, status: "running", leaseToken: row.leaseToken }, data: identityBound && row.idempotent && row.attempts < MAX_ATTEMPTS
       ? { status: "queued", leaseToken: null, leaseUntil: null, nextAttemptAt: now, error: "Delivery interrupted; retrying an idempotent call" }
       : { status: "unknown", leaseToken: null, leaseUntil: null, error: "Delivery interrupted; outcome unknown", finishedAt: now } });

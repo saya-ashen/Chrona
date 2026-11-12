@@ -5,7 +5,6 @@ import { CallError } from "./module-call-error";
 import { assertExecutionPrincipal } from "./execution-principal";
 import { createRuns, createRunSession } from "./runs";
 import { validateExecutionAnswer } from "./provider-channel";
-import { moduleCallbackContractHash } from "./module-tool-contract";
 import type { selectContextTools } from "./agent-context-tools";
 import { assertProviderBinding, providerSnapshot, type ProviderBinding } from "./agent-provider";
 import { reserveCompletionIn, refused } from "./module-model-budget";
@@ -99,7 +98,7 @@ async function admitRun(ports: StewardPorts, tx: Prisma.TransactionClient, comma
   const active = await tx.run.findFirst({ where: { workspaceId, sessionId: context.id, OR: [{ status: { in: ["queued", "running"] } }, { stopStatus: "unknown" }] }, select: { id: true } });
   if (active) throw new CallError("conflict", "Agent context already has an active run");
   const run = await createRuns(ports, workspaceId).enqueue({ sessionId: context.id, lane: args.lane as "foreground" | "background", trigger: "source", prompt: String(args.prompt) }, tx);
-  await tx.agentRunAdmission.create({ data: { runId: run.id, moduleId: principal.caller.moduleId, hash: principal.caller.hash, targets: selection!.entries.map(entry => ({ target: `${entry.module.name}.${entry.tool.name}`, moduleId: entry.module.id, contractHash: moduleCallbackContractHash(entry.tool) })), content: args.content as string[] } });
+  await tx.agentRunAdmission.create({ data: { runId: run.id, moduleId: principal.caller.moduleId, hash: principal.caller.hash, targets: selection!.entries.map(entry => ({ target: `${entry.module.name}.${entry.tool.name}`, moduleId: entry.module.id })), content: args.content as string[] } });
   await bindProviderRun(ports, tx, run.id, command);
   return view(run);
 }

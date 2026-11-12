@@ -115,7 +115,7 @@ export async function callProviderEndpoint<T>(ports: StewardPorts, workspaceId: 
   const allowFenced = await boundProviderControl(ports.db, workspaceId, binding, endpoint, args);
   const snapshot = await checkProviderBinding(ports.db, workspaceId, binding, allowFenced), tool = snapshot.endpoints[endpoint];
   if (!tool) throw new CallError("unavailable", `Provider ${endpoint} is unsupported`);
-  return (await callSync(ports, kernelOrigin(workspaceId), { moduleId: binding.moduleId, tool }, args, { key, private: true, expectedHash: binding.hash, expectedTarget: { moduleId: binding.moduleId, contractHash: snapshot.contracts[tool]! } })).output as T;
+  return (await callSync(ports, kernelOrigin(workspaceId), { moduleId: binding.moduleId, tool }, args, { key, private: true, expectedHash: binding.hash, expectedTarget: { moduleId: binding.moduleId } })).output as T;
 }
 export async function runProviderBinding(ports: StewardPorts, workspaceId: string, runId: string) {
   const binding = await ports.db.agentRunProvider.findFirst({ where: { runId, run: { workspaceId } } });

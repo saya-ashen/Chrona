@@ -96,7 +96,7 @@ test("app output references preserve original JSON Schema and generated call typ
   expect((await callsContracts(f.ports, f.workspace.id))["typed.read"]).toMatchObject({ input: { type: "object", properties: { filters: { type: "array" } } }, output: { type: "object", required: ["zeta", "alpha"] } });
 });
 
-test("reference hash binds the live tool and ignores documentation and object-key order", async () => {
+test("reference hash describes the live tool and ignores documentation and object-key order", async () => {
   const f = await fixture(), module = await active(f);
   const tool = moduleManifestSchema.parse({ ...manifest, tools: [{ ...manifest.tools[0]!, parameters: { type: "object", properties: { value: { type: "string" }, count: { type: "number" } }, required: ["value"] }, output: { type: "object", properties: { answer: { type: "string" } } } }] }).tools[0]!;
   const reordered = { ...tool, description: "Different documentation", visibility: [...tool.visibility].reverse(), parameters: { required: ["value"], properties: { count: { type: "number" as const }, value: { type: "string" as const } }, type: "object" as const } };
@@ -108,7 +108,7 @@ test("reference hash binds the live tool and ignores documentation and object-ke
   const reference = await f.call("modules.describe", { target: "target.read" }) as { contractHash: string };
   const origin = { workspaceId: f.workspace.id, caller: { kind: "owner" as const, via: null }, chain: [], path: [] };
   await expect(callSync(f.ports, origin, "target.read", { unexpected: true }, { expectedTarget: { moduleId: module.id, contractHash: reference.contractHash } })).rejects.toMatchObject({ code: "invalid" });
-  await expect(callSync(f.ports, origin, "target.read", {}, { expectedTarget: { moduleId: module.id, contractHash: "0".repeat(64) } })).rejects.toMatchObject({ code: "conflict" });
+  await expect(callSync(f.ports, origin, "target.read", { unexpected: true }, { expectedTarget: { moduleId: module.id, contractHash: "0".repeat(64) } })).rejects.toMatchObject({ code: "invalid" });
 });
 
 test.each(["building", "testing", "pending_review", "rejected", "active", "missing", "malformed", "paused", "migrating", "no-hash"])("references and declarations exclude a non-approved or inactive active pointer: %s", async state => {
