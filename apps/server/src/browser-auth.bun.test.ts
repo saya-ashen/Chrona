@@ -330,7 +330,7 @@ describe("browser auth request boundaries", () => {
 
   test("bounds bad attempts globally and per endpoint, then recovers after the window", async () => {
     const f = await fixture("key");
-    for (let i = 0; i < 10; i++) expect((await f.post("setup", { password })).status).toBe(403);
+    for (let i = 0; i < 10; i++) expect((await f.post("setup", { password: "short" }, { authorization: "Bearer key" })).status).toBe(400);
     const limited = await f.post("setup", { password }, { authorization: "Bearer key" });
     expect(limited.status).toBe(429); expect(limited.headers.get("retry-after")).toBe("300");
     f.advance(5 * 60_000);
@@ -338,6 +338,13 @@ describe("browser auth request boundaries", () => {
     for (let i = 0; i < 10; i++) expect((await f.post("login", { password: "wrong password" })).status).toBe(401);
     expect((await f.post("login", { password })).status).toBe(429);
     f.advance(5 * 60_000);
+    expect((await f.post("login", { password })).status).toBe(200);
+  });
+
+  test("unauthorized setup attempts do not consume the login limit", async () => {
+    const f = await fixture("key");
+    expect((await f.post("setup", { password }, { authorization: "Bearer key" })).status).toBe(200);
+    for (let i = 0; i < 40; i++) expect((await f.post("setup", { password })).status).toBe(403);
     expect((await f.post("login", { password })).status).toBe(200);
   });
 

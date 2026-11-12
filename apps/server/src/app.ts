@@ -9,8 +9,9 @@ import { createRemoteExecutionRouter, isRemoteExecutionDevicePath, isRemoteExecu
 import { completeOAuth, OAUTH_CALLBACK_PATH } from "@chrona/engine";
 import { createLogger } from "@chrona/logging";
 import { apiKeyAuth } from "./middleware/auth";
+import { loopbackHostGuard } from "./middleware/host";
 import { createBrowserAuth } from "./browser-auth";
-import { isTrustedRequestOrigin, readEnv, resolveAllowedOrigins } from "./config/env";
+import { isLoopbackBindHost, isTrustedRequestOrigin, readEnv, resolveAllowedOrigins } from "./config/env";
 
 import type { ServerBindings } from "./request-peer";
 
@@ -73,6 +74,11 @@ function mountHealthRoutes(app: Hono<{ Bindings: ServerBindings }>,  steward: St
  */
 export async function createServerApp(options: { steward?: StewardRuntime } = {}) {
   const app = new Hono<{ Bindings: ServerBindings }>();
+  if (await isLoopbackBindHost(readEnv().HOST)) {
+    const extra = [process.env.CHRONA_PUBLIC_URL, ...getAllowedOrigins().filter(o => o !== "*")]
+      .flatMap(value => value && URL.canParse(value) ? [new URL(value).hostname] : []);
+    app.use("*", loopbackHostGuard(extra));
+  }
   const steward = options.steward ?? createStewardRuntime((await import("@chrona/db")).db);
   await steward.initialize();
   const api = createApiRouter({ steward });
