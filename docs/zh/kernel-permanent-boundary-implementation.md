@@ -5,7 +5,7 @@
 
 本实施分支的后续内核与唯一内置 Agent 迁移、精确材料及离线门禁见[内核与 Agent 重构](kernel-agent-migration.md)。该结果不宣布普通应用迁移、生产验收或永久边界冻结。
 
-状态：2026-11-09 本轮代码收缩与 G1–G7 工程验收完成；**UNFROZEN（永久边界仍为冻结候选）**。完整命令、结果、跳过项及限制见[本轮验收记录](kernel-permanent-boundary-validation.md)。本轮目标是完整永久收缩，包括公开合同、应用所有权、调用方和打包入口，不限于修复若干授权问题。[合同盘点](kernel-permanent-boundary-contract.md)列出当前输入、输出和权限。[研究报告](../../reports/内核%20永久%20冻结%20边界.md)是设计背景，不是当前运行或测试结果。
+状态：2026-11-09 本轮代码收缩与 G1–G7 工程验收完成；**UNFROZEN（永久边界仍为冻结候选）**。完整命令、结果、跳过项及限制见本轮验收记录（已从工作树删除，见 git 历史 docs/zh/kernel-permanent-boundary-validation.md）。本轮目标是完整永久收缩，包括公开合同、应用所有权、调用方和打包入口，不限于修复若干授权问题。[合同盘点](kernel-permanent-boundary-contract.md)列出当前输入、输出和权限。[研究报告](../../reports/内核%20永久%20冻结%20边界.md)是设计背景，不是当前运行或测试结果。
 
 ## 范围与不可退让的约束
 
@@ -19,7 +19,7 @@
 
 ## 当前主要源码实际结构
 
-以下是实现结构；工程出口已经按[验收记录](kernel-permanent-boundary-validation.md)完成本轮范围验证。路径相对于 `packages/engine/src/modules/steward/`，共享 schema 另列。
+以下是实现结构；工程出口已经按验收记录（已从工作树删除，见 git 历史 docs/zh/kernel-permanent-boundary-validation.md）完成本轮范围验证。路径相对于 `packages/engine/src/modules/steward/`，共享 schema 另列。
 
 | 边界 | 当前实现 | 联合验证内容 |
 | --- | --- | --- |
@@ -82,13 +82,13 @@ MCP 已在 2026-11-09 后续迁移中恢复普通可选应用准入，详见 [MC
 
 | 门禁 | 验收出口 | 当前记录 |
 | --- | --- | --- |
-| G1 身份、授权与 wire | HTTP health/API 鉴权；真实 owner/模块身份；waiting/error/unknown；contractHash 与 expectedTarget；敏感值不记录 | 通过，见[验收记录](kernel-permanent-boundary-validation.md) |
-| G2 材料准入与固定 receipt | 精确 issuer/submitter/完整目标、路径与 symlink、固定 Git 材料、单次消费、同 key 冲突、并发及 lost reply、集合不部分激活、凭据与迁移守卫 | 通过，见[验收记录](kernel-permanent-boundary-validation.md) |
-| G3 公开面与调用方 | 五命名空间、13 modules 工具、4 approvals 工具与 3 actions、Agent 独立应用、私有宿主不发现；移除接口/参数真实拒绝；reference 过滤与输出合同；Manifest/SDK/调用方/资源和保留类型核对 | 通过，见[验收记录](kernel-permanent-boundary-validation.md) |
-| G4 应用普通化与通知 | Web/Notify 普通生命周期、删除替换/不补装/不覆盖；facts 消费权、ack 前持久化和 withdrawals；应用私有配置 | 通过，见[验收记录](kernel-permanent-boundary-validation.md) |
-| G5 暂停及资源 | 五应用入口和依赖真实停用、源码/依赖材料保留；memory-local 整理暂停；打包无旧入口恢复 | 通过，见[验收记录](kernel-permanent-boundary-validation.md) |
-| G6 执行与凭据 | Agent/Pi 唯一内置；configure 私有模型政策与 kernel caps；重启/租约/取消/unknown/实际停止；必要 OAuth 与秘密交付 | 通过，见[验收记录](kernel-permanent-boundary-validation.md) |
-| G7 仓库联合检查 | 全新临时环境，适当定向及全量静态/测试/打包检查，重型检查串行且限内存；禁止真实模型/QQ | 通过，见[验收记录](kernel-permanent-boundary-validation.md) |
+| G1 身份、授权与 wire | HTTP health/API 鉴权；真实 owner/模块身份；waiting/error/unknown；contractHash 与 expectedTarget；敏感值不记录 | 通过，见验收记录（已从工作树删除，见 git 历史 docs/zh/kernel-permanent-boundary-validation.md） |
+| G2 材料准入与固定 receipt | 精确 issuer/submitter/完整目标、路径与 symlink、固定 Git 材料、单次消费、同 key 冲突、并发及 lost reply、集合不部分激活、凭据与迁移守卫 | 通过，见验收记录（已从工作树删除，见 git 历史 docs/zh/kernel-permanent-boundary-validation.md） |
+| G3 公开面与调用方 | 五命名空间、13 modules 工具、4 approvals 工具与 3 actions、Agent 独立应用、私有宿主不发现；移除接口/参数真实拒绝；reference 过滤与输出合同；Manifest/SDK/调用方/资源和保留类型核对 | 通过，见验收记录（已从工作树删除，见 git 历史 docs/zh/kernel-permanent-boundary-validation.md） |
+| G4 应用普通化与通知 | Web/Notify 普通生命周期、删除替换/不补装/不覆盖；facts 消费权、ack 前持久化和 withdrawals；应用私有配置 | 通过，见验收记录（已从工作树删除，见 git 历史 docs/zh/kernel-permanent-boundary-validation.md） |
+| G5 暂停及资源 | 五应用入口和依赖真实停用、源码/依赖材料保留；memory-local 整理暂停；打包无旧入口恢复 | 通过，见验收记录（已从工作树删除，见 git 历史 docs/zh/kernel-permanent-boundary-validation.md） |
+| G6 执行与凭据 | Agent/Pi 唯一内置；configure 私有模型政策与 kernel caps；重启/租约/取消/unknown/实际停止；必要 OAuth 与秘密交付 | 通过，见验收记录（已从工作树删除，见 git 历史 docs/zh/kernel-permanent-boundary-validation.md） |
+| G7 仓库联合检查 | 全新临时环境，适当定向及全量静态/测试/打包检查，重型检查串行且限内存；禁止真实模型/QQ | 通过，见验收记录（已从工作树删除，见 git 历史 docs/zh/kernel-permanent-boundary-validation.md） |
 | G8 冻结审议 | 每个工具/字段的输入、输出、授权、pinning、兼容添加语义明确；G1–G7 全部有证据并完成残留处置 | **UNFROZEN：合同仍为冻结候选，未宣布永久承诺** |
 
 验收以当前结果为准；真实模型、真实账号和生产部署不在本轮范围。合同仍作为冻结候选管理，实施完成本身不替代公开边界的永久承诺。

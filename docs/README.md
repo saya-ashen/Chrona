@@ -9,7 +9,6 @@
 | [产品目标](zh/steward-goals.md) | 为什么做、用户价值与真实使用验收；最高产品依据 |
 | [内核 API 目标规范](zh/kernel-api-design.md) | 公开合同与待实现的七工具 Agent／Provider 注册制；未冻结 |
 | [内核 API 实施记录](zh/kernel-api-implementation.md) | 当前实现、自动检查及未覆盖范围 |
-| [API 消费者验收](zh/kernel-api-acceptance.md) | 独立 HTTP/SDK 验收、覆盖边界和冻结门槛 |
 | [持续关注与恢复](zh/continuous-steward-journey.md) | timer、来源、记忆纠正、恢复与用量的实施证据及未完成项 |
 | [当前架构](zh/architecture.md) | 当前源码边界、所有权和代码地图 |
 | [现有边界盘点](zh/kernel-permanent-boundary-contract.md) | 前一阶段工具与边界盘点；新版接口见 API 规范与实施记录 |
@@ -32,10 +31,10 @@
 | Web 与设置 | [外壳与组合](zh/web-components-and-shell.md)、[可执行组件](zh/web-executable-components.md)、[应用设置](zh/application-settings.md) |
 | 通知与自动化 | [有限内核事实](zh/kernel-notification-facts.md)、[Mind](zh/mind-implementation.md)、[应用迁移](zh/application-migration.md) |
 | 源码验收证据 | [内核/Agent 迁移](zh/kernel-agent-migration.md)、[普通应用迁移](zh/application-migration.md)、[边界实施](zh/kernel-permanent-boundary-implementation.md) |
-| Coding 证据 | [实施记录](zh/coding-peer-clients-implementation.md)、[工作台验证](zh/coding-workbench-validation.md)、[Editor 退役](zh/editor-retirement.md) |
+| Coding 证据 | [实施记录](zh/coding-peer-clients-implementation.md)、工作台验证（已从工作树删除，见 git 历史 docs/zh/coding-workbench-validation.md）、[Editor 退役](zh/editor-retirement.md) |
 | 可选代理工具 | [context-mode / CodeGraph](agents/tooling.md)：仅在当前会话提供对应工具时按需读取 |
 | 历史背景 | 已归档的早期方案从 Git 历史查阅，不作为当前开发规则 |
 
 安全简化的历史依据见[安全机制简化](zh/security-simplification.md)，跨平台范围及证据见[可移植方案](zh/kernel-portability-plan.md)和[验证记录](zh/kernel-portability-verification.md)；两者都按各自版本和验收范围阅读。贡献说明见[Contributing](../CONTRIBUTING.md)。
 
-早期归档已从工作树删除，可用 `git log --all -- docs/zh/history/` 定位，再用 `git show <revision>:<path>` 查阅。清理前的架构及路线正文分别查其原文件历史。
+早期归档已从工作树删除，可用 `git log --all -- docs/zh/history/` 定位，再用 `git show <revision>:<path>` 查阅。清理前的架构及路线正文分别查其原文件历史。阶段验收与验证记录（M1–M3、kernel-minimization 各阶段、portability S0 等）同样从工作树删除，从 git 历史查阅。

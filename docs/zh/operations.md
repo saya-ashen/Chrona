@@ -51,11 +51,11 @@ Agent 是唯一不可变内置应用；Web、Notify、QQ、Author 是普通默�
 
 ## M1 历史开发集成边界（2026-11-05）
 
-当前开发契约见 [P0 契约](chrona-workbench-p0-contract.md)。官方外置资源已移至 external；发行包需同时含 resources/builtin 与 resources/external，缺发行资源不得回退源码。`chrona admin catalog` 只读目录，`admin install <package> --request-key <key> [--update]` 在停服锁下仅持久受理/入队；运行时与停服 admin 共用真实官方安装适配器，不启动额外 Provider；受理后由原受检构建流水线处理。未配置适配器时返回 unavailable，收到 building/pending 不代表安装完成。失败重试要明确新 key；未知回执复用原 key 查询；初始化完成后不补装已删预装。只用全新开发数据目录，旧生产转换、迁移与部署另行授权。开发完整套件、三尺寸浏览器与 Linux x64 发行验证已完成，协调者已签署 M1 开发验收；精确树、归档散列与未覆盖环境见 [M1 验收记录](chrona-workbench-m1-acceptance.md)。当时的内置划分已被上方最小内核划分取代；该节仅保留历史验收边界。
+当前开发契约见 [P0 契约](chrona-workbench-p0-contract.md)。官方外置资源已移至 external；发行包需同时含 resources/builtin 与 resources/external，缺发行资源不得回退源码。`chrona admin catalog` 只读目录，`admin install <package> --request-key <key> [--update]` 在停服锁下仅持久受理/入队；运行时与停服 admin 共用真实官方安装适配器，不启动额外 Provider；受理后由原受检构建流水线处理。未配置适配器时返回 unavailable，收到 building/pending 不代表安装完成。失败重试要明确新 key；未知回执复用原 key 查询；初始化完成后不补装已删预装。只用全新开发数据目录，旧生产转换、迁移与部署另行授权。开发完整套件、三尺寸浏览器与 Linux x64 发行验证已完成，协调者已签署 M1 开发验收；精确树、归档散列与未覆盖环境见 M1 验收记录（已从工作树删除，见 git 历史 docs/zh/chrona-workbench-m1-acceptance.md）。当时的内置划分已被上方最小内核划分取代；该节仅保留历史验收边界。
 
 ## M2 历史编码开发集成边界
 
-当时可选官方外置 `coding`、`editor` 的项目映射、owner 身份、成果与停止未知恢复见[服务器编码工作](server-coding.md)。当时单服务器编码、真实 fake Pi/Neovim 目标联调已通过；完整集成检查状态见[M2 验收记录](chrona-workbench-m2-acceptance.md)。M3 在该阶段尚未实现；此记录不作为当前安装或部署说明。不得将旧 loopback Provider bridge 暴露到外网。
+当时可选官方外置 `coding`、`editor` 的项目映射、owner 身份、成果与停止未知恢复见服务器编码工作（已从工作树删除，见 git 历史 docs/zh/server-coding.md）。当时单服务器编码、真实 fake Pi/Neovim 目标联调已通过；完整集成检查状态见M2 验收记录（已从工作树删除，见 git 历史 docs/zh/chrona-workbench-m2-acceptance.md）。M3 在该阶段尚未实现；此记录不作为当前安装或部署说明。不得将旧 loopback Provider bridge 暴露到外网。
 
 ## 启动与数据位置
 

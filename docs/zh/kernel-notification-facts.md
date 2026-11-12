@@ -1,6 +1,6 @@
 # 内核通知事实契约
 
-状态：2026-11-10 本 worktree 已迁移有限事实的独立存储，当前检查见[内核与 Agent 重构](kernel-agent-migration.md)。[阶段 2 历史检查](kernel-minimization-stage2-validation.md)不构成本次迁移验收。不是新的投递队列，不表示生产部署或真实账号验收。
+状态：2026-11-10 本 worktree 已迁移有限事实的独立存储，当前检查见[内核与 Agent 重构](kernel-agent-migration.md)。阶段 2 历史检查（已从工作树删除，见 git 历史 docs/zh/kernel-minimization-stage2-validation.md）不构成本次迁移验收。不是新的投递队列，不表示生产部署或真实账号验收。
 
 - 内核在业务状态事务中向 `KernelFact` 写有限事实；`KernelFactConsumer` 保存单消费者选择，消费身份和时间与事实分开存储。当前迁移状态见[内核与 Agent 重构](kernel-agent-migration.md)。事实包括：审批、有限的应用生命周期、Provider 待输入标识及撤回。不记录投递目标应用名、工具名，也不提供通用调用参数或任意输出的转发接口。通知措辞和渠道投递仍属于应用，渠道调用沿用既有 `ModuleInvocation`。
 - 事实按 workspace + 类型 + 业务键确定身份，重写不能重新打开已确认事实。`consumedAt` 是否为空表示是否已被消费，`consumedBy` 保留接收应用身份，不表示消息已送达。事实不设置 TTL，也不自动删未确认事实；确认后保留事实及消费回执，当前无自动清理。

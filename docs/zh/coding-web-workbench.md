@@ -1,6 +1,6 @@
 # 编码工作台
 
-2026-11-08：连续编码工作台已完成开发集成。入口是 Web 的「编码工作台」（`/p/coding/main`），页面和业务记录归 coding 应用所有，操作经公开路由调用 projects 与 Agent。实现依据是[范围评估](coding-workbench-implementation-assessment.md)和已认可的[交互原型](../prototypes/coding-workbench/index.html)；验证范围见[开发验证记录](coding-workbench-validation.md)。这些记录不表示已部署或已用真实模型验收。
+2026-11-08：连续编码工作台已完成开发集成。入口是 Web 的「编码工作台」（`/p/coding/main`），页面和业务记录归 coding 应用所有，操作经公开路由调用 projects 与 Agent。实现依据是范围评估（已从工作树删除，见 git 历史 docs/zh/coding-workbench-implementation-assessment.md）和已认可的[交互原型](../prototypes/coding-workbench/index.html)；验证范围见开发验证记录（已从工作树删除，见 git 历史 docs/zh/coding-workbench-validation.md）。这些记录不表示已部署或已用真实模型验收。
 
 ## 使用
 

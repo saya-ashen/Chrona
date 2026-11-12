@@ -55,7 +55,7 @@ Provider 会话用量只有同会话、基线有效且计数未倒退时才标�
 
 ## API 与证据
 
-独立消费者、覆盖范围和冻结门槛见 [kernel-api-acceptance.md](kernel-api-acceptance.md)。API 维持 UNFROZEN。
+独立消费者、覆盖范围和冻结门槛见 kernel-api-acceptance.md（已从工作树删除，见 git 历史 docs/zh/kernel-api-acceptance.md）。API 维持 UNFROZEN。
 
 已运行的定向证据：
 

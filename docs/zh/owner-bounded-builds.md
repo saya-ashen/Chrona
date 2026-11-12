@@ -1,6 +1,6 @@
 # Owner 单次受控构建
 
-当前实现参考；不据此推断线上部署状态。M1 限定所有 owner/admin 构建目标为外置应用，内置 web/mcp/files/notify/events 的修复须更新 Chrona 发行。开发检查、协调者已签署的 M1 验收与环境边界见 [M1 验收记录](chrona-workbench-m1-acceptance.md)。总览见[当前架构](architecture.md)，检查后的启用规则见[安全机制简化](security-simplification.md)。
+当前实现参考；不据此推断线上部署状态。M1 限定所有 owner/admin 构建目标为外置应用，内置 web/mcp/files/notify/events 的修复须更新 Chrona 发行。开发检查、协调者已签署的 M1 验收与环境边界见 M1 验收记录（已从工作树删除，见 git 历史 docs/zh/chrona-workbench-m1-acceptance.md）。总览见[当前架构](architecture.md)，检查后的启用规则见[安全机制简化](security-simplification.md)。
 
 ## 入口
 
