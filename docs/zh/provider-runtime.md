@@ -20,7 +20,7 @@ Provider 的实际 `handle.done` 才能提供进程退出证据；启动门的�
 
 ## 启动和显式资源
 
-先按[运维说明](operations.md#确认-agent-真正可用)准备专用绝对命令、精确版本和私有 profile。默认 `0.85.0`；显式可选 `1.3.0` 及以后的 `1.x`。不同版本的 MCP/扩展能力不等同，不自动升级，不复制个人认证。
+先按[运维说明](operations.md#确认-agent-真正可用)准备专用绝对命令、精确版本和私有 profile。默认 `0.85.0`；显式可选 `1.3.0` 及以后的 `1.x`。不同版本的 MCP/扩展能力不等同，不自动升级，不复制个人认证。应用的有界模型调用（补全）只在精确 1.5.0 上可用；其他版本上健康检查报告不可用，日志事件 pi-completion completion_failed / pi completion_unavailable 给出原因。
 
 默认继续关闭发现、模板、上下文文件、主题及项目信任。需要资源时，由 owner 设置 `CHRONA_STEWARD_PI_RESOURCES_FILE` 指向审核过的 JSON 文件，例如：
 

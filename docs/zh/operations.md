@@ -125,7 +125,7 @@ bun run packages/cli/src/index.ts doctor
 
 - 存储：`DATABASE_URL`、`CHRONA_DATA_DIR`；迁移路径覆盖为 `CHRONA_MIGRATIONS_DIR`。
 - API：`HOST`、`PORT`、`API_KEY`、`ALLOWED_ORIGINS`。保持回环监听；不得靠危险覆盖项替代认证。
-- Provider：`CHRONA_STEWARD_AGENT=pi`、`CHRONA_STEWARD_PI_COMMAND`（必填绝对路径）、`CHRONA_STEWARD_PI_VERSION`（默认精确 `0.85.0`，可显式选 `1.3.0` 及以后的 `1.x`）、`CHRONA_STEWARD_PI_AGENT_DIR`（默认 `<dataDir>/providers/pi`）、`CHRONA_STEWARD_PI_RESOURCES_FILE`（可选受控资源清单）、`CHRONA_STEWARD_PI_MODEL`、`CHRONA_STEWARD_PI_WEB_EXTENSION`；Chrona 工具扩展由运行时选择。
+- Provider：`CHRONA_STEWARD_AGENT=pi`、`CHRONA_STEWARD_PI_COMMAND`（必填绝对路径）、`CHRONA_STEWARD_PI_VERSION`（默认精确 `0.85.0`，可显式选 `1.3.0` 及以后的 `1.x`）、`CHRONA_STEWARD_PI_AGENT_DIR`（默认 `<dataDir>/providers/pi`）、`CHRONA_STEWARD_PI_RESOURCES_FILE`（可选受控资源清单）、`CHRONA_STEWARD_PI_MODEL`、`CHRONA_STEWARD_PI_WEB_EXTENSION`；Chrona 工具扩展由运行时选择。应用的有界模型调用（补全）只在精确 1.5.0 上可用；其他版本上健康检查报告不可用，日志事件 pi-completion completion_failed / pi completion_unavailable 给出原因。
 - 后台：`CHRONA_STEWARD_TICK_SECONDS` 默认 30 秒；没有接待 / assessor 双角色。
 - 本地执行：`CHRONA_STEWARD_EXECUTION_MODE` 未设置、空值或 `trusted-local` 均为可信本地执行。`required-isolation` 和其他非空值报错；非空 `CHRONA_STEWARD_SANDBOX_BWRAP` 也报错，须从启动环境和配置文件移除，不能沿用旧隔离配置。
 - 模块依赖：manifest 的 `packages` 是宿主已安装、Chrona 进程 `PATH` 可找到的程序名，缺失时报告并请用户安装后重新提交；不再通过 Nix 自动供应，`CHRONA_NIXPKGS` 不再是模块运行配置。语言库按 `bun.lock` / `uv.lock` 安装；npm 依赖使用宿主 Bun 的冻结安装并禁用安装脚本，Python 依赖需要宿主 `uv` 和 `python3` / `python`，执行 `uv sync --frozen --python <宿主解释器> --no-python-downloads`。语言库安装仍需 npm / PyPI 或本机缓存。
@@ -181,7 +181,7 @@ install -d -m 700 "$CHRONA_STEWARD_PI_AGENT_DIR"
 # PI_CODING_AGENT_DIR="$CHRONA_STEWARD_PI_AGENT_DIR" "$CHRONA_STEWARD_PI_COMMAND"
 ```
 
-1. 审查并固定专用可执行文件，不附带 shell 参数。不要直接复用会追加日常扩展/主题/配置的交互式包装器。版本输出须精确匹配配置；当前只接受 `0.85.0` 和 `1.3.0` 及以后的 `1.x`（1.x 小版本按 semver 视为 RPC 兼容），0.85 与 1.x 能力并不等同，不据本机版本推断服务能力。
+1. 审查并固定专用可执行文件，不附带 shell 参数。不要直接复用会追加日常扩展/主题/配置的交互式包装器。版本输出须精确匹配配置；当前只接受 `0.85.0` 和 `1.3.0` 及以后的 `1.x`（1.x 小版本按 semver 视为 RPC 兼容），0.85 与 1.x 能力并不等同，不据本机版本推断服务能力。应用的有界模型调用（补全）只在精确 1.5.0 上可用；其他版本上健康检查报告不可用，日志事件 pi-completion completion_failed / pi completion_unavailable 给出原因。
 2. profile 须已存在、为绝对规范路径且不经符号链接，不与会话目录树重叠；默认 `<dataDir>/providers/pi` 可以位于数据根目录内。Unix 下不得有 group/other 权限（建议 `0700`），并应由服务用户管理。Chrona 不自动创建它、不复制认证。实际传给 Pi 的变量为 `PI_CODING_AGENT_DIR`。该目录仅隔开服务资源与可写状态，不是完整的宿主私密信息读取隔离。
 3. 设置 `CHRONA_STEWARD_AGENT=pi`，检查 Chrona 工具扩展有效；需要网页工具时显式设置已审查的网页扩展。保留关闭资源自动发现及 `--no-approve` 项目信任拒绝。每次启动在提示/注入前查询 `get_commands`，拒绝不属于显式扩展/技能的命令资源。可选资源清单须为 profile 和事务树之外、私有、规范路径的 JSON 文件，入口只接受明确的本地文件及三个已列明的 Pi 1.3 内置扩展；修改后重启，不自动安装或发现资源。配置与原生 MCP 限制见 [Provider 运行说明](provider-runtime.md)。命令检查不覆盖任意包装器代码或仅注入工具的扩展，不能替代入口审查。
 4. 重启后查看设置 → 运行状况及 `/health`。缺命令/profile/扩展、版本不符、未启用或正在停止都可能使 Agent 不可用。健康检查不发送模型请求，也不验证认证、完整工具清单或真实交互链路；命令资源检查发生在具体运行启动时。
