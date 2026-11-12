@@ -164,7 +164,7 @@ describe("Mind application-owned declarative pages", () => {
     for (const label of ["启用主动检查", "检查间隔（分钟）", "每日主动处理上限", "免打扰开始", "免打扰结束", "时区", "保存关注设置"]) expect(html).toContain(label);
     expect(html).toContain('name="interval-minutes"'); expect(html).toContain('value="15"'); expect(html).not.toContain("JSON");
     const initial = args(settings.save!, { policy: DEFAULT_SETTINGS });
-    expect(initial).toEqual({ enabled: false, "interval-minutes": "15", "daily-wakes": "6", "quiet-start": "22:00", "quiet-end": "08:00", timezone: "UTC" });
+    expect(initial).toEqual({ enabled: true, "interval-minutes": "15", "daily-wakes": "6", "quiet-start": "22:00", "quiet-end": "08:00", timezone: "UTC" });
     validate("ui-settings", initial);
     // Web's ordinary Input stores event.target.value, including for type=number.
     const edited = args(settings.save!, { policy: { ...DEFAULT_SETTINGS, intervalMinutes: "30", dailyWakes: "4", timezone: "Asia/Shanghai" } });

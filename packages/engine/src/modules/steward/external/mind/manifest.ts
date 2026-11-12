@@ -39,7 +39,7 @@ const descriptions: Record<Tool, string> = {
   signal: "Authenticated source modules push versioned observations. Real caller supplies source/moduleId; arguments cannot impersonate them. Exact event/ref/thread/from/domain matching with AND text conditions only requests verification. event-id dedupes within the caller.",
   report: "Current Mind reasoning only: submit one final structured report JSON with request-key and decision-id. Accepted candidates count only after this current Agent run's successful tool-result receipt and terminal success are verified. Owners cannot forge reports.",
   check: "Owner explicitly requests one bounded foreground review, or reconciles the outstanding reasoning run. Unknown work retains capacity; this does not create a parallel run.",
-  "ui-settings": "Owner read {} or save scalar Mind preferences. Background starts disabled. interval-minutes 5–120, daily-wakes 1–24, quiet times HH:mm, IANA timezone. notify-enabled is optional and defaults false.",
+  "ui-settings": "Owner read {} or save scalar Mind preferences. Background review starts enabled; notifications stay off until notify-enabled. interval-minutes 5–120, daily-wakes 1–24, quiet times HH:mm, IANA timezone. notify-enabled is optional and defaults false.",
 };
 export function buildManifest() {
   return {

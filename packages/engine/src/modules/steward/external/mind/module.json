@@ -2467,7 +2467,7 @@
     },
     {
       "name": "ui-settings",
-      "description": "Owner read {} or save scalar Mind preferences. Background starts disabled. interval-minutes 5–120, daily-wakes 1–24, quiet times HH:mm, IANA timezone. notify-enabled is optional and defaults false.",
+      "description": "Owner read {} or save scalar Mind preferences. Background review starts enabled; notifications stay off until notify-enabled. interval-minutes 5–120, daily-wakes 1–24, quiet times HH:mm, IANA timezone. notify-enabled is optional and defaults false.",
       "visibility": [
         "owner"
       ],

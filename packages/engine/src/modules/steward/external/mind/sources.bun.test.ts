@@ -17,6 +17,7 @@ test("Files observations bind identity, dedupe across restart, reject truncation
   let sources = new MindSources(store, service, () => identity, call);
   try {
     await sources.configure({ paths: "report.txt" });
+    await store.update(state => { state.settings.enabled = false; });
     await sources.poll("2026-11-11T12:00:00Z"); expect(reads).toBe(0);
     await store.update(state => { state.settings.enabled = true; });
     await sources.poll("2026-11-11T12:00:00Z");

@@ -62,6 +62,32 @@ async function unavailable(f: Awaited<ReturnType<typeof fixture>>, a: ReturnType
   return (await f.store.read()).decisions.find(d => d.id === row.id)!;
 }
 
+test("default settings perform a due background review without sending notifications", async () => {
+  const f = await fixture();
+  const settings = (await f.store.read()).settings;
+  expect(settings.enabled).toBe(true);
+  expect(settings.notifyEnabled).toBe(false);
+  await f.service.tool("note", { "request-key": "default-review", title: "Follow up" }, owner, NOW);
+  const a = agent(f), runtime = new MindRuntime(f.store, a.call);
+  await runtime.tick(NOW);
+  let state = await f.store.read();
+  expect(state.runtime.lastCheckAt).toBe(NOW);
+  expect(a.calls.filter(call => call.target === "agent.run")).toHaveLength(1);
+  expect(a.calls.find(call => call.target === "agent.run")!.args.lane).toBe("background");
+  const row = state.decisions[0]!;
+  const accepted = await f.service.tool("report", {
+    "request-key": `${row.id}:report`, "decision-id": row.id,
+    result: JSON.stringify({ ...result(row), feedback: { ...feedback, unavailable: false, userVisible: true } }),
+  }, mind, NOW);
+  a.finish(accepted);
+  await runtime.tick(at(0.01));
+  state = await f.store.read();
+  expect(state.decisions[0]!.phase).toBe("completed");
+  await runtime.tick(state.runtime.nextCheckAt!);
+  expect(a.calls.filter(call => call.target === "agent.run")).toHaveLength(1);
+  expect(a.calls.filter(call => call.target === "notify.send")).toHaveLength(0);
+});
+
 test("omitted candidate and tombstone fields default without rejecting seeded decision literals", () => {
   const state = freshState(), row = decision();
   delete state.signalTombstones;

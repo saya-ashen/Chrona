@@ -6,8 +6,8 @@ import { redactSensitiveText } from "@chrona/logging/redaction";
 import { seedFactConsumer } from "./notification-facts";
 import { isModulePaused, ModuleUnavailableError } from "./module-availability";
 
-// These optional apps retain explicit skipped ledger entries, never default installation.
-const initializationNames = [...new Set([...PREINSTALLED_MODULE_NAMES, "mind", "remind"] as const)];
+// Remind stays paused with an explicit skipped ledger entry; it is never installed by default.
+const initializationNames = [...new Set([...PREINSTALLED_MODULE_NAMES, "remind"] as const)];
 const isPreinstalled = (name: string) => PREINSTALLED_MODULE_NAMES.some(preinstalled => preinstalled === name);
 const KEY = "moduleInitialization";
 const settingsObject = (value: unknown) => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};

@@ -44,11 +44,11 @@ test("catalog reports missing releases and paused products unavailable and keeps
   const f = await fixture();
   const catalog = await externalPackageCatalog(f.ports, f.workspaceId);
   for (const name of ["coding", "mind", "remind"]) expect(catalog.find(item => item.name === name)).toMatchObject({ available: false, releaseHash: null, moduleId: null });
-  expect(new Set(PREINSTALLED_MODULE_NAMES.filter(name => !isModulePaused(name)))).toEqual(new Set(["pi", "web", "notify", "qq", "author"]));
+  expect(new Set(PREINSTALLED_MODULE_NAMES.filter(name => !isModulePaused(name)))).toEqual(new Set(["pi", "web", "notify", "qq", "author", "mind"]));
   expect(await f.db.module.count()).toBe(0);
 });
 
-test.each(["files", "events", "remote-execution", "mind"] as const)("optional %s installs, stays removed on restart and explicitly reinstalls through checks", async name => {
+test.each(["files", "events", "remote-execution"] as const)("optional %s installs, stays removed on restart and explicitly reinstalls through checks", async name => {
   const f = await fixture(); await f.resource(name, name === "files" ? { uses: ["*"] } : {});
   await f.db.module.createMany({ data: PREINSTALLED_MODULE_NAMES.map(name => ({ workspaceId: f.workspaceId, name })) });
   await ensureWorkspaceInitialized(f.ports, f.workspaceId);
@@ -208,9 +208,9 @@ test("initialization converges from the existing build queue and never reinstall
   const first = await ensureWorkspaceInitialized(f.ports, f.workspaceId);
   expect(first.status).toBe("pending");
   expect(await factConsumer(f.db, f.workspaceId)).toMatchObject({ moduleId: null, revision: "unselected" });
-  expect(new Set(Object.keys(first.packages))).toEqual(new Set([...PREINSTALLED_MODULE_NAMES, "mind", "remind"]));
+  expect(new Set(Object.keys(first.packages))).toEqual(new Set([...PREINSTALLED_MODULE_NAMES, "remind"]));
   for (const name of PREINSTALLED_MODULE_NAMES) expect(first.packages[name].status).toBe("building");
-  expect(first.packages.mind).toMatchObject({ status: "skipped", moduleId: null, hash: null, error: null });
+  expect(first.packages.mind).toMatchObject({ status: "building", error: null });
   expect(first.packages.remind).toMatchObject({ status: "skipped", moduleId: null, hash: null, error: { reason: "module_paused" } });
   const authorRelease = await resolveExternalRelease(f.ports, "author");
   expect(first.packages.author).toMatchObject({ requestKey: "initialize:v1:author:1", attempts: 1, hash: authorRelease.hash });

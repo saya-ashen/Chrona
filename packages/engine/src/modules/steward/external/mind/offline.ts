@@ -148,7 +148,7 @@ check("real caller authorization, projects, stop, due, progress and suggestions 
     assert.equal(selectWork(state, Date.parse(now), false)?.kind, "deadline");
     const proposal = outputs.propose.parse(await f.tool("propose", { "request-key": "suggest", title: "Review a new input", reason: "Unknown source evidence" }, source)).proposal;
     assert.equal((await f.store.read()).concerns.length, 1);
-    assert.equal((await f.store.read()).settings.enabled, false);
+    assert.equal((await f.store.read()).settings.enabled, true);
     await f.note({ "request-key": "accept", "proposal-id": proposal.id, title: "Accepted by owner" });
     assert.equal((await f.store.read()).proposals[0]!.status, "accepted");
     await f.note({ "request-key": "stop", id: c.id, status: "dropped" });
@@ -222,6 +222,7 @@ check("Unicode agenda and decision pages bound the complete encoded result and e
 check("lost run replies recover by the same key; unknown and waiting occupy one slot", async () => {
   const f = await fixture();
   try {
+    await f.store.update(state => { state.settings.enabled = false; });
     await f.note(); const a = agent(f); a.loseRun();
     await new MindRuntime(f.store, a.call).tick(now); assert.equal(a.calls.length, 0, "disabled background cannot start work");
     await new MindRuntime(f.store, a.call).tick(now, true);
