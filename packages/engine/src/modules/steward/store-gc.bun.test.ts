@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { collectStore } from "./store-gc";
 import { moduleSupervisor } from "./module-supervisor";
+import { commitModuleSource } from "./module-git";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
 
@@ -23,11 +24,23 @@ async function fixture() {
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example" } });
   const store = join(dataDir, "platform/store");
   await mkdir(store, { recursive: true });
-  async function version(hash: string, { age = 8, status = "approved", git = true } = {}) {
+  async function version(name: string, { age = 8, status = "approved", git = true, explicit = true } = {}) {
+    const files = [
+      { path: "index.ts", bytes: Buffer.from(name) },
+      { path: "module.json", bytes: Buffer.from(JSON.stringify({ name: "example", entry: "index.ts" })) },
+    ];
+    if (explicit) files.push({ path: "chrona-material.json", bytes: Buffer.from(JSON.stringify({
+      schema: 1, source: ["index.ts", "module.json"], artifacts: [],
+      build: { commands: ["true"], toolchain: "offline fixture", target: "fixture" },
+    })) });
+    const revision = git ? await commitModuleSource({
+      platform: join(dataDir, "platform"), moduleId: module.id, versionId: name, files, message: name,
+    }) : undefined;
+    const hash = revision?.commit ?? name;
     await mkdir(join(store, hash));
     return db.moduleVersion.create({ data: {
       moduleId: module.id, hash, manifest: { name: "example", entry: "index.ts" }, source: "user", intent: {},
-      report: git ? { git: { commit: hash, tree: "a".repeat(40) } } : {},
+      report: revision ? { git: revision } : {},
       status, createdAt: new Date(now.getTime() - age * DAY_MS),
     } });
   }
@@ -42,13 +55,15 @@ const cases = [
   { name: "pending review", status: "pending_review" },
   { name: "building", status: "building" },
   { name: "legacy version", git: false },
+  { name: "Git source without an explicit material record", explicit: false },
   { name: "orphan", orphan: true },
   { name: "restoration staging", staging: true },
 ];
 test.each(cases)("collectStore protects or collects $name", async scenario => {
-  const f = await fixture(), hash = scenario.staging ? ".restore-x" : "b".repeat(40);
+  const f = await fixture();
+  let hash = scenario.staging ? ".restore-x" : "b".repeat(40);
   if (scenario.orphan || scenario.staging) await mkdir(join(f.store, hash));
-  else await f.version(hash, scenario);
+  else hash = (await f.version(hash, scenario)).hash;
   if (scenario.active) await f.db.module.update({ where: { id: f.module.id }, data: { activeHash: hash } });
   const log = spyOn(console, "error").mockImplementation(() => {});
   try {
@@ -66,16 +81,14 @@ test.each(cases)("collectStore protects or collects $name", async scenario => {
 test("second call within 24 hours does no work; next daily pass collects", async () => {
   const f = await fixture();
   await collectStore(f.ports, now);
-  const hash = "c".repeat(40);
-  await f.version(hash);
+  const { hash } = await f.version("c".repeat(40));
   expect(await collectStore(f.ports, new Date(now.getTime() + DAY_MS - 1))).toEqual({ removed: [], kept: 0 });
   expect(await readdir(f.store)).toEqual([hash]);
   expect((await collectStore(f.ports, new Date(now.getTime() + DAY_MS))).removed).toEqual([hash]);
 });
 
 test("live process hashes remain protected after activeHash changes", async () => {
-  const f = await fixture(), hash = "d".repeat(40);
-  await f.version(hash);
+  const f = await fixture(), { hash } = await f.version("d".repeat(40));
   const live = spyOn(moduleSupervisor(f.ports), "liveHashes").mockReturnValue(new Set([hash]));
   try {
     expect(await collectStore(f.ports, now)).toEqual({ removed: [], kept: 1 });
@@ -104,11 +117,35 @@ test("a fresh installation without a store has nothing to collect", async () => 
   } finally { log.mockRestore(); }
 });
 
-test("store filesystem errors propagate for tick reporting", async () => {
+test("store filesystem errors propagate for tick logging", async () => {
   const f = await fixture();
   await rm(f.store, { recursive: true });
   await writeFile(f.store, "not a directory");
   await expect(collectStore(f.ports, now)).rejects.toMatchObject({ code: "ENOTDIR" });
+});
+
+test("a hash shared by an explicit Git version and a legacy version is preserved", async () => {
+  const f = await fixture(), version = await f.version("shared");
+  const other = await f.db.module.create({ data: { workspaceId: f.module.workspaceId, name: "other" } });
+  await f.db.moduleVersion.create({ data: {
+    moduleId: other.id, hash: version.hash, manifest: { name: "other", entry: "index.ts" },
+    source: "user", intent: {}, report: {}, status: "approved", createdAt: version.createdAt,
+  } });
+  expect(await collectStore(f.ports, now)).toEqual({ removed: [], kept: 1 });
+  expect(await readdir(f.store)).toEqual([version.hash]);
+});
+
+test("material lookup failures preserve the directory and log the failed check", async () => {
+  const f = await fixture(), { hash } = await f.version("unreadable");
+  await rm(join(f.ports.dataDir, "platform/repos", `${f.module.id}.git`), { recursive: true });
+  const log = spyOn(console, "error").mockImplementation(() => {});
+  try {
+    expect(await collectStore(f.ports, now)).toEqual({ removed: [], kept: 1 });
+    expect(await readdir(f.store)).toEqual([hash]);
+    expect(log.mock.calls.map(([line]) => JSON.parse(line))).toContainEqual({
+      component: "store-gc", event: "store_gc.check_failed", hash, error: expect.any(String),
+    });
+  } finally { log.mockRestore(); }
 });
 
 // Restoration after deleting an installed Git/CAS version is covered by

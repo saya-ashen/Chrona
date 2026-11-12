@@ -84,6 +84,11 @@ async function publishRestoredMaterial(store: string, staging: string, hash: str
     throw new StewardError("forbidden", "Atomic material restoration is unavailable on this host");
   } finally { await parent.close(); }
 }
+/** True when ensureVersionMaterial would rebuild store/<hash> from Git if it were missing. */
+export async function versionMaterialRestorable(context: ModuleContext, version: ModuleVersion) {
+  if (!(version.report as BuildReport).git) return false;
+  return !!moduleMaterialRecord((await versionMaterial(context, version)).sourceFiles);
+}
 /** Approved version switches verify existing copies or restore a missing explicit material. */
 export async function ensureVersionMaterial(context: ModuleContext, version: ModuleVersion) {
   // Legacy lifecycle copies retain their existing behavior; explicit materials always carry Git provenance.

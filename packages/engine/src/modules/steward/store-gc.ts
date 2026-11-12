@@ -2,7 +2,8 @@
 import { readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { StewardPorts } from "./ports";
-import type { BuildReport } from "./module-context";
+import { moduleContext } from "./module-context";
+import { versionMaterialRestorable } from "./module-source";
 import { moduleSupervisor } from "./module-supervisor";
 
 const DAY_MS = 24 * 3600_000;
@@ -18,6 +19,23 @@ async function storeEntries(store: string) {
     console.error(JSON.stringify({ component: "store-gc", event: "store_gc.missing", error: String(error) }));
     return [];
   }
+}
+
+async function restorableVersions(ports: StewardPorts, hash: string) {
+  const versions = await ports.db.moduleVersion.findMany({ where: { hash }, include: { module: { select: { workspaceId: true } } } });
+  if (!versions.length) {
+    console.error(JSON.stringify({ component: "store-gc", event: "store_gc.orphan", hash }));
+    return [];
+  }
+  try {
+    for (const version of versions) {
+      if (!await versionMaterialRestorable(moduleContext(ports, version.module.workspaceId), version)) return [];
+    }
+  } catch (error) {
+    console.error(JSON.stringify({ component: "store-gc", event: "store_gc.check_failed", hash, error: String(error).slice(0, 300) }));
+    return [];
+  }
+  return versions;
 }
 
 export async function collectStore(ports: StewardPorts, now: Date): Promise<{ removed: string[]; kept: number }> {
@@ -39,16 +57,11 @@ export async function collectStore(ports: StewardPorts, now: Date): Promise<{ re
     if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
     const hash = entry.name;
     if (keep.has(hash) || removed.length >= MAX_REMOVED) { kept++; continue; }
-    const version = await ports.db.moduleVersion.findFirst({ where: { hash } });
-    if (!version) {
-      console.error(JSON.stringify({ component: "store-gc", event: "store_gc.orphan", hash }));
-      kept++;
-      continue;
-    }
-    if (!(version.report as BuildReport).git) { kept++; continue; }
+    const versions = await restorableVersions(ports, hash);
+    if (!versions.length) { kept++; continue; }
     await rm(join(store, hash), { recursive: true, force: true });
     removed.push(hash);
-    console.error(JSON.stringify({ component: "store-gc", event: "store_gc.removed", moduleId: version.moduleId, hash }));
+    console.error(JSON.stringify({ component: "store-gc", event: "store_gc.removed", moduleId: versions[0]!.moduleId, hash }));
   }
   return { removed, kept };
 }
