@@ -51,7 +51,7 @@ async function routedCall(ports: StewardPorts, scope: CallScope, call: Extract<M
     }
     // The caller owns its keys (derive them from what is being done): a repeat after a crash returns the same call.
     const queued = await enqueueCall({ tx: ports.db, ports, origin: originOf(scope), target, raw: args }, { key: key!, reply, expectedTarget });
-    if (!queued.duplicate) void drainCalls(ports, scope.workspaceId).catch(() => {});
+    if (!queued.duplicate) void drainCalls(ports, scope.workspaceId).catch(error => console.error(JSON.stringify({ component: "module-effects", event: "drain_calls.failed", workspaceId: scope.workspaceId, error: String(error).slice(0, 2000) })));
     return { id: call.id, result: queued };
   } catch (error) {
     if (error instanceof CallError && error.code !== "unknown") await recordRejectedCall(ports, { moduleId: scope.moduleId, hash: scope.hash, moduleRunId: scope.moduleRunId, eventKey: scope.eventKey, method: "call", createdAt: ports.now(), key: JSON.stringify(target), status: "rejected", error: error.code });

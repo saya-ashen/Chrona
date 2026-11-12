@@ -32,7 +32,7 @@ async function assertActivationTarget(tx: Prisma.TransactionClient, workspaceId:
 }
 async function afterResolve<T extends { payload: Prisma.JsonValue | null; request: boolean }>(result: T, id: string, workspaceId: string, ports: StewardPorts | undefined, onApproved: OnApproved | undefined): Promise<T> {
   if (onApproved && !result.request && result.payload !== null) await onApproved({ workspaceId, approvalId: id, payload: result.payload });
-  if (ports && result.request) void drainCalls(ports, workspaceId).catch(() => {});
+  if (ports && result.request) void drainCalls(ports, workspaceId).catch(error => console.error(JSON.stringify({ component: "approvals", event: "drain_calls.failed", workspaceId: workspaceId, error: String(error).slice(0, 2000) })));
   return result;
 }
 export function createApprovals(context: RecordContext & { ports?: StewardPorts }, onApproved?: OnApproved, ports?: StewardPorts) {

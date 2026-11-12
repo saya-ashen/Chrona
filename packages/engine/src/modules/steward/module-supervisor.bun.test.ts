@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, spyOn, test } from "bun:test";
 import "./module-effects";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -69,6 +69,21 @@ test("supervisor starts keep-alive processes without producing health events", a
   for (const retired of ["readiness", "reportHealth", "refreshHealth"]) expect(f.supervisor).not.toHaveProperty(retired);
   expect(await f.db.moduleRun.count()).toBe(0);
   expect((await moduleEvolutionOutcomes(f.db, f.module.workspaceId, f.module.id))[0]).toMatchObject({ status: "awaiting-verification", observedCapabilities: [] });
+});
+
+test("one module with unknown stop does not block other keep-alive modules", async () => {
+  const f = await fixture({ keepAlive: true });
+  const unknown = new Error("synthetic descendant stop unknown");
+  f.expectStopErrors(unknown);
+  await f.supervisor.start();
+  f.processes[0]!.rejectExit(unknown);
+  await until(() => f.supervisor.status(f.module.id, "v1", true).state === "unknown");
+  const other = await f.db.module.create({ data: { workspaceId: f.module.workspaceId, name: "other", activeHash: "v1" } });
+  await f.db.moduleVersion.create({ data: { moduleId: other.id, hash: "v1", manifest: { ...f.manifest, name: "other" },
+    source: "user", intent: {}, report: {}, status: "approved" } });
+  await expect(f.supervisor.reconcile()).resolves.toBeUndefined();
+  expect(f.supervisor.status(f.module.id, "v1", true)).toMatchObject({ state: "unknown" });
+  expect(f.supervisor.status(other.id, "v1", true)).toMatchObject({ state: "running" });
 });
 
 test.each([false, true])("cold HTTP waits for authenticated readiness (reconciled=%s)", async reconciled => {
@@ -348,7 +363,10 @@ test.each(["same activation", "new hash", "new activation"])("rejected exit reta
   // No restart timer survives an unknown exit; the polling loop is still present.
   expect(f.pending()).toEqual([30_000]);
   f.advance(1000);
-  await expect(f.supervisor.reconcile()).rejects.toMatchObject({ message: unknown.message, cause: unknown });
+  const errors = spyOn(console, "error");
+  await f.supervisor.reconcile();
+  expect(errors.mock.calls.some(([line]) => String(line).includes('"event":"reconcile.module_failed"') && String(line).includes(unknown.message))).toBe(true);
+  errors.mockRestore();
   expect(f.processes).toHaveLength(1);
   const hash = replacement === "new hash" ? "v2" : "v1";
   if (replacement === "new hash") {

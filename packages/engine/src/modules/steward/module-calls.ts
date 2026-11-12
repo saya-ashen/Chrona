@@ -337,17 +337,24 @@ async function deliverRow(ports: StewardPorts, row: Row, token: string) {
   const { db } = ports, now = ports.now();
   const settle = (data: Prisma.ModuleInvocationUpdateManyMutationInput) => db.moduleInvocation.updateMany({ where: { id: row.id, status: "running", leaseToken: token }, data: { leaseToken: null, leaseUntil: null, ...data } });
   const retryOrFail = (error: string) => settle(row.attempts < MAX_ATTEMPTS ? { status: "queued", nextAttemptAt: backoff(now, row.attempts), error } : { status: "failed", error, finishedAt: now });
-  const target = `${row.target}.${row.tool}`, resolved = await resolveTarget(db, row.workspaceId, target);
-  // Not there yet (e.g. a built-in still building) or paused: it never got the call, so trying later is safe.
-  if (resolved instanceof CallError) return resolved.code === "unavailable" || resolved.code === "not_found" ? retryOrFail(resolved.message) : settle({ status: "failed", error: resolved.message, finishedAt: now });
-  if (!await checkInvocationTarget(ports, row, resolved)) return settle({ status: "failed", error: "conflict: queued callback target identity or contract changed; register again", finishedAt: now });
-  const callerModule = row.callerModuleId ? await db.module.findUnique({ where: { id: row.callerModuleId } }) : null;
-  if (missingCaller(row, callerModule)) return settle({ status: "failed", error: "forbidden: original caller no longer exists", finishedAt: now });
-  const caller = originOf(row, callerModule);
-  if (!await admitted(db, caller, resolved.tool, row.workspaceId)) return settle({ status: "failed", error: "forbidden: the target no longer accepts this caller", finishedAt: now });
-  let args;
-  try { args = validArgs(resolved.tool, row.args); }
-  catch (error) { return settle({ status: "failed", error: message(error), finishedAt: now }); }
+  let resolved: Target, caller: Caller, args: Record<string, unknown>;
+  try {
+    const target = `${row.target}.${row.tool}`, candidate = await resolveTarget(db, row.workspaceId, target);
+    // Not there yet (e.g. a built-in still building) or paused: it never got the call, so trying later is safe.
+    if (candidate instanceof CallError) return candidate.code === "unavailable" || candidate.code === "not_found" ? retryOrFail(candidate.message) : settle({ status: "failed", error: candidate.message, finishedAt: now });
+    resolved = candidate;
+    if (!await checkInvocationTarget(ports, row, resolved)) return settle({ status: "failed", error: "conflict: queued callback target identity or contract changed; register again", finishedAt: now });
+    const callerModule = row.callerModuleId ? await db.module.findUnique({ where: { id: row.callerModuleId } }) : null;
+    if (missingCaller(row, callerModule)) return settle({ status: "failed", error: "forbidden: original caller no longer exists", finishedAt: now });
+    caller = originOf(row, callerModule);
+    if (!await admitted(db, caller, resolved.tool, row.workspaceId)) return settle({ status: "failed", error: "forbidden: the target no longer accepts this caller", finishedAt: now });
+    try { args = validArgs(resolved.tool, row.args); }
+    catch (error) { return settle({ status: "failed", error: message(error), finishedAt: now }); }
+  } catch (error) {
+    console.error(JSON.stringify({ component: "module-calls", event: "call.pre_delivery_failed",
+      callId: row.id, workspaceId: row.workspaceId, error: String(error).slice(0, 2000) }));
+    return retryOrFail(`pre-delivery: ${String(error).slice(0, 500)}`);
+  }
   if (resolved.system) return deliverSystemRow(ports, row, { resolved, caller, args, settle });
   const path = Array.isArray(row.chain) ? row.chain.filter((name): name is string => typeof name === "string") : [];
   return deliverModuleRow({ ports, row, resolved, args, caller, path, now, settle, retryOrFail });
@@ -358,8 +365,9 @@ function replyTarget(row: Row): RoutedTarget {
 async function replyRow(ports: StewardPorts, row: Row) {
   const { db } = ports;
   const module = row.callerModuleId ? await db.module.findUnique({ where: { id: row.callerModuleId } }) : null;
+  if (module && (isModulePaused(module.name) || module.status !== "active" || !module.activeHash)) return;
   const claimed = await db.moduleInvocation.updateMany({ where: { id: row.id, repliedAt: null, replyAttempts: row.replyAttempts }, data: { replyAttempts: { increment: 1 } } });
-  if (!claimed.count || !module || isModulePaused(module.name) || module.status !== "active" || !module.activeHash) return;
+  if (!claimed.count || !module || !module.activeHash) return;
   const now = ports.now();
   const event: ModuleEvent = { trigger: { kind: "call_result", id: "call", firedAt: now.toISOString(), callId: row.id, target: replyTarget(row), key: row.key, status: row.status as "succeeded",
     ...(hasStoredOutput(row) ? { output: row.output as Json } : {}), ...(row.error ? { error: row.error.slice(0, 2000) } : {}) }, now: now.toISOString(), params: {} };
@@ -367,7 +375,11 @@ async function replyRow(ports: StewardPorts, row: Row) {
   try {
     await moduleSupervisor(ports).deliver(module.id, module.activeHash, event, { chain: [], path });
     await db.moduleInvocation.update({ where: { id: row.id }, data: { repliedAt: ports.now() } });
-  } catch { /* The caller can still read the result with callStatus; replies are retried a few times. */ }
+  } catch (error) {
+    // The caller can still read the result with callStatus; replies are retried a few times.
+    console.error(JSON.stringify({ component: "module-calls", event: "call_result.delivery_failed",
+      callId: row.id, callerModuleId: row.callerModuleId, error: String(error).slice(0, 2000) }));
+  }
 }
 
 /** One pass over the workspace's async calls: recover expired leases, deliver due calls, send results back. */
