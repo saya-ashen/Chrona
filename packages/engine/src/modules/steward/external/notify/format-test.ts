@@ -18,7 +18,8 @@ const nextDay = new Date("2026-10-22T04:00:00Z");
 type Call = { target: string; args: Record<string, unknown>; options: { key: string; mode: string; reply: boolean }; callId: string };
 function harness(store: Store) {
   const calls: Call[] = [];
-  const notify = createNotify({ store, publicUrl: "https://chrona.example", directory: async () => testDirectory(), call: async (target, args, options) => {
+  const directory = testDirectory();
+  const notify = createNotify({ store, publicUrl: "https://chrona.example", listModules: async () => directory.modules, describeTools: async () => directory.tools, call: async (target, args, options) => {
     const callId = `call-${calls.length + 1}`;
     calls.push({ target, args, options, callId }); return { callId, status: "queued" };
   }, status: async callId => ({ callId, status: "queued" }) });

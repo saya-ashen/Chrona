@@ -12,7 +12,7 @@ afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(
 async function fixture() {
   const dir = await mkdtemp("/tmp/chrona-fact-ingestion-"), store = openStore(dir), now = new Date("2026-11-08T12:00:00Z");
   cleanups.push(async () => { store.close(); await rm(dir, { recursive: true, force: true }); });
-  const create = () => createNotify({ store, publicUrl: null, directory: async () => ({ modules: [], tools: [] }), call: async () => { throw new Error("No external channel"); }, status: async () => { throw new Error("No pending delivery"); } });
+  const create = () => createNotify({ store, publicUrl: null, listModules: async () => [], describeTools: async () => [], call: async () => { throw new Error("No external channel"); }, status: async () => { throw new Error("No pending delivery"); } });
   return { store, now, create, notify: create() };
 }
 test("notification preferences persist privately and reject malformed changes without publishing facts", async () => {

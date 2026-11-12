@@ -29,7 +29,8 @@ test.each([
   const dir = await mkdtemp("/tmp/chrona-notify-counts-"), store = openStore(dir);
   let directoryCalls = 0;
   const notify = createNotify({ store, publicUrl: null,
-    directory: async () => { directoryCalls++; throw new Error("Directory unavailable"); },
+    listModules: async () => { directoryCalls++; throw new Error("Directory unavailable"); },
+    describeTools: async () => { throw new Error("Directory unavailable"); },
     call: async () => { throw new Error("Counts must not dispatch"); },
     status: async () => { throw new Error("Counts must not check delivery receipts"); },
   });
@@ -50,7 +51,8 @@ test.each([
 test("channel registration is owned, idempotent and calls only the registering module; without a ready channel notifications go to the web", async () => {
   const dir = await mkdtemp("/tmp/chrona-notify-channels-"), store = openStore(dir);
   const calls: { target: string; args: Record<string, unknown> }[] = [];
-  const ports = { store, publicUrl: null, directory: async () => testDirectory("transport"), call: async (target: string, args: Record<string, unknown>) => {
+  const directory = testDirectory("transport");
+  const ports = { store, publicUrl: null, listModules: async () => directory.modules, describeTools: async () => directory.tools, call: async (target: string, args: Record<string, unknown>) => {
     calls.push({ target, args }); return { callId: `c${calls.length}`, status: "succeeded", output: { outcome: "accepted", receiptRef: "receipt" } };
   }, status: async () => ({ callId: "unused", status: "pending" }) };
   let notify = createNotify(ports);
