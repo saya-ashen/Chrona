@@ -18,6 +18,7 @@ import { KERNEL_EXECUTION_LIMITS, type ProviderAdapter } from "@chrona/contracts
 import { refreshInstallationReceipts } from "./module-install";
 import { ensureWorkspaceInitialized } from "./module-initialization";
 import { executionRunInput } from "./execution-context";
+import { pruneHistory } from "./retention";
 
 import { contextRunTools } from "./agent-context-tools";
 import { contextRunImages } from "./agent-context-read";
@@ -74,6 +75,8 @@ export function createTick(ports: StewardPorts) {
   async function tick(now = ports.now()) {
     const failures: { workspaceId: string; stage: string; error: unknown }[] = [...buildFailures].map(([workspaceId, error]) => ({ workspaceId, stage: "modules", error }));
     buildFailures.clear();
+    // A backlog pass can take ~100 s on a large DB (measured); never hold up runs and timers for it.
+    void pruneHistory(ports.db, now).catch(error => console.error(JSON.stringify({ component: "retention", event: "prune_failed", error: String(error).slice(0, 300) })));
     for (const workspace of await ports.db.workspace.findMany()) {
       const workspaceId = workspace.id, runs = createRuns(ports, workspaceId);
       async function runInput(run: NonNullable<Awaited<ReturnType<typeof runs.claimNext>>>) {
