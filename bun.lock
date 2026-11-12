@@ -6,7 +6,7 @@
       "name": "chrona",
       "dependencies": {
         "@prisma/client": "7.9.1",
-        "hono": "^4.13.0",
+        "hono": "^4.13.18",
         "prisma-adapter-bun-sqlite": "^0.8.0",
         "zod": "^4.4.3",
       },
@@ -175,7 +175,6 @@
     "deepmerge-ts": "8.0.0",
     "fast-uri": "3.1.7",
     "fast-xml-parser": "5.10.1",
-    "hono": "4.13.0",
     "ip-address": "10.4.0",
     "js-yaml": "4.3.2",
     "mysql2": "3.22.0",
@@ -666,7 +665,7 @@
 
     "hasown": ["hasown@2.0.3", "", { "dependencies": { "function-bind": "^1.1.2" } }, "sha512-ej4AhfhfL2Q2zpMmLo7U1Uv9+PyhIZpgQLGT1F9miIGmiCJIoCgSmczFdrc97mWT4kVY72KA+WnnhJ5pghSvSg=="],
 
-    "hono": ["hono@4.13.0", "", {}, "sha512-jhunvfHWxd7J5EFfSgH4xsYJzSe/lfqbUCxiyyeaQasUsXeEHXtzVid+7EOGByc5JnFa23SSFL3Y2RV/z1T+eQ=="],
+    "hono": ["hono@4.13.18", "", {}, "sha512-H9q/E1XizaWstJxUW881dmLxEj+t/TrGGnyxINkm4+sK0qUwsMtFdo2BWI9Vs3cIS19MU6b6iCijoUoEf4f3DA=="],
 
     "iconv-lite": ["iconv-lite@0.7.2", "", { "dependencies": { "safer-buffer": ">= 2.1.2 < 3.0.0" } }, "sha512-im9DjEDQ55s9fL4EYzOAv0yMqmMBSZp6G0VvFyTMPKWxiSBHUj9NW/qqLmXUwXrrM7AvqSlTCfvqRb0cM8yYqw=="],
 

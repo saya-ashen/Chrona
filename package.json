@@ -48,7 +48,7 @@
   },
   "dependencies": {
     "@prisma/client": "7.9.1",
-    "hono": "^4.13.0",
+    "hono": "^4.13.18",
     "prisma-adapter-bun-sqlite": "^0.8.0",
     "zod": "^4.4.3"
   },
@@ -78,7 +78,6 @@
     "deepmerge-ts": "8.0.0",
     "fast-uri": "3.1.7",
     "fast-xml-parser": "5.10.1",
-    "hono": "4.13.0",
     "ip-address": "10.4.0",
     "js-yaml": "4.3.2",
     "mysql2": "3.22.0",
