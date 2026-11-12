@@ -1,12 +1,17 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, statSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { Database } from "bun:sqlite";
 
+import { checksumSql } from "@chrona/db/sqlite-migrations";
+import { PrismaClient } from "@chrona/db/generated/prisma/client";
+import { createBunSqliteAdapter } from "prisma-adapter-bun-sqlite";
+import { externalPackageCatalog } from "../../engine/src/modules/steward/module-install";
+import { fileURLToPath } from "node:url";
 import { inspectSqliteRuntimeLock, quarantineStaleSqliteRuntimeLock } from "@chrona/db/sqlite-runtime-lock";
 import { assertPrivateStoragePath, sqlitePathFromFileUrl } from "@chrona/db/sqlite-url";
 import { isIP } from "node:net";
-import { getChronaConfigDir, getChronaDataDir } from "./start-server.js";
+import { findResourceDir, getChronaConfigDir, getChronaDataDir } from "./start-server.js";
 
 // Exact local endpoint classification, preserved from the retired provider helper.
 function isExactLoopbackHost(host: string): boolean {
@@ -16,7 +21,7 @@ function isExactLoopbackHost(host: string): boolean {
 }
 
 export type ChronaDoctorCheck = {
-  key: "git" | "executionMode" | "database" | "databaseIntegrity" | "dataDirectoryPermissions" | "databasePermissions" | "databaseArtifactsPermissions" | "configDirectoryPermissions" | "configPermissions" | "runtimeLock" | "backupRestore" | "networkBind" | "apiProtection";
+  key: "git" | "executionMode" | "database" | "databaseIntegrity" | "migrationHistory" | "providerPi" | "externalApps" | "dataDirectoryPermissions" | "databasePermissions" | "databaseArtifactsPermissions" | "configDirectoryPermissions" | "configPermissions" | "runtimeLock" | "backupRestore" | "networkBind" | "apiProtection";
   status: "ok" | "warning" | "error";
   message: string;
 };
@@ -88,10 +93,59 @@ function executionModeCheck(): ChronaDoctorCheck {
   return { key: "executionMode", status: "ok", message: "Execution mode is trusted-local. Modules and Provider run with host user permissions, without OS isolation or a hard virtual-memory limit." };
 }
 
+function providerPiCheck(): ChronaDoctorCheck[] {
+  // Pi is the ordinary Provider configured by apps/server/src/steward-runtime.ts.
+  if (process.env.CHRONA_STEWARD_AGENT && process.env.CHRONA_STEWARD_AGENT !== "pi") return [];
+  const key = "providerPi";
+  const checks: ChronaDoctorCheck[] = [];
+  const command = process.env.CHRONA_STEWARD_PI_COMMAND ?? "";
+  if (!isAbsolute(command)) checks.push({ key, status: "error", message: "Configure CHRONA_STEWARD_PI_COMMAND as an absolute Pi executable path." });
+  const version = process.env.CHRONA_STEWARD_PI_VERSION ?? "0.85.0";
+  // Synchronous equivalent of packages/pi/src/pi-completion.ts TOKEN_LIMIT_PI_VERSION.
+  if (version !== "1.5.0") checks.push({ key, status: "warning", message: `Pi completion requires CHRONA_STEWARD_PI_VERSION=1.5.0 (configured ${version}); agent runs work, but bounded model calls by apps are unavailable.` });
+  if (!checks.length) checks.push({ key, status: "ok", message: "Pi 1.5.0 is configured with an absolute command path and supports bounded model calls." });
+  return checks;
+}
+
+function bundledMigrations() {
+  const directory = process.env.CHRONA_MIGRATIONS_DIR ?? join(findResourceDir(), "prisma", "migrations");
+  const migrations = readdirSync(directory, { withFileTypes: true })
+    .filter(entry => entry.isDirectory())
+    .map(entry => ({ name: entry.name, checksum: checksumSql(readFileSync(join(directory, entry.name, "migration.sql"), "utf8")) }))
+    .sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+  if (!migrations.length) throw new Error(`No migrations found in: ${directory}`);
+  return migrations;
+}
+
+function migrationHistoryCheck(databasePath: string): ChronaDoctorCheck {
+  const key = "migrationHistory";
+  if (!existsSync(databasePath)) return { key, status: "ok", message: "Database not created yet; migrations will be applied on startup." };
+  try {
+    const migrations = bundledMigrations();
+    const db = new Database(databasePath, { readonly: true });
+    try {
+      const tables = db.query<{ name: string }, []>("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all();
+      const tracked = tables.some(table => table.name === "_chrona_migrations");
+      if (tables.length && !tracked) return { key, status: "error", message: "Refusing an untracked database; steward requires a clean database baseline." };
+      const applied = tracked ? db.query<{ name: string; checksum: string }, []>('SELECT name, checksum FROM "_chrona_migrations" ORDER BY name').all() : [];
+      for (const [index, prior] of applied.entries()) {
+        const migration = migrations.at(index);
+        if (!migration || migration.name !== prior.name || migration.checksum !== prior.checksum) {
+          return { key, status: "error", message: `Database was created by a different schema baseline (${prior.name}); this release will refuse to start. Back up with \`chrona backup\`, then start on a fresh data directory.` };
+        }
+      }
+      return { key, status: "ok", message: `${migrations.length - applied.length} pending migrations.` };
+    } finally { db.close(); }
+  } catch (error) {
+    const message = `Could not inspect migration history: ${error instanceof Error ? error.message : String(error)}`;
+    return { key, status: "error", message };
+  }
+}
+
 export function inspectLocalChrona(): ChronaDoctorCheck[] {
   const git = spawnSync("git", ["--version"], { encoding: "utf8", timeout: 5_000, maxBuffer: 4096, windowsHide: true });
   const gitAvailable = git.status === 0 && /^git version /m.test(git.stdout);
-  const checks: ChronaDoctorCheck[] = [{ key: "git", status: gitAvailable ? "ok" : "error", message: gitAvailable ? "Git is available for module source repositories." : "Git is required for module source repositories. Install Git and make it available on the Chrona process PATH, then rerun chrona doctor." }, executionModeCheck()];
+  const checks: ChronaDoctorCheck[] = [{ key: "git", status: gitAvailable ? "ok" : "error", message: gitAvailable ? "Git is available for module source repositories." : "Git is required for module source repositories. Install Git and make it available on the Chrona process PATH, then rerun chrona doctor." }, executionModeCheck(), ...providerPiCheck()];
   const databaseUrl = configuredDatabaseUrl();
   const sqlitePath = sqlitePathFromFileUrl(databaseUrl);
   if (!sqlitePath || sqlitePath === ":memory:") {
@@ -100,6 +154,7 @@ export function inspectLocalChrona(): ChronaDoctorCheck[] {
     const databasePath = resolve(sqlitePath);
     const present = existsSync(databasePath);
     checks.push({ key: "database", status: present ? "ok" : "warning", message: present ? `Database found at ${databasePath}` : `Database not created yet at ${databasePath}; chrona start will initialize it` });
+    checks.push(migrationHistoryCheck(databasePath));
     checks.push(permissionsCheck("dataDirectoryPermissions", dirname(databasePath), 0o700, "Database directory"));
     checks.push(permissionsCheck("databasePermissions", databasePath, 0o600, "Database"));
     checks.push(artifactPermissionsCheck(databasePath));
@@ -123,6 +178,45 @@ export function inspectLocalChrona(): ChronaDoctorCheck[] {
   checks.push({ key: "networkBind", status: localOnly ? "ok" : "warning", message: localOnly ? `Chrona is limited to the local machine on ${host}` : `Chrona is configured for network access on ${host}` });
   checks.push({ key: "apiProtection", status: !localOnly && !process.env.API_KEY ? "error" : process.env.API_KEY ? "ok" : "warning", message: process.env.API_KEY ? "API_KEY protection is configured" : !localOnly ? "Non-loopback bind has no API_KEY; Chrona will refuse to start unless unsafe override is set" : "API_KEY is not configured; acceptable only for trusted localhost use" });
   return checks;
+}
+
+function externalResources(): string {
+  // Same resolution as integrations/steward/module-runtime.ts resourcePath, without its runtime imports.
+  const adjacent = join(dirname(process.execPath), "resources");
+  const root = process.env.CHRONA_RESOURCE_DIR || (existsSync(adjacent) ? adjacent : null);
+  return root ? join(root, "external") : fileURLToPath(new URL("../../engine/src/modules/steward/external", import.meta.url));
+}
+
+async function externalAppWarnings(db: PrismaClient) {
+  const catalog = await externalPackageCatalog({ db, dataDir: getChronaDataDir(), now: () => new Date(), publicUrl: null, moduleExternalResources: externalResources() }, "ws_default");
+  const messages: string[] = [];
+  for (const entry of catalog) {
+    if (entry.error) messages.push(`${entry.name}: ${entry.error}`);
+    if (entry.moduleId && entry.releaseHash) {
+      const module = await db.module.findUniqueOrThrow({ where: { id: entry.moduleId } });
+      if (entry.releaseHash !== module.activeHash) messages.push(`${entry.name}: bundled release differs from installed version; stop Chrona and run chrona admin install ${entry.name} --update --request-key <new-key>`);
+    }
+  }
+  return messages;
+}
+
+export async function inspectExternalApps(): Promise<ChronaDoctorCheck> {
+  const key = "externalApps";
+  const path = sqlitePathFromFileUrl(configuredDatabaseUrl());
+  if (!path || path === ":memory:") return { key, status: "warning", message: "Cannot inspect external apps without a persistent SQLite database." };
+  if (!existsSync(path)) return { key, status: "ok", message: "Database not created yet; no installed external apps to compare." };
+  const db = new PrismaClient({ adapter: {
+    provider: "sqlite", adapterName: "prisma-adapter-bun-sqlite",
+    connect: async () => createBunSqliteAdapter(new Database(path, { readonly: true, safeIntegers: true })),
+  } });
+  try {
+    // Catalog needs only resource paths and database reads; no supervisor or runtime is created.
+    const messages = await externalAppWarnings(db);
+    return { key, status: messages.length ? "warning" : "ok", message: messages.join("; ") || "Installed external apps match the bundled releases." };
+  } catch (error) {
+    const message = `Could not inspect external apps: ${error instanceof Error ? error.message : String(error)}`;
+    return { key, status: "warning", message };
+  } finally { await db.$disconnect(); }
 }
 
 export function repairStaleRuntimeLock(): string | null { return quarantineStaleSqliteRuntimeLock(configuredDatabaseUrl()); }

@@ -3,7 +3,7 @@ import { join, resolve } from "node:path";
 import { backupSqliteDatabase, restoreSqliteDatabase } from "@chrona/db/sqlite-backup";
 import cliPackage from "../package.json" with { type: "json" };
 import { getChronaDataDir } from "./start-server.js";
-import { inspectLocalChrona, repairStaleRuntimeLock } from "./doctor.js";
+import { inspectExternalApps, inspectLocalChrona, repairStaleRuntimeLock } from "./doctor.js";
 
 export type StartCommandOptions = { host?: string; port?: string; open?: boolean };
 type CreateProgramOptions = { startServer?: (options: StartCommandOptions) => Promise<void>; adminBuild?: (file: string) => Promise<unknown> };
@@ -36,12 +36,13 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
     });
   program.command("doctor").description("Inspect local database and network safety")
     .option("--repair-stale-lock", "Quarantine a confirmed stale runtime lock; never removes the database")
-    .action((input: { repairStaleLock?: boolean }) => {
+    .action(async (input: { repairStaleLock?: boolean }) => {
       if (input.repairStaleLock) {
         const quarantined = repairStaleRuntimeLock();
         console.log(quarantined ? `Stale runtime lock quarantined: ${quarantined}` : "No runtime lock is present.");
       }
       const checks = inspectLocalChrona();
+      checks.push(await inspectExternalApps());
       for (const check of checks) console.log(`[${check.status}] ${check.key}: ${check.message}`);
       if (checks.some((check) => check.status === "error")) process.exitCode = 1;
     });
