@@ -4,7 +4,7 @@ import { callbackReady, type Callback } from "./registry";
 const output = { type: "object", required: ["outcome", "receiptRef"], properties: { outcome: { const: "accepted" }, receiptRef: { type: ["string", "null"] } } };
 const input = { type: "object", properties: { key: { type: "string" }, title: { type: "string" }, body: { type: "string" } }, required: ["key", "title", "body"] };
 function ready(inputSchema: Callback["inputSchema"], outputSchema: unknown) {
-  return callbackReady({ modules: [{ id: "id", name: "adapter", status: "active", activeHash: "code" }], tools: [{ target: "adapter.deliver", moduleId: "id", hash: "code", contractHash: "contract", inputSchema, outputSchema }] }, "id", "adapter", "deliver", "contract");
+  return callbackReady({ modules: [{ id: "id", name: "adapter", status: "active", activeHash: "code" }], tools: [{ target: "adapter.deliver", moduleId: "id", inputSchema, outputSchema }] }, "id", "adapter", "deliver");
 }
 test("delivery schema guards retain missing property rejection", () => {
   expect(ready(input, output)).toBe(true);

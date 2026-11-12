@@ -12,12 +12,12 @@ import { componentOwner, createExecutableComponents, executablePropErrors, exten
  * own tools; web stores it under the kernel-recorded caller and later calls only those tools. Web knows no app by name.
  */
 type Args = Record<string, unknown>;
-type Schema = { properties?: Record<string, unknown>; required?: string[] };
+type Schema = { description?: string; properties?: Record<string, unknown>; required?: string[] };
 export type Caller = { kind: string; module?: string; moduleId?: string; hash?: string };
 export type ModuleState = { id: string; name: string; status: string; activeHash: string | null };
-export type PageTool = { inputSchema: Schema; moduleId: string; contractHash: string };
+export type PageTool = { inputSchema: Schema; moduleId: string };
 /** `keyed`: the app's tools that take a request key (the page sends a fresh one per press); `needs`: each source's required arguments (not read while one is empty). */
-export type Page = { module: string; moduleId: string; hash?: string; extensions?: Record<string, ComponentExtension>; templates?: string[]; revision: string; contracts: Record<string, string>; id: string; title: string; purpose?: "settings"; data: Record<string, Source>; spec: Spec; keyed: string[]; needs: Record<string, string[]>; catalog: string; updatedAt: string; layout?: "document" | "workspace"; content?: { tool: string } };
+export type Page = { module: string; moduleId: string; hash?: string; extensions?: Record<string, ComponentExtension>; templates?: string[]; revision: string; id: string; title: string; purpose?: "settings"; data: Record<string, Source>; spec: Spec; keyed: string[]; needs: Record<string, string[]>; catalog: string; updatedAt: string; layout?: "document" | "workspace"; content?: { tool: string } };
 type Source = { tool: string; args?: Args; refresh?: number };
 type Spec = { root: string; elements: Record<string, Element>; state?: Args };
 type Element = { type: string; props?: Args; children?: string[]; on?: Record<string, unknown>; [key: string]: unknown };
@@ -123,7 +123,7 @@ function activeOwner(modules: ModuleState[], moduleId: string, name: string) {
   return modules.find(item => item.id === moduleId && item.name === name && item.status === "active" && item.activeHash);
 }
 function assertPageIdentity(page: Partial<Page>) {
-  if (!page.moduleId || !page.contracts || !page.revision || (page.content && !/^[a-f0-9]{64}$/.test(page.contracts[page.content.tool] ?? ""))) throw stalePage();
+  if (!page.moduleId || !page.revision) throw stalePage();
 }
 function assertRegistration(args: Args) {
   if (typeof args.id !== "string" || !SLUG.test(args.id)) throw invalid("id 须为小写字母开头的 slug");
@@ -171,7 +171,7 @@ async function registerPage(deps: Deps, store: PageStore, components: ReturnType
   const { spec, templates, extensions, hash } = await pageComposition(components, owner, args, modules);
   const layout = args.layout === undefined ? "document" : args.layout;
   const current = await deps.tools(module);
-  if ([...current.values()].some(tool => tool.moduleId !== moduleId || !/^[a-f0-9]{64}$/.test(tool.contractHash))) throw Object.assign(new Error("应用工具身份不匹配，请重新登记页面"), { code: "conflict" });
+  if ([...current.values()].some(tool => tool.moduleId !== moduleId)) throw Object.assign(new Error("应用工具身份不匹配，请重新登记页面"), { code: "conflict" });
   // Discovery includes only tools Web may actually call, with the real caller's visibility.
   const tools = new Map([...current].map(([name, tool]) => [name, tool.inputSchema]));
   const errors = pageErrors({ spec, data, layout, content, purpose }, tools, module, extensions);
@@ -182,9 +182,8 @@ async function registerPage(deps: Deps, store: PageStore, components: ReturnType
   const sources = (data ?? {}) as Record<string, Source>;
   const needs = Object.fromEntries(Object.entries(sources).map(([key, source]) => [key, tools.get(source.tool)?.required ?? []]));
   const provider = content as Page["content"];
-  const contracts = Object.fromEntries([...references(spec as Spec, sources), ...[...extensions.values()].flatMap(component => component.tools), ...(provider ? [provider.tool] : [])].map(name => [name, current.get(name)!.contractHash]));
   const revision = crypto.randomUUID();
-  const page: Page = { module, moduleId, ...(hash ? { hash } : {}), ...(extensions.size ? { extensions: Object.fromEntries(extensions) } : {}), ...(templates.length ? { templates } : {}), revision, contracts, id, title: title.trim(), ...(purpose === "settings" ? { purpose } : {}), data: sources, content: provider, spec: spec as Spec, layout: layout as Page["layout"], keyed, needs, catalog: CATALOG_VERSION, updatedAt: (deps.now?.() ?? new Date()).toISOString() };
+  const page: Page = { module, moduleId, ...(hash ? { hash } : {}), ...(extensions.size ? { extensions: Object.fromEntries(extensions) } : {}), ...(templates.length ? { templates } : {}), revision, id, title: title.trim(), ...(purpose === "settings" ? { purpose } : {}), data: sources, content: provider, spec: spec as Spec, layout: layout as Page["layout"], keyed, needs, catalog: CATALOG_VERSION, updatedAt: (deps.now?.() ?? new Date()).toISOString() };
   await save([...others, page]);
   return { id, catalog: CATALOG_VERSION };
 }
@@ -195,7 +194,7 @@ function pinnedPageExtensions(page: Page, owner: ModuleState, available: Map<str
     if (page.hash !== owner.activeHash || owner.name !== page.module) throw stalePage();
     for (const [name, pinned] of Object.entries(page.extensions)) {
       const component = available.get(name);
-      if (!component || JSON.stringify(extension(component)) !== JSON.stringify(pinned) || component.tools.some(tool => !Object.hasOwn(page.contracts, tool))) throw stalePage();
+      if (!component || JSON.stringify(extension(component)) !== JSON.stringify(pinned)) throw stalePage();
       extensions.set(name, extension(component));
     }
   }
@@ -240,7 +239,7 @@ function listTools(deps: Deps): Deps["tools"] {
         return grouped;
       });
       // An unrelated oversized discovery item must not hide registered pages.
-      // Retry the original caller-scoped path; it still checks every current pin.
+      // Retry the original caller-scoped path; it still checks referenced tool identities.
       return inventory.then(grouped => grouped.get(module) ?? new Map(), () => filtered(module));
     }
     return filtered(module);
@@ -282,9 +281,9 @@ export function createPages(deps: Deps) {
     const owner = modules.find(item => item.id === page.moduleId);
     if (!owner || owner.status !== "active" || !owner.activeHash) throw Object.assign(new Error("应用已暂停或不可用，请先恢复应用"), { code: "conflict" });
     const current = await readTools(page.module);
-    for (const [name, contract] of Object.entries(page.contracts)) {
+    for (const name of pageToolNames(page)) {
       const tool = current.get(name);
-      if (!tool || tool.moduleId !== owner.id || tool.contractHash !== contract) throw stalePage();
+      if (!tool || tool.moduleId !== owner.id) throw stalePage();
     }
     const tools = new Map([...current].map(([name, tool]) => [name, tool.inputSchema]));
     const available = await components.available(page.module, page.moduleId, modules);
@@ -346,6 +345,15 @@ export function createPages(deps: Deps) {
   };
 }
 
+/** Only tool names referenced by the registered page may be called through its route. */
+export function pageToolNames(page: Page) {
+  return [...new Set([
+    ...references(page.spec, page.data),
+    ...Object.values(page.extensions ?? {}).flatMap(component => component.tools),
+    ...(page.content ? [page.content.tool] : []),
+  ])];
+}
+
 function references(spec: Spec, sources: Record<string, Source>) {
   const names = new Set(Object.values(sources).map(source => source.tool));
   const visit = (value: unknown) => {
@@ -376,7 +384,7 @@ export function describeCatalog() {
       "purpose: settings marks the app-owned settings page. At most one per app; updating the same id replaces it. Omit purpose for ordinary pages. Settings navigation uses this metadata, never a tool or page id convention.",
       "components: {app:Name:{props:{type:object,properties:{name:JSONSchema},required?:[names],additionalProperties:false},events?:[names],slots?:[names],spec:{root,elements}}}. Use {$prop:name} for a passed prop, {$event:name} for a caller event binding, and child key $slot:name for supplied children. Here app is a placeholder for your actual module name (e.g. music:Card); definitions belong to this page revision, expand before tool checks, and cannot contain scripts or private state. Max 16 definitions, 8 nesting levels, 300 expanded nodes.",
       "component-set {name: AudioPlayer, javascript, css?, props: {type: object, properties, required?, additionalProperties: false}, events?, slots?, tools?} registers trusted self-contained browser ESM default export mount(element, {props, emit(event), call(tool,args), children?}) returning cleanup or {update?,destroy?}. Returns {name, type, revision}; use the returned type verbatim in spec.elements (e.g. music:AudioPlayer for an app named music). The app prefix is the caller's actual module name, never the literal placeholder app. Default children require slot default. Only the real active approved app version can register. Prop schemas support primitive types, scalar enum/const, typed string/number constraints, nested objects/arrays (max 16 levels); unsupported keywords including refs, schema combinators, format and contains are rejected. Max 256 KiB and 16/app. component-remove {name} invalidates dependent pages. Re-register pages after component changes. Declared tools are own app tool names, must be visible to Web, and are pinned by the page; call uses the existing page-bound call route. Executable code runs trusted in the authenticated browser origin, without isolation. GET /api/web/components/:app/:name?revision=... serves JSON source under existing API authentication. Page extensions provide revision, props, events, slots, tools.",
-      "content: {tool} explicitly declares your own readable tool for Image. Web calls it with {ref}, restricted to your app/ prefix, pinned to the registered module identity and tool contract. Return null or {base64, mime}; only bounded PNG/JPEG/GIF/WebP raster images (max 8 MiB) are accepted. Without content, images cannot be read. Tool visibility must admit Web; no global content reader.",
+      "content: {tool} explicitly declares your own readable tool for Image. Web calls it with {ref}, restricted to your app/ prefix, bound to the registered module identity and validated against the current tool schema. Return null or {base64, mime}; only bounded PNG/JPEG/GIF/WebP raster images (max 8 MiB) are accepted. Without content, images cannot be read. Tool visibility must admit Web; no global content reader.",
       "data: {name: {tool, args?, refresh?}} calls one of your own tools when the page opens (and every refresh seconds, 5-3600); the result is state /name. args may use {\"$state\": \"/path\"}; data is re-read when such a value changes.",
       "Props may use {\"$state\": \"/path\"}, {\"$bindState\": \"/path\"} for inputs, {\"$template\": \"${field}/\"}, and repeat/$item for lists. In a top-level action param $item is the item's state path; use {\"$template\": \"${field}\"} for its value (nested call args resolve $item to the value).",
       "on.<event>: {action: \"call\", params: {tool, args?, result?, reload?}, confirm?: {title, message}} calls your tool; a tool with a request-key parameter gets a fresh key unless args sets one. result stores the output at a state path; data is re-read unless reload is false. Built-in actions: setState, pushState, removeState.",

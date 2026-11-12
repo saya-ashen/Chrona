@@ -17,13 +17,13 @@ test(`${app} settings page validates and registers against real own tool schemas
     expect(manifest.tools.find(tool => tool.name === "ui-settings")?.visibility).toEqual(["owner"]);
     const schemas = new Map(manifest.tools.map(tool => [tool.name, tool.parameters]));
     expect(pageErrors(SETTINGS_PAGE, schemas, app)).toEqual([]);
-    const tools = new Map(manifest.tools.map(tool => [tool.name, { inputSchema: tool.parameters, moduleId: app, contractHash: "1".repeat(64) }]));
+    const tools = new Map(manifest.tools.map(tool => [tool.name, { inputSchema: tool.parameters, moduleId: app }]));
     const pages = createPages({ dataDir: root, modules: async () => [{ id: app, name: app, activeHash: "approved", status: "active" }], tools: async () => tools });
     await pages.tool("page-set", SETTINGS_PAGE, { kind: "module", module: app, moduleId: app });
     const registered = await pages.list();
     expect(registered).toHaveLength(1);
     expect(registered[0]).toMatchObject({ id: "settings", purpose: "settings", title: SETTINGS_PAGE.title });
-    expect(await pages.get(app, "settings")).toMatchObject({ layout: "document", purpose: "settings", contracts: { "ui-settings": "1".repeat(64) } });
+    expect(await pages.get(app, "settings")).toMatchObject({ layout: "document", purpose: "settings" });
     const output = compileModuleOutput(manifest.tools.find(tool => tool.name === "ui-settings")!.output!);
     expect(output.safeParse(await uiSettings(createPreferences(root), {})).success).toBe(true);
   } finally { await rm(root, { recursive: true, force: true }); }

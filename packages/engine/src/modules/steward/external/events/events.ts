@@ -4,14 +4,14 @@ import { createHash, randomUUID } from "node:crypto";
 import { openPublishers, parseRegistration, type Schema } from "./declarations";
 
 export type Caller = { kind: "module"; module: string; moduleId: string; hash: string } | { kind: string };
-export type Subscription = { event: string; module: string; tool: string; moduleId: string; publisherId: string; contractHash: string; revision: string; invalid?: boolean };
-export type Directory = { modules: { id: string; name: string; status: string; activeHash: string | null }[]; tools: { target: string; moduleId?: string; hash?: string; contractHash?: string; inputSchema: Record<string, unknown> }[] };
+export type Subscription = { event: string; module: string; tool: string; moduleId: string; publisherId: string; revision: string; invalid?: boolean };
+export type Directory = { modules: { id: string; name: string; status: string; activeHash: string | null }[]; tools: { target: string; moduleId?: string; hash?: string; inputSchema: Record<string, unknown> }[] };
 export type CallResult = { callId: string; status: "succeeded" | "failed" | "unknown"; error?: string };
 type Ports = {
   dataDir: string;
   /** Complete module identities and tools reachable by events. */
   directory(): Promise<Directory>;
-  call(target: string, args: Record<string, unknown>, options: { mode: "async"; key: string; reply: boolean; expectedTarget: { moduleId: string; contractHash: string } }): Promise<{ callId: string; duplicate?: boolean }>;
+  call(target: string, args: Record<string, unknown>, options: { mode: "async"; key: string; reply: boolean; expectedTarget: { moduleId: string } }): Promise<{ callId: string; duplicate?: boolean }>;
 };
 
 const MAX_SUBSCRIBERS = 50, MAX_PAYLOAD = 64 * 1024;
@@ -53,7 +53,7 @@ function check(schema: Schema | undefined, value: unknown) {
 const same = (a: Subscription, b: Subscription) => a.event === b.event && a.moduleId === b.moduleId && a.tool === b.tool;
 function compatible(candidate: Directory["tools"][number] | undefined) {
   const schema = candidate?.inputSchema, properties = schema?.properties as Record<string, { type?: string; enum?: unknown }> | undefined;
-  return candidate?.contractHash && schema?.type === "object" && ["event", "from", "payload"].every(key => properties?.[key]?.type === "string" && !properties[key]!.enum)
+  return schema?.type === "object" && ["event", "from", "payload"].every(key => properties?.[key]?.type === "string" && !properties[key]!.enum)
     && (schema.required as string[] | undefined ?? []).every(key => ["event", "from", "payload"].includes(key));
 }
 function loadPending(file: string): Partial<Record<string, Subscription>> {
@@ -75,7 +75,7 @@ function openDeliveries(ports: Ports, store: ReturnType<typeof openStore>) {
       const saved = pending[intent];
       if (!saved) { pending[intent] = { ...row }; savePending(); }
       const expected = saved ?? row;
-      const reply = await ports.call(`${expected.module}.${expected.tool}`, { event: full, from: module, payload }, { mode: "async", key, reply: true, expectedTarget: { moduleId: expected.moduleId, contractHash: expected.contractHash } });
+      const reply = await ports.call(`${expected.module}.${expected.tool}`, { event: full, from: module, payload }, { mode: "async", key, reply: true, expectedTarget: { moduleId: expected.moduleId } });
       if ((!reply.duplicate || saved) && !pending[reply.callId]) pending[reply.callId] = { ...expected };
       delete pending[intent]; savePending();
     },
@@ -117,7 +117,7 @@ export function createEvents(ports: Ports) {
     const rows = store.rows().filter(row => row.moduleId && row.publisherId && owner(row.moduleId, row.module) && directory.modules.some(module => module.id === row.publisherId && row.event.startsWith(`${module.name}.`)));
     const checked = rows.map(row => {
       const current = owner(row.moduleId, row.module), callback = reference(row.moduleId, row.module, row.tool);
-      return current?.status === "active" && (!compatible(callback) || callback!.contractHash !== row.contractHash) ? { ...row, invalid: true } : row;
+      return current?.status === "active" && !compatible(callback) ? { ...row, invalid: true } : row;
     });
     if (JSON.stringify(checked) !== JSON.stringify(store.rows())) store.save(checked);
   }
@@ -148,7 +148,7 @@ export function createEvents(ports: Ports) {
     if (!compatible(callback)) throw fail("forbidden", `${target} must be your own reachable tool accepting event, from and payload strings`);
     const publisher = registered.publisher;
     const previous = store.rows().find(row => row.event === event && row.moduleId === moduleId && row.tool === tool);
-    const row: Subscription = { event, module, moduleId, publisherId: publisher.moduleId, tool, contractHash: callback!.contractHash!, revision: previous && !previous.invalid && previous.contractHash === callback!.contractHash && previous.publisherId === publisher.moduleId ? previous.revision : randomUUID() };
+    const row: Subscription = { event, module, moduleId, publisherId: publisher.moduleId, tool, revision: previous && !previous.invalid && previous.publisherId === publisher.moduleId ? previous.revision : randomUUID() };
     store.save([...store.rows().filter(other => !same(other, row)), row]);
     return { subscribed: true };
   }
@@ -163,7 +163,7 @@ export function createEvents(ports: Ports) {
     check(registered.declaration.payload, data);
     const subscribers = store.rows().filter(row => {
       const callback = reference(row.moduleId, row.module, row.tool);
-      return row.event === full && row.publisherId === moduleId && !row.invalid && compatible(callback) && callback!.contractHash === row.contractHash;
+      return row.event === full && row.publisherId === moduleId && !row.invalid && compatible(callback);
     }).slice(0, MAX_SUBSCRIBERS);
     for (const row of subscribers) await deliveries.enqueue(row, caller, { event, full, payload, requestKey: args.key });
     return { delivered: subscribers.length };

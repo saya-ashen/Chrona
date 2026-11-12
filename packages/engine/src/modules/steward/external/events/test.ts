@@ -13,7 +13,7 @@ const module = await startModule("index.ts", { stubs: {
     if (startupUnavailable) { startupUnavailable = false; return { items: null, nextCursor: null }; }
     return { items: ["planning", "beta"].map(name => ({ id: `${name}-id`, name, status: "active", activeHash: "h" })), nextCursor: null };
   },
-  "modules.describe": () => ({ items: [{ target: "beta.on-plan", moduleId: "beta-id", hash: "h", contractHash: "callback-v1", inputSchema: { type: "object", properties: { event: { type: "string" }, from: { type: "string" }, payload: { type: "string" } }, required: ["event", "from", "payload"] } }], nextCursor: null }),
+  "modules.describe": () => ({ items: [{ target: "beta.on-plan", moduleId: "beta-id", hash: "h", inputSchema: { type: "object", properties: { event: { type: "string" }, from: { type: "string" }, payload: { type: "string" } }, required: ["event", "from", "payload"] } }], nextCursor: null }),
 } });
 const caller = (name: string) => ({ kind: "module", module: name, moduleId: `${name}-id`, hash: "h" });
 let clock = Date.parse("2026-10-25T04:00:00.000Z");
@@ -55,7 +55,7 @@ try {
   const [delivery] = deliveries();
   assert.deepEqual(delivery!.params.args, { event: "planning.updated", from: "planning", payload: '{"id":"p1","rev":2}' });
   assert.equal(delivery!.params.mode, "async");
-  assert.deepEqual((delivery!.params as Record<string, unknown>).expectedTarget, { moduleId: "beta-id", contractHash: "callback-v1" });
+  assert.deepEqual((delivery!.params as Record<string, unknown>).expectedTarget, { moduleId: "beta-id" });
   assert.equal(delivery!.params.key, createHash("sha256").update(JSON.stringify(["planning-id", "updated", "k1", "beta-id", "on-plan"])).digest("hex"));
 
   // A delivery whose contract failed stays visible but receives nothing until the owner registers again.

@@ -21,7 +21,7 @@ test.each([false, true])("Notify author tests preserve storage and pass repeated
       if (existing) {
         store.set("settings", JSON.stringify({ dailyCap: 0, quietHours: { start: "00:00", end: "23:59" }, timezone: "America/New_York", digestAt: "23:59" }));
         store.set("settings_at", String(Date.parse("2099-01-01T00:00:00Z")));
-        store.set("channel:chrona_qqbot", JSON.stringify({ module: "previous", moduleId: "previous-id", tool: "deliver", ready: true, at: Date.parse("2099-01-01T00:00:00Z"), contractHash: "previous-contract", revision: "previous" }));
+        store.set("channel:chrona_qqbot", JSON.stringify({ module: "previous", moduleId: "previous-id", tool: "deliver", ready: true, at: Date.parse("2099-01-01T00:00:00Z"), revision: "previous" }));
         for (let i = 0; i < 65; i++) {
           store.insert({ id: `existing-${i}`, key: ["k1", "k2", "k3", "gone", "module:o:k1"][i] ?? `existing-${i}`,
             module_id: null, app: null, session_id: null, approval_id: null, scoped: 0, level: "now", web: 0, responds: 0,

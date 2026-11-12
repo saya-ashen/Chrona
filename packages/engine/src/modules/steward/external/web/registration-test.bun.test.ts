@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { compileModuleOutput, moduleManifestSchema } from "@chrona/contracts/steward";
 import { createRegistrationTest } from "./registration-test";
+import { pageToolNames } from "./pages";
 import webManifest from "./module.json";
 
 const cleanups: (() => Promise<unknown>)[] = [];
@@ -47,7 +48,7 @@ test("real activation registers with returned type, preserving component revisio
   const registered = h.calls[0]!.result as { name: string; type: string; revision: string };
   expect(registered).toEqual({ name: "Player", type: "music:Player", revision: expect.stringMatching(/^[a-f0-9]{64}$/) });
   const saved = await h.pages.get("music", "player");
-  expect(saved).toMatchObject({ moduleId: h.caller.moduleId, hash: h.caller.hash, spec: { elements: { player: { type: registered.type } } }, extensions: { [registered.type]: { revision: registered.revision } }, contracts: { play: expect.stringMatching(/^[a-f0-9]{64}$/) } });
+  expect(saved).toMatchObject({ moduleId: h.caller.moduleId, hash: h.caller.hash, spec: { elements: { player: { type: registered.type } } }, extensions: { [registered.type]: { revision: registered.revision, tools: ["play"] } } });
   expect(await h.pages.component("music", registered.name, registered.revision)).toMatchObject({ moduleId: h.caller.moduleId, hash: h.caller.hash, ...definition });
   await h.activate();
   expect(h.calls[2]!.result).toEqual(registered);
@@ -154,5 +155,5 @@ test("reusable harness executes the existing Coding Web activated handler and va
   expect(pages).toHaveLength(1);
   const saved = await h.pages.get("coding-web", pages[0]!.id);
   expect(saved?.moduleId).toBe(h.caller.moduleId);
-  expect(Object.keys(saved!.contracts).length).toBeGreaterThan(0);
+  expect(pageToolNames(saved!).length).toBeGreaterThan(0);
 });
