@@ -18,7 +18,7 @@ const css = await readFile(join(web, "src/pages.css"), "utf8");
 const policy = createConfiguration(join(root, "pi"), { agentDir: root, chronaExtension: join(root, "unused-extension.ts"), agentUrl: "http://127.0.0.1:1/api/steward-agent" });
 await mkdir(join(root, "notify"));
 const store = openStore(join(root, "notify"));
-const notify = createNotify({ store, publicUrl: null, directory: async () => ({ modules: [], tools: [] }), call: async () => { throw new Error("Unexpected delivery"); }, status: async () => { throw new Error("Unexpected delivery"); } });
+const notify = createNotify({ store, publicUrl: null, listModules: async () => [], describeTools: async () => [], call: async () => { throw new Error("Unexpected delivery"); }, status: async () => { throw new Error("Unexpected delivery"); } });
 const chrome = process.env.CHRONA_TEST_CHROME ?? Bun.which("google-chrome") ?? Bun.which("chromium");
 assert(chrome, "Chrome/Chromium is required");
 const browser = await puppeteer.launch({ executablePath: chrome, headless: true, userDataDir: join(root, "browser"), args: ["--no-sandbox", "--disable-dev-shm-usage", "--disable-background-networking"] });
