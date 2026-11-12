@@ -261,7 +261,7 @@ export const SYSTEM_MODULES = ["approvals", "modules", "settings", "secrets", "a
 /** Longest call path; synchronous calls are refused when the target is already on their path (it is waiting). */
 export const MAX_CALL_DEPTH = 6;
 /** A saved registration may only call this exact app identity and tool contract; this grants no access. */
-export const expectedModuleTargetSchema = z.object({ moduleId: z.string().min(1), contractHash: z.string().regex(/^[a-f0-9]{64}$/) }).strict();
+export const expectedModuleTargetSchema = z.object({ moduleId: z.string().min(1), contractHash: z.string().regex(/^[a-f0-9]{64}$/).optional() }).strict();
 export type ExpectedModuleTarget = z.infer<typeof expectedModuleTargetSchema>;
 export const moduleCallSchema = z.discriminatedUnion("method", [
   /**
