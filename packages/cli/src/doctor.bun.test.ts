@@ -198,7 +198,7 @@ it.each([
 
 it("fresh official installation uses the bundled release hash as its active version", async () => {
   const directory = mkdtempSync(join(tmpdir(), "chrona-doctor-install-"));
-  const databasePath = join(directory, "chrona.db");
+  const databasePath = join(directory, "chrona-test.db");
   ensureSqliteDatabase({ databaseUrl: `file:${databasePath}`, migrationsDir: join(import.meta.dir, "../../../prisma/migrations") });
   const { PrismaClient } = await import("@chrona/db/generated/prisma/client");
   const { PrismaBunSqlite } = await import("prisma-adapter-bun-sqlite");

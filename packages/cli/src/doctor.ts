@@ -6,7 +6,7 @@ import { Database } from "bun:sqlite";
 import { checksumSql } from "@chrona/db/sqlite-migrations";
 import { PrismaClient } from "@chrona/db/generated/prisma/client";
 import { createBunSqliteAdapter } from "prisma-adapter-bun-sqlite";
-import { externalPackageCatalog } from "../../engine/src/modules/steward/module-install";
+import { externalPackageCatalog } from "@chrona/engine/catalog";
 import { fileURLToPath } from "node:url";
 import { inspectSqliteRuntimeLock, quarantineStaleSqliteRuntimeLock } from "@chrona/db/sqlite-runtime-lock";
 import { assertPrivateStoragePath, sqlitePathFromFileUrl } from "@chrona/db/sqlite-url";
