@@ -21,7 +21,7 @@ export type Page = { module: string; moduleId: string; hash?: string; extensions
 type Source = { tool: string; args?: Args; refresh?: number };
 type Spec = { root: string; elements: Record<string, Element>; state?: Args };
 type Element = { type: string; props?: Args; children?: string[]; on?: Record<string, unknown>; [key: string]: unknown };
-export type Deps = { dataDir: string; modules: () => Promise<ModuleState[]>; tools: (module: string) => Promise<Map<string, PageTool>>; now?: () => Date };
+export type Deps = { dataDir: string; modules: () => Promise<ModuleState[]>; tools: (module: string) => Promise<Map<string, PageTool>>; toolInventory?: () => Promise<(PageTool & { target: string })[]>; now?: () => Date };
 
 const SLUG = /^[a-z][a-z0-9-]{0,40}$/, MAX_BYTES = 64 * 1024, MAX_PAGES = 20, MAX_ELEMENTS = 300;
 const invalid = (message: string) => Object.assign(new Error(message), { code: "invalid" });
@@ -202,6 +202,51 @@ function pinnedPageExtensions(page: Page, owner: ModuleState, available: Map<str
   return extensions;
 }
 
+function pageAccess() {
+  // Writers wait for earlier reads; later reads wait for the writer.
+  let pending: Promise<unknown> = Promise.resolve(), readers: Promise<void> = Promise.resolve();
+  return {
+    read<T>(work: () => Promise<T>) {
+      const next = pending.then(work);
+      readers = Promise.allSettled([readers, next]).then(() => {});
+      return next;
+    },
+    exclusive<T>(work: () => Promise<T>) {
+      const next = Promise.all([pending, readers]).then(work);
+      pending = next.catch(() => {}); readers = Promise.resolve(); return next;
+    },
+  };
+}
+
+/** Caller-visible discovery lives for exactly one navigation inventory operation. */
+function listTools(deps: Deps): Deps["tools"] {
+  const tools = new Map<string, ReturnType<Deps["tools"]>>();
+  let inventory: Promise<Map<string, Map<string, PageTool>>> | undefined;
+  const filtered = (module: string) => {
+    if (!tools.has(module)) tools.set(module, deps.tools(module));
+    return tools.get(module)!;
+  };
+  return module => {
+    if (deps.toolInventory) {
+      // Start only when an active page needs discovery, and group the complete
+      // caller-visible inventory once for all pages in this list operation.
+      inventory ??= deps.toolInventory().then(items => {
+        const grouped = new Map<string, Map<string, PageTool>>();
+        for (const tool of items) {
+          const boundary = tool.target.indexOf("."), owner = tool.target.slice(0, boundary);
+          if (!grouped.has(owner)) grouped.set(owner, new Map());
+          grouped.get(owner)!.set(tool.target.slice(boundary + 1), tool);
+        }
+        return grouped;
+      });
+      // An unrelated oversized discovery item must not hide registered pages.
+      // Retry the original caller-scoped path; it still checks every current pin.
+      return inventory.then(grouped => grouped.get(module) ?? new Map(), () => filtered(module));
+    }
+    return filtered(module);
+  };
+}
+
 export function createPages(deps: Deps) {
   const file = join(deps.dataDir, "pages.json"), components = createExecutableComponents(deps.dataDir);
   let pages: Page[] | undefined;
@@ -217,14 +262,20 @@ export function createPages(deps: Deps) {
     await rename(`${file}.tmp`, file);
     pages = next;
   }
+  let registry: Promise<unknown> = Promise.resolve();
   async function knownPages() {
     // A failed/incomplete read must never become an empty inventory and erase registrations.
     const parsed = moduleStateSchema.array().safeParse(await deps.modules());
     if (!parsed.success) throw new Error("应用目录读取失败");
     const modules = parsed.data;
-    const all = await load(), kept = all.filter(page => !page.moduleId || modules.some(module => module.id === page.moduleId && module.name === page.module));
-    if (kept.length !== all.length) await save(kept);
-    return { modules, pages: kept };
+    // Reads can overlap, but pruning must load and save against the latest registry.
+    const next = registry.then(async () => {
+      const all = await load(), kept = all.filter(page => !page.moduleId || modules.some(module => module.id === page.moduleId && module.name === page.module));
+      if (kept.length !== all.length) await save(kept);
+      return { modules, pages: kept };
+    });
+    registry = next.catch(() => {});
+    return next;
   }
   async function validatedTools(page: Page, modules: ModuleState[], readTools = deps.tools) {
     assertPageIdentity(page);
@@ -249,11 +300,7 @@ export function createPages(deps: Deps) {
     if (pages.some(page => page.moduleId === moduleId && page.templates?.includes(`${module}:${String(args.name)}`))) throw invalid("可执行组件不能与已登记的声明式组件重名");
     return components.set(args, caller, modules);
   }
-  // Page reads may prune deleted owners; serialize them with registration/removal saves.
-  let pending: Promise<unknown> = Promise.resolve();
-  function exclusive<T>(work: () => Promise<T>) {
-    const next = pending.then(work); pending = next.catch(() => {}); return next;
-  }
+  const { read, exclusive } = pageAccess();
   return {
     /** Tools other modules call. Pages belong to the caller Chrona recorded, never to a name in the arguments. */
     tool(name: string, args: Args, caller: Caller | undefined) { return exclusive(async () => {
@@ -270,27 +317,26 @@ export function createPages(deps: Deps) {
       throw new Error(`Unknown tool ${name}`);
     }); },
     /** Navigation includes only usable pages. Pages of apps that are gone are dropped. */
-    list() { return exclusive(async () => {
-      const { modules, pages } = await knownPages(), available: Page[] = [];
-      // Reuse discovery only within this serialized inventory read. The next
-      // read must observe current identities, visibility and contract hashes.
-      const tools = new Map<string, ReturnType<Deps["tools"]>>();
-      const readTools: Deps["tools"] = module => {
-        if (!tools.has(module)) tools.set(module, deps.tools(module));
-        return tools.get(module)!;
-      };
-      for (const page of pages) {
+    list() { return read(async () => {
+      const { modules, pages } = await knownPages();
+      const readTools = listTools(deps);
+      const results = await Promise.allSettled(pages.map(async page => {
         try { await validatedTools(page, modules, readTools); }
-        catch (error) { if ((error as { code?: string }).code === "conflict") continue; throw error; }
-        available.push(page);
-      }
+        catch (error) { if ((error as { code?: string }).code === "conflict") return null; throw error; }
+        return page;
+      }));
+      // Drain validations even after an unexpected failure before allowing a writer.
+      const available = results.flatMap(result => {
+        if (result.status === "rejected") throw result.reason;
+        return result.value ? [result.value] : [];
+      });
       return available.map(({ module, moduleId, id, title, purpose }) => ({ module, moduleId, id, title, ...(purpose ? { purpose } : {}) }));
     }); },
-    component(module: string, name: string, revision: string | null) { return exclusive(async () => {
+    component(module: string, name: string, revision: string | null) { return read(async () => {
       const { modules } = await knownPages();
       return components.get(module, name, revision, modules);
     }); },
-    get(module: string, id: string) { return exclusive(async () => {
+    get(module: string, id: string) { return read(async () => {
       const { modules, pages } = await knownPages(), page = pages.find(page => page.module === module && page.id === id);
       if (!page) return null;
       const tools = await validatedTools(page, modules);

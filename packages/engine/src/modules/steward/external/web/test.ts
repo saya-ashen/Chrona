@@ -33,13 +33,13 @@ type Args = Record<string, unknown>;
 const calls: [string, Args][] = [];
 const stub = (target: string, answer: (args: Args, options: { key?: string }) => unknown) => [target, (args: Args, options: { key?: string }) => { calls.push([target, args]); return answer(args, options); }] as const;
 let inventoryFailure = false;
-const inventory = [{ id: "m-files", name: "files", status: "active", activeHash: "h" }, { id: "m-p", name: "planning", status: "active", activeHash: "h" }];
+const inventory = [{ id: "m-files", name: "files", status: "active", activeHash: "h" }, { id: "m-p", name: "planning", status: "active", activeHash: "h" }].map(app => ({ ...app, health: { module: app.name, moduleId: app.id, open: false, incident: null, contractFailureCount: 0, nextAction: null, truncated: false } }));
 let filesContract = "a".repeat(64);
 let execution = { status: "queued", active: true }, phase = "", earlyText = false;
 const admissions = new Map<string, { digest: string; runId: string; status: string; active: boolean }>();
 const module = await startModule("index.ts", { stubs: Object.fromEntries([
   stub("activity.runtime", () => ({ at: "2026-10-27T04:00:00Z", provider: { name: "fixture", available: false, sandboxed: false, lastError: null }, moduleSandbox: false, queuedRuns: 0, runningRuns: 0, failedRunsToday: 0, dueSchedules: 0, lastTickAt: null })),
-  stub("approvals.list", () => ({ items: [], nextCursor: null })), stub("modules.health", () => ({ items: [], nextCursor: null })), stub("notify.list", () => ({ items: [] })), stub("notify.status", () => ({ queued: 0, failed: 0 })),
+  stub("approvals.list", () => ({ items: [], nextCursor: null })), stub("modules.health", () => ({ items: [], nextCursor: null })), stub("notify.list", () => ({ items: [] })), stub("notify.counts", () => ({ queued: 0, failed: 0 })),
   stub("agent.run", (args, options) => {
     const key = String(options.key), digest = JSON.stringify(args);
     if (admissions.has(key)) assert.equal(admissions.get(key)!.digest, digest);
@@ -62,7 +62,7 @@ const module = await startModule("index.ts", { stubs: Object.fromEntries([
       { target: "chat.list", moduleId: "m-chat", hash: "h", contractHash: "e".repeat(64), inputSchema: { type: "object", properties: { path: { type: "string" } }, required: [] }, idempotent: true },
       { target: "planning.get", moduleId: "m-p", hash: "h", contractHash: "b".repeat(64), inputSchema: { type: "object", properties: {}, required: [] }, idempotent: true },
       { target: "modules.list", inputSchema: { type: "object", properties: {} } },
-      ...["notify.list", "notify.status", "notify.settings", "notify.activity", "pi.settings"].map(target => ({ target, moduleId: target.split(".")[0], contractHash: "d".repeat(64) })),
+      ...["notify.list", "notify.counts", "notify.settings", "notify.activity", "pi.settings"].map(target => ({ target, moduleId: target.split(".")[0], contractHash: "d".repeat(64) })),
       ...(args.audience === "user" ? [] : [{ target: "agent.run", moduleId: "agent" }]),
     ];
     // Search may return a related contract; forwarding must still require the exact target.
@@ -329,7 +329,7 @@ try {
   assert.ok(!(await (await get("/api/web/pages")).json()).some((item: { module: string }) => item.module === "planning"));
   await checkExecutableComponents(tool, get, post, files, inventory[0]!);
   // Chat is an ordinary app: its executable callbacks follow the same page and contract guards.
-  const chatState = { id: "m-chat", name: "chat", status: "active", activeHash: "h" };
+  const chatState = { id: "m-chat", name: "chat", status: "active", activeHash: "h", health: { module: "chat", moduleId: "m-chat", open: false, incident: null, contractFailureCount: 0, nextAction: null, truncated: false } };
   inventory.push(chatState);
   const chat = { ...files, module: "chat", moduleId: "m-chat" };
   await checkExecutableComponents(tool, get, post, chat, chatState);

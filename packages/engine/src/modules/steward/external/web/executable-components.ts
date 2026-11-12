@@ -106,12 +106,17 @@ export function extension(component: ExecutableComponent): ComponentExtension {
   return { revision, props, events, slots, tools };
 }
 
-/** Web-private storage. Its caller serializes reads/writes with page operations. No source is ever evaluated here. */
+/** Web-private storage. Page operations allow concurrent reads and serialize writes. No source is ever evaluated here. */
 export function createExecutableComponents(dataDir: string) {
   const file = join(dataDir, "executable-components.json");
-  let cached: ExecutableComponent[] | undefined;
+  let cached: ExecutableComponent[] | undefined, loading: Promise<ExecutableComponent[]> | undefined;
   async function load() {
     if (cached) return cached;
+    if (loading) return loading;
+    loading = readStored();
+    try { return await loading; } finally { loading = undefined; }
+  }
+  async function readStored() {
     try {
       if ((await stat(file)).size > MAX_BYTES * MAX_COMPONENTS + 256 * 1024) throw fail("可执行组件存储超过上限");
       const parsed = z.object({ components: storedSchema.array().max(MAX_COMPONENTS) }).strict().parse(JSON.parse(await readFile(file, "utf8")));

@@ -71,7 +71,6 @@ export async function providerView(ports: StewardPorts, workspaceId: string, bin
   let available = false;
   try {
     if (!observeHealth) throw new CallError("unavailable", "Provider health has not been observed");
-    await assertProviderBinding(ports.db, workspaceId, binding);
     const health = runtimeHealthSchema.parse(await callProviderEndpoint(ports, workspaceId, binding, "health", {}));
     available = health.available;
   } catch { /* An installed registration remains discoverable while its module is unavailable. */ }

@@ -63,7 +63,9 @@ function events() {
   return new Response(body, { headers: { "content-type": "text/event-stream", "cache-control": "no-cache" } });
 }
 // Pages apps register (module-dependency-direction §4); `tools` is what this page may call of that app.
-const pages = createPages({ dataDir: chrona.paths.data, modules: () => call("modules.list").then(page => (page as { items: unknown }).items) as Promise<ModuleState[]>, tools: async module => {
+const pages = createPages({ dataDir: chrona.paths.data, modules: () => call("modules.list").then(page => (page as { items: unknown }).items) as Promise<ModuleState[]>,
+  toolInventory: () => call("modules.describe", { audience: "user" }).then(page => (page as { items: (PageTool & { target: string })[] }).items),
+  tools: async module => {
   const tools = await call("modules.describe", { query: module, audience: "user" }).then(page => (page as { items: unknown }).items) as (PageTool & { target: string })[];
   return new Map(tools.filter(tool => tool.target.startsWith(`${module}.`)).map(tool => [tool.target.slice(module.length + 1), tool]));
 } });

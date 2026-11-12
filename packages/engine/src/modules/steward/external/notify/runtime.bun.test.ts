@@ -17,6 +17,36 @@ test.each([
 const kernel: Caller = { kind: "kernel" };
 const owner: Caller = { kind: "module", module: "transport", moduleId: "transport-id", hash: "h" };
 const at = new Date("2026-11-02T04:00:00Z");
+test.each([
+  { name: "empty", statuses: [], queued: 0, failed: 0 },
+  { name: "queued", statuses: ["queued", "queued"], queued: 2, failed: 0 },
+  { name: "sending", statuses: ["sending", "sending"], queued: 2, failed: 0 },
+  { name: "failed", statuses: ["failed", "failed"], queued: 0, failed: 2 },
+  { name: "uncertain", statuses: ["uncertain", "uncertain"], queued: 0, failed: 2 },
+  { name: "other statuses", statuses: ["sent", "folded", "suppressed"], queued: 0, failed: 0 },
+  { name: "mixed", statuses: ["queued", "sending", "failed", "uncertain", "sent", "folded", "suppressed"], queued: 2, failed: 2 },
+])("counts and status use the same queue semantics: $name", async ({ statuses, queued, failed }) => {
+  const dir = await mkdtemp("/tmp/chrona-notify-counts-"), store = openStore(dir);
+  let directoryCalls = 0;
+  const notify = createNotify({ store, publicUrl: null,
+    directory: async () => { directoryCalls++; throw new Error("Directory unavailable"); },
+    call: async () => { throw new Error("Counts must not dispatch"); },
+    status: async () => { throw new Error("Counts must not check delivery receipts"); },
+  });
+  try {
+    for (const [i, status] of statuses.entries()) store.insert({ key: `count-${i}`, module_id: i % 2 ? "module-id" : null,
+      app: null, session_id: null, approval_id: null, scoped: i % 2, level: i % 2 ? "now" : "web", web: i % 2, responds: i % 2,
+      status, title: "Count", body: "Body", recipient: null, link: null, created_at: at.getTime() - i * 86_400_000,
+      channel: i % 2 ? "transport" : "in_app" });
+    const before = store.rows("SELECT * FROM notifications ORDER BY key");
+    for (let i = 0; i < 2; i++) expect(notify.handle("counts", {}, kernel, at)).toEqual({ queued, failed });
+    expect(notify.handle("status", {}, kernel, at)).toEqual({ chat: { channel: "in_app", bound: false, sentToday: 0 }, queued, failed });
+    expect(directoryCalls).toBe(0);
+    expect(store.rows("SELECT * FROM notifications ORDER BY key")).toEqual(before);
+    expect(store.db.query("SELECT * FROM kv").all()).toEqual([]);
+  } finally { store.close(); await rm(dir, { recursive: true, force: true }); }
+});
+
 test("channel registration is owned, idempotent and calls only the registering module; without a ready channel notifications go to the web", async () => {
   const dir = await mkdtemp("/tmp/chrona-notify-channels-"), store = openStore(dir);
   const calls: { target: string; args: Record<string, unknown> }[] = [];

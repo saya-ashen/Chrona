@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, spyOn, test } from "bun:test";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -169,6 +169,26 @@ test("declarative composition remains usable beside executable components; eithe
   expect((await pages.get("alpha", "old"))?.spec.elements.card?.type).toBe("Text");
   modules[0]!.activeHash = "approved-v2";
   await expect(pages.tool("page-set", { ...plain, components: { "alpha:AudioPlayer": template } }, { ...caller, hash: "approved-v2" })).rejects.toThrow("重名");
+});
+
+test("concurrent cold page reads validate stored component source once and retry failed loads", async () => {
+  const f = await fixture(); await f.pages.tool("component-set", definition, caller);
+  for (let i = 0; i < 20; i++) await f.pages.tool("page-set", { ...registration, id: `page-${i}` }, caller);
+  const scan = spyOn(Bun.Transpiler.prototype, "scan");
+  try {
+    const restarted = createPages(f.deps);
+    expect(await restarted.list()).toHaveLength(20);
+    expect(scan).toHaveBeenCalledTimes(1);
+    expect(await restarted.list()).toHaveLength(20);
+    expect(scan).toHaveBeenCalledTimes(1);
+    const file = join(f.dataDir, "executable-components.json"), original = await readFile(file, "utf8");
+    await writeFile(file, "invalid json");
+    const recovered = createPages(f.deps);
+    await expect(recovered.list()).rejects.toThrow();
+    await writeFile(file, original);
+    expect(await recovered.list()).toHaveLength(20);
+    expect(scan).toHaveBeenCalledTimes(2);
+  } finally { scan.mockRestore(); }
 });
 
 test("corrupt persisted source fails closed after restart", async () => {

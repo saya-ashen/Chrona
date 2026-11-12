@@ -10,7 +10,7 @@ const runtime = { at, provider: { name: "fixture", available: true, sandboxed: f
 function fixture(overrides: Record<string, unknown> = {}) {
   const calls: [string, Record<string, unknown> | undefined][] = [];
   const answers: Record<string, unknown> = { "activity.runtime": runtime, "approvals.list": { items: [], nextCursor: null }, "notify.list": { items: [] },
-    "notify.status": { queued: 2, failed: 1 }, "modules.list": { items: [], nextCursor: null }, "modules.health": { items: [], nextCursor: null }, ...overrides };
+    "notify.counts": { queued: 2, failed: 1 }, "modules.list": { items: [], nextCursor: null }, ...overrides };
   return { calls, call: async (target: string, args?: Record<string, unknown>) => { calls.push([target, args]); const result = answers[target]; if (result instanceof Error) throw result; return result; } };
 }
 test("web retains runtime health with empty upcoming and no calendar source", async () => {
@@ -21,7 +21,7 @@ test("web retains runtime health with empty upcoming and no calendar source", as
   expect(JSON.stringify(result)).not.toContain("PRIVATE INSTRUCTION");
   expect(result.health).toMatchObject({ queuedNotifications: 2, failedNotifications: 1 });
   expect(f.calls.map(([target]) => target).sort()).toEqual([
-    "activity.runtime", "approvals.list", "modules.health", "modules.list", "notify.list", "notify.status",
+    "activity.runtime", "approvals.list", "modules.list", "notify.counts", "notify.list",
   ]);
   expect(f.calls).toContainEqual(["notify.list", { limit: 20 }]);
 });
@@ -35,35 +35,37 @@ test("web projects Notify-owned updates while preserving delivery and source det
   expect(result.updates).toEqual([expected]);
   expect(result.updates[0]).not.toHaveProperty("format");
 });
-test("web follows health cursors, excludes recovered facts and bounds problems", async () => {
-  const f = fixture();
-  const call = async (target: string, args?: Record<string, unknown>) => target === "modules.health" ? {
-    items: [{ module: args?.cursor ? "second" : "first", moduleId: args?.cursor ? "m2" : "m1", open: true, incident: { status: "unresolved", lastAt: args?.cursor ? "2026-10-27T05:00:00Z" : at }, contractFailureCount: 0, nextAction: "检查" },
-      { module: "recovered", moduleId: "m3", open: false, incident: null, contractFailureCount: 0, nextAction: null }],
-    nextCursor: args?.cursor ? null : "next",
-  } : f.call(target, args);
-  expect((await todayView(call, async () => [])).problems.map(item => item.module)).toEqual(["second", "first"]);
+test("web uses listed health summaries and excludes closed recovered facts", async () => {
+  const health = (module: string, open: boolean, lastAt: string) => ({ module, moduleId: module, open,
+    incident: { status: open ? "unresolved" : "recovered", lastAt }, contractFailureCount: 0, nextAction: open ? "检查" : null, truncated: false });
+  const f = fixture({ "modules.list": { items: [
+    { id: "first", name: "first", health: health("first", true, at) },
+    { id: "second", name: "second", health: health("second", true, "2026-10-27T05:00:00Z") },
+    { id: "recovered", name: "recovered", health: health("recovered", false, "2026-10-27T06:00:00Z") },
+  ], nextCursor: null } });
+  expect((await todayView(f.call, async () => [])).problems.map(item => item.module)).toEqual(["second", "first"]);
+  expect(f.calls.filter(([target]) => target.startsWith("modules."))).toEqual([["modules.list", undefined]]);
 });
 test.each(["not_found", "unavailable"])("optional Notify %s errors keep Today available", async code => {
   const failure = Object.assign(new Error(`Notify ${code}`), { code });
-  for (const target of ["notify.list", "notify.status"]) {
+  for (const target of ["notify.list", "notify.counts"]) {
     const result = await todayView(fixture({ [target]: failure }).call, async () => []);
     expect(result.upcoming).toEqual([]);
     expect(result.problems).toEqual([]);
     expect(result.updates).toEqual([]);
-    expect(result.health).toMatchObject(target === "notify.status"
+    expect(result.health).toMatchObject(target === "notify.counts"
       ? { queuedNotifications: 0, failedNotifications: 0 }
       : { queuedNotifications: 2, failedNotifications: 1 });
   }
 });
 test("Today preserves unexpected Notify errors and all required read errors", async () => {
-  for (const target of ["notify.list", "notify.status"]) {
+  for (const target of ["notify.list", "notify.counts"]) {
     for (const code of [undefined, "invalid", "forbidden", "conflict"]) {
       const failure = Object.assign(new Error(`${target} failed`), code ? { code } : {});
       await expect(todayView(fixture({ [target]: failure }).call, async () => [])).rejects.toBe(failure);
     }
   }
-  for (const target of ["activity.runtime", "approvals.list", "modules.list", "modules.health"]) {
+  for (const target of ["activity.runtime", "approvals.list", "modules.list"]) {
     for (const code of [undefined, "not_found", "unavailable"]) {
       const failure = Object.assign(new Error(`${target} failed`), code ? { code } : {});
       await expect(todayView(fixture({ [target]: failure }).call, async () => [])).rejects.toBe(failure);

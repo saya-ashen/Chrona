@@ -43,7 +43,17 @@ async function request(url, { method = "GET", body, raw = false } = {}) {
   }
   return raw ? response.blob() : response.json();
 }
-const web = (path, options) => request(`/api/web${path}`, options);
+let pagesRead = null;
+function web(path, options) {
+  if (path !== "/pages" || (options?.method ?? "GET") !== "GET") return request(`/api/web${path}`, options);
+  // Navigation and settings can request the same display inventory together.
+  // Share only an in-flight read in this login session; later reads stay fresh.
+  if (pagesRead?.session === session) return pagesRead.promise;
+  const current = { session, promise: null };
+  current.promise = request("/api/web/pages", options).finally(() => { if (pagesRead === current) pagesRead = null; });
+  pagesRead = current;
+  return current.promise;
+}
 // A module tool, through the page's data API (Chrona checks what this page may call).
 const tool = (target, args = {}) => web("/call", { method: "POST", body: { target, args } });
 
@@ -92,8 +102,10 @@ async function registeredPage(module, id, version) {
   const loading = document.createElement("p");
   loading.setAttribute("role", "status"); loading.textContent = "正在读取应用页面……";
   main.replaceChildren(loading);
-  const page = await web(`/pages/${encodeURIComponent(module)}/${encodeURIComponent(id)}`);
-  const { mount, registeredDeps } = await import("/pages.js");
+  const [page, { mount, registeredDeps }] = await Promise.all([
+    web(`/pages/${encodeURIComponent(module)}/${encodeURIComponent(id)}`),
+    import("/pages.js"),
+  ]);
   if (version !== navigation || !authenticated) return;
   shellState(page.layout);
   main.replaceChildren();

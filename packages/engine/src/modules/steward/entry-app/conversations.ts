@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { conversationMemory, type MemoryJournal } from "./memory";
-import { captureApplicationDelivery, reconcileApplicationDelivery, validApplicationDelivery, type ApplicationDelivery, type DeliveryPages } from "./delivery";
+import { captureApplicationDelivery, createDeliveryReconciler, reconcileApplicationDelivery, validApplicationDelivery, type ApplicationDelivery, type DeliveryPages } from "./delivery";
 
 type Target = string | { moduleId: string; tool: string };
 type Args = Record<string, unknown>;
@@ -15,7 +15,8 @@ type Turn = { pendingToolResults?: string[]; applicationDelivery?: ApplicationDe
 type Conversation = { id: string; memory?: MemoryJournal; contextId?: string; key: string; title: string; status: "active" | "ended"; source: "web" | "mcp" | "qq"; createdAt: string; lastActivityAt: string; messages: Message[]; turns: Turn[] };
 type State = { version: 1; sessions: Conversation[] };
 type Options = { dataDir: string; call: Call; reply: (event: Args) => void; now?: () => Date; source?: "web" | "mcp" | "qq"; guidance?: string; tools?: Target[]; deliveryPages?: DeliveryPages };
-type Runtime = Options & { now: () => Date; source: "web" | "mcp" | "qq" };
+type Runtime = Options & { now: () => Date; source: "web" | "mcp" | "qq"; background?: boolean; checkDelivery?: ReturnType<typeof createDeliveryReconciler> };
+const deliveryOperation = (options: Runtime): Runtime => ({ ...options, checkDelivery: createDeliveryReconciler(options.call, options.deliveryPages) });
 type SendInput = { session?: string; key?: string; text: unknown; requestKey?: string; attachments?: unknown[]; quotedExternalId?: string };
 type TextInput = SendInput & { text: string };
 type SendRequest = { input: TextInput; key: string; identity: string };
@@ -180,11 +181,12 @@ async function refresh(options: Runtime, state: State, session: Conversation, tu
 }
 async function reconcileDelivery(options: Runtime, state: State, session: Conversation, turn: Turn, publish = true) {
   if (turn.active || !turn.applicationDelivery?.length) return;
+  if (options.background && !needsBackgroundDelivery(options, turn)) return;
   const at = options.now().toISOString();
-  if (turn.deliveryCheckedAt && Date.parse(at) - Date.parse(turn.deliveryCheckedAt) < 1500) return;
   // The actual receipt and immutable targets must survive a crash before any read checks.
   await save(options.dataDir, state);
-  await reconcileApplicationDelivery(options.call, turn.applicationDelivery, at, options.deliveryPages);
+  if (options.checkDelivery) await options.checkDelivery(turn.applicationDelivery, at);
+  else await reconcileApplicationDelivery(options.call, turn.applicationDelivery, at, options.deliveryPages);
   turn.deliveryCheckedAt = at;
   const previous = session.messages.find(message => message.id === `reply:${turn.id}`);
   if (publish && previous) {
@@ -197,6 +199,12 @@ async function reconcileDelivery(options: Runtime, state: State, session: Conver
 }
 function needsRefresh(session: Conversation, turn: Turn) {
   return turn.runId && (turn.active || turn.streamPending || turn.pendingToolResults?.length || !session.messages.find(message => message.id === `reply:${turn.id}`)?.execution);
+}
+function needsBackgroundDelivery(options: Runtime, turn: Turn) {
+  // Follow unresolved receipts until approval/rejection. Historical activation/page
+  // evidence is refreshed on explicit execution/messages reads, without a TTL.
+  return turn.applicationDelivery?.some(delivery => delivery.receiptCheck !== "current" || !["approved", "rejected"].includes(delivery.receipt.state))
+    && (!turn.deliveryCheckedAt || options.now().getTime() - Date.parse(turn.deliveryCheckedAt) >= 1500);
 }
 async function refreshSession(options: Runtime, state: State, session: Conversation) {
   for (const turn of session.turns) {
@@ -321,8 +329,10 @@ export function createAgentConversations(inputOptions: Options) {
     const next = queue.then(work); queue = next.catch(() => {}); return next;
   }
   return {
-    list: () => serial(async () => (await load(dataDir)).sessions.map(({ messages: _messages, turns: _turns, ...session }) => session).sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt))),
-    session: (id: string) => serial(async () => { const { messages: _messages, turns: _turns, ...session } = owned(await load(dataDir), id); return session; }),
+    // save() atomically renames a complete journal. These snapshots never mutate or
+    // save it, so they need not wait behind network checks in the writer queue.
+    list: async () => (await load(dataDir)).sessions.map(({ messages: _messages, turns: _turns, ...session }) => session).sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt)),
+    session: async (id: string) => { const { messages: _messages, turns: _turns, ...session } = owned(await load(dataDir), id); return session; },
     update: (id: string, input: { title?: string; status?: "ended" }) => serial(async () => {
       const state = await load(dataDir), session = owned(state, id);
       if (input.title !== undefined) { if (!input.title.trim() || input.title.length > 200) throw failure("invalid", "Title must contain 1–200 characters"); session.title = input.title; }
@@ -334,30 +344,30 @@ export function createAgentConversations(inputOptions: Options) {
       }
       await save(dataDir, state); return { id: session.id, title: session.title, status: session.status };
     }),
-    owns: (id: string) => serial(async () => (await load(dataDir)).sessions.some(session => session.id === id)),
+    owns: async (id: string) => (await load(dataDir)).sessions.some(session => session.id === id),
     messages: (id: string) => serial(async () => {
       const state = await load(dataDir), session = owned(state, id);
-      await refreshSession(options, state, session);
+      await refreshSession(deliveryOperation(options), state, session);
       return session.messages.slice(-100);
     }),
     execution: (id: string) => serial(async () => {
       const state = await load(dataDir), session = owned(state, id), turn = session.turns.at(-1);
       if (!turn) return null;
-      await refreshSession(options, state, session);
+      await refreshSession(deliveryOperation(options), state, session);
       if (!turn.runId) return pendingExecution(turn);
       const view = execution(turn);
       return view ? { ...view, canContinue: view.canContinue && session.status === "active" } : null;
     }),
     continue: (id: string, input: ContinueInput) => serial(() => continueConversation(options, id, input)),
     reconcile: (id: string, input: { requestKey: string }) => serial(() => reconcileAdmission(options, id, input)),
-    attachment: (messageId: string, ref: string) => serial(async () => {
+    attachment: async (messageId: string, ref: string) => {
       for (const session of (await load(dataDir)).sessions) {
         const message = session.messages.find(item => item.id === messageId);
         if (message) return message.attachments.find(file => file && typeof file === "object" && "ref" in file && file.ref === ref);
       }
       return undefined;
-    }),
-    transcript: (id: string) => serial(async () => owned(await load(dataDir), id).turns.at(-1)?.transcript ?? []),
+    },
+    transcript: async (id: string) => owned(await load(dataDir), id).turns.at(-1)?.transcript ?? [],
     send: (input: SendInput) => serial(async () => {
       validateText(input);
       const state = await load(dataDir), key = input.requestKey ?? randomUUID();
@@ -393,10 +403,10 @@ export function createAgentConversations(inputOptions: Options) {
       await save(dataDir, state); return { ok: true };
     }),
     poll: () => serial(async () => {
-      const state = await load(dataDir);
-      for (const session of state.sessions) await refreshSession(options, state, session);
+      const state = await load(dataDir), operation = { ...deliveryOperation(options), background: true };
+      for (const session of state.sessions) await refreshSession(operation, state, session);
     }),
-    runs: () => serial(async () => (await load(dataDir)).sessions.flatMap(session => session.turns.slice(-10).map(turn => ({ id: turn.runId, sessionId: session.id, sessionTitle: session.title, status: turn.status, active: turn.active, reason: turn.reason, phase: turn.phase, interactions: turn.interactions }))).filter(run => run.id)),
+    runs: async () => (await load(dataDir)).sessions.flatMap(session => session.turns.slice(-10).map(turn => ({ id: turn.runId, sessionId: session.id, sessionTitle: session.title, status: turn.status, active: turn.active, reason: turn.reason, phase: turn.phase, interactions: turn.interactions }))).filter(run => run.id),
     interrupt: (runId: string) => serial(async () => {
       const state = await load(dataDir);
       if (!state.sessions.some(session => session.turns.some(turn => turn.runId === runId))) throw failure("not_found", "Web run not found");

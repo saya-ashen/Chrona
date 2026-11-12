@@ -114,6 +114,19 @@ function observeTarget(target: ApplicationDelivery["targets"][number], health: z
   target.pages = knownPages.filter(page => page.moduleId === target.moduleId && page.module === target.name && page.hash === target.hash).slice(0, 20).map(page => ({ id: page.id, title: page.title, href: `/p/${encodeURIComponent(page.module)}/${encodeURIComponent(page.id)}` }));
   if (target.pages.length) target.pagesCheck = "current";
 }
+/** Share observations only within one read operation, never across approval/delivery reads. */
+export function createDeliveryReconciler(call: Call, pages?: DeliveryPages) {
+  const reads = new Map<string, Promise<unknown>>();
+  const read: Call = (target, args) => {
+    const key = JSON.stringify([target, args]);
+    if (!reads.has(key)) reads.set(key, Promise.resolve().then(() => call(target, args)));
+    return reads.get(key)!;
+  };
+  let pageRead: Promise<DeliveryPage[]> | undefined;
+  const readPages = pages ? () => pageRead ??= Promise.resolve().then(pages) : undefined;
+  return (deliveries: ApplicationDelivery[], at: string) => reconcileApplicationDelivery(read, deliveries, at, readPages);
+}
+
 /** Terminal reconciliation is application read policy; it never calls Agent or submits material.
  * Web injects its existing local registry reader (list + get); public web.pages is caller-owned
  * and cannot prove another application's hash. Other entry apps leave page proof unknown.

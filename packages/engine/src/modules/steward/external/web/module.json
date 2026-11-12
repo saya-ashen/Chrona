@@ -20,7 +20,7 @@
     "approvals.resolve",
     "modules.health",
     "notify.list",
-    "notify.status",
+    "notify.counts",
     "settings.get",
     "settings.update",
     "secrets.list",

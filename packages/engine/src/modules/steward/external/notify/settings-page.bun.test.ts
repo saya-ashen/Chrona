@@ -17,7 +17,12 @@ test("Notify settings page validates against its real owner tools", () => {
   expect(pageErrors(SETTINGS_PAGE, tools, "notify")).toEqual([]);
   expect(parsed.uses).toContain("web.page-set");
   expect(parsed.activated).toBe(true);
-  for (const name of ["settings", "ui-settings"]) expect(parsed.tools.find(tool => tool.name === name)!.visibility).toEqual(["owner"]);
+  for (const name of ["settings", "ui-settings", "counts"]) expect(parsed.tools.find(tool => tool.name === name)!.visibility).toEqual(["owner"]);
+  const counts = parsed.tools.find(tool => tool.name === "counts")!;
+  expect(counts.idempotent).toBe(true);
+  expect(counts.sideEffects).toEqual([]);
+  expect(counts.parameters).toEqual({ type: "object", properties: {}, required: [] });
+  expect(counts.output).toEqual({ type: "object", properties: { queued: { type: "integer" }, failed: { type: "integer" } }, required: ["queued", "failed"], additionalProperties: false });
 });
 test("Notify registration survives unavailable Web and retries rejected registrations", async () => {
   let attempts = 0;

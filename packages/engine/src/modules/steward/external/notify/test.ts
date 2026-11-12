@@ -14,6 +14,18 @@ const previousData = process.env.CHRONA_DATA;
 process.env.CHRONA_DATA = fixture;
 // The registered channel exposes its delivery tool to modules.
 const directory = testDirectory();
+let directoryUnavailable = true;
+let releaseDirectory!: () => void;
+const startupDirectory = new Promise<void>(resolve => { releaseDirectory = resolve; });
+let startupDirectoryEntered = false;
+async function listModules() {
+  if (!startupDirectoryEntered) { startupDirectoryEntered = true; await startupDirectory; }
+  return directoryPage(directory.modules);
+}
+function directoryPage(items: unknown[]) {
+  if (directoryUnavailable) throw new Error("Module directory unavailable");
+  return { items, nextCursor: null };
+}
 let module!: Awaited<ReturnType<typeof startModule>>;
 const kernel = { kind: "kernel" };
 // Delivery ticks use the wall clock. Events must stay due regardless of polling count or time of day.
@@ -29,9 +41,26 @@ function activityRecords(args: Record<string, unknown>) {
   return args.cursor ? { items: records.slice(100), nextCursor: null } : { items: records.slice(0, 100), nextCursor: "opaque-next-records-page" };
 }
 const deliveries = () => (module.calls as Call[]).filter(call => call.method === "call" && targetName(call.params.target) === "qq.deliver");
+const directoryCalls = () => (module.calls as Call[]).filter(call => call.method === "call" && ["modules.list", "modules.describe"].includes(targetName(call.params.target))).length;
 async function until(condition: () => boolean) { for (let i = 0; i < 200 && !condition(); i++) await new Promise(resolve => setTimeout(resolve, 10)); assert.ok(condition()); }
 try {
-  module = await startModule("index.ts", { stubs: { "modules.list": () => ({ items: directory.modules, nextCursor: null }), "modules.describe": () => ({ items: directory.tools, nextCursor: null }), "activity.records": activityRecords, "activity.facts": () => ({ revision: "test", facts: [] }), "activity.withdrawals": () => ({ withdrawn: [] }) } });
+  module = await startModule("index.ts", { stubs: { "modules.list": listModules, "modules.describe": () => directoryPage(directory.tools), "activity.records": activityRecords, "activity.facts": () => ({ revision: "test", facts: [] }), "activity.withdrawals": () => ({ withdrawn: [] }) } });
+  // Hold the startup directory refresh open: counts must complete independently, without another directory call.
+  await until(() => startupDirectoryEntered);
+  const beforeCounts = directoryCalls();
+  for (let i = 0; i < 2; i++) assert.deepEqual((await tool("counts", {}, { kind: "owner" })).result.result, { queued: 0, failed: 0 });
+  assert.equal(directoryCalls(), beforeCounts);
+  // Full status checks the current directory on every call, including failures.
+  for (let i = 0; i < 2; i++) {
+    const beforeStatus = directoryCalls();
+    assert.equal((await tool("status", {})).result.result.error, "unavailable");
+    assert.equal(directoryCalls(), beforeStatus + 1);
+  }
+  const afterStatus = directoryCalls();
+  assert.deepEqual((await tool("counts", {}, { kind: "owner" })).result.result, { queued: 0, failed: 0 });
+  assert.equal(directoryCalls(), afterStatus);
+  directoryUnavailable = false;
+  releaseDirectory();
   const activity = (await tool("activity", { limit: 2 })).result.result;
   assert.deepEqual(activity.items.map((item: { id: string }) => item.id), ["activity-100", "activity-99"]);
   assert.equal(activity.items[0].text, "你在命令行恢复了 notify");
@@ -85,6 +114,7 @@ try {
   const status = (await tool("status", {})).result.result;
   // Replies to the user (responds) do not count against the proactive daily budget.
   assert.deepEqual(status.chat, { channel: "chrona_qqbot", bound: true, sentToday: 0 });
+  assert.deepEqual((await tool("counts", {}, { kind: "owner" })).result.result, { queued: status.queued, failed: status.failed });
 } finally {
   if (module) await module.stop();
   if (previousData === undefined) delete process.env.CHRONA_DATA; else process.env.CHRONA_DATA = previousData;

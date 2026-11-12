@@ -655,6 +655,34 @@
       }
     },
     {
+      "name": "counts",
+      "description": "Read-only notification counts: queued includes queued/sending; failed includes failed/uncertain. Does not refresh the channel directory.",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": true,
+      "sideEffects": [],
+      "output": {
+        "type": "object",
+        "properties": {
+          "queued": {
+            "type": "integer"
+          },
+          "failed": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "queued",
+          "failed"
+        ],
+        "additionalProperties": false
+      },
+      "parameters": {
+        "type": "object"
+      }
+    },
+    {
       "name": "status",
       "description": "Channel readiness and queue counts.",
       "visibility": [

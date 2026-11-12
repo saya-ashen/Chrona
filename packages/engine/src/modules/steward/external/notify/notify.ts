@@ -316,12 +316,15 @@ class NotifyRuntime {
     const limit = Math.max(1, Math.min(50, Math.trunc(Number(args.limit)) || 20));
     return { items: this.store.rows("SELECT * FROM notifications WHERE status != 'suppressed' ORDER BY created_at DESC, id DESC LIMIT ?", limit).map(row => this.view(row)) };
   }
+  private counts() {
+    const count = (first: string, second: string) => (this.store.db.query("SELECT COUNT(*) AS n FROM notifications WHERE status IN (?, ?)").get(first, second) as { n: number }).n;
+    return { queued: count("queued", "sending"), failed: count("failed", "uncertain") };
+  }
   private status(now: Date) {
     const settings = this.store.settings(), day = localDayKey(now, settings.timezone);
     const channels = this.channels().filter(channel => this.usable(channel)), channel = channels.at(0);
     const sent = this.store.rows("SELECT * FROM notifications WHERE channel = ? AND responds = 0 AND sent_at >= ?", channel?.name ?? "in_app", now.getTime() - 2 * DAY).filter(row => localDayKey(new Date(row.sent_at!), settings.timezone) === day).length;
-    const count = (statuses: string) => (this.store.db.query(`SELECT COUNT(*) AS n FROM notifications WHERE status IN (${statuses})`).get() as { n: number }).n;
-    return { chat: { channel: channel?.name ?? "in_app", bound: channel?.ready ?? false, sentToday: sent }, queued: count("'queued', 'sending'"), failed: count("'failed', 'uncertain'") };
+    return { chat: { channel: channel?.name ?? "in_app", bound: channel?.ready ?? false, sentToday: sent }, ...this.counts() };
   }
   private feedback(args: Args) {
     const row = this.store.byId(String(args.id));
@@ -350,7 +353,7 @@ class NotifyRuntime {
   handle(tool: string, args: Args, caller: Caller, now: Date) {
     const handlers: Record<string, () => unknown> = {
       send: () => this.send(args, caller, now), lifecycle: () => this.lifecycle(args, caller, now), approval: () => this.approval(args, caller, now), withdraw: () => this.withdraw(args, now), channel: () => this.channel(args, caller), list: () => this.list(args),
-      "ui-settings": () => this.uiSettings(args, now), settings: () => this.settings(args, now), status: () => this.status(now), feedback: () => this.feedback(args), retry: () => this.retry(args, now), configure: () => this.configure(args), import: () => this.importRows(args),
+      "ui-settings": () => this.uiSettings(args, now), settings: () => this.settings(args, now), counts: () => this.counts(), status: () => this.status(now), feedback: () => this.feedback(args), retry: () => this.retry(args, now), configure: () => this.configure(args), import: () => this.importRows(args),
     };
     if (!Object.hasOwn(handlers, tool)) throw new Error(`Unknown tool ${tool}`);
     return handlers[tool]!();

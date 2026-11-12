@@ -1,6 +1,7 @@
 {
   "schema": 1,
   "source": [
+    "agent-conversations.bun.test.ts",
     "agent-conversations.ts",
     "app-overview.bun.test.ts",
     "app-overview.ts",
@@ -29,8 +30,12 @@
     "memory.ts",
     "module.json",
     "package.json",
+    "page-inventory.bun.test.ts",
+    "page-read-sharing.bun.test.ts",
     "pages.ts",
     "preferences.ts",
+    "read-concurrency.bun.test.ts",
+    "registered-page-browser.bun.test.ts",
     "registration-test-build.ts",
     "registration-test.bun.test.ts",
     "registration-test.ts",
@@ -96,6 +101,7 @@
     "test-system-pages.ts",
     "test.ts",
     "THIRD-PARTY-NOTICES.txt",
+    "today-health.bun.test.ts",
     "today.bun.test.ts",
     "today.ts",
     "tsconfig.json",
