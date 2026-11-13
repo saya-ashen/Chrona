@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, platform-v2]
   pull_request:
     branches: [main]
 
@@ -41,6 +41,8 @@ jobs:
         run: bun run smoke:entrypoints
       - name: Types, lint, boundaries and tests on a fresh migrated database
         run: bun run ci:local
+        env:
+          LINT_RATCHET_BASE: ${{ github.event_name == 'push' && github.event.before || '' }}
 
       - name: Verify migration and container startup contracts
         run: bun test ./scripts/init-sqlite-current.bun.test.ts ./scripts/docker-entrypoint.bun.test.ts ./scripts/release-smoke.bun.test.ts
