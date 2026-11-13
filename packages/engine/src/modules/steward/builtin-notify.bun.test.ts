@@ -60,7 +60,7 @@ on("tool",async ev=>{appendFileSync(join(chrona.paths.data,"sent.jsonl"),JSON.st
     for (const row of [alpha, beta]) {
       const changed = transportManifest(row.name);
       changed.tools[0]!.description = "Updated offline delivery description";
-      changed.tools[0]!.output.properties.receiptRef = { type: "string", description: "Transport receipt" };
+      (changed.tools[0]!.output as { properties: { receiptRef: { type: string; description?: string } } }).properties.receiptRef = { type: "string", description: "Transport receipt" };
       await db.moduleVersion.update({ where: { moduleId_hash: { moduleId: row.id, hash: row.activeHash! } }, data: { manifest: changed } });
     }
     await send("one"); await send("one");
