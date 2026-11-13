@@ -92,7 +92,7 @@ describe.skipIf(!posix)("host protocol contracts, not native Windows evidence", 
         } });
         if (process.platform === "linux") expect(requireDescendantStop(exit)).toBe(exit);
       } else {
-        expect(exit.stop.state).toBe("unknown");
+        expect(exit.stop.state).toBe(scenario === "false" && task.capability.scope === "process-group" ? "stopped" : "unknown");
         expect(exit.stop.treeClean).toBe(false);
         expect(() => requireDescendantStop(exit)).toThrow("stop unknown");
       }
