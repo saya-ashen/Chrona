@@ -33,7 +33,7 @@ function result(row: Decision): ReportResult {
 }
 function receipt(row: Decision, reportId: string) { return { accepted: true, reportId, decisionId: row.id, pendingVerification: true }; }
 function transcript(value: unknown, patch: Record<string, unknown> = {}) {
-  return { sequence: 1, kind: "tool-result", payload: { type: "tool-result", value: { runId: "run-1", callId: "call-1", target: "mind.report", moduleId: "mind-test", hash: "mind-test-hash", contractHash: "a".repeat(64), status: "succeeded", outputState: "complete", output: value, ...patch } } };
+  return { sequence: 1, kind: "tool-result", payload: { type: "tool-result", value: { runId: "run-1", callId: "call-1", target: "mind.report", moduleId: "mind-test", hash: "mind-test-hash", status: "succeeded", outputState: "complete", output: value, ...patch } } };
 }
 
 // The external Agent is the only fake: all receipts, report staging and settlement use the real private store.

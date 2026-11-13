@@ -11,7 +11,7 @@ const caller = (module: string) => ({ kind: "module", module, moduleId: `${modul
 async function fixture() {
   const dataDir = await mkdtemp("/tmp/chrona-page-reads-"); dirs.push(dataDir);
   const modules: ModuleState[] = ["alpha", "beta"].map(name => ({ id: `${name}-id`, name, status: "active", activeHash: "approved" }));
-  const tools = (module: string) => new Map<string, PageTool>([["read", { inputSchema: {}, moduleId: `${module}-id`, contractHash: "a".repeat(64) }]]);
+  const tools = (module: string) => new Map<string, PageTool>([["read", { inputSchema: {}, moduleId: `${module}-id` }]]);
   const deps = { dataDir, modules: async () => modules, tools: async (module: string) => tools(module) };
   const pages = createPages(deps);
   for (const module of ["alpha", "beta"]) await pages.tool("page-set", input, caller(module));

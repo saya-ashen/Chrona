@@ -5,7 +5,7 @@ import { moduleManifestSchema, moduleCallSchema, type ModuleEvent } from "@chron
 import { moduleSupervisor } from "./module-supervisor";
 import { testModuleProcess } from "./module-test-process";
 import { testDb } from "./test-db";
-import { admitted, callStatus, callSync, callsSettled, enqueueCall, kernelOrigin, moduleCallbackContractHash, moduleToolExampleError, runDueCalls, validateToolArgs } from "./module-calls";
+import { admitted, callStatus, callSync, callsSettled, enqueueCall, kernelOrigin, moduleToolExampleError, runDueCalls, validateToolArgs } from "./module-calls";
 import { callModuleTool, moduleToolCatalog } from "./module-tools";
 import { moduleIncidents, recordModuleFailure } from "./module-diagnostics";
 import { registerSystemModules } from "./system-modules";
@@ -57,7 +57,7 @@ test("keyless unrecorded system reads return results and failures without touchi
   expect((await callSync(ports, origin, "modules.list", {})).callId).not.toBe(first.callId);
   await expect(callSync(ports, origin, "modules.health", { moduleId: "missing" })).rejects.toMatchObject({ code: "not_found" });
   await expect(callSync(ports, origin, "modules.list", { unexpected: true })).rejects.toMatchObject({ code: "invalid" });
-  await expect(callSync(ports, origin, "modules.list", {}, { expectedTarget: { moduleId: "reinstalled", contractHash: "f".repeat(64) } })).rejects.toMatchObject({ code: "conflict" });
+  await expect(callSync(ports, origin, "modules.list", {}, { expectedTarget: { moduleId: "reinstalled" } })).rejects.toMatchObject({ code: "conflict" });
   expect(await f.db.moduleInvocation.count()).toBe(0);
   expect(await f.db.runEvent.count({ where: { kind: "tool-result" } })).toBe(0);
 });
@@ -123,9 +123,9 @@ test("structured native arguments survive sync and async routed delivery", async
 test("expectedTarget is an optional strict routed identity contract", () => {
   const params = { target: { moduleId: "module-fixture", tool: "echo" }, args: {}, mode: "sync" };
   expect(moduleCallSchema.safeParse({ id: "fixture", method: "call", params }).success).toBe(true);
-  const expectedTarget = { moduleId: "module-fixture", contractHash: "a".repeat(64) };
+  const expectedTarget = { moduleId: "module-fixture" };
   expect(moduleCallSchema.safeParse({ id: "fixture", method: "call", params: { ...params, expectedTarget } }).success).toBe(true);
-  for (const expected of [{ ...expectedTarget, extra: true }, { ...expectedTarget, moduleId: "" }, { ...expectedTarget, contractHash: "sample-contract" }, { ...expectedTarget, contractHash: "A".repeat(64) }]) {
+  for (const expected of [{ ...expectedTarget, extra: true }, { ...expectedTarget, moduleId: "" }]) {
     expect(moduleCallSchema.safeParse({ id: "fixture", method: "call", params: { ...params, expectedTarget: expected } }).success).toBe(false);
   }
 });
@@ -133,11 +133,9 @@ test("expectedTarget is an optional strict routed identity contract", () => {
 test("saved target expectations fence sync, enqueue and duplicate keys without granting visibility", async () => {
   let calls = 0;
   const f = await fixture({ alpha: async () => ({}), beta: async () => { calls++; return { result: "matched" }; } });
-  const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.beta.id, hash: "beta-v1" } } });
-  const manifest = moduleManifestSchema.parse(version.manifest);
-  const expectedTarget = { moduleId: f.beta.id, contractHash: moduleCallbackContractHash(manifest.tools[0]!) };
+  const expectedTarget = { moduleId: f.beta.id };
   const origin = kernelOrigin(f.workspace.id);
-  for (const expected of [{ ...expectedTarget, moduleId: "reinstalled-id" }, { ...expectedTarget, contractHash: "f".repeat(64) }]) {
+  for (const expected of [{ ...expectedTarget, moduleId: "reinstalled-id" }]) {
     await expect(callSync(f.ports, origin, "beta.echo", {}, { expectedTarget: expected })).rejects.toMatchObject({ code: "conflict" });
     await expect(enqueueCall({ tx: f.db, ports: f.ports, origin, target: "beta.echo", raw: {} }, { key: "expectation", expectedTarget: expected })).rejects.toMatchObject({ code: "conflict" });
   }
@@ -153,14 +151,14 @@ test("saved target expectations fence sync, enqueue and duplicate keys without g
   expect(calls).toBe(2);
 });
 
-test("a saved sync target is fenced again after waiting in the supervisor queue", async () => {
+test("a saved sync target survives a schema update while waiting in the supervisor queue", async () => {
   let calls = 0, release!: () => void, entered!: () => void;
   const blocked = new Promise<void>(resolve => { release = resolve; }), started = new Promise<void>(resolve => { entered = resolve; });
   const f = await fixture({ alpha: async () => ({}), beta: async () => { calls++; entered(); await blocked; return { result: 42 }; } });
   const origin = kernelOrigin(f.workspace.id);
   const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.beta.id, hash: "beta-v1" } } });
   const manifest = moduleManifestSchema.parse(version.manifest);
-  const expectedTarget = { moduleId: f.beta.id, contractHash: moduleCallbackContractHash(manifest.tools[0]!) };
+  const expectedTarget = { moduleId: f.beta.id };
   const first = callSync(f.ports, origin, "beta.echo", {});
   await started;
   const second = callSync(f.ports, origin, "beta.echo", {}, { expectedTarget }).then(value => ({ value }), error => ({ error }));
@@ -171,9 +169,9 @@ test("a saved sync target is fenced again after waiting in the supervisor queue"
     await f.db.moduleVersion.update({ where: { id: version.id }, data: { manifest } });
   } finally { release(); }
   await first;
-  expect(await second).toMatchObject({ error: { code: "unavailable" } });
-  expect(calls).toBe(1);
-  expect(await f.db.moduleInvocation.findMany({ orderBy: { createdAt: "asc" }, select: { status: true } })).toEqual([{ status: "succeeded" }, { status: "failed" }]);
+  expect(await second).toMatchObject({ value: { output: 42 } });
+  expect(calls).toBe(2);
+  expect(await f.db.moduleInvocation.findMany({ orderBy: { createdAt: "asc" }, select: { status: true } })).toEqual([{ status: "succeeded" }, { status: "succeeded" }]);
 });
 
 test("missing callbacks keep explicit never-sent attribution across several unavailable retries", async () => {
@@ -189,7 +187,7 @@ test("missing callbacks keep explicit never-sent attribution across several unav
   await f.db.moduleVersion.create({ data: { moduleId: replacement.id, hash: "beta-v1", manifest: moduleManifestSchema.parse(original.manifest), source: "user", intent: {}, report: {}, status: "approved" } });
   await runDueCalls(f.ports, f.workspace.id);
   expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: queued.callId } })).toMatchObject({ status: "succeeded", attempts: 3, output: "late-bound" });
-  expect(await f.db.moduleInvocation.findUnique({ where: { id: queued.callId } })).toMatchObject({ targetModuleId: replacement.id, targetContractHash: expect.any(String) });
+  expect(await f.db.moduleInvocation.findUnique({ where: { id: queued.callId } })).toMatchObject({ targetModuleId: replacement.id, targetContractHash: null });
   expect(calls).toBe(1);
 });
 
@@ -207,23 +205,23 @@ test("legacy unattributed callbacks fail closed on their first or recovered deli
   }
 });
 
-test("paused callbacks bind their current tool contract before a later incompatible update", async () => {
+test("paused callbacks retain their app identity across a tool schema update", async () => {
   let calls = 0;
   const f = await fixture({ alpha: async () => ({}), beta: async () => { calls++; return { result: 42 }; } });
   await f.db.module.update({ where: { id: f.beta.id }, data: { status: "paused" } });
   const queued = await enqueueCall({ tx: f.db, ports: f.ports, origin: kernelOrigin(f.workspace.id), target: "beta.echo", raw: {} }, { key: "paused-target" });
-  expect(await f.db.moduleInvocation.findUnique({ where: { id: queued.callId } })).toMatchObject({ targetModuleId: f.beta.id, targetContractHash: expect.any(String) });
+  expect(await f.db.moduleInvocation.findUnique({ where: { id: queued.callId } })).toMatchObject({ targetModuleId: f.beta.id, targetContractHash: null });
   const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.beta.id, hash: "beta-v1" } } });
   const manifest = moduleManifestSchema.parse(version.manifest);
   manifest.tools[0]!.output = { type: "number" };
   await f.db.moduleVersion.update({ where: { id: version.id }, data: { manifest } });
   await f.db.module.update({ where: { id: f.beta.id }, data: { status: "active" } });
   await runDueCalls(f.ports, f.workspace.id);
-  expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: queued.callId } })).toMatchObject({ status: "failed" });
-  expect(calls).toBe(0);
+  expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: queued.callId } })).toMatchObject({ status: "succeeded", output: 42 });
+  expect(calls).toBe(1);
 });
 
-test("callback identity is rechecked when a contract changes between resolution and binding", async () => {
+test("callback delivery survives a schema update between resolution and binding", async () => {
   let calls = 0;
   const f = await fixture({ alpha: async () => ({}), beta: async () => { calls++; return { result: 42 }; } });
   const queued = await enqueueCall({ tx: f.db, ports: f.ports, origin: kernelOrigin(f.workspace.id), target: "beta.echo", raw: {} }, { key: "racing-contract" });
@@ -240,8 +238,8 @@ test("callback identity is rechecked when a contract changes between resolution 
   } } } }) as typeof f.db;
   await runDueCalls(f.ports, f.workspace.id);
   expect(armed).toBe(false);
-  expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: queued.callId } })).toMatchObject({ status: "failed" });
-  expect(calls).toBe(0);
+  expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: queued.callId } })).toMatchObject({ status: "succeeded", output: 42 });
+  expect(calls).toBe(1);
 });
 
 test("expired callbacks recover only attributed idempotent delivery; unknown work is never replayed", async () => {
@@ -261,20 +259,37 @@ test("expired callbacks recover only attributed idempotent delivery; unknown wor
     const expected = scenario === "idempotent" ? "succeeded" : scenario === "changed" ? "failed" : "unknown";
     expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: queued.callId } })).toMatchObject({ status: expected });
     await runDueCalls(f.ports, f.workspace.id);
-    expect(calls).toBe(scenario === "idempotent" ? 1 : 0);
+    expect(calls).toBe(scenario === "idempotent" || scenario === "changed" ? 1 : 0);
   }
 });
 
-test("compatible callback code updates retain their original app identity", async () => {
+test("a tool description change keeps registered callers working", async () => {
   let calls = 0;
   const f = await fixture({ alpha: async () => ({}), beta: async () => { calls++; return { result: "compatible" }; } });
-  const queued = await enqueueCall({ tx: f.db, ports: f.ports, origin: kernelOrigin(f.workspace.id), target: "beta.echo", raw: {} }, { key: "compatible-code" });
+  const expectedTarget = { moduleId: f.beta.id }, origin = kernelOrigin(f.workspace.id);
+  const queued = await enqueueCall({ tx: f.db, ports: f.ports, origin, target: "beta.echo", raw: {} }, { key: "compatible-code", expectedTarget });
   const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.beta.id, hash: "beta-v1" } } });
-  await f.db.moduleVersion.create({ data: { moduleId: f.beta.id, hash: "beta-v2", manifest: moduleManifestSchema.parse(version.manifest), source: "user", intent: {}, report: {}, status: "approved" } });
+  const manifest = moduleManifestSchema.parse(version.manifest);
+  manifest.tools[0]!.description = "Updated tool documentation";
+  await f.db.moduleVersion.create({ data: { moduleId: f.beta.id, hash: "beta-v2", manifest, source: "user", intent: {}, report: {}, status: "approved" } });
   await f.db.module.update({ where: { id: f.beta.id }, data: { activeHash: "beta-v2" } });
+  expect(await enqueueCall({ tx: f.db, ports: f.ports, origin, target: "beta.echo", raw: {} }, { key: "compatible-code", expectedTarget })).toMatchObject({ callId: queued.callId, duplicate: true });
   await runDueCalls(f.ports, f.workspace.id);
   expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: queued.callId } })).toMatchObject({ status: "succeeded", output: "compatible" });
-  expect(calls).toBe(1);
+  expect((await callSync(f.ports, origin, "beta.echo", {}, { expectedTarget })).output).toBe("compatible");
+  expect(calls).toBe(2);
+});
+
+test("an incompatible argument shape fails with invalid, not conflict", async () => {
+  const f = await fixture({ alpha: async () => ({}), beta: async event => ({ result: (event.trigger as { args: unknown }).args }) });
+  const expectedTarget = { moduleId: f.beta.id }, origin = kernelOrigin(f.workspace.id);
+  expect((await callSync(f.ports, origin, "beta.echo", { text: "before" }, { expectedTarget })).output).toEqual({ text: "before" });
+  const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.beta.id, hash: "beta-v1" } } });
+  const manifest = moduleManifestSchema.parse(version.manifest);
+  manifest.tools[0]!.parameters = { type: "object", properties: { message: { type: "string" } }, required: ["message"] };
+  await f.db.moduleVersion.create({ data: { moduleId: f.beta.id, hash: "beta-v2", manifest, source: "user", intent: {}, report: {}, status: "approved" } });
+  await f.db.module.update({ where: { id: f.beta.id }, data: { activeHash: "beta-v2" } });
+  await expect(callSync(f.ports, origin, "beta.echo", { text: "before" }, { expectedTarget })).rejects.toMatchObject({ code: "invalid" });
 });
 
 test("visibility admission is independent of target contracts; only uses star reaches owner-only tools", async () => {

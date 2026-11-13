@@ -10,14 +10,14 @@ async function fixture() {
   const dir = await mkdtemp("/tmp/notify-lifecycle-"), store = openStore(dir);
   const alpha = testDirectory("alpha"), beta = testDirectory("beta");
   const directory = { modules: [...alpha.modules, ...beta.modules], tools: [...alpha.tools, ...beta.tools] };
-  const calls: { target: string; key: string; callId: string }[] = [];
+  const calls: { target: string; key: string; callId: string; expectedTarget: { moduleId: string } }[] = [];
   let unavailable = false, loseReceipt = false;
   const ports = { store, publicUrl: null, listModules: async () => { if (unavailable) throw new Error("directory offline"); return directory.modules; },
     describeTools: async () => directory.tools,
-    call: async (target: string, _args: Record<string, unknown>, options: { key: string }) => {
+    call: async (target: string, _args: Record<string, unknown>, options: { key: string; expectedTarget: { moduleId: string } }) => {
       const existing = calls.find(call => call.target === target && call.key === options.key);
       if (existing) return { callId: existing.callId, status: "queued" };
-      const call = { target, key: options.key, callId: `call-${calls.length}` }; calls.push(call);
+      const call = { target, key: options.key, callId: `call-${calls.length}`, expectedTarget: options.expectedTarget }; calls.push(call);
       if (loseReceipt) throw new Error("enqueue response lost");
       return { callId: call.callId, status: "queued" };
     }, status: async (callId: string) => ({ callId, status: "unknown", error: "transport receipt lost" }) };
@@ -71,6 +71,33 @@ test("two external channel owners: repeated registration, pause/resume, deletion
   } finally { await f.close(); }
 });
 
+test.each(["tool description", "schema documentation"])("channel continues across a %s upgrade and ignores legacy stored hashes", async change => {
+  const f = await fixture();
+  try {
+    f.register("alpha");
+    const channel = JSON.parse(f.store.get("channel:alpha")!);
+    expect(channel).not.toHaveProperty("contractHash");
+    f.store.set("channel:alpha", JSON.stringify({ ...channel, contractHash: "old-contract" }));
+    const callback = f.directory.tools[0]!;
+    if (change === "tool description") Object.assign(callback, { description: "Updated delivery documentation" });
+    else {
+      callback.inputSchema = { ...callback.inputSchema, description: "Updated input documentation" };
+      callback.outputSchema = { ...(callback.outputSchema as Record<string, unknown>), description: "Updated output documentation" };
+    }
+    Object.assign(callback, { hash: "upgraded-code", contractHash: "new-contract" });
+    f.directory.modules[0]!.activeHash = "upgraded-code";
+    const sent = f.send("after-upgrade"); await f.notify.tick(at);
+    expect(f.calls).toHaveLength(1);
+    expect(f.calls[0]!.expectedTarget).toEqual({ moduleId: "alpha-id" });
+    expect(JSON.parse(f.store.get(`attempt:${sent.id}:1`)!)).not.toHaveProperty("contractHash");
+    f.notify.result({ callId: f.calls[0]!.callId, status: "succeeded", output: { outcome: "accepted", receiptRef: "upgraded" } }, at);
+    expect(f.store.byId(sent.id)!.status).toBe("sent");
+    f.restart(); await f.notify.refresh();
+    expect(f.register("alpha", "alpha", "alpha-id", "upgraded-code")).toEqual({ ready: true });
+    expect(JSON.parse(f.store.get("channel:alpha")!)).toEqual(channel);
+  } finally { await f.close(); }
+});
+
 test.each(["unknown", "malformed", "enqueue-lost"])("%s is terminal uncertain across restart and late receipts never create a new attempt", async mode => {
   const f = await fixture();
   try {
@@ -95,27 +122,53 @@ test("interrupted attempt uses its persisted original target instead of changed 
     // Crash after enqueue, before its acknowledgement was persisted.
     f.store.update(row.id, { call_id: null });
     const channel = JSON.parse(f.store.get("channel:alpha")!);
-    f.store.set("channel:alpha", JSON.stringify({ ...channel, tool: "other", contractHash: "changed", revision: "new" }));
+    const attemptKey = `attempt:${row.id}:1`;
+    f.store.set(attemptKey, JSON.stringify({ ...JSON.parse(f.store.get(attemptKey)!), contractHash: "legacy-contract" }));
+    f.store.set("channel:alpha", JSON.stringify({ ...channel, tool: "other", revision: "new" }));
     f.restart(); await f.notify.tick(new Date(at.getTime() + 61_000));
     expect(f.calls).toHaveLength(1); expect(f.calls[0]!.target).toBe("alpha.deliver");
     expect(f.store.byId(row.id)!.call_id).toBe(f.calls[0]!.callId);
-    expect(JSON.parse(f.store.get(`attempt:${row.id}:1`)!)).toMatchObject({ moduleId: "alpha-id", tool: "deliver", contractHash: "c".repeat(64), revision: channel.revision });
+    expect(JSON.parse(f.store.get(attemptKey)!)).toMatchObject({ moduleId: "alpha-id", tool: "deliver", revision: channel.revision });
+    expect(f.calls[0]!.expectedTarget).toEqual({ moduleId: "alpha-id" });
   } finally { await f.close(); }
 });
 
-test("channel length, callback ownership and changed contracts fail closed", async () => {
+test("interrupted delivery cannot resume against a same-name reinstalled module", async () => {
+  const f = await fixture();
+  try {
+    f.register("alpha"); const sent = f.send("before-reinstall"); await f.notify.tick(at);
+    f.store.update(sent.id, { call_id: null });
+    f.directory.modules[0]!.id = "alpha-reinstalled";
+    f.directory.tools[0]!.moduleId = "alpha-reinstalled";
+    f.restart(); await f.notify.tick(new Date(at.getTime() + 61_000));
+    expect(f.calls).toHaveLength(1);
+    expect(f.store.byId(sent.id)!.status).toBe("uncertain");
+    expect(f.store.get("channel:alpha")).toBeNull();
+    expect(f.register("alpha")).toMatchObject({ error: "forbidden" });
+    expect(f.register("alpha", "alpha", "alpha-reinstalled")).toEqual({ ready: true });
+    expect(f.store.byId(sent.id)!.status).toBe("uncertain");
+  } finally { await f.close(); }
+});
+
+test.each(["input", "output", "missing"])("channel length, callback ownership and %s callback incompatibility fail closed", async change => {
   const f = await fixture();
   try {
     expect(f.register("alpha", "a".repeat(120))).toEqual({ ready: true });
     expect(f.register("alpha", "a".repeat(121))).toMatchObject({ error: "invalid" });
     expect(f.register("alpha", "bad/name")).toMatchObject({ error: "invalid" });
     expect(f.register("alpha", "valid", "alpha-id", "old-code")).toMatchObject({ error: "forbidden" });
+    const original = structuredClone(f.directory.tools[0]!);
     f.directory.tools[0]!.inputSchema = { type: "object", properties: { key: { type: "integer" } } };
     expect(f.register("alpha", "broken")).toMatchObject({ error: "forbidden" });
-    f.directory.tools.splice(0, 1);
+    if (change === "output") {
+      f.directory.tools[0]!.inputSchema = original.inputSchema;
+      f.directory.tools[0]!.outputSchema = { type: "object", properties: { outcome: { const: "accepted" } }, required: ["outcome"] };
+    } else if (change === "missing") f.directory.tools.splice(0, 1);
     f.send("invalid-callback"); await f.notify.tick(at);
     expect(f.calls).toHaveLength(0);
-    f.directory.tools.unshift(...testDirectory("alpha").tools);
+    expect(JSON.parse(f.store.get(`channel:${"a".repeat(120)}`)!)).toMatchObject({ invalid: true });
+    if (change === "missing") f.directory.tools.unshift(original);
+    else f.directory.tools[0] = original;
     f.send("rolled-back"); await f.notify.tick(at);
     expect(f.calls).toHaveLength(0);
     expect(f.register("alpha", "a".repeat(120))).toEqual({ ready: true });

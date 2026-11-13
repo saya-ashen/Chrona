@@ -12,7 +12,7 @@ type Args = Record<string, unknown>;
 const str = (description?: string) => ({ type: "string", minLength: 1, ...(description ? { description } : {}) });
 const schema = (properties: Args = {}, required: string[] = []) => ({ type: "object", properties, required, additionalProperties: false });
 type McpTool = { name: string; description: string; inputSchema: Args; run(args: Args): Promise<unknown>; destructive?: boolean };
-type Contract = { target: string; inputSchema: Args; moduleId?: string; hash?: string; contractHash?: string };
+type Contract = { target: string; inputSchema: Args; moduleId?: string; hash?: string };
 const preferences = createPreferences(chrona.paths.data);
 const call = (target: string, args: Args = {}, options: { key?: string } = {}) => target === "mcp.settings" ? preferences.tool(args) : applicationCall(target, Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined)), options);
 on("tool", async event => {
@@ -69,8 +69,8 @@ async function discoveredCall(args: Args) {
   const tool = exact[0]!, input = args.arguments ?? {};
   validate(tool.inputSchema, input);
   if (tool.moduleId !== undefined || !kernelNamespaces.includes(name.split(".")[0]!)) {
-    if (!tool.moduleId || !tool.contractHash || !tool.hash) throw Object.assign(new Error("Application contract binding is unavailable"), { code: "unavailable" });
-    return applicationCall(name, input, { key: args.key as string | undefined, expectedTarget: { moduleId: tool.moduleId, contractHash: tool.contractHash } });
+    if (!tool.moduleId || !tool.hash) throw Object.assign(new Error("Application contract binding is unavailable"), { code: "unavailable" });
+    return applicationCall(name, input, { key: args.key as string | undefined, expectedTarget: { moduleId: tool.moduleId } });
   }
   return applicationCall(name, input, { key: args.key as string | undefined });
 }

@@ -58,7 +58,7 @@ test("actual files and events handler results satisfy declared outputs, includin
 
     const eventsDir = join(dir, "events"); await mkdir(eventsDir);
     const events = createEvents({ dataDir: eventsDir,
-      directory: async () => ({ modules: [{ id: "sample-id", name: "sample", status: "active", activeHash: "hash" }], tools: [{ target: "sample.receive", moduleId: "sample-id", hash: "hash", contractHash: "a".repeat(64), inputSchema: { type: "object", properties: { event: { type: "string" }, from: { type: "string" }, payload: { type: "string" } }, required: ["event", "from", "payload"] } }] }), call: async () => ({ callId: "call-1" }) });
+      directory: async () => ({ modules: [{ id: "sample-id", name: "sample", status: "active", activeHash: "hash" }], tools: [{ target: "sample.receive", moduleId: "sample-id", hash: "hash", inputSchema: { type: "object", properties: { event: { type: "string" }, from: { type: "string" }, payload: { type: "string" } }, required: ["event", "from", "payload"] } }] }), call: async () => ({ callId: "call-1" }) });
     const caller: Caller = { kind: "module", module: "sample", moduleId: "sample-id", hash: "hash" };
     check("events.register", await events.handle("register", { emits: JSON.stringify([{ name: "changed", payload: { type: "object", required: ["id"], properties: { id: { type: "string" } } } }]) }, caller));
     check("events.subscriptions", await events.handle("subscriptions", {}, caller));

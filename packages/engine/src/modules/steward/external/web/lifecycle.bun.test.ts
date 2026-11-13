@@ -16,7 +16,7 @@ const withRead = { root: "button", elements: { button: { type: "Button", props: 
 async function fixture() {
   const dataDir = await mkdtemp("/tmp/chrona-web-lifecycle-"); cleanups.push(dataDir);
   const state = { modules: [{ id: "alpha-id", name: "alpha", status: "active", activeHash: "a" }, { id: "beta-id", name: "beta", status: "active", activeHash: "b" }] as ModuleState[], fail: false,
-    tools: new Map<string, PageTool>([["read", { moduleId: "alpha-id", contractHash: "a".repeat(64), inputSchema: { properties: { path: { type: "string" } }, required: ["path"] } }]]) };
+    tools: new Map<string, PageTool>([["read", { moduleId: "alpha-id", inputSchema: { properties: { path: { type: "string" } }, required: ["path"] } }]]) };
   const pages = createPages({ dataDir, modules: async () => { if (state.fail) throw new Error("directory unavailable"); return state.modules; }, tools: async name => name === "alpha" ? state.tools : new Map() });
   const caller = { kind: "module", module: "alpha", moduleId: "alpha-id" };
   const register = () => pages.tool("page-set", { id: "main", title: "主页面", spec: withRead, data: { content: { tool: "read", args: { path: "x" } } } }, caller);
@@ -62,16 +62,27 @@ test("failed inventory reads cannot erase registrations and legacy pages never g
   expect(await legacy.list()).toEqual([]);
   await expect(legacy.get("alpha", "old")).rejects.toThrow("重新登记");
 });
-test("code-only updates preserve contracts, callback changes fail until re-registration and metadata is derived anew", async () => {
-  const f = await fixture(); await f.register(); f.state.modules[0]!.activeHash = "new-code";
-  expect((await f.pages.get("alpha", "main"))?.needs).toEqual({ content: ["path"] });
-  f.state.tools.get("read")!.contractHash = "b".repeat(64);
+test("description upgrades preserve registered pages and legacy contracts while current schemas derive metadata and reject removed arguments", async () => {
+  const f = await fixture(); await f.register();
+  const revision = (await f.pages.get("alpha", "main"))!.revision;
+  f.state.modules[0]!.activeHash = "new-code";
+  f.state.tools.get("read")!.inputSchema.description = "Updated read description";
+  expect(await f.pages.get("alpha", "main")).toMatchObject({ revision, needs: { content: ["path"] } });
+  const file = join(f.dataDir, "pages.json"), stored = JSON.parse(await readFile(file, "utf8"));
+  expect(stored.pages[0]).not.toHaveProperty("contracts");
+  stored.pages[0].contracts = { read: "obsolete", unreferenced: "legacy-pin" };
+  await writeFile(file, JSON.stringify(stored));
+  const restarted = createPages({ dataDir: f.dataDir, modules: async () => f.state.modules, tools: async () => f.state.tools });
+  expect(await restarted.list()).toHaveLength(1);
+  expect(await restarted.get("alpha", "main")).toMatchObject({ revision });
+  f.state.tools.get("read")!.inputSchema = { properties: { renamed: {} }, required: ["renamed"] };
+  await expect(restarted.get("alpha", "main")).rejects.toThrow("重新登记");
+  await expect(f.register()).rejects.toMatchObject({ code: "invalid" });
   f.state.tools.get("read")!.inputSchema = { properties: { path: {}, "request-key": {} }, required: ["path", "request-key"] };
-  await expect(f.pages.get("alpha", "main")).rejects.toThrow("重新登记");
-  await f.register();
-  const page = await f.pages.get("alpha", "main");
+  const page = await restarted.get("alpha", "main");
+  expect(page?.revision).toBe(revision);
   expect(page?.keyed).toEqual(["read"]); expect(page?.needs).toEqual({ content: ["path", "request-key"] });
-  f.state.tools.delete("read"); await expect(f.pages.get("alpha", "main")).rejects.toThrow("重新登记");
+  f.state.tools.delete("read"); await expect(restarted.get("alpha", "main")).rejects.toThrow("重新登记");
 });
 const app = (name = "alpha") => {
   const row = { id: `fixture-${name}`, name, builtin: false, status: "active", activeHash: "a".repeat(64) };

@@ -8,11 +8,11 @@ const inputSchema = { type: "object", properties: { event: { type: "string" }, f
 const declarations = [{ name: "changed", payload: { required: ["id"], properties: { id: { type: "string" } } } }];
 async function fixture(registered = true) {
   const dir = await mkdtemp("/tmp/events-lifecycle-");
-  const directory: Directory = { modules: ["alpha", "beta", "source"].map(name => ({ id: `${name}-id`, name, status: "active", activeHash: "h" })), tools: ["alpha", "beta"].map(name => ({ target: `${name}.receive`, moduleId: `${name}-id`, hash: "h", contractHash: "callback-v1", inputSchema })) };
-  const calls: { target: string; key: string; callId: string; expectedTarget: { moduleId: string; contractHash: string } }[] = [];
+  const directory: Directory = { modules: ["alpha", "beta", "source"].map(name => ({ id: `${name}-id`, name, status: "active", activeHash: "h" })), tools: ["alpha", "beta"].map(name => ({ target: `${name}.receive`, moduleId: `${name}-id`, hash: "h", inputSchema })) };
+  const calls: { target: string; key: string; callId: string; expectedTarget: { moduleId: string } }[] = [];
   let offline = false, loseNextReceipt = false;
   const ports = { dataDir: dir, directory: async () => { if (offline) throw new Error("directory unavailable"); return directory; },
-    call: async (target: string, _args: Record<string, unknown>, options: { key: string; expectedTarget: { moduleId: string; contractHash: string } }) => {
+    call: async (target: string, _args: Record<string, unknown>, options: { key: string; expectedTarget: { moduleId: string } }) => {
       const existing = calls.find(call => call.target === target && call.key === options.key);
       if (existing) return { callId: existing.callId, duplicate: true };
       const call = { target, key: options.key, callId: `call-${calls.length}`, expectedTarget: options.expectedTarget }; calls.push(call);
@@ -52,8 +52,11 @@ test("persistent revision fencing rejects stale failed receipts, duplicate and u
   try {
     await f.subscribe("alpha"); await f.emit("first");
     const old = f.calls[0]!;
-    f.directory.tools[0]!.contractHash = "callback-v2";
+    f.directory.tools[0]!.inputSchema = { ...inputSchema, description: "Updated callback documentation" };
+    expect(await f.emit("upgraded")).toEqual({ delivered: 1 });
+    f.directory.tools[0]!.inputSchema = { type: "object", properties: {} };
     expect(await f.emit("invalidated")).toEqual({ delivered: 0 });
+    f.directory.tools[0]!.inputSchema = inputSchema;
     await f.subscribe("alpha");
     f.restart();
     f.events.result({ callId: old.callId, status: "failed", error: "forbidden: previous contract" });
@@ -61,7 +64,7 @@ test("persistent revision fencing rejects stale failed receipts, duplicate and u
     const second = f.calls.at(-1)!;
     f.events.result({ callId: second.callId, status: "unknown", error: "receipt lost" });
     f.restart(); await f.emit("second");
-    expect(f.calls).toHaveLength(2);
+    expect(f.calls).toHaveLength(3);
     f.events.result({ callId: second.callId, status: "failed", error: "not_found: stale duplicate" });
     expect(await f.emit("third")).toEqual({ delivered: 1 });
     f.events.result({ callId: f.calls.at(-1)!.callId, status: "failed", error: "unavailable: owner paused" });
@@ -126,7 +129,7 @@ test("registration requires a live SDK caller and never accepts identity in argu
     expect(await f.register()).toEqual({ registered: true });
     await f.subscribe("alpha");
     expect(await f.emit("registered")).toEqual({ delivered: 1 });
-    expect(f.calls[0]!.expectedTarget).toEqual({ moduleId: "alpha-id", contractHash: "callback-v1" });
+    expect(f.calls[0]!.expectedTarget).toEqual({ moduleId: "alpha-id" });
     expect(JSON.parse(await readFile(join(f.dir, "publishers.json"), "utf8"))).toEqual([{ module: "source", moduleId: "source-id", hash: "h", emits: declarations }]);
   } finally { await f.close(); }
 });

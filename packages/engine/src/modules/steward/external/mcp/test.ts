@@ -7,7 +7,7 @@ const calls: [string, Args][] = [];
 let webAvailable = false;
 const pages: Args[] = [];
 const objectSchema = (properties: Args = {}, required: string[] = []) => ({ type: "object", properties, required, additionalProperties: false });
-const contract = (target: string, inputSchema = objectSchema(), app?: string) => ({ target, description: target, inputSchema, outputSchema: null, ...(app ? { moduleId: `${app}-id`, hash: "a".repeat(64), contractHash: "b".repeat(64) } : {}) });
+const contract = (target: string, inputSchema = objectSchema(), app?: string) => ({ target, description: target, inputSchema, outputSchema: null, ...(app ? { moduleId: `${app}-id`, hash: "a".repeat(64) } : {}) });
 const authorInput = objectSchema({ input: { type: "string" } }, ["input"]);
 const admissionInput = objectSchema({ submitter: objectSchema({ moduleId: { type: "string" }, hash: { type: "string", pattern: "^[a-f0-9]{64}$" } }, ["moduleId", "hash"]), targets: { type: "array", minItems: 1, items: objectSchema({ name: { type: "string" }, moduleId: { type: ["string", "null"] }, expectedActiveHash: { type: ["string", "null"] } }, ["name", "moduleId", "expectedActiveHash"]) } }, ["submitter", "targets"]);
 const contracts = [
@@ -127,7 +127,7 @@ try {
   const author = (name: string, input: Args) => json("chrona_module_call", { name: `author.${name}`, arguments: { input: JSON.stringify(input) } });
   const prepared = await author("prepare", { requestKey: "material-one", submitter: { moduleId: "author-id", hash: "a".repeat(64) }, targets: [{ name: "example", moduleId: null, expectedActiveHash: null }], goal: "Use supplied material", intent: { changes: ["Add example"] } });
   assert.equal(prepared.kind, "material-only"); assert.equal(prepared.execution.supported, false);
-  assert.deepEqual(forwarded().at(-1)!.params.expectedTarget, { moduleId: "author-id", contractHash: "b".repeat(64) });
+  assert.deepEqual(forwarded().at(-1)!.params.expectedTarget, { moduleId: "author-id" });
   const { requestKey: admissionKey, ...admissionArgs } = prepared.admission;
   const admission = await json("chrona_module_call", { name: "modules.admit", arguments: admissionArgs, key: admissionKey });
   assert.equal(forwarded().at(-1)!.params.key, admissionKey);
@@ -151,12 +151,9 @@ try {
   contracts.push(contract("files.later", objectSchema(), "files"));
   assert.equal((await json("chrona_module_tools", { query: "files.later" }))[0].target, "files.later");
   const changed = contracts.find(tool => tool.target === "files.list")!;
-  changed.contractHash = "c".repeat(64);
+  changed.description = "Updated documentation";
   assert.deepEqual(await json("chrona_module_call", { name: "files.list" }), ["file"]);
-  assert.equal(forwarded().at(-1)!.params.expectedTarget.contractHash, "c".repeat(64));
-  changed.contractHash = "";
-  assert.equal((await tool("chrona_module_call", { name: "files.list" })).isError, true);
-  changed.contractHash = "b".repeat(64);
+  assert.deepEqual(forwarded().at(-1)!.params.expectedTarget, { moduleId: "files-id" });
   delete changed.moduleId;
   assert.equal((await tool("chrona_module_call", { name: "files.list" })).isError, true, "application tools require an identity binding");
   changed.moduleId = "files-id";

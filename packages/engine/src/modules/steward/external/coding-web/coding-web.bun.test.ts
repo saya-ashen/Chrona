@@ -32,7 +32,7 @@ test("Coding Web page validates and registers against current Web contracts", as
     const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(import.meta.dirname, "module.json"), "utf8")));
     const tools = new Map(manifest.tools.map(t => [t.name, t.parameters]));
     expect(pageErrors(PAGE, tools, "coding-web")).toEqual([]);
-    const pageTools = new Map(manifest.tools.map(t => [t.name, { inputSchema: t.parameters, moduleId: "cw1", contractHash: "1".repeat(64) }]));
+    const pageTools = new Map(manifest.tools.map(t => [t.name, { inputSchema: t.parameters, moduleId: "cw1" }]));
     let active = true;
     const pages = createPages({ dataDir: root, modules: async () => [{ name: "coding-web", id: "cw1", activeHash: active ? "approved" : null, status: active ? "active" : "disabled" }], tools: async () => pageTools });
     await pages.tool("page-set", PAGE, { kind: "module", module: "coding-web", moduleId: "cw1" });

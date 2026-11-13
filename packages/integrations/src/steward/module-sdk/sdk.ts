@@ -19,7 +19,7 @@ type WireTrigger = { kind: "timer"; id: string; eventId: string; timerId: string
 export type Trigger = Exclude<WireTrigger, { kind: "schedule" }>;
 type EventResult = { result?: unknown };
 export type CallState = { callId: string; status: "queued" | "running" | "waiting" | "succeeded" | "failed" | "unknown"; duplicate?: boolean; output?: unknown; error?: string };
-export type CallOptions = { mode?: "sync" | "async"; key?: string; reply?: boolean; timeoutMs?: number; expectedTarget?: { moduleId: string; contractHash: string } };
+export type CallOptions = { mode?: "sync" | "async"; key?: string; reply?: boolean; timeoutMs?: number; expectedTarget?: { moduleId: string } };
 // v2-25: targets with a declared contract (calls.d.ts, generated per build) take typed arguments and give a typed result.
 export type KernelTarget = `${"modules" | "approvals" | "settings" | "secrets" | "activity" | "timers" | "agent" | "runtime-callback" | "workspace-local"}.${string}`;
 export type CallTarget = KernelTarget | { moduleId: string; tool: string };

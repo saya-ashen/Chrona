@@ -1,30 +1,29 @@
 import type { Prisma } from "@chrona/db/generated/prisma/client";
 import { expectedModuleTargetSchema, moduleManifestSchema, type ExpectedModuleTarget, type RoutedTarget } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
-import type { Caller, Tool, RoutedTool } from "./module-call-types";
-import type { SystemModule, SystemTool } from "./module-system-types";
+import type { Caller, RoutedTool } from "./module-call-types";
+import type { SystemModule } from "./module-system-types";
 import { CallError } from "./module-call-error";
 import { admitted } from "./module-call-admission";
-import { moduleCallbackContractHash } from "./module-tool-contract";
 import { isModulePaused, ModuleUnavailableError } from "./module-availability";
 import { injectedModules, localModules, systemModules } from "./module-registry";
 
 type Db = StewardPorts["db"] | Prisma.TransactionClient;
 
-/** Target identity, contract binding, and delivery fences share one resolution policy. */
+/** Target identity and delivery fences share one resolution policy. */
 export type Target = { module: { id: string; name: string; activeHash: string; workspaceId: string }; tool: RoutedTool; system?: SystemModule };
 export function assertExpectedTarget(resolved: Target | CallError, expected?: ExpectedModuleTarget) {
   if (!expected) return;
   const parsed = expectedModuleTargetSchema.safeParse(expected);
   if (!parsed.success) throw new CallError("invalid", "Invalid expected target identity");
-  if (resolved instanceof CallError || resolved.module.id !== parsed.data.moduleId || moduleCallbackContractHash(resolved.tool as Tool | SystemTool) !== parsed.data.contractHash) throw new CallError("conflict", "Registered target identity or contract changed; register again");
+  if (resolved instanceof CallError || resolved.module.id !== parsed.data.moduleId) throw new CallError("conflict", "Registered target identity changed; register again");
 }
 /** Kernel-only closure used at the supervisor's final never-sent boundary. */
 export function targetFence(ports: StewardPorts, workspaceId: string, resolved: Target, caller: Caller) {
   return async () => {
     const current = await resolveTarget(ports.db, workspaceId, `${resolved.module.name}.${resolved.tool.name}`);
     try {
-      assertExpectedTarget(current, { moduleId: resolved.module.id, contractHash: moduleCallbackContractHash(resolved.tool as Tool | SystemTool) });
+      assertExpectedTarget(current, { moduleId: resolved.module.id });
       if (current instanceof CallError || current.module.activeHash !== resolved.module.activeHash) throw new CallError("conflict", "Target activation changed before delivery");
       if (!await admitted(ports.db, caller, current.tool, workspaceId)) throw new CallError("forbidden", "Target no longer accepts this caller");
     } catch (error) { throw Object.assign(error instanceof Error ? error : new Error(String(error)), { stage: "unavailable" }); }
@@ -34,33 +33,26 @@ export async function bindInvocationTarget(tx: Db, input: { workspaceId: string;
   const { workspaceId, callId, resolved, target } = input;
   // An unavailable known app still has an identity. Bind it before a later same-name reinstall can take over.
   const module = resolved instanceof CallError ? await tx.module.findFirst({ where: { workspaceId, name: splitTarget(target).module } }) : resolved.module;
-  let contractHash: string | null = resolved instanceof CallError ? null : moduleCallbackContractHash(resolved.tool as Tool | SystemTool);
-  // Pause affects delivery, not identity: freeze a known tool's contract even while unavailable.
-  if (resolved instanceof CallError && module?.activeHash) {
-    const version = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } });
-    const tool = moduleManifestSchema.safeParse(version?.manifest).data?.tools.find(tool => tool.name === splitTarget(target).tool);
-    if (tool) contractHash = moduleCallbackContractHash(tool);
-  }
   // Explicit null identity authorizes only a never-sent missing target to bind later; absence is legacy, not permission.
-  const binding = { moduleId: module?.id ?? null, contractHash };
-  await tx.moduleInvocation.update({ where: { id: callId }, data: { targetBound: true, targetModuleId: binding.moduleId, targetContractHash: binding.contractHash } });
+  const binding = { moduleId: module?.id ?? null };
+  await tx.moduleInvocation.update({ where: { id: callId }, data: { targetBound: true, targetModuleId: binding.moduleId, targetContractHash: null } });
 }
-const differentBinding = (binding: { moduleId: string | null; contractHash: string | null }, current: { moduleId: string; contractHash: string }) =>
-  binding.moduleId !== null && binding.moduleId !== current.moduleId || binding.contractHash !== null && binding.contractHash !== current.contractHash;
-const differentActivation = (active: Target | CallError, resolved: Target, contractHash: string) =>
-  active instanceof CallError || active.module.id !== resolved.module.id || active.module.activeHash !== resolved.module.activeHash || moduleCallbackContractHash(active.tool as Tool | SystemTool) !== contractHash;
+const differentBinding = (binding: { moduleId: string | null }, current: { moduleId: string }) =>
+  binding.moduleId !== null && binding.moduleId !== current.moduleId;
+const differentActivation = (active: Target | CallError, resolved: Target) =>
+  active instanceof CallError || active.module.id !== resolved.module.id || active.module.activeHash !== resolved.module.activeHash;
 export async function checkInvocationTarget(ports: StewardPorts, row: { id: string; workspaceId: string; leaseToken: string | null; target: string; tool: string }, resolved: Target) {
   return ports.db.$transaction(async tx => {
     const previous = await tx.moduleInvocation.findFirst({ where: { id: row.id, workspaceId: row.workspaceId, status: "running", leaseToken: row.leaseToken } });
     if (!previous?.targetBound) return false;
-    const current = { moduleId: resolved.module.id, contractHash: moduleCallbackContractHash(resolved.tool as Tool | SystemTool) };
-    const binding = { moduleId: previous.targetModuleId, contractHash: previous.targetContractHash };
+    const current = { moduleId: resolved.module.id };
+    const binding = { moduleId: previous.targetModuleId };
     if (differentBinding(binding, current)) return false;
     // Resolve and claim the exact identity inside the transaction. Supervisor rechecks id/hash before sending.
     const active = await resolveTarget(tx, row.workspaceId, `${row.target}.${row.tool}`);
-    if (differentActivation(active, resolved, current.contractHash)) return false;
+    if (differentActivation(active, resolved)) return false;
 
-    await tx.moduleInvocation.update({ where: { id: row.id }, data: { idempotent: resolved.tool.idempotent, targetModuleId: current.moduleId, targetContractHash: current.contractHash } });
+    await tx.moduleInvocation.update({ where: { id: row.id }, data: { idempotent: resolved.tool.idempotent, targetModuleId: current.moduleId, targetContractHash: null } });
     return true;
   });
 }

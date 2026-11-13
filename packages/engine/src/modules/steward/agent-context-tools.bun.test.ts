@@ -143,7 +143,7 @@ test("audit retention does not change context ownership, admitted tools or fixed
   expect((await contextRunTools(f.ports, f.run))?.caller).toEqual(f.context.caller);
   expect(await f.invoke("m_context_origin_observe")).toMatchObject({ result: { caller: f.context.caller } });
   const event = await f.db.runEvent.findFirstOrThrow({ where: { runId: f.run.id, kind: "tool-result" } });
-  expect(runToolResultSchema.parse((event.payload as { value: unknown }).value).contractHash).toMatch(/^[a-f0-9]{64}$/);
+  expect(runToolResultSchema.safeParse((event.payload as { value: unknown }).value).success).toBe(true);
   expect(event.payload).toMatchObject({ type: "tool-result", value: { runId: f.run.id, target: { moduleId: f.origin.id, tool: "observe" }, moduleId: f.origin.id, hash: f.origin.activeHash, status: "succeeded", outputState: "complete", output: { caller: f.context.caller } } });
   const page = await admitContextPrimitive(f.ports, f.principal, "stream", { runId: f.run.id, after: 0, limit: 10 }) as { items: { sequence: number; payload: unknown }[] };
   expect(page.items).toEqual([expect.objectContaining({ sequence: event.sequence, payload: event.payload })]);

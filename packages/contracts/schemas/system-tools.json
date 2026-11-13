@@ -3511,9 +3511,6 @@
                   "hash": {
                     "type": "string"
                   },
-                  "contractHash": {
-                    "type": "string"
-                  },
                   "target": {
                     "anyOf": [
                       {
@@ -3837,10 +3834,6 @@
               "items": {
                 "type": "string"
               }
-            },
-            "contractHash": {
-              "type": "string",
-              "pattern": "^[a-f0-9]{64}$"
             }
           },
           "required": [
@@ -3855,8 +3848,7 @@
             "errors",
             "retry",
             "admission",
-            "routingErrors",
-            "contractHash"
+            "routingErrors"
           ],
           "additionalProperties": false
         }

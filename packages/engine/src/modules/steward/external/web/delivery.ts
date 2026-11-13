@@ -50,7 +50,7 @@ type ReceiptSource = { applicationDelivery?: ApplicationDelivery[]; pendingToolR
 const resultEvent = z.object({
   kind: z.literal("tool-result"), payload: z.object({ type: z.literal("tool-result"), value: z.object({
     runId: id, callId: id, target: z.union([z.enum(["modules.submit", "modules.receipt"]), z.object({ moduleId: id, tool: z.enum(["submit", "receipt"]) }).strict()]),
-    moduleId: id, hash, contractHash: z.string().regex(/^[a-f0-9]{64}$/), status: z.enum(["succeeded", "failed", "unknown"]), outputState: z.enum(["complete", "filtered", "omitted"]), output: z.unknown(),
+    moduleId: id, hash, status: z.enum(["succeeded", "failed", "unknown"]), outputState: z.enum(["complete", "filtered", "omitted"]), output: z.unknown(),
   }).strict() }),
 });
 function completeReceipt(result: z.infer<typeof resultEvent>["payload"]["value"]) {

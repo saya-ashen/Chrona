@@ -14,12 +14,12 @@ type Ports = {
   store: Store; publicUrl: string | null;
   listModules(): Promise<ModuleIdentity[]>;
   describeTools(): Promise<Callback[]>;
-  call(target: string, args: Record<string, unknown>, options: { mode: "async"; key: string; reply: boolean; expectedTarget: { moduleId: string; contractHash: string } }): Promise<CallReply>;
+  call(target: string, args: Record<string, unknown>, options: { mode: "async"; key: string; reply: boolean; expectedTarget: { moduleId: string } }): Promise<CallReply>;
   status(callId: string): Promise<CallReply>;
 };
 type Args = Record<string, unknown>;
 type ImportedArgs = Args & { idempotencyKey: string; title: string };
-type Channel = { module: string; moduleId: string; tool: string; ready: boolean; at: number; contractHash: string; revision: string; invalid?: boolean };
+type Channel = { module: string; moduleId: string; tool: string; ready: boolean; at: number; revision: string; invalid?: boolean };
 type Attempt = Channel & { name: string };
 const text = (value: unknown) => typeof value === "string" && value.length ? value : null;
 const iso = (ms: number | null) => ms === null ? null : new Date(ms).toISOString();
@@ -77,17 +77,20 @@ class NotifyRuntime {
     for (const channel of this.channels()) {
       const owner = directory.modules.find(module => module.id === channel.moduleId && module.name === channel.module);
       if (!owner) this.store.db.run("DELETE FROM kv WHERE key = ?", [`channel:${channel.name}`]);
-      else if (owner.status === "active" && !callbackReady(directory, channel.moduleId, channel.module, channel.tool, channel.contractHash))
+      else if (owner.status === "active" && !callbackReady(directory, channel.moduleId, channel.module, channel.tool))
         this.store.set(`channel:${channel.name}`, JSON.stringify({ ...channel, invalid: true }));
     }
   }
   private usable(channel: Channel) {
-    return !channel.invalid && channel.ready && callbackReady(this.directory, channel.moduleId, channel.module, channel.tool, channel.contractHash);
+    return !channel.invalid && channel.ready && callbackReady(this.directory, channel.moduleId, channel.module, channel.tool);
   }
   /** Old readiness-only records are not registrations: wait for their owner to register again. */
   private channels() {
     return (this.store.db.query("SELECT key, value FROM kv WHERE key LIKE 'channel:%' ORDER BY key").all() as { key: string; value: string }[])
-      .map(row => ({ name: row.key.slice(8), ...JSON.parse(row.value) as Channel }))
+      .map(row => {
+        const { module, moduleId, tool, ready, at, revision, invalid } = JSON.parse(row.value) as Channel;
+        return { name: row.key.slice(8), module, moduleId, tool, ready, at, revision, invalid };
+      })
       .filter(channel => channel.module && channel.moduleId && channel.tool);
   }
   private channelFor(row: Row) {
@@ -155,7 +158,7 @@ class NotifyRuntime {
       ...(row.approval_id ? { approval: row.approval_id, scoped: row.scoped === 1 } : {}) };
     try {
       // Async with the attempt in the key: a repeat after a crash returns the same call instead of sending twice.
-      const reply = await this.callPort(`${channel.module}.${channel.tool}`, args, { mode: "async", key: `deliver:${row.id}:${attempts}`, reply: true, expectedTarget: { moduleId: channel.moduleId, contractHash: channel.contractHash } });
+      const reply = await this.callPort(`${channel.module}.${channel.tool}`, args, { mode: "async", key: `deliver:${row.id}:${attempts}`, reply: true, expectedTarget: { moduleId: channel.moduleId } });
       this.store.update(row.id, { call_id: reply.callId });
       if (["succeeded", "failed", "unknown"].includes(reply.status)) this.result({ ...reply, status: reply.status as CallResult["status"] }, now);
     } catch (error) {
@@ -314,11 +317,13 @@ class NotifyRuntime {
     const value = this.store.get(`channel:${name}`), previous = value ? JSON.parse(value) as Partial<Channel> : null;
     if (previous?.moduleId && previous.moduleId !== caller.moduleId) return { error: "forbidden", message: "Channel belongs to another module" };
     if (previous?.moduleId && previous.at! > at) return { ignored: true };
-    const reference = this.directory.tools.find(candidate => candidate.target === `${caller.module}.${tool}` && candidate.moduleId === caller.moduleId && candidate.hash === caller.hash);
-    if (!reference?.contractHash || !callbackReady(this.directory, caller.moduleId, caller.module, tool, reference.contractHash))
+    const owner = this.directory.modules.find(module => module.id === caller.moduleId && module.name === caller.module);
+    if (owner?.activeHash !== caller.hash || !callbackReady(this.directory, caller.moduleId, caller.module, tool))
       return { error: "forbidden", message: "Delivery tool must belong to the active caller and accept the notification protocol; register again after fixing it" };
-    const revision = !previous?.invalid && previous?.tool === tool && previous.contractHash === reference.contractHash && previous.ready === (args.ready === true) ? previous.revision! : randomUUID();
-    this.store.set(`channel:${name}`, JSON.stringify({ module: caller.module, moduleId: caller.moduleId, tool, ready: args.ready === true, at, contractHash: reference.contractHash, revision } satisfies Channel));
+    const unchanged = !previous?.invalid && previous?.module === caller.module && previous.moduleId === caller.moduleId
+      && previous.tool === tool && previous.ready === (args.ready === true);
+    const revision = unchanged ? previous.revision! : randomUUID();
+    this.store.set(`channel:${name}`, JSON.stringify({ module: caller.module, moduleId: caller.moduleId, tool, ready: args.ready === true, at, revision } satisfies Channel));
     return { ready: args.ready === true };
   }
   private list(args: Args) {

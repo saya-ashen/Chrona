@@ -5,8 +5,8 @@ import { MindService } from "./service";
 import { sourceInput } from "./schema";
 
 type Target = string | { moduleId: string; tool: string };
-type Call = (target: Target, args: Record<string, unknown>, options?: { expectedTarget: { moduleId: string; contractHash: string }; timeoutMs: number }) => Promise<unknown>;
-const reference = z.object({ source: z.object({ kind: z.literal("module"), hash: z.string() }), contractHash: z.string().regex(/^[a-f0-9]{64}$/), sideEffects: z.array(z.string()).length(0) });
+type Call = (target: Target, args: Record<string, unknown>, options?: { expectedTarget: { moduleId: string }; timeoutMs: number }) => Promise<unknown>;
+const reference = z.object({ source: z.object({ kind: z.literal("module"), hash: z.string() }), sideEffects: z.array(z.string()).length(0) });
 /** A concrete read adapter: only Files' bounded read contract, never arbitrary tools or URLs. */
 export class MindSources {
   private pending: Promise<void> | null = null;
@@ -18,8 +18,8 @@ export class MindSources {
       if (new Set(paths).size !== paths.length) throw new Error("Duplicate source path");
       const moduleId = this.filesId();
       if (paths.length && !moduleId) throw new Error("Files application unavailable");
-      const contract = paths.length ? reference.parse(await this.call("modules.describe", { target: { moduleId: moduleId!, tool: "read" } })) : null;
-      await this.store.update(state => { state.sources = paths.map(path => state.sources?.find(row => row.path === path && row.moduleId === moduleId && row.contractHash === contract!.contractHash) ?? { path, moduleId: moduleId!, contractHash: contract!.contractHash, version: null, error: null }); });
+      if (paths.length) reference.parse(await this.call("modules.describe", { target: { moduleId: moduleId!, tool: "read" } }));
+      await this.store.update(state => { state.sources = paths.map(path => state.sources?.find(row => row.path === path && row.moduleId === moduleId) ?? { path, moduleId: moduleId!, version: null, error: null }); });
     }
     const sources = (await this.store.read()).sources ?? [];
     return { sources, paths: sources.map(row => row.path).join("\n"), errors: sources.filter(row => row.error).map(row => `${row.path}: ${row.error}`).join("\n") };
@@ -36,13 +36,12 @@ export class MindSources {
       try {
         if (this.filesId() !== bound.moduleId) throw new Error("Files identity changed; configure sources again");
         const target = { moduleId: bound.moduleId, tool: "read" };
-        const contract = reference.parse(await this.call("modules.describe", { target }));
-        if (contract.contractHash !== bound.contractHash) throw new Error("Files contract changed; configure sources again");
-        const file = z.object({ content: z.string().max(2000), truncated: z.literal(false), size: z.number().int().nonnegative().max(8000), mime: z.string() }).strict().parse(await this.call(target, { path: bound.path }, { expectedTarget: { moduleId: bound.moduleId, contractHash: bound.contractHash }, timeoutMs: 10_000 }));
+        reference.parse(await this.call("modules.describe", { target }));
+        const file = z.object({ content: z.string().max(2000), truncated: z.literal(false), size: z.number().int().nonnegative().max(8000), mime: z.string() }).strict().parse(await this.call(target, { path: bound.path }, { expectedTarget: { moduleId: bound.moduleId }, timeoutMs: 10_000 }));
         const version = digest(file.content);
         // Recheck owner configuration after asynchronous reads, before accepting evidence.
         await this.store.update(current => {
-          const entry = current.sources?.find(row => row.path === bound.path && row.moduleId === bound.moduleId && row.contractHash === bound.contractHash);
+          const entry = current.sources?.find(row => row.path === bound.path && row.moduleId === bound.moduleId);
           if (!current.settings.enabled || !entry) return;
           if (entry.version !== version) {
             this.service.observeFile(current, { moduleId: bound.moduleId, path: bound.path, version, text: file.content }, now);
@@ -51,7 +50,7 @@ export class MindSources {
           entry.error = null;
         });
       } catch {
-        await this.store.update(current => { const entry = current.sources?.find(row => row.path === bound.path && row.moduleId === bound.moduleId && row.contractHash === bound.contractHash); if (entry) entry.error = "来源读取失败或合同已改变；请核对文件与来源设置。旧内容未当作新证据。"; });
+        await this.store.update(current => { const entry = current.sources?.find(row => row.path === bound.path && row.moduleId === bound.moduleId); if (entry) entry.error = "来源读取失败或合同已改变；请核对文件与来源设置。旧内容未当作新证据。"; });
       }
     }
   }

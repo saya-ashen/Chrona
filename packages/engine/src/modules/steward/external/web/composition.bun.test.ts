@@ -77,14 +77,16 @@ test("slot fanout is charged before copying references, independently of distinc
 });
 const dirs: string[] = [];
 afterEach(async () => { for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true }); });
-test("registration persists only expanded snapshots, keeps layout and fingerprints callback tools across restart", async () => {
+test("registration persists expanded snapshots and layout across restart and tool description upgrades", async () => {
   const dataDir = await mkdtemp("/tmp/chrona-components-"); dirs.push(dataDir);
-  const tools = new Map([["save", { moduleId: "alpha-id", contractHash: "a".repeat(64), inputSchema: { properties: { text: {} } } }]]);
+  const tools = new Map([["save", { moduleId: "alpha-id", inputSchema: { description: "Save text", properties: { text: {} } } }]]);
   const deps = { dataDir, modules: async () => [{ id: "alpha-id", name: "alpha", activeHash: "active", status: "active" }], tools: async () => tools };
   await createPages(deps).tool("page-set", { id: "main", title: "示例", layout: "workspace", spec, components }, { kind: "module", module: "alpha", moduleId: "alpha-id" });
   const pages = createPages(deps), page = await pages.get("alpha", "main");
-  expect(page?.layout).toBe("workspace"); expect(page?.contracts).toEqual({ save: "a".repeat(64) });
+  expect(page?.layout).toBe("workspace");
   expect(JSON.stringify(page?.spec)).not.toContain("alpha:Card");
-  tools.get("save")!.contractHash = "b".repeat(64);
+  tools.get("save")!.inputSchema.description = "Updated save description";
+  expect(await pages.get("alpha", "main")).toMatchObject({ revision: page!.revision, layout: "workspace" });
+  tools.get("save")!.moduleId = "replacement-id";
   await expect(pages.get("alpha", "main")).rejects.toThrow("重新登记");
 });

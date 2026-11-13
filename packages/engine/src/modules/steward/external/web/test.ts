@@ -34,7 +34,7 @@ const calls: [string, Args][] = [];
 const stub = (target: string, answer: (args: Args, options: { key?: string }) => unknown) => [target, (args: Args, options: { key?: string }) => { calls.push([target, args]); return answer(args, options); }] as const;
 let inventoryFailure = false;
 const inventory = [{ id: "m-files", name: "files", status: "active", activeHash: "h" }, { id: "m-p", name: "planning", status: "active", activeHash: "h" }].map(app => ({ ...app, health: { module: app.name, moduleId: app.id, open: false, incident: null, contractFailureCount: 0, nextAction: null, truncated: false } }));
-let filesContract = "a".repeat(64);
+let filesDescription = "Files tool description";
 let execution = { status: "queued", active: true }, phase = "", earlyText = false;
 const admissions = new Map<string, { digest: string; runId: string; status: string; active: boolean }>();
 const module = await startModule("index.ts", { stubs: Object.fromEntries([
@@ -58,11 +58,11 @@ const module = await startModule("index.ts", { stubs: Object.fromEntries([
       ...[{ target: "files.list", description: "List", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: [] }, idempotent: true },
         { target: "files.read-image", description: "Read image", inputSchema: { type: "object", properties: { ref: { type: "string" } }, required: ["ref"] }, idempotent: true },
         { target: "files.delete", description: "Delete", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"] }, idempotent: false }]
-        .map(tool => ({ ...tool, moduleId: "m-files", hash: "h", contractHash: filesContract })),
-      { target: "chat.list", moduleId: "m-chat", hash: "h", contractHash: "e".repeat(64), inputSchema: { type: "object", properties: { path: { type: "string" } }, required: [] }, idempotent: true },
-      { target: "planning.get", moduleId: "m-p", hash: "h", contractHash: "b".repeat(64), inputSchema: { type: "object", properties: {}, required: [] }, idempotent: true },
+        .map(tool => ({ ...tool, moduleId: "m-files", hash: "h", inputSchema: { ...tool.inputSchema, description: filesDescription } })),
+      { target: "chat.list", moduleId: "m-chat", hash: "h", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: [] }, idempotent: true },
+      { target: "planning.get", moduleId: "m-p", hash: "h", inputSchema: { type: "object", properties: {}, required: [] }, idempotent: true },
       { target: "modules.list", inputSchema: { type: "object", properties: {} } },
-      ...["notify.list", "notify.counts", "notify.settings", "notify.activity", "pi.settings"].map(target => ({ target, moduleId: target.split(".")[0], contractHash: "d".repeat(64) })),
+      ...["notify.list", "notify.counts", "notify.settings", "notify.activity", "pi.settings"].map(target => ({ target, moduleId: target.split(".")[0] })),
       ...(args.audience === "user" ? [] : [{ target: "agent.run", moduleId: "agent" }]),
     ];
     // Search may return a related contract; forwarding must still require the exact target.
@@ -187,7 +187,7 @@ try {
   assert.deepEqual(calls.at(-1), ["approvals.resolve", { approval: "a1", decision: "deny" }]);
   assert.deepEqual(await (await post("/api/web/call", { target: "planning.get", args: {} })).json(), { plan: 1 });
   assert.deepEqual(calls.at(-2), ["modules.describe", { query: "planning.get", audience: "user" }]);
-  assert.deepEqual(module.calls.findLast((call: { method: string; params: Args }) => call.method === "call" && targetName(call.params.target) === "planning.get")?.params.expectedTarget, { moduleId: "m-p", contractHash: "b".repeat(64) });
+  assert.deepEqual(module.calls.findLast((call: { method: string; params: Args }) => call.method === "call" && targetName(call.params.target) === "planning.get")?.params.expectedTarget, { moduleId: "m-p" });
   assert.equal((await post("/api/web/call", { target: "approvals.resolve", args: {} })).status, 404);
   assert.equal((await post("/api/web/call", { target: "$web.resolve", args: {} })).status, 404);
   assert.equal((await get("/api/web/nope")).status, 404);
@@ -286,7 +286,7 @@ try {
   const page = await (await get("/api/web/pages/files/main")).json();
   const pageCall = { target: "files.list", args: { path: "" }, page: { module: "files", id: "main", revision: page.revision } };
   assert.equal((await post("/api/web/call", pageCall)).status, 200);
-  assert.deepEqual(module.calls.findLast((call: { method: string; params: Args }) => call.method === "call" && targetName(call.params.target) === "files.list")?.params.expectedTarget, { moduleId: "m-files", contractHash: "a".repeat(64) });
+  assert.deepEqual(module.calls.findLast((call: { method: string; params: Args }) => call.method === "call" && targetName(call.params.target) === "files.list")?.params.expectedTarget, { moduleId: "m-files" });
   assert.equal((await post("/api/web/call", { ...pageCall, page: { ...pageCall.page, revision: "stale" } })).status, 409);
   assert.equal((await post("/api/web/call", { ...pageCall, target: "planning.get" })).status, 409);
   assert.equal(page.data.list.tool, "list"); assert.equal(page.spec.elements.remove.on.press.params.tool, "delete");
@@ -311,15 +311,15 @@ try {
   assert.equal(calls.filter(([target]) => target === "files.read-image").length, before); // Rejected before the owner's tool.
   await checkRasterContent(get, png);
   assert.deepEqual(calls.at(-1), ["files.read-image", { ref: "files/picture.png" }]);
-  assert.deepEqual(module.calls.findLast((call: { method: string; params: Args }) => call.method === "call" && targetName(call.params.target) === "files.read-image")?.params.expectedTarget, { moduleId: "m-files", contractHash: "a".repeat(64) });
+  assert.deepEqual(module.calls.findLast((call: { method: string; params: Args }) => call.method === "call" && targetName(call.params.target) === "files.read-image")?.params.expectedTarget, { moduleId: "m-files" });
   inventory[0]!.status = "paused";
   assert.equal((await get(imageUrl + "files%2Fpicture.png")).status, 409);
   assert.equal((await get("/api/web/pages/files/main")).status, 409);
   inventory[0]!.status = "active";
-  filesContract = "c".repeat(64);
-  assert.equal((await get("/api/web/pages/files/main")).status, 409);
-  assert.equal((await get(imageUrl + "files%2Fpicture.png")).status, 409);
-  filesContract = "a".repeat(64);
+  filesDescription = "Updated files tool description";
+  assert.equal((await get("/api/web/pages/files/main")).status, 200);
+  assert.equal((await post("/api/web/call", pageCall)).status, 200);
+  assert.equal((await get(imageUrl + "files%2Fpicture.png")).status, 200);
   inventoryFailure = true;
   assert.equal((await get("/api/web/pages")).status, 502);
   inventoryFailure = false;

@@ -60,7 +60,6 @@
               "required": [
                 "path",
                 "moduleId",
-                "contractHash",
                 "version",
                 "error"
               ],

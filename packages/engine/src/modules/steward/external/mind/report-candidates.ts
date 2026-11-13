@@ -21,7 +21,7 @@ export function addReportCandidate(decision: Decision, candidate: Candidate): vo
 }
 
 const resultEvent = z.object({ kind: z.literal("tool-result"), payload: z.object({ type: z.literal("tool-result"), value: z.object({
-  runId: z.string(), callId: z.string().min(1), target: z.literal("mind.report"), moduleId: z.string().min(1), hash: z.string().min(1), contractHash: z.string().regex(/^[a-f0-9]{64}$/),
+  runId: z.string(), callId: z.string().min(1), target: z.literal("mind.report"), moduleId: z.string().min(1), hash: z.string().min(1),
   status: z.literal("succeeded"), outputState: z.literal("complete"), output: receiptResultSchema,
 }).strict() }) });
 

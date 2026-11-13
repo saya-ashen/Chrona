@@ -10,7 +10,7 @@ const input = { id: "main", title: "Page", data: { view: { tool: "read" } }, spe
 async function fixture(register = true) {
   const dataDir = await mkdtemp("/tmp/chrona-page-inventory-"); dirs.push(dataDir);
   const modules: ModuleState[] = ["alpha", "beta"].map(name => ({ id: `${name}-id`, name, status: "active", activeHash: "approved" }));
-  const tools = (module: string) => new Map<string, PageTool>([["read", { inputSchema: {}, moduleId: `${module}-id`, contractHash: "a".repeat(64) }]]);
+  const tools = (module: string) => new Map<string, PageTool>([["read", { inputSchema: {}, moduleId: `${module}-id` }]]);
   const state = { discoveries: 0, moduleReads: 0, filteredReads: 0, fail: false, filteredFailure: false, moduleFailure: false,
     inventory: modules.map(module => ({ ...tools(module.name).get("read")!, target: `${module.name}.read` })) };
   const deps: Deps = { dataDir,
@@ -34,11 +34,11 @@ test("navigation discovers all apps once per operation while individual page rea
   expect(f.state).toMatchObject({ discoveries: 1, moduleReads: 1, filteredReads: 0 });
   await Promise.all([f.pages.list(), f.pages.list()]);
   expect(f.state).toMatchObject({ discoveries: 3, moduleReads: 3, filteredReads: 0 });
-  expect(await f.pages.get("alpha", "main")).toMatchObject({ contracts: { read: "a".repeat(64) } });
+  expect(await f.pages.get("alpha", "main")).toMatchObject({ moduleId: "alpha-id", data: { view: { tool: "read" } } });
   expect(f.state).toMatchObject({ discoveries: 3, moduleReads: 4, filteredReads: 1 });
 });
 
-test("next navigation read rechecks visibility, exact prefixes, identities and contract pins", async () => {
+test("next navigation read rechecks visibility, exact prefixes and identities while permitting description upgrades", async () => {
   const f = await fixture();
   expect(await f.pages.list()).toHaveLength(4);
   const alpha = f.state.inventory[0]!;
@@ -46,8 +46,8 @@ test("next navigation read rechecks visibility, exact prefixes, identities and c
   expect((await f.pages.list()).map(page => page.module)).toEqual(["beta", "beta"]);
   f.state.inventory.push({ ...alpha, moduleId: "replacement-id" });
   expect(await f.pages.list()).toHaveLength(2);
-  f.state.inventory[f.state.inventory.length - 1] = { ...alpha, contractHash: "b".repeat(64) };
-  expect(await f.pages.list()).toHaveLength(2);
+  f.state.inventory[f.state.inventory.length - 1] = { ...alpha, inputSchema: { description: "Updated read description" } };
+  expect(await f.pages.list()).toHaveLength(4);
   f.state.inventory[f.state.inventory.length - 1] = alpha;
   expect(await f.pages.list()).toHaveLength(4);
   expect(f.state.discoveries).toBe(5);
@@ -63,7 +63,7 @@ test("complete module inventory alone controls pruning even when tool discovery 
   expect(await f.pages.list()).toEqual([]);
   const saved = JSON.parse(await readFile(`${f.dataDir}/pages.json`, "utf8"));
   expect(saved.pages.map((page: { module: string }) => page.module)).toEqual(["beta", "beta"]);
-  f.state.inventory = [{ target: "beta.read", inputSchema: {}, moduleId: "beta-id", contractHash: "a".repeat(64) }];
+  f.state.inventory = [{ target: "beta.read", inputSchema: {}, moduleId: "beta-id" }];
   expect(await createPages(f.deps).list()).toHaveLength(2);
 });
 
@@ -105,7 +105,7 @@ test("Web wiring completes list and user discovery pages through its existing SD
       if (target !== "modules.describe") throw new Error(`Unexpected ${target}`);
       expect(args.audience).toBe("user");
       const item = (module: string) => ({ target: { moduleId: `${module}-id`, tool: "read" },
-        moduleId: `${module}-id`, inputSchema: {}, contractHash: "a".repeat(64) });
+        moduleId: `${module}-id`, inputSchema: {} });
       if (args.query) return { items: [item(String(args.query))], nextCursor: null };
       return args.cursor ? { items: [item("beta")], nextCursor: null } : { items: [item("alpha")], nextCursor: "tools-next" };
     },
@@ -144,7 +144,9 @@ test("shared discovery preserves executable page version and revision pins", asy
   expect(await f.pages.list()).toEqual([]);
   await f.pages.tool("page-set", registration, caller);
   expect(await f.pages.list()).toHaveLength(1);
-  f.state.inventory[0]!.contractHash = "b".repeat(64);
+  f.state.inventory[0]!.inputSchema.description = "Updated read description";
+  expect(await f.pages.list()).toHaveLength(1);
+  f.state.inventory[0]!.moduleId = "replacement-id";
   expect(await f.pages.list()).toEqual([]);
 });
 
@@ -154,7 +156,10 @@ test("unrelated oversized inventory falls back to current filtered discovery onc
   f.deps.toolInventory = async () => { f.state.discoveries++; throw new Error("A list item exceeds the output bound"); };
   expect(await f.pages.list()).toHaveLength(4);
   expect(f.state).toMatchObject({ discoveries: 1, filteredReads: 2 });
-  f.deps.tools = async module => new Map([["read", { inputSchema: {}, moduleId: `${module}-id`, contractHash: "b".repeat(64) }]]);
-  expect(await f.pages.list()).toEqual([]);
+  f.deps.tools = async module => new Map([["read", { inputSchema: { description: "Updated read description" }, moduleId: `${module}-id` }]]);
+  expect(await f.pages.list()).toHaveLength(4);
   expect(f.state.discoveries).toBe(2);
+  f.deps.tools = async () => new Map();
+  expect(await f.pages.list()).toEqual([]);
+  expect(f.state.discoveries).toBe(3);
 });

@@ -24,7 +24,7 @@ async function fixture() {
     { id: "alpha-id", name: "alpha", status: "active", activeHash: "approved-v1" },
     { id: "beta-id", name: "beta", status: "active", activeHash: "beta-v1" },
   ];
-  const tools = new Map<string, PageTool>([["play", { moduleId: "alpha-id", contractHash: "a".repeat(64), inputSchema: { properties: { title: { type: "string" } } } }]]);
+  const tools = new Map<string, PageTool>([["play", { moduleId: "alpha-id", inputSchema: { properties: { title: { type: "string" } } } }]]);
   const deps = { dataDir, modules: async () => modules, tools: async (module: string) => module === "alpha" ? tools : new Map<string, PageTool>() };
   return { dataDir, modules, tools, deps, pages: createPages(deps) };
 }
@@ -51,13 +51,16 @@ test("atomic private persistence survives restart, retains source and pins decla
   expect(await f.pages.tool("component-set", definition, caller)).toEqual(registered);
   await f.pages.tool("page-set", { ...registration, spec: { ...spec, elements: { ...spec.elements, player: { ...spec.elements.player, type: registered.type } } } }, caller);
   const restarted = createPages(f.deps), page = await restarted.get("alpha", "main");
-  expect(page).toMatchObject({ hash: "approved-v1", contracts: { play: "a".repeat(64) }, extensions: { "alpha:AudioPlayer": { revision: registered.revision, props: definition.props, events: ["ended"], slots: ["default", "actions"], tools: ["play"] } } });
+  expect(page).toMatchObject({ hash: "approved-v1", extensions: { "alpha:AudioPlayer": { revision: registered.revision, props: definition.props, events: ["ended"], slots: ["default", "actions"], tools: ["play"] } } });
   expect(page!.spec.elements.player!.type).toBe("alpha:AudioPlayer");
   expect(await restarted.component("alpha", "AudioPlayer", registered.revision)).toMatchObject({ javascript: definition.javascript, css: definition.css });
   expect(await readdir(f.dataDir)).toEqual(expect.arrayContaining(["pages.json", "executable-components.json"]));
   expect((await readdir(f.dataDir)).some(name => name.endsWith(".tmp"))).toBe(false);
   expect(JSON.parse(await readFile(join(f.dataDir, "executable-components.json"), "utf8")).components).toHaveLength(1);
-  f.tools.get("play")!.contractHash = "b".repeat(64);
+  f.tools.get("play")!.inputSchema.description = "Updated play description";
+  expect(await restarted.get("alpha", "main")).toMatchObject({ revision: page!.revision });
+  expect(await restarted.list()).toHaveLength(1);
+  f.tools.delete("play");
   await expect(restarted.get("alpha", "main")).rejects.toMatchObject({ code: "conflict" });
   expect(await restarted.list()).toEqual([]);
 });
@@ -207,7 +210,8 @@ test("SDK events preserve caller hash; source HTTP authenticates transport and p
     import { startModule } from 'chrona/testing';
     const identity = ${JSON.stringify(caller)}, definition = ${JSON.stringify(definition)}, registration = ${JSON.stringify(registration)};
     const inventory = [{id:'alpha-id',name:'alpha',status:'active',activeHash:'approved-v1'}];
-    const tools = [{target:'alpha.play',moduleId:'alpha-id',contractHash:'${"a".repeat(64)}',inputSchema:{type:'object',properties:{title:{type:'string'}}}}];
+    const tools = [{target:'alpha.play',moduleId:'alpha-id',inputSchema:{type:'object',description:'Play',properties:{title:{type:'string'}}}},
+      {target:'alpha.unreferenced',moduleId:'alpha-id',inputSchema:{type:'object',properties:{}}}];
     const module = await startModule(${JSON.stringify(join(import.meta.dirname, "index.ts"))}, {stubs:{'modules.list':()=>({items:inventory,nextCursor:null}), 'modules.describe':()=>({items:tools,nextCursor:null}), 'alpha.play':args=>args}});
     async function event(id,args,caller=identity) { return module.send({trigger:{kind:'tool',id,args,caller,firedAt:new Date().toISOString()},now:new Date().toISOString(),params:{}}); }
     try {
@@ -229,7 +233,10 @@ test("SDK events preserve caller hash; source HTTP authenticates transport and p
       const body = {target:'alpha.play',args:{title:'Play'},page:{module:'alpha',id:'main',revision:page.revision}};
       const call = body => module.fetch('/api/web/call',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
       assert.equal((await call(body)).status,200);
-      const routed = module.calls.findLast(call=>call.params.target?.moduleId==='alpha-id' && call.params.target?.tool==='play'); assert.deepEqual(routed.params.expectedTarget,{moduleId:'alpha-id',contractHash:'${"a".repeat(64)}'});
+      const routed = module.calls.findLast(call=>call.params.target?.moduleId==='alpha-id' && call.params.target?.tool==='play'); assert.deepEqual(routed.params.expectedTarget,{moduleId:'alpha-id'});
+      tools[0].inputSchema.description='Updated play description';
+      assert.equal((await call(body)).status,200);
+      assert.equal((await call({...body,target:'alpha.unreferenced'})).status,409);
       assert.equal((await call({...body,target:'beta.play'})).status,409);
       assert.equal((await call({...body,page:{...body.page,revision:'old'}})).status,409);
       inventory[0].activeHash='approved-v2';

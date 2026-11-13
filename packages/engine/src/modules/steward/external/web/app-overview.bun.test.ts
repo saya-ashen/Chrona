@@ -11,7 +11,7 @@ function fixture() {
   const app = { id: "app-id", name: "files", origin: "external", status: "active", activeHash: "hash",
     capabilities: { update: true, remove: true }, health: { runtime: { state: "unobserved", pid: null } },
     versions: [{ hash: "hash", git: { commit: "commit", tree: "tree" } }] };
-  const appTool = contract("files.read", { moduleId: app.id, hash: "hash", contractHash: "contract-hash" });
+  const appTool = contract("files.read", { moduleId: app.id, hash: "hash" });
   const diagnostic = { module: app.name, moduleId: app.id, runtime: { state: "unobserved", pid: null }, incidents: [], truncated: true };
   const state = {
     fail: "", apps: [app], tools: [contract("modules.list"), contract("modules.describe"), appTool, contract("notify.activity", { moduleId: "notify-id" })],

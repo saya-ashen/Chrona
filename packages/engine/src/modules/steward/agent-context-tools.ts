@@ -1,4 +1,3 @@
-import { moduleCallbackContractHash } from "./module-tool-contract";
 import { z } from "zod";
 import type { ExecutionPrincipal, RoutedTarget } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
@@ -35,11 +34,11 @@ export async function contextRunTools(ports: StewardPorts, run: { id: string; se
   const principal: ExecutionPrincipal = { workspaceId: run.workspaceId, ownerId: "owner", caller: { kind: "module", moduleId: session.moduleId, hash } };
   await assertExecutionPrincipal(ports.db, principal);
   const tools = await ports.db.agentRunAdmission.findFirstOrThrow({ where: { runId: run.id, moduleId: session.moduleId, hash } });
-  const { targets } = z.object({ targets: z.array(z.object({ target: z.string(), moduleId: z.string(), contractHash: z.string() }).strict()).max(100) }).parse(tools);
+  const { targets } = z.object({ targets: z.array(z.object({ target: z.string(), moduleId: z.string(), contractHash: z.string().optional() }).strict()).max(100) }).parse(tools);
   const selected = await selectContextTools(ports, principal, targets.map(item => item.target));
   for (const entry of selected.entries) {
     const bound = targets.find(item => item.target === `${entry.module.name}.${entry.tool.name}`)!;
-    if (entry.module.id !== bound.moduleId || moduleCallbackContractHash(entry.tool) !== bound.contractHash) throw new CallError("conflict", "Admitted Run tool identity or contract changed");
+    if (entry.module.id !== bound.moduleId) throw new CallError("conflict", "Admitted Run tool identity changed");
   }
   return { ...selected, runId: run.id };
 }
@@ -53,7 +52,7 @@ export async function callContextTool(ports: StewardPorts, context: NonNullable<
   if (!entry) throw new CallError("forbidden", "Tool is outside the module's Agent run selection");
   const origin: CallOrigin = { workspaceId: current.workspaceId, caller: current.caller, chain: [], path: [], deadline: run.deadlineAt ? Math.min(deadline, run.deadlineAt.getTime()) : deadline, run: { executionRunId: run.id } };
   return withAgentContextEntry(ports, origin, async () => {
-    const result = await callSync(ports, origin, `${entry.module.name}.${entry.tool.name}`, raw, { key, expectedTarget: { moduleId: entry.module.id, contractHash: moduleCallbackContractHash(entry.tool) } });
+    const result = await callSync(ports, origin, `${entry.module.name}.${entry.tool.name}`, raw, { key, expectedTarget: { moduleId: entry.module.id } });
     return { result: result.output };
   });
 }

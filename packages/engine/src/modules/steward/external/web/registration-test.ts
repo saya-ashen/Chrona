@@ -4,7 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { randomUUID } from "node:crypto";
 import { compileModuleOutput, moduleManifestSchema, moduleRuntimeParams } from "@chrona/contracts/steward";
-import { moduleCallbackContractHash, normalizedToolInputSchema, validateToolArgs } from "../../module-tool-contract";
+import { normalizedToolInputSchema, validateToolArgs } from "../../module-tool-contract";
 import { createPages, type PageTool } from "./pages";
 import webManifest from "./module.json";
 
@@ -34,7 +34,7 @@ export async function createRegistrationTest(entry: string, options: { manifest?
   const key = `chrona-registration-test-${randomUUID()}`;
   const caller = { kind: "module", module: manifest.name, moduleId: options.moduleId ?? `${manifest.name}-id`, hash: options.hash ?? "approved-test-version" };
   // Web requests modules.describe with audience:user, excluding module-only callbacks.
-  const tools = new Map<string, PageTool>(manifest.tools.filter(tool => tool.visibility.some(audience => audience === "owner" || audience === "provider")).map(tool => [tool.name, { inputSchema: normalizedToolInputSchema(tool), moduleId: caller.moduleId, contractHash: moduleCallbackContractHash(tool) }]));
+  const tools = new Map<string, PageTool>(manifest.tools.filter(tool => tool.visibility.some(audience => audience === "owner" || audience === "provider")).map(tool => [tool.name, { inputSchema: normalizedToolInputSchema(tool), moduleId: caller.moduleId }]));
   const pages = createPages({ dataDir: join(root, "web"), modules: async () => [{ id: caller.moduleId, name: caller.module, activeHash: caller.hash, status: "active" }], tools: async module => module === caller.module ? tools : new Map() });
   const calls: Call[] = [];
   let activated: Activated | undefined;

@@ -9,10 +9,10 @@ test.each([40, 64])("module source versions accept %i hex characters throughout 
   expect(moduleUpstreamRequestSchema.parse({ action: "merge", moduleId: "module", commit: "b".repeat(40), baseHash: hash, requestKey: "merge" })).toMatchObject({ baseHash: hash });
 });
 
-test("Git source compatibility never widens contract digests or Git commit identity", () => {
+test("Git source compatibility preserves module identity and Git commit validation", () => {
   for (const hash of ["a".repeat(39), "a".repeat(41), "a".repeat(63), "A".repeat(40)]) expect(moduleVersionHashSchema.safeParse(hash).success).toBe(false);
-  expect(expectedModuleTargetSchema.safeParse({ moduleId: "module", contractHash: "a".repeat(40) }).success).toBe(false);
-  expect(expectedModuleTargetSchema.safeParse({ moduleId: "module", contractHash: "a".repeat(64) }).success).toBe(true);
+  expect(expectedModuleTargetSchema.parse({ moduleId: "module" })).toEqual({ moduleId: "module" });
+  expect(expectedModuleTargetSchema.safeParse({ moduleId: "module", extra: "obsolete" }).success).toBe(false);
   expect(moduleUpstreamRequestSchema.safeParse({ action: "status", moduleId: "module" }).success).toBe(true);
   expect(moduleUpstreamRequestSchema.safeParse({ action: "fetch", moduleId: "module", repository: "https://example.com" }).success).toBe(false);
 });

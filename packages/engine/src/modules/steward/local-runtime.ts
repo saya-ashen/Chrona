@@ -12,7 +12,7 @@ export async function stopAgentRuns(ports: StewardPorts) {
   await Promise.all([...(active.get(ports.db) ?? [])].map(async handle => { await handle.abort(); await handle.done; }));
 }
 export function registerLocalRuntime() { registerProviderCallbacks(); }
-export async function runtimeCall<T>(ports: StewardPorts, workspaceId: string, target: RoutedTarget, args: Record<string, unknown>, options: { key?: string; expectedTarget?: { moduleId: string; contractHash: string }; private?: boolean; expectedHash?: string } = {}): Promise<T> {
+export async function runtimeCall<T>(ports: StewardPorts, workspaceId: string, target: RoutedTarget, args: Record<string, unknown>, options: { key?: string; expectedTarget?: { moduleId: string }; private?: boolean; expectedHash?: string } = {}): Promise<T> {
   registerLocalRuntime();
   return (await callSync(ports, kernelOrigin(workspaceId), target, args, options)).output as T;
 }

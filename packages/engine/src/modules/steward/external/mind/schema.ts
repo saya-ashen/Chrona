@@ -71,7 +71,8 @@ export const receiptResultSchema = z.union([
 const receiptSchema = z.object({ scope: z.string().min(1).max(300), key, digest: z.string().length(64), result: receiptResultSchema, at: time }).strict();
 export const runtimeSchema = z.object({ nextCheckAt: time.nullable(), lastCheckAt: time.nullable(), lastDailyDate: z.string().max(10).nullable(), currentDecisionId: id.nullable(), lastError: z.string().max(500).nullable(), wakeError: z.string().max(500).nullable().default(null) }).strict();
 const signalTombstoneSchema = z.object({ moduleId: id, eventId: id, digest: z.string().length(64), signalId: id }).strict();
-export const sourcesSchema = z.array(z.object({ path: z.string().min(1).max(128), moduleId: id, contractHash: z.string().regex(/^[a-f0-9]{64}$/), version: z.string().nullable(), error: z.string().max(300).nullable() }).strict()).max(4);
+// Read-only: rows persisted before plan 008 still carry it; never written.
+export const sourcesSchema = z.array(z.object({ path: z.string().min(1).max(128), moduleId: id, contractHash: z.string().regex(/^[a-f0-9]{64}$/).optional(), version: z.string().nullable(), error: z.string().max(300).nullable() }).strict()).max(4);
 export const sourceInput = z.object({ paths: z.string().max(1000).optional() }).strict();
 export const stateSchema = z.object({
   sources: sourcesSchema.default([]).optional(),

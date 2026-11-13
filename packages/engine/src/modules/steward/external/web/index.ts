@@ -3,7 +3,7 @@ import { chrona, on } from "chrona";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
-import { createPages, type Caller, type ModuleState, type PageTool } from "./pages";
+import { createPages, pageToolNames, type Caller, type ModuleState, type PageTool } from "./pages";
 import { todayView } from "./today";
 import { createAgentConversations, isAgentConversation } from "./agent-conversations";
 import { readDeliveryPages } from "./delivery";
@@ -16,8 +16,8 @@ import { attachmentBody, createAttachments, decodeBase64 } from "./attachments";
 // "/" serves the static page (no data). "/api/web/*" is the page's data API: Chrona checks the user's key before it
 // forwards a request here; other applications are reached through routed calls (v2-8).
 type Args = Record<string, unknown>;
-type UserTool = { target: string; moduleId?: string; contractHash?: string; inputSchema: Record<string, unknown>; outputSchema: Record<string, unknown> | null };
-type TargetPin = { moduleId: string; contractHash: string };
+type UserTool = { target: string; moduleId?: string; inputSchema: Record<string, unknown>; outputSchema: Record<string, unknown> | null };
+type TargetPin = { moduleId: string };
 const files: Record<string, string> = { "/app.js": "text/javascript; charset=utf-8", "/pages.js": "text/javascript; charset=utf-8", "/style.css": "text/css; charset=utf-8" };
 const headers = { "cache-control": "no-cache", "x-content-type-options": "nosniff", "referrer-policy": "same-origin",
   "content-security-policy": "default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob:; frame-src blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'" };
@@ -209,23 +209,23 @@ async function moduleCall(body: Args) {
   if (!/^[a-z][a-z0-9-]{1,40}\.[a-z][a-z0-9-]{1,40}$/.test(target) || /^(approvals|modules|settings|schedules|secrets)\./.test(target)) throw Object.assign(new Error(`Unknown module tool ${target}`), { code: "not_found" });
   if (body.page && typeof body.page === "object") {
     const ref = body.page as { module: string; id: string; revision: string }, page = await pages.get(ref.module, ref.id);
-    if (!page || page.revision !== ref.revision || !target.startsWith(`${page.module}.`) || !Object.hasOwn(page.contracts, target.slice(page.module.length + 1))) throw Object.assign(new Error("页面或工具已变化，请重新打开页面"), { code: "conflict" });
-    const expectedTarget = { moduleId: page.moduleId, contractHash: page.contracts[target.slice(page.module.length + 1)]! };
-    // pages.get already validated current user-visible contracts. The routed
-    // call rechecks admission and this pin atomically; local settings still
+    if (!page || page.revision !== ref.revision || !target.startsWith(`${page.module}.`) || !pageToolNames(page).includes(target.slice(page.module.length + 1))) throw Object.assign(new Error("页面或工具已变化，请重新打开页面"), { code: "conflict" });
+    const expectedTarget = { moduleId: page.moduleId };
+    // pages.get already validated current user-visible tools. The routed
+    // call rechecks admission and module identity atomically; local settings still
     // need their in-process input/output validation below.
     if (!ownSettings.has(target)) return applicationCall(target, args, { expectedTarget });
     return invokeUserTool(target, args, await userTool(target), expectedTarget);
   }
   const tool = await userTool(target);
-  return invokeUserTool(target, args, tool, tool.moduleId && tool.contractHash ? { moduleId: tool.moduleId, contractHash: tool.contractHash } : undefined);
+  return invokeUserTool(target, args, tool, tool.moduleId ? { moduleId: tool.moduleId } : undefined);
 }
 async function invokeUserTool(target: string, args: Args, tool: UserTool, expectedTarget?: TargetPin) {
   const own = ownSettings.get(target);
   if (!own) return applicationCall(target, args, expectedTarget ? { expectedTarget } : undefined);
   // Discovery admits the actual SDK caller against its current approved owner authority.
-  // Own business dispatch avoids a routed self-call, retaining the page's identity and contract pins.
-  if (!expectedTarget || tool.moduleId !== expectedTarget.moduleId || tool.contractHash !== expectedTarget.contractHash) throw Object.assign(new Error("页面或工具已变化，请重新打开页面"), { code: "conflict" });
+  // Own business dispatch avoids a routed self-call, retaining the page's module identity.
+  if (!expectedTarget || tool.moduleId !== expectedTarget.moduleId) throw Object.assign(new Error("页面或工具已变化，请重新打开页面"), { code: "conflict" });
   const input = z.fromJSONSchema(tool.inputSchema).safeParse(args);
   if (!input.success) throw Object.assign(new Error("Invalid tool arguments"), { code: "invalid" });
   const output = await own(input.data as Args);
@@ -274,7 +274,7 @@ async function pageContentResponse(request: Request, module: string, id: string)
     if (!page) return new Response("没有这张图片", { status: 404, headers: imageHeaders });
     const ref = new URL(request.url).searchParams.get("ref") ?? "";
     if (!page.content || !validPageContentRef(ref, page.module)) return new Response("只能读取本应用声明的图片", { status: 403, headers: imageHeaders });
-    const file = await chrona.call({ moduleId: page.moduleId, tool: page.content.tool }, { ref }, { expectedTarget: { moduleId: page.moduleId, contractHash: page.contracts[page.content.tool]! } }) as { base64: string; mime: string } | null;
+    const file = await chrona.call({ moduleId: page.moduleId, tool: page.content.tool }, { ref }, { expectedTarget: { moduleId: page.moduleId } }) as { base64: string; mime: string } | null;
     return rasterResponse(file, imageHeaders);
   } catch (error) {
     const { code } = error as { code?: string };

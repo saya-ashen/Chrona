@@ -7,7 +7,7 @@ const spec = { root: "text", elements: { text: { type: "Text", props: { text: "�
 async function fixture() {
   const dataDir = await mkdtemp("/tmp/chrona-settings-pages-"); dirs.push(dataDir);
   const modules: ModuleState[] = [{ id: "owner-id", name: "fixture", status: "active", activeHash: "active" }];
-  const tools = new Map([["read", { inputSchema: {}, moduleId: "owner-id", contractHash: "a".repeat(64) }]]);
+  const tools = new Map([["read", { inputSchema: {}, moduleId: "owner-id" }]]);
   const deps = { dataDir, modules: async () => modules, tools: async () => tools };
   return { deps, modules, tools, caller: { kind: "module", module: "fixture", moduleId: "owner-id" }, input: { id: "preferences", title: "偏好设置", purpose: "settings", data: { view: { tool: "read" } }, spec } };
 }
@@ -15,7 +15,7 @@ test("settings purpose survives restart and is exposed through both page lists",
   const { deps, caller, input } = await fixture();
   await createPages(deps).tool("page-set", input, caller);
   const pages = createPages(deps), page = await pages.get("fixture", "preferences");
-  expect(page).toMatchObject({ moduleId: "owner-id", purpose: "settings", contracts: { read: "a".repeat(64) } });
+  expect(page).toMatchObject({ moduleId: "owner-id", purpose: "settings", data: { view: { tool: "read" } } });
   expect(await pages.list()).toEqual([{ module: "fixture", moduleId: "owner-id", id: "preferences", title: "偏好设置", purpose: "settings" }]);
   expect(await pages.tool("pages", {}, caller)).toMatchObject({ items: [{ id: "preferences", purpose: "settings" }] });
   const revision = page!.revision;
@@ -39,28 +39,28 @@ test.each([null, "general", "Settings", {}, false])("invalid purpose %j is rejec
   expect(await pages.list()).toEqual([]);
 });
 test.each([
-  { label: "unchanged", contractHash: "a".repeat(64), visible: true },
-  { label: "replaced", contractHash: "b".repeat(64), visible: false },
-])("settings navigation validates $label tool contracts while retaining valid pages", async ({ contractHash, visible }) => {
+  { label: "description upgrade", moduleId: "owner-id", visible: true },
+  { label: "owner replacement", moduleId: "replacement-id", visible: false },
+])("settings navigation handles $label while retaining valid pages", async ({ moduleId, visible }) => {
   const { deps, caller, input, tools } = await fixture();
   const registry = createPages(deps);
   tools.set("stable", { ...tools.get("read")! });
   await registry.tool("page-set", input, caller);
   await registry.tool("page-set", { ...input, id: "stable", title: "有效页面", purpose: undefined, data: { view: { tool: "stable" } } }, caller);
-  tools.set("read", { ...tools.get("read")!, contractHash });
+  tools.set("read", { moduleId, inputSchema: { description: "Updated read description" } });
   const pages = createPages(deps);
   const settings = { module: "fixture", moduleId: "owner-id", id: input.id, title: input.title, purpose: "settings" };
   const stable = { module: "fixture", moduleId: "owner-id", id: "stable", title: "有效页面" };
   expect(await pages.list()).toEqual(visible ? [settings, stable] : [stable]);
-  if (visible) expect(await pages.get("fixture", input.id)).toMatchObject({ contracts: { read: contractHash }, purpose: "settings" });
+  if (visible) expect(await pages.get("fixture", input.id)).toMatchObject({ moduleId: "owner-id", purpose: "settings" });
   else await expect(pages.get("fixture", input.id)).rejects.toMatchObject({ code: "conflict" });
-  expect(await pages.get("fixture", "stable")).toMatchObject({ contracts: { stable: "a".repeat(64) } });
-  // Listing must preserve the registration so the app can renew its pinned contract.
-  await pages.tool("page-set", input, caller);
-  expect(await pages.list()).toEqual([stable, settings]);
-  expect(await pages.get("fixture", input.id)).toMatchObject({ contracts: { read: contractHash } });
+  expect(await pages.get("fixture", "stable")).toMatchObject({ data: { view: { tool: "stable" } } });
+  // Listing preserves registrations so restoring the original tool identity restores navigation.
+  tools.set("read", { moduleId: "owner-id", inputSchema: {} });
+  expect(await pages.list()).toEqual([settings, stable]);
+  expect(await pages.get("fixture", input.id)).toMatchObject({ moduleId: "owner-id", purpose: "settings" });
 });
-test("settings preserve active-owner and pinned-tool checks across pause, contract replacement and owner recreation", async () => {
+test("settings preserve active-owner and tool identity checks across pause, description upgrades and owner recreation", async () => {
   const { deps, caller, input, modules, tools } = await fixture(), pages = createPages(deps);
   await pages.tool("page-set", input, caller);
   modules[0]!.status = "paused";
@@ -68,15 +68,15 @@ test("settings preserve active-owner and pinned-tool checks across pause, contra
   await expect(pages.get("fixture", input.id)).rejects.toMatchObject({ code: "conflict" });
   await expect(pages.tool("page-set", input, caller)).rejects.toMatchObject({ code: "conflict" });
   modules[0]!.status = "active";
-  tools.set("read", { ...tools.get("read")!, contractHash: "b".repeat(64) });
-  await expect(pages.get("fixture", input.id)).rejects.toMatchObject({ code: "conflict" });
+  tools.set("read", { ...tools.get("read")!, inputSchema: { description: "Updated read description" } });
+  expect(await pages.get("fixture", input.id)).toMatchObject({ moduleId: "owner-id", purpose: "settings" });
   modules[0]!.id = "new-owner";
   expect(await pages.list()).toEqual([]);
   expect(await pages.get("fixture", input.id)).toBeNull();
   await expect(pages.tool("page-set", input, caller)).rejects.toMatchObject({ code: "conflict" });
 });
 
-test("one inventory reuses each app discovery, and subsequent reads revalidate changed pins", async () => {
+test("one inventory reuses each app discovery, and subsequent reads revalidate tool identity", async () => {
   const { deps, caller, input, tools } = await fixture();
   let reads = 0;
   const pages = createPages({ ...deps, tools: async () => { reads++; return tools; } });
@@ -85,7 +85,7 @@ test("one inventory reuses each app discovery, and subsequent reads revalidate c
   reads = 0;
   expect(await pages.list()).toHaveLength(2);
   expect(reads).toBe(1);
-  tools.set("read", { ...tools.get("read")!, contractHash: "b".repeat(64) });
+  tools.set("read", { ...tools.get("read")!, moduleId: "replacement-id" });
   expect(await pages.list()).toEqual([]);
   expect(reads).toBe(2);
   await expect(pages.get("fixture", "main")).rejects.toMatchObject({ code: "conflict" });
