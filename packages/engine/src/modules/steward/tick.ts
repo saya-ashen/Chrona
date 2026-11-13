@@ -95,7 +95,7 @@ export function createTick(ports: StewardPorts) {
         if (execution) return (({ onInteraction: _observer, ...input }) => input)(execution);
         return { runId: run.id, token: run.token, lane, cwd: run.cwd, sessionDir, sessionId: ordinary!.sessionId,
           prompt: ordinary!.prompt, systemPrompt: ordinary!.systemPrompt, resources: ordinary!.resources, images: ordinary!.images, deadline: run.deadlineAt,
-          model: run.model, extraTools: ordinary!.extraTools, searchTools: ordinary!.searchTools, hostPaths: ordinary!.hostPaths, content: ordinary!.content };
+          extraTools: ordinary!.extraTools, searchTools: ordinary!.searchTools, hostPaths: ordinary!.hostPaths, content: ordinary!.content };
       }
       async function launchLocal(run: ClaimedRun, lane: "foreground" | "background" | "build") {
           const gate = providerStartGate();

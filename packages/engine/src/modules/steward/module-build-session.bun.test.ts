@@ -17,8 +17,8 @@ import { liveRuns } from "./runs";
 import { startLocalProvider } from "./local-runtime";
 import { moduleSupervisor } from "./module-supervisor";
 import { approvalNoticeBody } from "./external/notify/approval";
-import { buildControl, startOwnerBuild } from "./owner-build";
-import { buildDiagnostics, buildHealthTargets, controlBuild, declaredModules, queueBuild, startBuild, readBuildFacts, readBuildTranscript } from "./module-build-session";
+import { buildControl } from "./module-build-control";
+import { buildDiagnostics, buildHealthTargets, controlBuild, declaredModules, startBuild, readBuildFacts, readBuildTranscript } from "./module-build-session";
 import { recordModuleFailure } from "./module-diagnostics";
 import { createBuildGovernance } from "./build-governance";
 import { buildRequestSchema } from "./module-build-inputs";
@@ -239,67 +239,6 @@ test("missing required references reject before admitting or charging a build", 
   expect(f.starts).toHaveLength(0);
 });
 
-const ownerRequest = { name: "mail-sort", goal: "Only the authorized change", intent, requestKey: "one-user-authorization",
-  execution: { provider: "pi" as const, model: "openai/gpt-6.1-sol", timeoutMinutes: 10, maxSubmissions: 1 } };
-async function ownerFixture() {
-  return fixture({ name: "pi", supportsRunModel: true });
-}
-test("owner builds pin their own limits and model, deduplicate even after completion, and never resume", async () => {
-  const f = await ownerFixture();
-  const before = (await f.db.workspace.findUniqueOrThrow({ where: { id: f.workspaceId } })).settings;
-  const started = await startOwnerBuild(f.ports, f.workspaceId, ownerRequest);
-  expect((await f.db.workspace.findUniqueOrThrow({ where: { id: f.workspaceId } })).settings).toEqual(before);
-  await f.db.audit.deleteMany();
-  expect(await startOwnerBuild(f.ports, f.workspaceId, ownerRequest)).toMatchObject({ runId: started.runId, duplicate: true });
-  await expect(startOwnerBuild(f.ports, f.workspaceId, { ...ownerRequest, goal: "different" })).rejects.toMatchObject({ code: "conflict" });
-  // Global settings change after admission cannot inflate the single-run authorization.
-  await f.db.workspace.update({ where: { id: f.workspaceId }, data: { settings: { builds: { timeoutMinutes: 120, dailyLimit: 20, maxSubmissions: 20 } } } });
-  await f.db.audit.create({ data: { id: `build-execution:${started.runId}`, workspaceId: f.workspaceId, actorKey: "user", kind: "build_execution", details: { ...ownerRequest.execution, model: "other/model", maxSubmissions: 20, timeoutMinutes: 120 } } });
-  expect(await f.db.buildExecutionAdmission.findUniqueOrThrow({ where: { runId: started.runId } })).toMatchObject(ownerRequest.execution);
-  const claimed = (await f.api.runs.claimNext("build"))!;
-  expect(claimed.model).toBe("openai/gpt-6.1-sol");
-  expect(claimed.deadlineAt!.getTime() - claimed.startedAt.getTime()).toBe(600_000);
-  expect((await f.db.audit.findFirstOrThrow({ where: { kind: "run_claimed", subjectId: claimed.id } })).details).toMatchObject({ builds: { timeoutMinutes: 10, maxSubmissions: 1 } });
-  // Only the bounded claim is exercised; no Provider process was launched.
-  await f.api.runs.finish(claimed.id, { outcome: "timed_out", sessionId: null, error: "deadline" }, { stopEvidence: "never_started" });
-  expect(await startOwnerBuild(f.ports, f.workspaceId, ownerRequest)).toMatchObject({ runId: claimed.id, status: "timed_out", duplicate: true });
-  await expect(controlBuild(f.ports, f.workspaceId, started.sessionId, "continue")).rejects.toMatchObject({ code: "forbidden" });
-  expect(await f.db.run.count({ where: { sessionId: started.sessionId } })).toBe(1);
-  expect(before).not.toHaveProperty("builds.timeoutMinutes", 10);
-});
-test("owner bounds cannot authorize builtin targets, including replay after identity changes", async () => {
-  const f = await ownerFixture();
-  await expect(startOwnerBuild(f.ports, f.workspaceId, { ...ownerRequest, name: "agent" })).rejects.toMatchObject({ code: "forbidden" });
-  expect(await f.db.run.count({ where: { lane: "build" } })).toBe(0);
-  const started = await startOwnerBuild(f.ports, f.workspaceId, ownerRequest);
-  await f.db.module.create({ data: { workspaceId: f.workspaceId, name: ownerRequest.name, builtin: true } });
-  await expect(startOwnerBuild(f.ports, f.workspaceId, ownerRequest)).rejects.toMatchObject({ code: "forbidden" });
-  expect(await f.db.run.count({ where: { sessionId: started.sessionId } })).toBe(1);
-});
-test("owner build validation rejects host paths, multiple modules, unsupported providers and excess caps without enqueueing", async () => {
-  const f = await ownerFixture();
-  for (const request of [{ ...ownerRequest, files: ["/home/user/private"] }, { ...ownerRequest, modules: ["web", "calendar"] },
-    { ...ownerRequest, execution: { ...ownerRequest.execution, provider: "other" } },
-    { ...ownerRequest, execution: { ...ownerRequest.execution, timeoutMinutes: 121 } }]) await expect(startOwnerBuild(f.ports, f.workspaceId, request)).rejects.toThrow();
-  f.ports.provider = { ...f.ports.provider!, supportsRunModel: false };
-  await expect(startOwnerBuild(f.ports, f.workspaceId, ownerRequest)).rejects.toMatchObject({ code: "conflict" });
-  expect(await f.db.run.count({ where: { lane: "build" } })).toBe(0);
-});
-test("a changed Provider cannot claim a bounded owner build with a fallback", async () => {
-  const f = await ownerFixture();
-  const started = await startOwnerBuild(f.ports, f.workspaceId, ownerRequest);
-  const binding = await f.db.agentRunProvider.findUniqueOrThrow({ where: { runId: started.runId } });
-  await f.db.module.update({ where: { id: binding.moduleId }, data: { name: "retired-provider", status: "paused" } });
-  await f.db.agentProvider.deleteMany({ where: { workspaceId: f.workspaceId, moduleId: binding.moduleId } });
-  f.ports.provider = { ...f.ports.provider!, name: "different" };
-  await testProviderPorts(f.ports);
-  const replacement = await f.db.agentProvider.findUniqueOrThrow({ where: { workspaceId_id: { workspaceId: f.workspaceId, id: "different" } } });
-  expect(replacement.moduleId).not.toBe(binding.moduleId);
-  expect(await f.db.module.findUniqueOrThrow({ where: { id: replacement.moduleId } })).toMatchObject({ status: "active", activeHash: replacement.hash });
-  expect(await f.api.runs.claimNext("build")).toBeNull();
-  expect(await f.db.run.findUniqueOrThrow({ where: { id: started.runId } })).toMatchObject({ status: "failed" });
-  expect(f.starts).toHaveLength(0);
-});
 const cause = { moduleId: "health-module", activationId: "activation-1", incidentId: "incident-1" };
 async function otherConversation(f: Awaited<ReturnType<typeof fixture>>) {
   const session = await f.db.session.create({ data: { workspaceId: f.workspaceId, key: "web:other", source: "web" } });
@@ -376,21 +315,6 @@ test("without cause identical requests in different conversations still queue se
   expect((await f.governance.get()).buildUsage.used).toBe(2);
 });
 
-test("owner authorization is independent of a same-target causal build and key replay never retries", async () => {
-  const f = await ownerFixture();
-  const causal = await f.start({ ...request, cause }) as { sessionId: string };
-  const owner = await startOwnerBuild(f.ports, f.workspaceId, ownerRequest);
-  expect(owner.duplicate).toBe(false);
-  expect(owner.sessionId).not.toBe(causal.sessionId);
-  expect(await startOwnerBuild(f.ports, f.workspaceId, ownerRequest)).toMatchObject({ sessionId: owner.sessionId, runId: owner.runId, duplicate: true });
-  await f.db.run.update({ where: { id: owner.runId }, data: { status: "cancelled" } });
-  expect(await startOwnerBuild(f.ports, f.workspaceId, ownerRequest)).toMatchObject({ sessionId: owner.sessionId, runId: owner.runId, duplicate: true, status: "cancelled" });
-  await expect(queueBuild(f.ports, f.workspaceId, { key: "invalid-owner-cause", actorKey: "user", originSessionId: null,
-    request: buildRequestSchema.parse({ ...request, cause }), execution: ownerRequest.execution })).rejects.toMatchObject({ code: "invalid" });
-  await expect(startOwnerBuild(f.ports, f.workspaceId, { ...ownerRequest, cause })).rejects.toThrow();
-  expect(await f.db.run.count({ where: { lane: "build" } })).toBe(2);
-  expect((await f.governance.get()).buildUsage.used).toBe(2);
-});
 
 test("causes with both incidentId and topic or neither are invalid before admission", async () => {
   const f = await fixture();

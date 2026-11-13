@@ -319,7 +319,7 @@ flowchart LR
 ### 11.4 检查方式
 
 - 按 `AGENTS.md` **串行且限制内存**执行 `typecheck`、`lint`、`check:boundaries`、`test:bun`、`test:api`；Linux 可用带 `MemoryMax` 的 systemd-run，具体命令与原生 macOS/Windows 的执行条件见[验证记录](kernel-portability-verification.md)。不能把 systemd 作为产品运行依赖或原生平台测试的替代。
-- 端到端回放：在全新数据目录中完成一次 Agent 运行（普通对话请求和一次 Coding 项目工作）、一次 owner 发起的受控构建（生成、检查、激活）、events/notify/web 三类 hash 绑定各一次，并按 [steward-goals](steward-goals.md) §8 场景回放、保存截图。绿色 CI 不能替代这一步。
+- 端到端回放：在全新数据目录中完成一次 Agent 运行（普通对话请求和一次 Coding 项目工作）、一次当前会话创作（Agent 在已有 Run 中开发和构建，Author 提交精确材料，再检查、激活）、events/notify/web 三类 hash 绑定各一次，并按 [steward-goals](steward-goals.md) §8 场景回放、保存截图。绿色 CI 不能替代这一步。
 - 开发阶段用临时数据库、假 completion 和真实本地进程覆盖故障场景。当前已有实际设备程序、实际生产 HTTP/SDK/内核与 Pi 的本机确定性通过；跨主机设备、外部模型、账号或部署验收须另记范围、环境和证据。自动化测试遵守 `AGENTS.md`，不调用真实模型或 QQ。
 - 每个阶段结束时在本文追加一行状态，写明实际运行的命令和结果；没有运行的项要如实写明。
 

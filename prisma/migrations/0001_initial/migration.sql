@@ -672,16 +672,6 @@ CREATE TABLE "ModuleRemoval" (
 );
 
 -- CreateTable
-CREATE TABLE "BuildExecutionAdmission" (
-    "runId" TEXT NOT NULL PRIMARY KEY,
-    "provider" TEXT NOT NULL,
-    "model" TEXT NOT NULL,
-    "timeoutMinutes" INTEGER NOT NULL,
-    "maxSubmissions" INTEGER NOT NULL,
-    CONSTRAINT "BuildExecutionAdmission_runId_fkey" FOREIGN KEY ("runId") REFERENCES "Run" ("id") ON DELETE CASCADE ON UPDATE CASCADE
-);
-
--- CreateTable
 CREATE TABLE "BuildTargets" (
     "sessionId" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,

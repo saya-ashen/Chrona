@@ -5,9 +5,7 @@ import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { moduleManifestSchema, type AgentProviderRegistration, type ProviderTranscriptItem } from "@chrona/contracts/steward";
 import { registerAgentProvider } from "./agent-provider";
-import { assertBuildProvider, assertBuildProviderIn, buildExecutionSchema } from "./build-execution";
 import { assertExecutionModuleIdle } from "./execution-module-guard";
-import { startOwnerBuild } from "./owner-build";
 import { runtimeHealth } from "./runtime-health";
 import { sessionTranscript } from "./transcript";
 import { moduleSupervisor } from "./module-supervisor";
@@ -18,7 +16,6 @@ import "./module-effects";
 
 const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await close(); });
-const execution = { provider: "offline", model: "vendor/exact-model", timeoutMinutes: 5, maxSubmissions: 2 };
 const health = () => ({ name: "Fake backend display name", supportsRunModel: true, complete: false, available: true, sandboxed: false, error: null });
 async function fixture() {
   const db = testDb({ injectedAgent: false }), dataDir = await mkdtemp(join(tmpdir(), "chrona-provider-helpers-"));
@@ -53,43 +50,8 @@ async function fixture() {
   return { db, ports, workspaceId, register, session, run, requests, state };
 }
 
-test("build preflight resolves the registered id and checks available exact-model capability", async () => {
-  const f = await fixture(), backend = await f.register();
-  expect(buildExecutionSchema.parse(execution).provider).toBe("offline");
-  expect((await assertBuildProvider(f.ports, f.workspaceId, execution)).moduleId).toBe(backend.module.id);
-  await expect(assertBuildProvider(f.ports, f.workspaceId, { ...execution, provider: "unregistered" })).rejects.toMatchObject({ code: "conflict" });
-  f.state.health.supportsRunModel = false;
-  await expect(assertBuildProvider(f.ports, f.workspaceId, execution)).rejects.toMatchObject({ code: "conflict" });
-  f.state.health.supportsRunModel = true; f.state.health.available = false;
-  await expect(assertBuildProvider(f.ports, f.workspaceId, execution)).rejects.toMatchObject({ code: "conflict" });
-  f.state.health.available = true;
-  await f.db.module.update({ where: { id: backend.module.id }, data: { status: "paused" } });
-  const before = f.requests.length;
-  await expect(assertBuildProvider(f.ports, f.workspaceId, execution)).rejects.toMatchObject({ code: "forbidden" });
-  expect(f.requests).toHaveLength(before);
-});
 
-test("builds reject completion-only providers and owner admission awaits live preflight", async () => {
-  const f = await fixture();
-  await f.register("complete", { conversation: false });
-  await expect(assertBuildProvider(f.ports, f.workspaceId, { ...execution, provider: "complete" })).rejects.toMatchObject({ code: "conflict" });
-  await f.register();
-  f.state.health.available = false;
-  await expect(startOwnerBuild(f.ports, f.workspaceId, { name: "target-app", goal: "test", intent: { changes: ["test"] }, requestKey: "owner-request", execution })).rejects.toMatchObject({ code: "conflict" });
-  expect(await f.db.session.count()).toBe(0);
-});
 
-test("claim revalidation uses the Run binding, verifies workspace and does no module IO in the writer", async () => {
-  const f = await fixture(), backend = await f.register(), session = await f.session(), run = await f.run(session.id, backend.registration);
-  const before = f.requests.length;
-  expect((await f.db.$transaction(tx => assertBuildProviderIn(tx, f.workspaceId, execution, run.id))).runId).toBe(run.id);
-  expect(f.requests).toHaveLength(before);
-  await expect(assertBuildProviderIn(f.db, f.workspaceId, { ...execution, provider: "another" }, run.id)).rejects.toMatchObject({ code: "conflict" });
-  await expect(assertBuildProviderIn(f.db, "other-workspace", execution, run.id)).rejects.toMatchObject({ code: "conflict" });
-  await expect(assertBuildProvider(f.ports, f.workspaceId, { ...execution, provider: "another" }, run.id)).rejects.toMatchObject({ code: "conflict" });
-  await f.db.module.update({ where: { id: backend.module.id }, data: { activeHash: "changed" } });
-  await expect(assertBuildProviderIn(f.db, f.workspaceId, execution, run.id)).rejects.toMatchObject({ code: "forbidden" });
-});
 
 test("health discovers registered providers without a host Provider adapter", async () => {
   const f = await fixture();

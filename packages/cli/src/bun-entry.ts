@@ -9,22 +9,17 @@ function startServer(options: StartCommandOptions) {
   return import("./start-server.js").then(({ startChronaServer }) => startChronaServer(bootServer, options));
 }
 
-async function adminBuild(file: string) {
-  const [{ adminBuild }, { getChronaDataDir }] = await Promise.all([import("@server/admin-build"), import("./start-server.js")]);
-  return adminBuild(file, { dataDir: getChronaDataDir() });
-}
-
 async function main() {
   const args = process.argv.slice(2);
   const { createProgram } = await import("./program.js");
 
   if (args.length > 0 && args[0] !== "start") {
-    await createProgram({ startServer, adminBuild }).parseAsync(process.argv);
+    await createProgram({ startServer }).parseAsync(process.argv);
     return;
   }
 
   const startArgs = args[0] === "start" ? args.slice(1) : [];
-  const program = createProgram({ startServer, adminBuild });
+  const program = createProgram({ startServer });
   const startCommand = program.commands.find((command) => command.name() === "start");
   if (!startCommand) {
     throw new Error("chrona start command is not registered.");

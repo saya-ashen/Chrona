@@ -23,7 +23,7 @@
 
 ### Takeaway
 
-`system/modules.ts` 实际注册 **31 个工具**，包含数组生成的五个名称。其公开义务远大于工具数量：当前契约还包含官方包枚举、Git 上游协议、构建会话与队列策略、应用设置 DSL、健康状态机、权限页面结构，以及将宿主能力当作目录条目的分类体系。
+审计基线中 `system/modules.ts` 注册 **31 个工具**，包含数组生成的五个名称；下表已剔除退役构建入口，不代表当前工具清单。其公开义务远大于工具数量：当前契约还包含官方包枚举、Git 上游协议、构建会话与队列策略、应用设置 DSL、健康状态机、权限页面结构，以及将宿主能力当作目录条目的分类体系。
 
 ### Cited Findings
 
@@ -41,7 +41,7 @@ name: `m_${system.name}_${tool.name.replaceAll("-", "_")}`
 
 这不表示每个名称都向 Provider 开放。`systemEntries(audience)` 先按 `visibility` 过滤，再生成对应受众目录。模块可调用性还受路由准入及工具处理函数的进一步限制。见 `packages/engine/src/modules/steward/module-tools.ts:13-18`、`packages/engine/src/modules/steward/module-calls.ts:157-164`。
 
-### 2. 逐工具完整矩阵
+### 2. 基线逐工具矩阵（已剔除退役入口）
 
 表内 `m_modules_*` 是依上述规则转换的名称；是否实际进入某受众目录取决于可见性。
 
@@ -74,10 +74,9 @@ name: `m_${system.name}_${tool.name.replaceAll("-", "_")}`
 | **`build-session`** → `m_modules_build_session`，`packages/engine/src/modules/steward/system/modules.ts:192` | `{session}`；一个构建加最近最多 50 个 run facts。 | Web 非 Agent 会话 messages 分支；MCP `chrona_session`。见 `packages/engine/src/modules/steward/builtin/web/index.ts:84`、`packages/engine/src/modules/steward/external/mcp/index.ts:45`。 | **MOVE**。保留用户查看构建状态，数据由作者模块和 Agent 自有接口提供；不公开 kernel 专属“build session”永久类型。 |
 | **`build-transcript`** → `m_modules_build_transcript`，`packages/engine/src/modules/steward/system/modules.ts:193` | `{session}`；最多 100 条标准化脱敏 transcript。 | Web transcript；MCP transcript。见 `packages/engine/src/modules/steward/builtin/web/index.ts:83`、`packages/engine/src/modules/steward/external/mcp/index.ts:57`。 | **MOVE** 作者模块＋Agent。必须先提供授权读日志路径和脱敏保证，不能以减少内核为由把 host sessionDir 暴露给 Web。 |
 | **`build-settings`** → `m_modules_build_settings`，`packages/engine/src/modules/steward/system/modules.ts:194` | `{limits?:Partial<{dailyLimit,timeoutMinutes,maxSubmissions}>}`；读取／更新限制和今日 use。 | Web Settings GET/POST：`packages/engine/src/modules/steward/builtin/web/settings.ts:11,31`。 | **MOVE 默认作者业务额度；FREEZE 实际执行／授权预算的执行原则**。用户仍能控制作者模块的日额度；Agent/内核执行不能依赖应用自觉遵守 owner 上限。不应冻结“每日新 build session 次数”作为内核通用概念。 |
-| **`build-owner`** → `m_modules_build_owner`，`packages/engine/src/modules/steward/system/modules.ts:195` | `{name,goal,intent,requestKey,execution:{provider:"pi",model,timeoutMinutes,maxSubmissions}}`；显式单模块、exact model、一次性 key，不重启或重试。 | MCP `chrona_build`：`packages/engine/src/modules/steward/external/mcp/index.ts:92-94`；stopped CLI 复用 `startOwnerBuild`：`packages/engine/src/modules/steward/owner-build-run.ts:16-21`。 | **MOVE 正常作者入口；PRIVATE 保留 stopped-owner 救援执行器**。一次授权、exact model／时限／提交上限、重放不执行的治理不变。救援不能依赖可被删坏的 Web/Notify/作者模块；但无须因此把其完整 build 产品 API 永久公开。 |
 | **`request-group`** → `m_modules_request_group`，`packages/engine/src/modules/steward/system/modules.ts:196` | `{versions:[{module,hash}]}`，2..4 个，必须恰好覆盖调用构建声明的目标；需要数据迁移的成员拒绝；整体切换。 | 构建工具集和 group 作者提示：`packages/engine/src/modules/steward/module-reference.ts:11`、`packages/engine/src/modules/steward/module-build-session.ts:179-180`。 | **FREEZE 已有原子批量切换必要性；MOVE “一个构建声明几个模块／何时请求”流程**。批量候选必须先被内核登记为一个受治理集合；不能删掉 group 后依次 auto-activate，或让普通模块用循环调用假装原子。 |
 | **`stop-build`** → `m_modules_stop_build`，`packages/engine/src/modules/steward/system/modules.ts:197` | `{session}`；停止 queued/running，不撤回已提交版本与审批。 | MCP 泛工具显式允许；目录搜索特判加入。见 `packages/engine/src/modules/steward/external/mcp/index.ts:98-100`、`packages/engine/src/modules/steward/system/modules.ts:133-137`。 | **MOVE** 作者工作操作；底层 Agent／内核取消与实际停止证据保留。UI 必须继续说明“停止作者执行 ≠ 撤销候选或审批”。 |
-| **`revise-build`** → `m_modules_revise_build`，`packages/engine/src/modules/steward/system/modules.ts:197` | `{session,requirements,files?}`；先验证文件，再停旧 run，同 cwd 尾部排新 run；owner bounded build 不允许续跑。 | MCP 泛工具允许；构建工具目录特判。见 `packages/engine/src/modules/steward/external/mcp/index.ts:98-100`、`packages/engine/src/modules/steward/system/modules.ts:133-137`。 | **MOVE** 作者模块续写流程。保留旧 run 停止确认、参考材料先解析、已有审批不变与 bounded-owner 不可续跑；不冻结 request.json、沿用 cwd、旧 prompt 累加等作者实现。 |
+| **`revise-build`** → `m_modules_revise_build`，`packages/engine/src/modules/steward/system/modules.ts:197` | `{session,requirements,files?}`；先验证文件，再停旧 run，同 cwd 尾部排新 run。 | MCP 泛工具允许；构建工具目录特判。见 `packages/engine/src/modules/steward/external/mcp/index.ts:98-100`、`packages/engine/src/modules/steward/system/modules.ts:133-137`。 | **MOVE** 作者模块续写流程。保留旧 run 停止确认、参考材料先解析、已有审批不变与未知结果不重放；不冻结 request.json、沿用 cwd、旧 prompt 累加等作者实现。 |
 
 ### 3. 三个容易被注册描述误导的事实
 
@@ -331,34 +330,15 @@ export async function assertExecutionModuleIdle(
 |---|---|---|
 | 默认作者提示、manifest 帮助、例子、参考文件布局、active 源码复制、诊断快照、model tier 文案 | `packages/engine/src/modules/steward/module-build-session.ts:146-181` | 作者模块 |
 | 构建会话、goal/examples、request.json、cause 合并、修订 prompt、尾部排队、工作列表 | `packages/engine/src/modules/steward/module-build-session.ts:187-267,270-320` | 作者模块；执行仍经 Agent/内核治理 |
-| 真实提交者、授权目标、提交上限、exact model、deadline、一次性 owner request、未知停止 | `packages/engine/src/modules/steward/system/modules.ts:86-107`、`packages/engine/src/modules/steward/owner-build.ts:34-46`、`packages/engine/src/modules/steward/build-execution.ts:5-22` | 内核执行／生命周期强制边界，Agent 提供可信执行接口 |
+| 真实提交者、授权目标、提交上限、模型预算、deadline、未知停止 | 当前 Run 授权与生命周期治理；当前合同见 [Author/Agent 创作](../../docs/zh/author-current-conversation.md) | 内核执行／生命周期强制边界，当前 Agent 在已有 Run 内执行 |
 
 关键误区：`cause:{moduleId,activationId,incidentId|topic}` 是 **mind 自主修复去重策略**，不是通用内核构建授权。`outstandingCause` 会跨会话查同 cause 的 outstanding build 并复用。证据：`packages/engine/src/modules/steward/module-build-session.ts:205-218`；实际 mind 协议明确要求传 cause：`packages/engine/src/modules/steward/external/mind/execution.ts:6-8`。这应由 mind／作者模块协商，不应永久冻结为内核字段。
 
-### 3. stopped-owner build 必须保留，但不等于公开 build 产品必须保留
+### 3. 当前创作与独立救援的边界
 
-`adminBuild(file: string, options: Options = {})`：
+当前 Agent 在已有 Run 中开发、安装依赖、构建和验证；Author 只接收、导出和提交精确材料，不拥有编译器或额外执行队列。完整源码、锁、构建输入、制品字节和可执行模式继续校验，见[当前对话创作](../../docs/zh/author-current-conversation.md)与[版本材料](../../docs/zh/author-version-materials.md)。
 
-- 取得 SQLite exclusive runtime lock；
-- 只启动 loopback tool bridge；
-- 禁用常规 onQueued/onRunFinished；
-- 运行一次 recovery build；
-- 清理 runtime/server/db/lock。
-
-证据：`packages/cli/src/admin-build.ts:16-43`。
-
-`runOwnerBuild(ports: StewardPorts, workspaceId: string, input: unknown)`：
-
-- 其他 queued/running 工作或 building/testing 版本存在则拒绝；
-- 不跑正常 tick、builtin upgrades；
-- 重放 requestKey 返回原 receipt，不执行；
-- 只 claim 对应 run，否则取消且不重试；
-- 复用正常 `buildPending` 检查，而非绕过检查；
-- 失败需新的显式授权。
-
-证据：`packages/engine/src/modules/steward/owner-build-run.ts:15-57`。
-
-**最小保留方式：** 作为内核／宿主的私有 stopped-service 管理路径保存。普通作者模块被移除或损坏后仍能救援；但其 goal/intent/session/transcript/queue 产品模型不必因此成为永久应用契约。
+停服救援保留诊断、回滚、启停与精确审批等现有管理能力，写操作仍取得运行锁；不保留额外的模型构建执行器。未知外部效果查询原固定回执，停止状态不明时继续保留占用，不能借救援绕过授权或检查。
 
 ### 4. manifest、SDK 与生命周期字段逐项审查
 
@@ -436,7 +416,7 @@ readiness / healthCheck
 | `ModuleVersion` | manifest/intent/source/report/status 与 module/hash 唯一。`prisma/schema.prisma:85-98` | 内核保留固定候选及检查／授权状态；不公开 Prisma 行作为契约。 |
 | `Generation` | 所有模块 active hash 映射与 seq。`prisma/schema.prisma:100-109` | **PRIVATE** 原子激活实现。公开只需核对这次切换及目标版本，不必承诺全局 generation 模型。 |
 | `ModuleInvocation` | 真实 caller、callerModuleId/hash、target/tool、key、lease、unknown、callback。`prisma/schema.prisma:142-174` | 路由／身份／未知效果和 in-flight 删除守卫依据，不能迁移到任意管理模块自报。 |
-| Audit 中 build_request/targets/execution | 当前构建目标与 exact execution 的权威来源，非 writable request.json。`packages/engine/src/modules/steward/module-build-session.ts:40-48,220-250`、`packages/engine/src/modules/steward/build-execution.ts:13-17` | 内容要按最小授权记录重定界；不能全部转成作者私有 JSON 后丢掉强制目标授权。 |
+| Audit 中 build_request/targets | 内部构建会话保留目标授权事实，非 writable request.json。`packages/engine/src/modules/steward/module-build-session.ts`。旧 owner build 的 execution 授权已随旧入口删除。 | 当前候选仍由真实提交应用按精确材料准入；内部构建会话的目标约束继续保留。 |
 | Audit 中 install/upstream receipts | 官方安装幂等、merge 来源和结果归属。`packages/engine/src/modules/steward/module-install.ts:203-246`、`packages/engine/src/modules/steward/module-upstream.ts:61-95` | 分发模块拥有请求回执；内核候选／切换结果继续作为权威证据。迁移期间不得未知结果重提。 |
 | 应用 settings | workspace.settings.moduleSettings。`packages/engine/src/modules/steward/module-overview.ts:108-114` | 应用私有持久化；真实迁移另需明确授权，本审计没有执行。 |
 | readiness | supervisor instance 内存。`packages/engine/src/modules/steward/module-supervisor.ts:475` | 应用自检结果，不应为它建立新的内核持久存储。 |
@@ -457,8 +437,7 @@ readiness / healthCheck
 
 - Prisma、Generation、Git repository／bundle 导入与 active source 物化；
 - staging/store 路径、隔离命令、依赖安装器；
-- 自动启动回滚内部 eligibility、恢复扫描、重试次数；
-- stopped-owner 救援 driver。
+- 自动启动回滚内部 eligibility、恢复扫描、重试次数。
 
 **应移到模块的现有工作流：**
 
@@ -571,8 +550,7 @@ Web / MCP / QQ / mind
 | **目录重复且受众语义不同** | tools：`packages/engine/src/modules/steward/system/modules.ts:128-156`；reference：`packages/engine/src/modules/steward/module-reference.ts:17-62`；interfaces：`packages/engine/src/modules/steward/system-apps.ts:23-37` | 合并唯一目录，但保留开发所需声明读取与执行准入的区别；不强迫全工具元数据一次返回。 |
 | **健康投影永久固化恢复策略** | `packages/engine/src/modules/steward/module-diagnostics.ts:27-69` | 提取最小内核事实；open/nextAction/业务 ready 留在模块。保留 unknown 与 truncated 语义。 |
 | **官方包和 GitHub 上游限制进入内核合同** | `packages/contracts/src/steward/module-lifecycle.ts:33-49,60-64`；`packages/engine/src/modules/steward/module-upstream.ts:18` | 移到分发模块；内核只接收候选和目标，不设计未来 package registry framework。 |
-| **owner bounded build 的一次性授权可能随搬迁丢失** | `packages/engine/src/modules/steward/module-build-session.ts:233-237,278-285`；`packages/engine/src/modules/steward/owner-build.ts:35-46` | 保留 exact execution、request fingerprint、原 receipt、不得续跑；作者模块不可用相同授权创建新 run。 |
-| **stopped-owner 救援与当前 hash 格式不一致** | `packages/cli/src/admin.ts:19-20`；`packages/contracts/src/steward/module-lifecycle.ts:13` | 修正并静态／受控验证救援路径后才依赖它支持可删除 Web。此次未修改。 |
+| **离线 CLI 回滚与基线 hash 格式不一致** | `packages/cli/src/admin.ts:19-20`；`packages/contracts/src/steward/module-lifecycle.ts:13` | 修正并静态／受控验证救援路径后才依赖它支持可删除 Web。此次未修改。 |
 | **迁移所有权写死 builtin:false** | `packages/engine/src/modules/steward/module-migration.ts:24` | 先统一 Web/Notify 普通身份与迁移链；避免冻结后维护身份例外。 |
 | **group 新 OAuth 定义审批可能与单项不同** | `packages/engine/src/modules/steward/module-build.ts:93-98`；`packages/engine/src/modules/steward/module-group.ts:68-71` | 对齐精确 credential/OAuth 变更审批；不能在移动 orchestration 时放大现有差异。 |
 | **prompt 和注释残留已移除／错误能力** | `BUILD_REFERENCE_PROMPT` 仍提“五个 built-in”、旧保护规则：`packages/engine/src/modules/steward/module-reference.ts:14`；propose 长说明含旧 `content/chat/`、`provider.complete` 等：`packages/contracts/src/steward/index.ts:570-591`；entry 审批注释与代码不符：`packages/contracts/src/steward/index.ts:265-273` | 清理而非 grandfather。默认作者说明归模块，不应作为内核 schema 描述永久承担兼容义务。 |

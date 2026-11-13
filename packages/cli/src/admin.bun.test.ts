@@ -9,10 +9,7 @@ import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 import { createStewardService } from "@chrona/engine";
 import { removeSecret, runAdmin, setSecret } from "./admin";
 import { createProgram } from "./program";
-import { adminBuild } from "@server/admin-build";
 import { seedTestModuleRelease } from "../../engine/src/modules/steward/module-release-test-fixture";
-import { registerTestProvider } from "../../engine/src/modules/steward/test-provider";
-import * as stewardRuntime from "@server/steward-runtime";
 
 const dbs: PrismaClient[] = [];
 afterEach(async () => { for (const db of dbs.splice(0)) await db.$disconnect(); });
@@ -42,39 +39,9 @@ async function offlineResources(dataDir: string, name: string) {
 }
 test("admin commands are registered", () => {
   const admin = createProgram().commands.find(c => c.name() === "admin")!;
-  expect(admin.commands.map(c => c.name())).toEqual(["build", "legacy", "git-status", "git-associate", "git-push", "modules", "catalog", "install", "diagnostics", "approvals", "rollback", "disable", "enable", "remove", "approve", "reject", "secret-set", "secret-remove"]);
-});
-test("admin build dispatches the request file through the packaged host", async () => {
-  const files: string[] = [];
-  await createProgram({ adminBuild: async file => { files.push(file); } }).parseAsync(["node", "chrona", "admin", "build", "request.json"]);
-  expect(files).toEqual(["request.json"]);
+  expect(admin.commands.map(c => c.name())).toEqual(["legacy", "git-status", "git-associate", "git-push", "modules", "catalog", "install", "diagnostics", "approvals", "rollback", "disable", "enable", "remove", "approve", "reject", "secret-set", "secret-remove"]);
 });
 
-test("admin build respects the runtime lock and runs no ordinary tick or built-in upgrades", async () => {
-  const f = await fixture(), log = spyOn(console, "log").mockImplementation(() => {});
-  const file = join(f.options.dataDir, "request.json");
-  writeFileSync(file, JSON.stringify({ name: "owner-app", goal: "memory only", intent: { changes: ["memory"], preserves: [] }, requestKey: "once", execution: { provider: "pi", model: "openai/gpt-6.1-sol", timeoutMinutes: 10, maxSubmissions: 1 } }));
-  const createRuntime = stewardRuntime.createStewardRuntime;
-  const runtimeFactory = spyOn(stewardRuntime, "createStewardRuntime").mockImplementation((...args) => {
-    const runtime = createRuntime(...args);
-    registerTestProvider(runtime.ports.db);
-    return runtime;
-  });
-  const seen: unknown[] = [];
-  const provider = { name: "pi", supportsRunModel: true, async health() { return { available: true, sandboxed: true, error: null }; }, start(input: unknown) { seen.push(input); return { async inject() {}, async abort() {}, done: Promise.resolve({ outcome: "finished" as const, sessionId: null, error: null }) }; } };
-  const lock = acquireSqliteRuntimeLock(f.options.databaseUrl);
-  try { await expect(adminBuild(file, { ...f.options, provider })).rejects.toThrow("already in use"); }
-  finally { lock.release(); }
-  try {
-    const modules = await f.db.module.count();
-    expect(await adminBuild(file, { ...f.options, provider })).toMatchObject({ status: "finished" });
-    expect(seen).toHaveLength(1);
-    expect(seen[0]).toMatchObject({ model: "openai/gpt-6.1-sol", lane: "build" });
-    expect(await f.db.module.count()).toBe(modules);
-    expect(await f.db.stewardState.count()).toBe(0);
-    const released = acquireSqliteRuntimeLock(f.options.databaseUrl); released.release();
-  } finally { runtimeFactory.mockRestore(); log.mockRestore(); }
-});
 
 test("admin reads while runtime locked but refuses writes; approval audit source is cli", async () => {
   const f = await fixture(), log = spyOn(console, "log").mockImplementation(() => {});

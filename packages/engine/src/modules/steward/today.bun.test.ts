@@ -1,8 +1,5 @@
 import { expect, test } from "bun:test";
 import { todayView } from "./external/web/today";
-import { testDb } from "./test-db";
-import { startOwnerBuildAsCaller } from "./owner-build";
-import type { StewardPorts } from "./ports";
 
 const at = "2026-10-27T04:00:00Z";
 const runtime = { at, provider: { name: "fixture", available: true, sandboxed: false, lastError: null }, moduleSandbox: false,
@@ -77,17 +74,4 @@ test("web bounds private conversations and propagates private journal failures",
   expect((await todayView(f.call, async () => sessions)).sessions).toEqual(sessions.slice(0, 20));
   expect(f.calls.some(([target]) => target.startsWith("history."))).toBe(false);
   await expect(todayView(f.call, async () => { throw new Error("journal unavailable"); })).rejects.toThrow("journal unavailable");
-});
-test("owner builds recognize entry manifests without application-name lists", async () => {
-  const db = testDb(), workspaceId = (await db.workspace.create({ data: { name: "entries" } })).id;
-  const ports: StewardPorts = { db, dataDir: "/unused", now: () => new Date(at), publicUrl: null };
-  try {
-    for (const [name, uses, entry] of [["new-entry", ["approvals.grants"], false], ["agent-entry", ["*"], true],
-      ["approval-entry", ["approvals.revoke-grant"], false], ["web", ["approvals.request"], false]] as const) {
-      const module = await db.module.create({ data: { workspaceId, name, activeHash: "h" } });
-      await db.moduleVersion.create({ data: { moduleId: module.id, hash: "h", manifest: { name, entry: "index.ts", keepAlive: true, effects: [], authority: entry ? "owner" : undefined, ...(entry ? {listen:"/"} : {}), uses: [...uses], tests: ["test.ts"] }, status: "approved", source: "builtin", intent: {}, report: {} } });
-      const caller = { kind: "module" as const, module: name, moduleId: module.id, hash: "h" };
-      await expect(startOwnerBuildAsCaller(ports, workspaceId, caller, {})).rejects.toMatchObject(entry ? { name: "ZodError" } : { code: "forbidden" });
-    }
-  } finally { await db.$disconnect(); }
 });
