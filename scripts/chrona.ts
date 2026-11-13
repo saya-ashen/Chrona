@@ -29,6 +29,7 @@ export const COMMANDS: Record<string, Partial<Record<string, Command>>> = {
     types: command("Types", ...types),
     lint: command("Lint ratchet", ["scripts/lint-ratchet.ts"]),
     boundaries: command("Package boundaries", boundaries),
+    deadcode: command("Dead code (advisory)", ["x", "knip", "--no-progress"]),
   },
   test: TEST_COMMANDS,
   db: {

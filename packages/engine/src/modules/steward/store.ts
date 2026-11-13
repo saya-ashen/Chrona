@@ -10,7 +10,6 @@ export const toSchedule = (row: db.Schedule) => project(c.scheduleSchema, row);
 export const toRun = (row: db.Run) => project(c.runSchema, row);
 export const toApproval = (row: db.Approval) => project(c.approvalSchema, row);
 export const toGrant = (row: db.Grant) => project(c.grantSchema, row);
-export const toPreference = (row: db.Preference) => project(c.preferenceSchema, row);
 /** Stored attachments. The earliest web replies recorded `path` without `ref`: they keep their name and have no file. */
 export function storedAttachments(value: unknown): c.Attachment[] {
   const files = (Array.isArray(value) ? value : []).map(file => (file && typeof file === "object" ? { ...file, ref: (file as { ref?: unknown }).ref ?? null } : file));
