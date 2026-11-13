@@ -37,6 +37,8 @@ class ModuleSupervisor {
   private started = false;
   private poll?: ReturnType<typeof setTimeout>;
   constructor(private readonly ports: StewardPorts, private readonly timers: Timers, private readonly idleMs: number, private readonly backoffMs: number) {}
+  /** Code directories a running or retiring process still executes from. */
+  liveHashes() { return new Set([...this.instances.values()].map(instance => instance.hash)); }
   private isStopped() { return this.stopped; }
   private close(instance: Instance): Promise<void> {
     if (instance.closePromise) return instance.closePromise;
@@ -544,6 +546,7 @@ class ModuleSupervisor {
 export function createModuleSupervisor(ports: StewardPorts, { timers = globalThis, idleMs = 10 * 60_000, backoffMs = 1000 }: Options = {}) {
   const runtime = new ModuleSupervisor(ports, timers, idleMs, backoffMs);
   // Preserve the closure API: consumers may extract methods without a receiver.
-  return { deliver: runtime.deliver.bind(runtime), reconcile: runtime.reconcile.bind(runtime), listener: runtime.listener.bind(runtime),
+  return { liveHashes: runtime.liveHashes.bind(runtime), deliver: runtime.deliver.bind(runtime),
+    reconcile: runtime.reconcile.bind(runtime), listener: runtime.listener.bind(runtime),
     status: runtime.status.bind(runtime), start: runtime.start.bind(runtime), stop: runtime.stop.bind(runtime), settleModule: runtime.settleModule.bind(runtime) };
 }

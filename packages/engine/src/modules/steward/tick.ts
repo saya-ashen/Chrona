@@ -19,6 +19,7 @@ import { refreshInstallationReceipts } from "./module-install";
 import { ensureWorkspaceInitialized } from "./module-initialization";
 import { executionRunInput } from "./execution-context";
 import { pruneHistory } from "./retention";
+import { collectStore } from "./store-gc";
 
 import { contextRunTools } from "./agent-context-tools";
 import { contextRunImages } from "./agent-context-read";
@@ -77,6 +78,9 @@ export function createTick(ports: StewardPorts) {
     buildFailures.clear();
     // A backlog pass can take ~100 s on a large DB (measured); never hold up runs and timers for it.
     void pruneHistory(ports.db, now).catch(error => console.error(JSON.stringify({ component: "retention", event: "prune_failed", error: String(error).slice(0, 300) })));
+    void collectStore(ports, now).catch(function (error) {
+      console.error(JSON.stringify({ component: "store-gc", event: "collect_failed", error: String(error).slice(0, 300) }));
+    });
     for (const workspace of await ports.db.workspace.findMany()) {
       const workspaceId = workspace.id, runs = createRuns(ports, workspaceId);
       async function runInput(run: NonNullable<Awaited<ReturnType<typeof runs.claimNext>>>) {
