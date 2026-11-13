@@ -30,6 +30,26 @@ async function assertActivationTarget(tx: Prisma.TransactionClient, workspaceId:
   if (!moduleId || !payload || typeof payload !== "object" || Array.isArray(payload) || typeof payload.hash !== "string") throw new StewardError("invalid", "Module activation must be bound to a version hash");
   if (!await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: payload.hash } } })) throw new StewardError("not_found", "Module version not found");
 }
+const moduleEffectPayloadSchema = z.union([
+  groupPayloadSchema, moduleRemovePayloadSchema,
+  z.object({ kind: z.literal("activate_module"), moduleId: z.string(), hash: z.string() }).passthrough(),
+]);
+// Replaying after a newer activation would roll the app back to an older version.
+async function pendingModuleEffect(tx: Prisma.TransactionClient, workspaceId: string, row: Parameters<typeof toApproval>[0]) {
+  if (row.status !== "approved" || !row.resolvedAt) return false;
+  const parsed = moduleEffectPayloadSchema.safeParse(row.payload);
+  if (!parsed.success) return false;
+  const payload = parsed.data;
+  if (payload.kind === "module_remove") return !await tx.moduleRemoval.findFirst({ where: { workspaceId, moduleId: payload.moduleId } });
+  const versions = payload.kind === "activate_modules" ? payload.versions : [{ moduleId: payload.moduleId, hash: payload.hash }];
+  const modules = await tx.module.findMany({ where: { workspaceId, id: { in: versions.map(version => version.moduleId) } } });
+  if (versions.some(version => !modules.some(module => module.id === version.moduleId && module.status !== "migrating"))) return false;
+  if (versions.every(version => modules.some(module => module.id === version.moduleId && module.activeHash === version.hash && module.status === "active"))) return false;
+  const newer = await tx.moduleActivation.findFirst({ where: {
+    moduleId: { in: versions.map(version => version.moduleId) }, activatedAt: { gt: row.resolvedAt.toISOString() }, module: { workspaceId },
+  } });
+  return !newer;
+}
 async function afterResolve<T extends { payload: Prisma.JsonValue | null; request: boolean }>(result: T, id: string, workspaceId: string, ports: StewardPorts | undefined, onApproved: OnApproved | undefined): Promise<T> {
   if (onApproved && !result.request && result.payload !== null) await onApproved({ workspaceId, approvalId: id, payload: result.payload });
   if (ports && result.request) void drainCalls(ports, workspaceId).catch(error => console.error(JSON.stringify({ component: "approvals", event: "drain_calls.failed", workspaceId: workspaceId, error: String(error).slice(0, 2000) })));
@@ -59,19 +79,22 @@ export function createApprovals(context: RecordContext & { ports?: StewardPorts 
     }),
     resolve: (id: string, raw: unknown, source: string = "entry") => db.$transaction(async tx => {
       const input = parseInput(resolveApprovalSchema, raw);
+      const status = input.decision === "approve" ? "approved" : "denied";
       const row = await tx.approval.findFirst({ where: { workspaceId, id } });
       if (!row) throw new StewardError("not_found", "Approval not found");
       if (row.status !== "open") {
-        if (row.status !== (input.decision === "approve" ? "approved" : "denied")) throw new StewardError("conflict", "Approval already resolved differently");
-        return { approval: toApproval(row), grantId: null, payload: null, request: isModuleRequest(row.payload) };
+        if (row.status !== status) throw new StewardError("conflict", "Approval already resolved differently");
+        const replay = input.decision === "approve" && await pendingModuleEffect(tx, workspaceId, row);
+        if (replay) await audit(tx, { workspaceId, actor: "user", kind: "approval_replayed", subjectId: id, details: { source } });
+        return { approval: toApproval(row), grantId: null, payload: replay ? row.payload : null, request: isModuleRequest(row.payload) };
       }
       if (input.decision === "approve") await approve(tx, workspaceId, row);
       const grantId = null;
-      const changed = await tx.approval.updateMany({ where: { workspaceId, id, status: "open" }, data: { status: input.decision === "approve" ? "approved" : "denied", scope: input.scope, grantId, resolvedAt: now() } });
+      const changed = await tx.approval.updateMany({ where: { workspaceId, id, status: "open" }, data: { status, scope: input.scope, grantId, resolvedAt: now() } });
       if (!changed.count) throw new StewardError("conflict", "Approval already resolved");
       await recordWithdrawal(tx, workspaceId, `approval:${id}`, now());
       await audit(tx, { workspaceId, actor: "user", kind: "approval_resolved", subjectId: id, details: { ...input, grantId, source } });
-      if (isModuleRequest(row.payload)) await settleWaiting(tx, row.payload.call, { approval: id, decision: input.decision === "approve" ? "approved" : "denied" }, now());
+      if (isModuleRequest(row.payload)) await settleWaiting(tx, row.payload.call, { approval: id, decision: status }, now());
       return { approval: toApproval(await tx.approval.findUniqueOrThrow({ where: { id } })), grantId, payload: input.decision === "approve" ? row.payload : null, request: isModuleRequest(row.payload) };
     }).then(result => afterResolve(result, id, workspaceId, ports, onApproved)),
   };

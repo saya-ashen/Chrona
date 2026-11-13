@@ -94,6 +94,51 @@ test("a fresh app and an update adding credentials ask once", async () => {
   expect(await f.db.approval.count({ where: { status: "open" } })).toBe(1);
 });
 
+test("re-approving replays an activation whose first attempt failed", async () => {
+  const f = await fixture(), first = await f.propose();
+  await f.approve(first.approvalId!);
+  await f.write(2);
+  const next = await f.propose(), moduleId = first.moduleId!;
+  // An ongoing migration blocks activation after the approval decision has committed.
+  await f.db.module.update({ where: { id: moduleId }, data: { status: "migrating" } });
+  await expect(f.approve(next.approvalId!)).rejects.toThrow("Module is migrating");
+  expect(await f.db.approval.findUniqueOrThrow({ where: { id: next.approvalId! } })).toMatchObject({ status: "approved" });
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: moduleId } })).toMatchObject({ activeHash: first.hash });
+  await f.db.module.update({ where: { id: moduleId }, data: { status: "active" } });
+  await f.approve(next.approvalId!);
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: moduleId } })).toMatchObject({ activeHash: next.hash, status: "active" });
+});
+
+test("re-approving an applied activation is a no-op", async () => {
+  const f = await fixture(), first = await f.propose();
+  await f.approve(first.approvalId!);
+  await f.write(2);
+  const next = await f.propose();
+  await f.approve(next.approvalId!);
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: first.moduleId! } })).toMatchObject({ activeHash: next.hash, status: "active" });
+  await f.approve(next.approvalId!);
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: first.moduleId! } })).toMatchObject({ activeHash: next.hash, status: "active" });
+});
+
+test("re-approving after a newer activation does not roll back", async () => {
+  const f = await fixture(), first = await f.propose();
+  await f.approve(first.approvalId!);
+  await f.write(2);
+  const second = await f.propose(), moduleId = first.moduleId!;
+  await f.db.module.update({ where: { id: moduleId }, data: { status: "migrating" } });
+  await expect(f.approve(second.approvalId!)).rejects.toThrow("Module is migrating");
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: moduleId } })).toMatchObject({ activeHash: first.hash });
+  await f.db.module.update({ where: { id: moduleId }, data: { status: "active" } });
+  // Activation history must be strictly later than the failed approval's resolution.
+  f.ports.now = () => new Date("2026-10-20T04:01:00Z");
+  await f.write(3);
+  const third = await f.propose();
+  await f.approve(third.approvalId!);
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: moduleId } })).toMatchObject({ activeHash: third.hash, status: "active" });
+  await f.approve(second.approvalId!);
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: moduleId } })).toMatchObject({ activeHash: third.hash, status: "active" });
+});
+
 test.each(["package.json", "pyproject.toml", "system", "none"])("trusted local builds prepare declared dependencies: %s", async kind => {
   const f = await fixture();
   let installs = 0;
