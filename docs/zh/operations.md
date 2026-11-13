@@ -34,7 +34,8 @@ Agent 是唯一不可变内置应用；Web、Notify、QQ、Author 是普通默�
 
 固定内置为 `agent/web/notify`。`mcp/files/events` 已转为可选官方外置应用；保留已有身份、批准版本及私有数据，删除后启动不补装。Agent 不允许动态替换。当前开发仅面向本地，不以 chino 数据副本作为门禁；真实旧数据删除仍须单独确认。
 
-- Web 不可用时使用不可变救援页：审批、暂停应用、回滚已批准版本；没有聊天入口。
+- Web 不可用时使用不可变救援页：审批、暂停或恢复应用、回滚已批准版本；恢复按钮调用 `POST /api/modules/:id/resume`（请求体 `{}`，使用 `RESCUE_KEY` 认证），也适用于连续失败后自动暂停的应用；没有聊天入口。
+- 离线恢复先停止服务，再运行 `chrona admin enable <module>`（与 `chrona admin disable <module>` 使用同一数据库运行锁）；完成后重启 Chrona。
 - MCP 已删除时，停服后运行 `chrona admin catalog`，再用 `chrona admin install mcp --request-key <唯一键>`。这只是受理受检构建，不代表已安装完成；未知回执用原 key 查询，失败重试须明确使用新 key。
 - 全局 `history/content/memory`、`projects.default` 已删除。附件由所属应用读取；记忆和偏好由应用自己保存；默认项目由 Coding 选择，宿主只提供有界 `projects.create`。
 - OAuth 清单必须声明 HTTPS 授权/令牌端点。改变定义需要审批；没有定义绑定的旧凭据须重新授权，不能把旧 refresh token 自动发给新端点。

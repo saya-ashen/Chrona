@@ -37,6 +37,10 @@ export function createRescueApp(service: StewardService, key: string, html: stri
     z.object({}).strict().parse(await c.req.json());
     return c.json(await api().modules.lifecycle("disable", c.req.param("id"), { reason: "rescue" }, true));
   });
+  app.post("/api/modules/:id/resume", async c => {
+    z.object({}).strict().parse(await c.req.json());
+    return c.json(await api().modules.lifecycle("enable", c.req.param("id"), { reason: "rescue" }, true));
+  });
   app.post("/api/modules/:id/rollback", async c => {
     const input = z.object({ hash: z.string().min(1).max(200) }).strict().parse(await c.req.json());
     return c.json(await api().modules.rollback(c.req.param("id"), input.hash));

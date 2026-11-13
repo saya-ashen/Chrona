@@ -10,7 +10,7 @@
 </head>
 <body>
 <h1>Chrona rescue (immutable)</h1>
-<p>独立恢复控制台：处理审批、暂停或回滚应用。深度修复请在宿主运行 <code>chrona admin</code>；这里不提供对话。</p>
+<p>独立恢复控制台：处理审批、暂停、恢复或回滚应用。深度修复请在宿主运行 <code>chrona admin</code>；这里不提供对话。</p>
 <form id="login"><label>恢复密钥 <input id="key" type="password" autocomplete="off" required></label><button>连接</button></form>
 <p id="error" role="alert"></p>
 <main hidden id="console">
@@ -53,10 +53,12 @@ async function refresh() {
     article.append(node("h3", app.name), node("p", app.status));
     const pause = node("button", "暂停应用"); pause.disabled = app.status === "paused";
     pause.onclick = () => run(async () => { pause.disabled = true; try { await api(path + "/pause", {}); await refresh(); } finally { pause.disabled = app.status === "paused"; } });
+    const resume = node("button", "恢复应用"); resume.disabled = app.status !== "paused";
+    resume.onclick = () => run(async () => { resume.disabled = true; try { await api(path + "/resume", {}); await refresh(); } finally { resume.disabled = app.status !== "paused"; } });
     const form = node("form", ""), label = node("label", "回滚到已批准的版本哈希 "), hash = document.createElement("input");
     hash.required = true; hash.maxLength = 200; label.append(hash); form.append(label, node("button", "请求回滚"));
     form.onsubmit = event => { event.preventDefault(); run(async () => { await api(path + "/rollback", { hash: hash.value }); await refresh(); }); };
-    article.append(pause, form); el("modules").append(article);
+    article.append(pause, resume, form); el("modules").append(article);
   }
 }
 el("login").onsubmit = event => { event.preventDefault(); run(async () => { key = el("key").value; el("key").value = ""; await refresh(); el("console").hidden = false; el("login").hidden = true; }); };
