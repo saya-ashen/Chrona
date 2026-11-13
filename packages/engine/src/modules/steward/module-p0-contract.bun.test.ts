@@ -21,7 +21,7 @@ import { createStewardService } from "./service";
 import { modulePermissions } from "./module-overview";
 import { moduleInterfaces } from "./system-apps";
 import { createSecrets } from "./secrets";
-import { callSync, enqueueCall, kernelOrigin, moduleCallbackContractHash, runDueCalls } from "./module-calls";
+import { callSync, enqueueCall, kernelOrigin, runDueCalls } from "./module-calls";
 
 import { moduleLifecycleFixtures as fixtures } from "./module-lifecycle.fixtures";
 import { registerAgentProvider } from "./agent-provider";
@@ -143,28 +143,34 @@ test("failed initialization requires explicit retry; interrupted requests keep t
   await installExternal(f.ports, f.workspaceId, { package: "qq", mode: "install", requestKey: "interrupted" }); expect(calls).toBe(PREINSTALLED_MODULE_NAMES.length * 2 + 1);
 });
 
-test("queued callbacks cannot switch to a same-name reinstall or a changed tool contract", async () => {
-  for (const change of ["reinstall", "contract"] as const) {
+test("queued callbacks reject same-name reinstalls and invalid arguments but survive tool contract changes", async () => {
+  for (const change of ["reinstall", "contract", "arguments"] as const) {
     const f = await fixture(); let starts = 0;
-    f.ports.sandbox = { available: true, isolated: false, startModule() { starts++; throw new Error("Callback must be refused before execution"); } };
+    const peer = testModuleProcess(async event => { if (event.trigger.kind !== "tool") return {}; starts++; return { result: 42 }; });
+    f.ports.sandbox = { available: true, isolated: false, startModule: peer.startModule };
     const manifest = moduleManifestSchema.parse({ ...fixtures.external.manifest, tools: [{ name: "receive", description: "Fixture", parameters: { type: "object", properties: {}, required: [] }, visibility: ["kernel"], idempotent: true,
         output: {}
     }] });
     const row = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "alpha", activeHash: "a".repeat(64) } });
     await f.db.moduleVersion.create({ data: { moduleId: row.id, hash: row.activeHash!, status: "approved", source: "user", manifest, intent: {}, report: {} } });
     const call = await enqueueCall({ tx: f.db, ports: f.ports, origin: kernelOrigin(f.workspaceId), target: "alpha.receive", raw: {} }, { key: "callback-one" });
-    expect(await f.db.moduleInvocation.findUnique({ where: { id: call.callId } })).toMatchObject({ targetModuleId: row.id, targetContractHash: moduleCallbackContractHash(manifest.tools[0]!) });
+    expect(await f.db.moduleInvocation.findUnique({ where: { id: call.callId } })).toMatchObject({ targetModuleId: row.id, targetContractHash: null });
     if (change === "reinstall") {
       await f.db.module.delete({ where: { id: row.id } });
       const replacement = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "alpha", activeHash: row.activeHash } });
       await f.db.moduleVersion.create({ data: { moduleId: replacement.id, hash: row.activeHash!, status: "approved", source: "user", manifest, intent: {}, report: {} } });
     } else {
+      manifest.tools[0]!.description = "Updated callback description";
       manifest.tools[0]!.output = { type: "number" };
+      if (change === "arguments") manifest.tools[0]!.parameters = { type: "object", properties: { value: { type: "string" } }, required: ["value"] };
       await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: row.id, hash: row.activeHash! } }, data: { manifest } });
     }
     await runDueCalls(f.ports, f.workspaceId);
-    expect(await f.db.moduleInvocation.findUnique({ where: { id: call.callId } })).toMatchObject({ status: "failed", error: expect.stringContaining("target identity or contract changed") });
-    expect(starts).toBe(0);
+    const result = await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: call.callId } });
+    if (change === "contract") expect(result).toMatchObject({ status: "succeeded", output: 42, error: null, targetModuleId: row.id, targetContractHash: null });
+    else expect(result).toMatchObject({ status: "failed", error: expect.stringContaining(change === "reinstall" ? "conflict: queued callback target identity" : "Invalid tool arguments:") });
+    if (change === "arguments") await expect(callSync(f.ports, kernelOrigin(f.workspaceId), "alpha.receive", {})).rejects.toMatchObject({ code: "invalid" });
+    expect(starts).toBe(change === "contract" ? 1 : 0);
   }
 });
 

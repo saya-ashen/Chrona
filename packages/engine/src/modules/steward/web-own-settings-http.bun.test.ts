@@ -99,7 +99,7 @@ test("authenticated HTTP reads and saves Web's own settings through the real SDK
   expect(await f.db.run.count()).toBe(0);
 }, 30_000);
 
-test("own-settings HTTP retains page revision and contract pins and input/output validation", async () => {
+test("own-settings HTTP retains page revisions and validation while tool contracts change", async () => {
   await f.activate();
   const page = await f.page();
   for (const args of [[], "bad", { ...savedArgs, extra: true }, { ...savedArgs, "auto-recall": "false" }]) {
@@ -110,9 +110,15 @@ test("own-settings HTTP retains page revision and contract pins and input/output
   expect((await f.request("web.ui-settings", savedArgs, page)).status).toBe(409);
   const current = await f.page();
   const changed = structuredClone(f.manifest), settings = changed.tools!.find(tool => tool.name === "ui-settings")!;
+  settings.description = "Updated settings description";
+  settings.output = { type: "object", properties: { provider: { type: "string", description: "Selected memory provider" }, autoRecall: { type: "boolean" }, autoRetain: { type: "boolean" } }, required: ["provider", "autoRecall", "autoRetain"], additionalProperties: false };
+  await f.changeManifest(changed);
+  await success(await f.request("web.ui-settings", {}, current), { provider: "", autoRecall: true, autoRetain: true });
   settings.parameters.properties.provider = { type: "string", enum: ["memory-other"] };
   await f.changeManifest(changed);
-  expect((await f.request("web.ui-settings", savedArgs, current)).status).toBe(409);
+  const invalid = await f.request("web.ui-settings", savedArgs, current);
+  expect(invalid.status).toBe(400);
+  expect(await invalid.json()).toMatchObject({ code: "invalid" });
   expect((await f.request("web.ui-settings", savedArgs)).status).toBe(400);
   settings.output = { type: "object", properties: { unexpected: { type: "string" } }, required: ["unexpected"], additionalProperties: false };
   await f.changeManifest(changed);

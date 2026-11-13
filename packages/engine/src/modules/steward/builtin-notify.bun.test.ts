@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";
 import { moduleSupervisor } from "./module-supervisor";
-import { callSync, kernelOrigin, drainCalls, moduleCallbackContractHash } from "./module-calls";
+import { callSync, kernelOrigin, drainCalls } from "./module-calls";
 import { seedFactConsumer } from "./notification-facts";
 import { seedTestModuleRelease } from "./module-release-test-fixture";
 import { resolveExternalRelease } from "./module-release";
@@ -18,7 +18,7 @@ const transportManifest = (name: string) => moduleManifestSchema.parse({ name, e
     key: { type: "string" }, title: { type: "string" }, body: { type: "string" }, format: { type: "string", enum: ["text", "markdown"] }, link: { type: "string" }, recipient: { type: "string" }, approval: { type: "string" }, scoped: { type: "boolean" } } },
   output: { type: "object", properties: { outcome: { const: "accepted" }, receiptRef: { type: "string" } }, required: ["outcome", "receiptRef"], additionalProperties: false } }] });
 
-test("real notify SDK uses two external callbacks, persists target bindings and isolates a paused owner", async () => {
+test("real notify SDK uses two external callbacks, retains module bindings through contract changes and isolates a paused owner", async () => {
   registerSystemModules();
   const dataDir = await mkdtemp("/tmp/chrona-notify-routed-"), resources = join(dataDir, "platform/external"), db = testDb();
   const runtime = createScriptSandbox({ dataDir, executionMode: "trusted-local" });
@@ -57,6 +57,12 @@ on("tool",async ev=>{appendFileSync(join(chrona.paths.data,"sent.jsonl"),JSON.st
       }
       throw new Error(`notification not settled: ${key}`);
     }
+    for (const row of [alpha, beta]) {
+      const changed = transportManifest(row.name);
+      changed.tools[0]!.description = "Updated offline delivery description";
+      changed.tools[0]!.output.properties.receiptRef = { type: "string", description: "Transport receipt" };
+      await db.moduleVersion.update({ where: { moduleId_hash: { moduleId: row.id, hash: row.activeHash! } }, data: { manifest: changed } });
+    }
     await send("one"); await send("one");
     const sent = async (row: typeof alpha) => { try { return (await readFile(join(dataDir, "platform/data", row.id, "sent.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line)); } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return []; throw error; } };
     expect((await sent(alpha)).map(item => item.args.title)).toEqual(["one"]); expect(await sent(beta)).toEqual([]);
@@ -66,6 +72,6 @@ on("tool",async ev=>{appendFileSync(join(chrona.paths.data,"sent.jsonl"),JSON.st
     expect((await sent(beta))[0].caller).toMatchObject({ kind: "module", module: "notify", moduleId: notify.id });
     const calls = await db.moduleInvocation.findMany({ where: { workspaceId, tool: "deliver" } });
     expect(calls).toHaveLength(2);
-    for (const invocation of calls) expect(await db.moduleInvocation.findUnique({ where: { id: invocation.id } })).toMatchObject({ targetModuleId: invocation.target === "alpha" ? alpha.id : beta.id, targetContractHash: moduleCallbackContractHash(transportManifest(invocation.target).tools[0]!) });
+    for (const invocation of calls) expect(await db.moduleInvocation.findUnique({ where: { id: invocation.id } })).toMatchObject({ targetModuleId: invocation.target === "alpha" ? alpha.id : beta.id, targetContractHash: null });
   } finally { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); }
 }, 60_000);
