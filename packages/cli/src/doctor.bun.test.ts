@@ -197,7 +197,7 @@ it.each([
   } finally { rmSync(f.directory, { recursive: true, force: true }); }
 });
 
-it.each(["fresh", "local", "outdated", "unfetched", "missing", "invalid"])("compares the bundled release with installed Git ancestry: %s without writing data", async scenario => {
+it.each(["fresh", "local", "outdated", "unfetched", "missing", "invalid", "inactive", "inactive-rejected"])("compares the bundled release with installed Git ancestry: %s without writing data", async scenario => {
   const directory = mkdtempSync(join(tmpdir(), "chrona-doctor-install-"));
   const databasePath = join(directory, "chrona-test.db");
   ensureSqliteDatabase({ databaseUrl: `file:${databasePath}`, migrationsDir: join(import.meta.dir, "../../../prisma/migrations") });
@@ -213,8 +213,9 @@ it.each(["fresh", "local", "outdated", "unfetched", "missing", "invalid"])("comp
     const workspaceId = "ws_default";
     await db.workspace.create({ data: { id: workspaceId, name: "Doctor" } });
     const resources = join(directory, "external"), code = join(resources, "web");
+    const inactive = scenario.startsWith("inactive");
     mkdirSync(code, { recursive: true });
-    writeFileSync(join(code, "module.json"), JSON.stringify({ name: "web", entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [] }));
+    writeFileSync(join(code, "module.json"), JSON.stringify({ name: "web", entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [], ...(inactive ? { secrets: ["fixture_key"] } : {}) }));
     writeFileSync(join(code, "index.ts"), "// synthetic fixture\n");
     writeFileSync(join(code, "test.ts"), "// offline fixture\n");
     await seedTestModuleRelease(resources, "web");
@@ -226,12 +227,19 @@ it.each(["fresh", "local", "outdated", "unfetched", "missing", "invalid"])("comp
     await buildPending(moduleContext(ports, workspaceId));
     await refreshInstallationReceipts(ports, workspaceId);
     const installed = await installExternal(ports, workspaceId, request);
-    expect(installed.status).toBe("installed");
+    expect(installed.status).toBe(inactive ? "pending_approval" : "installed");
+    if (inactive) {
+      expect(await db.approval.findUniqueOrThrow({ where: { id: installed.approvalId! } })).toMatchObject({ status: "open", action: "activate_module" });
+    }
     const entry = (await externalPackageCatalog(ports, workspaceId)).find(item => item.name === "web")!;
     const module = await db.module.findUniqueOrThrow({ where: { id: installed.moduleId! } });
     expect(entry.releaseHash).toBe(entry.git?.commit ?? null);
-    expect(entry.releaseHash).toBe(module.activeHash);
+    if (inactive) expect(module.activeHash).toBeNull();
+    else expect(entry.releaseHash).toBe(module.activeHash);
     expect(entry.installation?.hash).toBe(entry.releaseHash);
+    if (scenario === "inactive-rejected") {
+      await db.moduleVersion.update({ where: { moduleId_hash: { moduleId: module.id, hash: installed.hash! } }, data: { status: "rejected", report: { tests: [], typecheck: { status: "failed", errors: [{ file: "index.ts", line: 1, code: 2322, message: "Inactive candidate failed checks" }] } } } });
+    }
     process.env.DATABASE_URL = `file:${databasePath}`;
     process.env.CHRONA_DATA_DIR = directory;
     process.env.CHRONA_RESOURCE_DIR = directory;
@@ -240,7 +248,7 @@ it.each(["fresh", "local", "outdated", "unfetched", "missing", "invalid"])("comp
       encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, GIT_AUTHOR_NAME: "Doctor test", GIT_AUTHOR_EMAIL: "doctor@localhost", GIT_COMMITTER_NAME: "Doctor test", GIT_COMMITTER_EMAIL: "doctor@localhost" },
     }).trim();
-    if (scenario !== "fresh") {
+    if (scenario !== "fresh" && !inactive) {
       const tree = git("rev-parse", `${entry.releaseHash}^{tree}`);
       const activeHash = scenario === "invalid" ? "a".repeat(40)
         : git("commit-tree", tree, ...(scenario === "outdated" ? [] : ["-p", entry.releaseHash!]), "-m", "Local customization");
@@ -263,9 +271,17 @@ it.each(["fresh", "local", "outdated", "unfetched", "missing", "invalid"])("comp
     if (scenario !== "missing") expect(before.some(([name]) => String(name).startsWith(`platform/repos/${module.id}.git/`))).toBe(true);
     const current = await inspectExternalApps();
     // Other missing fixtures and the paused Remind release still produce catalog warnings.
-    expect(current.status).toBe("warning");
+    expect(current.status).toBe(scenario === "inactive-rejected" ? "error" : "warning");
     expect(current.message).toContain("pi: Release resources missing");
-    if (["outdated", "unfetched"].includes(scenario)) {
+    if (inactive) {
+      const waiting = "web: installed but not yet active (waiting for approval or build); run chrona admin approvals to see pending items";
+      if (scenario === "inactive-rejected") {
+        expect(current.message).toContain(`web: update ${installed.hash!.slice(0, 8)} was rejected: Inactive candidate failed checks`);
+        expect(current.message).not.toContain(waiting);
+      } else expect(current.message).toContain(waiting);
+      expect(current.message).not.toContain("Could not compare web");
+      expect(current.message).not.toContain("web: bundled release differs");
+    } else if (["outdated", "unfetched"].includes(scenario)) {
       expect(current.message).toContain("web: bundled release differs from installed version; stop Chrona and run chrona admin install web --update --request-key <new-key>");
       expect(current.message).not.toContain("Could not compare web");
     } else if (["missing", "invalid"].includes(scenario)) {

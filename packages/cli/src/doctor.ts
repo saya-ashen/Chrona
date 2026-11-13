@@ -207,7 +207,7 @@ function rejectedUpdateMessage(
   module: { id: string; activeHash: string | null },
 ): string | undefined {
   const candidate = entry.installation;
-  if (module.activeHash && candidate?.moduleId === module.id && candidate.hash && candidate.hash !== module.activeHash
+  if (candidate?.moduleId === module.id && candidate.hash && candidate.hash !== module.activeHash
     && candidate.error?.reason === "installation_rejected") {
     return `${entry.name}: update ${candidate.hash.slice(0, 8)} was rejected: ${candidate.error.message}`;
   }
@@ -225,8 +225,10 @@ async function externalAppMessages(db: PrismaClient) {
       if (rejection) {
         rejected = true;
         messages.push(rejection);
+      } else if (!module.activeHash) {
+        messages.push(`${entry.name}: installed but not yet active (waiting for approval or build); run chrona admin approvals to see pending items`);
       } else if (entry.releaseHash && entry.releaseHash !== module.activeHash) {
-        const message = bundledReleaseMessage(entry.name, entry.moduleId, entry.releaseHash, module.activeHash ?? "");
+        const message = bundledReleaseMessage(entry.name, entry.moduleId, entry.releaseHash, module.activeHash);
         if (message) messages.push(message);
       }
     }
