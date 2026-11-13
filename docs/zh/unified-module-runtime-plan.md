@@ -2,7 +2,7 @@
 
 > 2026-11-09 当前状态：本文涉及旧 Editor 应用的架构、安装、接口、源码保留和验收结果均属于当时记录，相关运行指引已过时。Editor 已退役并移除；仅 Mind、Remind 整应用暂停并保留源码。现行编码接入见[客户端协议](coding-peer-clients-protocol.md)和[实施记录](coding-peer-clients-implementation.md)，删除范围及待补验证见[Editor 退役记录](editor-retirement.md)。保留本文的其他架构与历史证据；原测试计数、产物散列及部署事实不改写，也不证明本次清理已验证或部署。
 
-日期：2026-11-07。状态：**V1 本机统一实现、最终审查与隔离真实模型验收完成；未部署**。最终证据见[本机 V1 验收](./unified-module-v1-acceptance.md)。远端通用宿主属于后续版本，不是 V1 交付条件。
+日期：2026-11-07。状态：**V1 本机统一实现、最终审查与隔离真实模型验收完成；未部署**。最终证据见本机 V1 验收（已从工作树删除，见 git 历史 docs/zh/unified-module-v1-acceptance.md）。远端通用宿主属于后续版本，不是 V1 交付条件。
 核查基线：`platform-v2` / `31a726c9c1dc58a7a989a6beca57d573c59d7629`，文档修改前工作树干净。
 
 本文保存本机 V1 实施和后续远端 U3/U4 专题，接替此前把 Provider、执行后端、存储适配器作为独立对外调用类别的目标设计。全项目待办与优先级见[统一开发路线](development-roadmap.md)，近期调用治理详见[调用上下文路线](call-context-run-artifact-roadmap.md)。[当前架构](architecture.md)继续描述现有实现；[M1–M3 方案](chrona-workbench-unified-development-plan.md)、冻结的 P0/P1/P2 契约和各阶段验收记录保留历史与兼容依据；[Provider 分离计划](provider-kernel-module-plan.md)记录已完成的边界收窄。本文不表示通用远端模块已实现，不修改既有验收结果。
@@ -147,7 +147,7 @@ V1 直接实现最终本机结构，不为保持中间状态可用添加桥接�
 - Linux x64 真正编译二进制，打包发行资源与 11 个既有模块种子，ELF 校验、发行内模块类型检查以及隔离 fresh SQLite 的真实启动／HTTP smoke 均通过，`runtime: true`。制品：`/tmp/chrona-local-v1-release-UJy6P4/chrona-linux-x64`。未调用真实模型、QQ 或私人账户，未修改生产数据／服务。没有 schema 变更；未对真实用户库进行迁移。
 - 验证日志：`/tmp/chrona-local-acceptance-progress.log`，`/tmp/chrona-local-{typecheck,lint,check-boundaries,new-lint,affected,test-bun,test-api,release}.log`。113 项定向覆盖操作并发／固定身份／重建后不重放／未知完成／问答取消竞态／私密数据不持久化／输出拒绝／名称冲突／路径与符号链接保护，以及既有真实 Git 工作树和构建/admin 闭环。完整 API 保留真实 SDK/host、受控 fake Pi 及 SQLite 集成证据；跳过项仍为环境边界，不宣称真实模型或个人设备验收。
 - 过程中的失败已修复并在最终完整检查复验：模型 timeout 类别、调用审计断言、适配器错误正文、启动鉴权、源码变更造成的旧运行结果失效及循环依赖。重构结束不保留兼容执行路径或第二套队列。
-- 最终收口（2026-11-07）：修复服务端 wrapper 丢失 transcript、FIFO 打开阻塞、复合 Provider 工具 ID 丢事件三项问题；最终完整 Bun **1447 pass / 7 skip / 0 fail**，API **65 pass / 3 skip / 0 fail**，typecheck／lint／boundaries 通过；最终源码 Linux x64 构建及隔离 runtime smoke 通过。使用真实 Pi 与已配置模型验证编码、运行中指令、原生问答、工具事件、成果、显式审阅、取消及强制重启后 unknown 不重放。环境、失败轮次、最终 Run／成果标识与证据路径见[本机 V1 验收](./unified-module-v1-acceptance.md)。没有生产部署或远端 V2 实施。
+- 最终收口（2026-11-07）：修复服务端 wrapper 丢失 transcript、FIFO 打开阻塞、复合 Provider 工具 ID 丢事件三项问题；最终完整 Bun **1447 pass / 7 skip / 0 fail**，API **65 pass / 3 skip / 0 fail**，typecheck／lint／boundaries 通过；最终源码 Linux x64 构建及隔离 runtime smoke 通过。使用真实 Pi 与已配置模型验证编码、运行中指令、原生问答、工具事件、成果、显式审阅、取消及强制重启后 unknown 不重放。环境、失败轮次、最终 Run／成果标识与证据路径见本机 V1 验收（已从工作树删除，见 git 历史 docs/zh/unified-module-v1-acceptance.md）。没有生产部署或远端 V2 实施。
 
 ## 8. 范围控制与待冻结事项
 

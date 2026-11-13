@@ -16,9 +16,9 @@
 
 | 工作 | 最小下一步与完成条件 |
 | --- | --- |
-| API 合同收口 | [独立消费者与冻结门槛](kernel-api-acceptance.md)已加入；继续补齐 35 个工具的外部故障路径，不以单实现测试宣称可替换内核已验证 |
+| API 合同收口 | 独立消费者与冻结门槛（已从工作树删除，见 git 历史 docs/zh/kernel-api-acceptance.md）已加入；继续补齐 35 个工具的外部故障路径，不以单实现测试宣称可替换内核已验证 |
 | 产品闭环验收 | 用目标 §12 的真实新需求和连续补充验证完成、修订、暂停、恢复及主动反馈；记录失败场景，不以测试数量证明省心 |
-| Coding 使用反馈 | 按[客户端协议](coding-peer-clients-protocol.md)、[工作台验证](coding-workbench-validation.md)验证实际需要；work 执行合同暂不冻结 |
+| Coding 使用反馈 | 按[客户端协议](coding-peer-clients-protocol.md)、工作台验证（已从工作树删除，见 git 历史 docs/zh/coding-workbench-validation.md）验证实际需要；work 执行合同暂不冻结 |
 | 应用自动化 | [持续关注与恢复](continuous-steward-journey.md)包含 Mind 持久 timer、Files 读取和记忆纠正；尚需真实连续使用验收。memory-local 周期整理和 Remind 仍暂停 |
 | 发行与部署 | 选定精确 revision，核对生成合同、种子和制品，隔离构建及 fresh-data 验证；真实模型、账号和部署分别授权 |
 | 既有数据接管 | 另行盘点真实实例、设计备份及转换，在副本演练；不把旧接口兼容加回正常架构，不自行操作真实库 |

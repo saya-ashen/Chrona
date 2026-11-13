@@ -6,7 +6,7 @@
 
 ## M1 开发集成契约（2026-11-05）
 
-内核/五个发行内置名及 rescue 保留，应用类别只认 Module.builtin。动态操作禁止改内置；外置安装只接受可信官方包白名单，不接受宿主路径。具体 schema 见冻结 [P0 契约](chrona-workbench-p0-contract.md)，后续事务复核、回调持久身份与最终验证见[共享接线记录](chrona-workbench-m1-shared-integration.md)和 [M1 验收记录](chrona-workbench-m1-acceptance.md)。开发集成已连接动态入口的事务身份复核、可信发行注册与官方安装适配器。内置不走普通提案或代码回滚；修改须发布 Chrona。登记调用的 expectedTarget 只收紧 moduleId/contractHash，不授予权限。全量开发检查已完成，协调者已签署 M1 开发验收；[P1 契约](chrona-workbench-p1-contract.md)尚待审核冻结、无新的运行时权限路径；不能把受信资源目录当作 OS 隔离，也不能据此宣称生产部署。下文 2026-11-02/03 的审批统计、部署和旧模式转换是当时的决策背景；M1 不执行旧生产转换。
+内核/五个发行内置名及 rescue 保留，应用类别只认 Module.builtin。动态操作禁止改内置；外置安装只接受可信官方包白名单，不接受宿主路径。具体 schema 见冻结 [P0 契约](chrona-workbench-p0-contract.md)，后续事务复核、回调持久身份与最终验证见共享接线记录（已从工作树删除，见 git 历史 docs/zh/chrona-workbench-m1-shared-integration.md）和 M1 验收记录（已从工作树删除，见 git 历史 docs/zh/chrona-workbench-m1-acceptance.md）。开发集成已连接动态入口的事务身份复核、可信发行注册与官方安装适配器。内置不走普通提案或代码回滚；修改须发布 Chrona。登记调用的 expectedTarget 只收紧 moduleId/contractHash，不授予权限。全量开发检查已完成，协调者已签署 M1 开发验收；[P1 契约](chrona-workbench-p1-contract.md)尚待审核冻结、无新的运行时权限路径；不能把受信资源目录当作 OS 隔离，也不能据此宣称生产部署。下文 2026-11-02/03 的审批统计、部署和旧模式转换是当时的决策背景；M1 不执行旧生产转换。
 
 ## 1. 结论
 

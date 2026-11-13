@@ -4,7 +4,7 @@
 
 ## M1 开发集成恢复契约（2026-11-05）
 
-[P0 契约](chrona-workbench-p0-contract.md) 将代码回滚限定外置：内置只重启/暂停/诊断，修复通过 Chrona 发行，不允许恢复任意旧定制 hash。CLI、动态入口与审批事务均拒绝内置代码回滚；supervisor 启动内置只取可信发行资源，坏单项暂停诊断且继续其他注册。M1 开发完整套件、三尺寸浏览器及 Linux x64 发行 smoke 已完成；[验收记录](chrona-workbench-m1-acceptance.md)已由协调者签署 M1 开发验收，不代表生产部署。安装 pending/unknown 回执不重发副作用，按持久请求身份对账；旧无归属回调不猜测同名新应用。下文一次自动代码回滚仅适用外置模块；内置发行启动失败不回到任意旧 store 代码。
+[P0 契约](chrona-workbench-p0-contract.md) 将代码回滚限定外置：内置只重启/暂停/诊断，修复通过 Chrona 发行，不允许恢复任意旧定制 hash。CLI、动态入口与审批事务均拒绝内置代码回滚；supervisor 启动内置只取可信发行资源，坏单项暂停诊断且继续其他注册。M1 开发完整套件、三尺寸浏览器及 Linux x64 发行 smoke 已完成；验收记录（已从工作树删除，见 git 历史 docs/zh/chrona-workbench-m1-acceptance.md）已由协调者签署 M1 开发验收，不代表生产部署。安装 pending/unknown 回执不重发副作用，按持久请求身份对账；旧无归属回调不猜测同名新应用。下文一次自动代码回滚仅适用外置模块；内置发行启动失败不回到任意旧 store 代码。
 
 ## 目的与边界
 

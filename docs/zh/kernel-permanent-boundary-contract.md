@@ -5,7 +5,7 @@
 
 本文维护现有五命名空间的源码合同；后续设计见[API 目标规范](kernel-api-design.md)，新目标尚未实现或冻结。2026-11-09 的门禁是阶段证据，后续内核及应用变更分别见[内核迁移](kernel-agent-migration.md)、[应用迁移](application-migration.md)，不能沿用旧计数证明当前整树通过。
 
-状态：2026-11-09 本轮代码收缩及工程验收完成，**UNFROZEN（冻结候选，未宣布永久只增不删）**。具体命令、基线、结果与限制见[验收记录](kernel-permanent-boundary-validation.md)。本文依据本地主要源码，不把历史报告、旧类型导出、已存在的测试文件或此前检查次数视为本轮通过证据。[实施记录](kernel-permanent-boundary-implementation.md)记录实现与门禁。公开合同、应用所有权、仓库调用方及发布入口已经在本轮同步收缩。
+状态：2026-11-09 本轮代码收缩及工程验收完成，**UNFROZEN（冻结候选，未宣布永久只增不删）**。具体命令、基线、结果与限制见验收记录（已从工作树删除，见 git 历史 docs/zh/kernel-permanent-boundary-validation.md）。本文依据本地主要源码，不把历史报告、旧类型导出、已存在的测试文件或此前检查次数视为本轮通过证据。[实施记录](kernel-permanent-boundary-implementation.md)记录实现与门禁。公开合同、应用所有权、仓库调用方及发布入口已经在本轮同步收缩。
 
 ## 1. 所有权与适用范围
 
@@ -238,7 +238,7 @@ memory-local 不在上述整应用暂停名单；保留 recall/retain/forget/pre
 
 Notify 应用专属 lenient 分支已删除。普通应用调用缺失或不可用目标时，在创建异步队列记录前拒绝；Notify 与其他普通目标遵循同一规则。受限的内核内部延迟解析不赋予普通调用者该权限。
 
-以下工程出口已完成本轮范围验收；计数、环境与限制统一记录在[验收记录](kernel-permanent-boundary-validation.md)：
+以下工程出口已完成本轮范围验收；计数、环境与限制统一记录在验收记录（已从工作树删除，见 git 历史 docs/zh/kernel-permanent-boundary-validation.md）：
 
 | 门禁 | 验证内容 | 状态 |
 | --- | --- | --- |
