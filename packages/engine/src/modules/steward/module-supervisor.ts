@@ -314,7 +314,13 @@ class ModuleSupervisor {
       const current = active.get(instance.moduleId);
       if (current?.activeHash !== instance.hash || current.activationId !== instance.scope.receiverActivationId) this.retire(instance);
     }
-    for (const module of modules) await this.ensureActive(module.id);
+    for (const module of modules) {
+      try { await this.ensureActive(module.id); }
+      catch (error) {
+        console.error(JSON.stringify({ component: "module-supervisor", event: "reconcile.module_failed",
+          moduleId: module.id, module: module.name, error: String(error).slice(0, 2000) }));
+      }
+    }
     void this.announce(modules).catch(error => console.error(JSON.stringify({ level: "error", message: "module activated delivery failed", error: String(error) })));
   }
   /**
@@ -500,7 +506,15 @@ class ModuleSupervisor {
   async start() {
     if (this.started) return;
     this.stopped = false; this.started = true;
-    const loop = async () => { try { await this.reconcile(); } finally { if (!this.stopped) this.poll = this.timers.setTimeout(() => { void loop().catch(() => {}); }, 30_000); } };
+    const loop = async () => {
+      try { await this.reconcile(); }
+      finally {
+        if (!this.stopped) this.poll = this.timers.setTimeout(() => {
+          void loop().catch(error => console.error(JSON.stringify({ component: "module-supervisor",
+            event: "reconcile.loop_failed", error: String(error).slice(0, 2000) })));
+        }, 30_000);
+      }
+    };
     await loop();
   }
   /** Removal waits for this app's in-flight event and confirmed process exit before copying data. */

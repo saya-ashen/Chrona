@@ -57,13 +57,13 @@ export function createProviderChannel(ports: StewardPorts, run: RunIdentity, onI
         else await providerReceipt(db, run.workspaceId, request.id, status, now());
         request.status = status;
         await observe(request);
-        if (owned.size === 1) { await withdraw(); void drainCalls(ports, run.workspaceId).catch(() => {}); }
+        if (owned.size === 1) { await withdraw(); void drainCalls(ports, run.workspaceId).catch(error => console.error(JSON.stringify({ component: "provider-channel", event: "drain_calls.failed", workspaceId: run.workspaceId, error: String(error).slice(0, 2000) }))); }
       } catch (error) { resolve({ decision: "cancel" }); throw error; }
       finally { pending.delete(request.id); owned.delete(request.id); }
       resolve(signal.aborted || closed || now() >= expires ? { decision: "cancel" } : value);
     } };
-    const abort = () => { void entry.settle({ decision: "cancel" }, "interrupted").catch(() => {}); };
-    const timer = setTimeout(() => { void entry.settle({ decision: "cancel" }, "expired").catch(() => {}); }, expires.getTime() - at.getTime());
+    const abort = () => { void entry.settle({ decision: "cancel" }, "interrupted").catch(error => console.error(JSON.stringify({ component: "provider-channel", event: "interaction.settle_failed", runId: run.id, requestId: request.id, status: "interrupted", error: String(error).slice(0, 2000) }))); };
+    const timer = setTimeout(() => { void entry.settle({ decision: "cancel" }, "expired").catch(error => console.error(JSON.stringify({ component: "provider-channel", event: "interaction.settle_failed", runId: run.id, requestId: request.id, status: "expired", error: String(error).slice(0, 2000) }))); }, expires.getTime() - at.getTime());
     pending.set(request.id, entry); owned.add(request.id);
     signal.addEventListener("abort", abort, { once: true });
     try {
@@ -75,7 +75,7 @@ export function createProviderChannel(ports: StewardPorts, run: RunIdentity, onI
       });
       if (!entry.closed) await observe(request);
       if (signal.aborted || closed) abort();
-      void drainCalls(ports, run.workspaceId).catch(() => {});
+      void drainCalls(ports, run.workspaceId).catch(error => console.error(JSON.stringify({ component: "provider-channel", event: "drain_calls.failed", workspaceId: run.workspaceId, error: String(error).slice(0, 2000) })));
       if (entry.closed && !owned.size) await withdraw();
       return await answer;
     } catch (error) { await entry.settle({ decision: "cancel" }, "interrupted"); throw error; }

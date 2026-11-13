@@ -5,7 +5,7 @@ import { moduleManifestSchema, moduleCallSchema, type ModuleEvent } from "@chron
 import { moduleSupervisor } from "./module-supervisor";
 import { testModuleProcess } from "./module-test-process";
 import { testDb } from "./test-db";
-import { admitted, callSync, callsSettled, enqueueCall, kernelOrigin, moduleCallbackContractHash, moduleToolExampleError, runDueCalls, validateToolArgs } from "./module-calls";
+import { admitted, callStatus, callSync, callsSettled, enqueueCall, kernelOrigin, moduleCallbackContractHash, moduleToolExampleError, runDueCalls, validateToolArgs } from "./module-calls";
 import { callModuleTool, moduleToolCatalog } from "./module-tools";
 import { moduleIncidents, recordModuleFailure } from "./module-diagnostics";
 import { registerSystemModules } from "./system-modules";
@@ -461,6 +461,50 @@ test("async calls are stored under the caller's key, delivered once and answered
   expect(output(status)).toMatchObject({ result: { callId, status: "succeeded", output: { echo: "once" } } });
 });
 
+test("call result waits while the caller is paused and is delivered after resume", async () => {
+  const results: unknown[] = [];
+  const f = await fixture({
+    alpha: async event => { if (event.trigger.kind === "call_result") results.push(event.trigger); return {}; },
+    beta: async () => ({ result: { echo: "once" } }),
+  });
+  const origin = { ...kernelOrigin(f.workspace.id), caller: { kind: "module" as const, module: "alpha", moduleId: f.alpha.id, hash: "alpha-v1" } };
+  const queued = await enqueueCall({ tx: f.db, ports: f.ports, origin, target: "beta.echo", raw: {} }, { key: "paused-result", reply: true });
+  await f.db.moduleInvocation.update({ where: { id: queued.callId }, data: { status: "succeeded", output: {}, finishedAt: f.ports.now() } });
+  await f.db.module.update({ where: { id: f.alpha.id }, data: { status: "paused" } });
+  for (let i = 0; i < 5; i++) await runDueCalls(f.ports, f.workspace.id);
+  expect(results).toEqual([]);
+  await f.db.module.update({ where: { id: f.alpha.id }, data: { status: "active" } });
+  await runDueCalls(f.ports, f.workspace.id);
+  expect(results).toHaveLength(1);
+  expect(results).toMatchObject([{ kind: "call_result", callId: queued.callId, status: "succeeded", output: {} }]);
+});
+
+test("pre-delivery failure releases the lease for retry", async () => {
+  const received: unknown[] = [];
+  const f = await fixture({ alpha: async () => ({}), beta: async event => { received.push(event.trigger); return { result: {} }; } });
+  const origin = { ...kernelOrigin(f.workspace.id), caller: { kind: "module" as const, module: "alpha", moduleId: f.alpha.id, hash: "alpha-v1" } };
+  const queued = await enqueueCall({ tx: f.db, ports: f.ports, origin, target: "beta.echo", raw: {} }, { key: "pre-delivery", reply: false });
+  let failLookup = true;
+  const module = new Proxy(f.db.module, { get(delegate, property, receiver) {
+    if (property === "findUnique") return (...args: Parameters<typeof delegate.findUnique>) => {
+      if (failLookup) { failLookup = false; throw new Error("synthetic pre-delivery lookup failure"); }
+      return delegate.findUnique(...args);
+    };
+    return Reflect.get(delegate, property, receiver);
+  } });
+  const db = new Proxy(f.db, { get(client, property, receiver) {
+    return property === "module" ? module : Reflect.get(client, property, receiver);
+  } });
+  const ports = { ...f.ports, db };
+  await runDueCalls(ports, f.workspace.id);
+  expect(await callStatus(f.ports, origin, queued.callId)).toMatchObject({ status: "queued", error: "pre-delivery: Error: synthetic pre-delivery lookup failure" });
+  expect(received).toEqual([]);
+  f.advance(30_000);
+  await runDueCalls(f.ports, f.workspace.id);
+  expect(await callStatus(f.ports, origin, queued.callId)).toMatchObject({ status: "succeeded", output: {} });
+  expect(received).toHaveLength(1);
+});
+
 test("delivery outcomes: never-delivered retries, lost after sending is unknown, restarts redeliver only idempotent calls", async () => {
   const seen: string[] = [];
   const f = await fixture({ alpha: async () => ({}), beta: async (event, _call, input) => {
@@ -614,7 +658,7 @@ test("paused installed callers cannot invoke active tools or receive deferred re
   await expect(enqueueCall({ tx: f.db, ports: f.ports, origin: caller, target: "missing.echo", raw: {} }, { key: "paused-missing" })).rejects.toMatchObject({ code: "forbidden" });
   await expect(enqueueCall({ tx: f.db, ports: f.ports, origin: caller, target: "beta.echo", raw: {} }, { key: "old-callback", reply: true })).rejects.toMatchObject({ code: "forbidden" });
   await runDueCalls(f.ports, f.workspace.id);
-  expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: queued.callId } })).toMatchObject({ repliedAt: null, replyAttempts: 1 });
+  expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: queued.callId } })).toMatchObject({ repliedAt: null, replyAttempts: 0 });
   expect(await f.db.moduleInvocation.count()).toBe(1);
   expect(f.processes).toHaveLength(0);
   expect(await f.db.moduleRun.count()).toBe(0);

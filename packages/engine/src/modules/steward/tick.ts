@@ -152,7 +152,7 @@ export function createTick(ports: StewardPorts) {
         ["reconcile", async () => { await reconcileAgentStops(ports, workspaceId); }],
         ["launch", launch], ["expire", async () => { await runs.expireLeases(now); }],
         // Routed async calls (notifications among them) are delivered beside the tick.
-        ["calls", async () => { void drainCalls(ports, workspaceId).catch(() => {}); }],
+        ["calls", async () => { void drainCalls(ports, workspaceId).catch(error => console.error(JSON.stringify({ component: "tick", event: "drain_calls.failed", workspaceId: workspaceId, error: String(error).slice(0, 2000) }))); }],
       ] as const) {
         try { await action(); } catch (error) { failures.push({ workspaceId, stage, error }); }
       }
