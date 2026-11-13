@@ -229,7 +229,7 @@ it.each(["fresh", "local", "outdated", "unfetched", "missing", "invalid"])("comp
     expect(installed.status).toBe("installed");
     const entry = (await externalPackageCatalog(ports, workspaceId)).find(item => item.name === "web")!;
     const module = await db.module.findUniqueOrThrow({ where: { id: installed.moduleId! } });
-    expect(entry.releaseHash).toBe(entry.git?.commit);
+    expect(entry.releaseHash).toBe(entry.git?.commit ?? null);
     expect(entry.releaseHash).toBe(module.activeHash);
     expect(entry.installation?.hash).toBe(entry.releaseHash);
     process.env.DATABASE_URL = `file:${databasePath}`;
@@ -252,7 +252,7 @@ it.each(["fresh", "local", "outdated", "unfetched", "missing", "invalid"])("comp
       const release = await seedTestModuleRelease(resources, "web");
       const catalog = (await externalPackageCatalog(ports, workspaceId)).find(item => item.name === "web")!;
       expect(catalog.releaseHash).toBe(release.commit);
-      expect(catalog.releaseHash).toBe(catalog.git?.commit);
+      expect(catalog.releaseHash).toBe(catalog.git?.commit ?? null);
       expect(() => git("cat-file", "-e", `${release.commit}^{commit}`)).toThrow();
     }
     const snapshot = () => readdirSync(directory, { recursive: true }).map(name => {

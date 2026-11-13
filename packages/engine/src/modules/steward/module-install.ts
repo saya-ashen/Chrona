@@ -25,15 +25,22 @@ export function rejectionSummary(report: unknown): string {
   const build = report as Partial<BuildReport> | null;
   const error = build?.errors?.find(error => error.trim())
     ?? build?.typecheck?.errors?.find(error => error.message.trim())?.message
-    ?? build?.tests?.find(test => test.exitCode !== 0 && test.stderr.trim())?.stderr
+    ?? failedTestError(build?.tests)
     ?? "Module checks failed; inspect the version report";
   return redactSensitiveText(error).slice(0, 300);
+}
+
+function failedTestError(tests: BuildReport["tests"] | undefined): string | undefined {
+  return tests?.find(test => test.exitCode !== 0 && test.stderr.trim())?.stderr;
 }
 
 export const installationId = (workspaceId: string, requestKey: string) => `module-install:${createHash("sha256").update(workspaceId).update("\0").update(requestKey).digest("hex")}`;
 const submissionId = (workspaceId: string, key: string) => `${installationId(workspaceId, key)}:submission`;
 const activeSubmissions = new WeakMap<StewardPorts["db"], Set<string>>();
-const submissionSchema = z.object({ hash: z.string(), moduleId: z.string().nullable(), existingVersionId: z.string().nullable(), marker: z.string(), phase: z.enum(["prepared", "proposing", "submitted"]), error: z.string().nullable() });
+const submissionSchema = z.object({
+  hash: z.string(), moduleId: z.string().nullable(), existingVersionId: z.string().nullable(), marker: z.string(),
+  phase: z.enum(["prepared", "proposing", "submitted"]), error: z.string().nullable(),
+});
 type Submission = z.infer<typeof submissionSchema>;
 function installationResult(row: Prisma.ModuleInstallationGetPayload<object>): ModuleInstallResult {
   return moduleInstallResultSchema.parse({ package: row.package, requestKey: row.requestKey, status: row.status, moduleId: row.moduleId, hash: row.hash, approvalId: row.approvalId,
@@ -263,7 +270,7 @@ export async function recordInstallationResult(ports: StewardPorts, workspaceId:
     await tx.moduleInstallation.update({ where: { id }, data: resultData(result) });
     if (row.mode === "update" && result.error?.reason === "installation_rejected" && result.moduleId && result.hash) {
       const module = await tx.module.findFirst({ where: { id: result.moduleId, workspaceId, name: result.package, builtin: false } });
-      if (module) await rejectedUpdateNotice(ports, workspaceId, tx, module, result.hash, result.error.message);
+      if (module) await rejectedUpdateNotice({ ports, workspaceId, tx, module, hash: result.hash, error: result.error.message });
     }
   });
 }

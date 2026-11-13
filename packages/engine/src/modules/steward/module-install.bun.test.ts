@@ -231,7 +231,7 @@ test("rejected official update emits one lifecycle notice with its cause and ret
   await recordInstallationResult({ ...f.ports }, f.workspaceId, failed);
   const consumer = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "fact-reader", status: "active", activeHash: "reader" } });
   await selectFactConsumer(f.db, f.workspaceId, consumer.id, f.ports.now());
-  const facts = await readKernelFacts(f.db, f.workspaceId, { kind: "module", moduleId: consumer.id, hash: "reader" });
+  const facts = await readKernelFacts(f.db, f.workspaceId, { kind: "module", module: consumer.name, moduleId: consumer.id, hash: "reader" });
   const notices = facts.facts.filter(fact => fact.type === "lifecycle" && fact.data.fact.kind === "module-update-rejected");
   expect(notices).toHaveLength(1);
   expect(notices[0]).toMatchObject({ type: "lifecycle", data: { fact: { kind: "module-update-rejected", app: "files", hash: candidate.hash, activeHash: first.hash, error: error.slice(0, 300) } } });

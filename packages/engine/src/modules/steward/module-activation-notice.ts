@@ -2,7 +2,14 @@ import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { notifyLifecycle } from "./notify-user";
 import type { ModuleContext, ModuleVersion } from "./module-context";
 
-export async function rejectedUpdateNotice(ports: ModuleContext["ports"], workspaceId: string, tx: Parameters<typeof notifyLifecycle>[0], module: { id: string; name: string; activeHash: string | null }, hash: string, error: string) {
+export async function rejectedUpdateNotice({ ports, workspaceId, tx, module, hash, error }: {
+  ports: ModuleContext["ports"];
+  workspaceId: string;
+  tx: Parameters<typeof notifyLifecycle>[0];
+  module: { id: string; name: string; activeHash: string | null };
+  hash: string;
+  error: string;
+}) {
   if (!module.activeHash || module.activeHash === hash) return;
   await notifyLifecycle(tx, ports, workspaceId, `module-update-rejected:${module.id}:${hash}`, { kind: "module-update-rejected", app: module.name, hash, activeHash: module.activeHash, error: error.slice(0, 300), module: module.id });
 }

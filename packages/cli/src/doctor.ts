@@ -187,6 +187,32 @@ function externalResources(): string {
   return root ? join(root, "external") : fileURLToPath(new URL("../../engine/src/modules/steward/external", import.meta.url));
 }
 
+function bundledReleaseMessage(name: string, moduleId: string, releaseHash: string, activeHash: string): string | undefined {
+  const repo = join(getChronaDataDir(), "platform", "repos", `${moduleId}.git`);
+  const options: SpawnSyncOptionsWithStringEncoding = { encoding: "utf8", timeout: 5_000, maxBuffer: 4096, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] };
+  const release = spawnSync("git", [`--git-dir=${repo}`, "cat-file", "-e", `${releaseHash}^{commit}`], options);
+  const missingRelease = ![null, 0].includes(release.status) && !release.error && existsSync(repo);
+  const comparison = release.status === 0
+    ? spawnSync("git", [`--git-dir=${repo}`, "merge-base", "--is-ancestor", releaseHash, activeHash], options)
+    : release;
+  if (missingRelease || (release.status === 0 && comparison.status === 1)) return `${name}: bundled release differs from installed version; stop Chrona and run chrona admin install ${name} --update --request-key <new-key>`;
+  else if (comparison.status !== 0) {
+    const reason = comparison.error?.message || (comparison.stderr || "").trim() || `Git exited with status ${comparison.status} (signal ${comparison.signal})`;
+    return `Could not compare ${name} with the bundled release: ${reason}`;
+  }
+}
+
+function rejectedUpdateMessage(
+  entry: Awaited<ReturnType<typeof externalPackageCatalog>>[number],
+  module: { id: string; activeHash: string | null },
+): string | undefined {
+  const candidate = entry.installation;
+  if (module.activeHash && candidate?.moduleId === module.id && candidate.hash && candidate.hash !== module.activeHash
+    && candidate.error?.reason === "installation_rejected") {
+    return `${entry.name}: update ${candidate.hash.slice(0, 8)} was rejected: ${candidate.error.message}`;
+  }
+}
+
 async function externalAppMessages(db: PrismaClient) {
   const catalog = await externalPackageCatalog({ db, dataDir: getChronaDataDir(), now: () => new Date(), publicUrl: null, moduleExternalResources: externalResources() }, "ws_default");
   const messages: string[] = [];
@@ -195,23 +221,13 @@ async function externalAppMessages(db: PrismaClient) {
     if (entry.error) messages.push(`${entry.name}: ${entry.error}`);
     if (entry.moduleId) {
       const module = await db.module.findUniqueOrThrow({ where: { id: entry.moduleId } });
-      const candidate = entry.installation;
-      if (module.activeHash && candidate?.moduleId === module.id && candidate.hash && candidate.hash !== module.activeHash && candidate.error?.reason === "installation_rejected") {
+      const rejection = rejectedUpdateMessage(entry, module);
+      if (rejection) {
         rejected = true;
-        messages.push(`${entry.name}: update ${candidate.hash.slice(0, 8)} was rejected: ${candidate.error.message}`);
+        messages.push(rejection);
       } else if (entry.releaseHash && entry.releaseHash !== module.activeHash) {
-        const repo = join(getChronaDataDir(), "platform", "repos", `${entry.moduleId}.git`);
-        const options: SpawnSyncOptionsWithStringEncoding = { encoding: "utf8", timeout: 5_000, maxBuffer: 4096, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] };
-        const release = spawnSync("git", [`--git-dir=${repo}`, "cat-file", "-e", `${entry.releaseHash}^{commit}`], options);
-        const missingRelease = release.status !== null && release.status !== 0 && !release.error && existsSync(repo);
-        const comparison = release.status === 0
-          ? spawnSync("git", [`--git-dir=${repo}`, "merge-base", "--is-ancestor", entry.releaseHash, module.activeHash ?? ""], options)
-          : release;
-        if (missingRelease || (release.status === 0 && comparison.status === 1)) messages.push(`${entry.name}: bundled release differs from installed version; stop Chrona and run chrona admin install ${entry.name} --update --request-key <new-key>`);
-        else if (comparison.status !== 0) {
-          const reason = comparison.error?.message || comparison.stderr?.trim() || `Git exited with status ${comparison.status} (signal ${comparison.signal})`;
-          messages.push(`Could not compare ${entry.name} with the bundled release: ${reason}`);
-        }
+        const message = bundledReleaseMessage(entry.name, entry.moduleId, entry.releaseHash, module.activeHash ?? "");
+        if (message) messages.push(message);
       }
     }
   }
