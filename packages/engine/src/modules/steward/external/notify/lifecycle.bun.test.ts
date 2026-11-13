@@ -3,6 +3,15 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { createNotify, type Caller } from "./notify";
 import { openStore } from "./store";
 import { testDirectory } from "./test-directory";
+import { lifecycleNotice } from "./lifecycle";
+
+test("rejected update tells the owner why and identifies the retained version", () => {
+  const error = `TS2322: Type string is not assignable to number ${"x".repeat(400)}`;
+  const notice = lifecycleNotice("module-update-rejected", { app: "web", hash: "new-candidate", activeHash: "1234567890abcdef", error });
+  expect(notice.level).toBe("now");
+  expect(notice.title).toBe("应用 web 的更新未通过");
+  expect(notice.body).toBe(`应用 web 的更新未通过：${error.slice(0, 300)}。当前仍在运行旧版本 12345678，它可能与当前 Chrona 不兼容。`);
+});
 
 const at = new Date("2026-11-05T04:00:00Z");
 const caller = (name: string, id = `${name}-id`, hash = "h"): Caller => ({ kind: "module", module: name, moduleId: id, hash });

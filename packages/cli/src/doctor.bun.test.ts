@@ -281,3 +281,94 @@ it.each(["fresh", "local", "outdated", "unfetched", "missing", "invalid"])("comp
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+it("reports rejected updates and clears the error for the next candidate without writing data", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "chrona-doctor-install-"));
+  const databasePath = join(directory, "chrona-test.db");
+  ensureSqliteDatabase({ databaseUrl: `file:${databasePath}`, migrationsDir: join(import.meta.dir, "../../../prisma/migrations") });
+  const { PrismaClient } = await import("@chrona/db/generated/prisma/client");
+  const { PrismaBunSqlite } = await import("prisma-adapter-bun-sqlite");
+  const { seedTestModuleRelease } = await import("../../engine/src/modules/steward/module-release-test-fixture");
+  const { testModuleSandbox } = await import("../../engine/src/modules/steward/module-test-process");
+  const { createExternalModuleInstaller, installExternal, externalPackageCatalog, refreshInstallationReceipts } = await import("../../engine/src/modules/steward/module-install");
+  const { buildPending } = await import("../../engine/src/modules/steward/module-build");
+  const { moduleContext } = await import("../../engine/src/modules/steward/module-context");
+  const db = new PrismaClient({ adapter: new PrismaBunSqlite({ url: `file:${databasePath}` }) });
+  try {
+    const workspaceId = "ws_default";
+    await db.workspace.create({ data: { id: workspaceId, name: "Doctor" } });
+    const resources = join(directory, "external"), code = join(resources, "files");
+    mkdirSync(code, { recursive: true });
+    writeFileSync(join(code, "module.json"), JSON.stringify({ name: "files", entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [] }));
+    writeFileSync(join(code, "index.ts"), "// synthetic fixture\n");
+    writeFileSync(join(code, "test.ts"), "// offline fixture\n");
+    await seedTestModuleRelease(resources, "files");
+    const ports: import("../../engine/src/modules/steward/ports").StewardPorts = { db, dataDir: directory, now: () => new Date(), publicUrl: null, moduleExternalResources: resources, sandbox: testModuleSandbox(async () => ({ status: "succeeded", exitCode: 0, output: "{}", error: null })) };
+    ports.moduleExternalInstaller = createExternalModuleInstaller(ports);
+    const request = { package: "files" as const, mode: "install" as const, requestKey: "doctor-install" };
+    const first = await installExternal(ports, workspaceId, request);
+    expect(first.status).toBe("building");
+    await buildPending(moduleContext(ports, workspaceId));
+    await refreshInstallationReceipts(ports, workspaceId);
+    const installed = await installExternal(ports, workspaceId, request);
+    expect(installed.status).toBe("installed");
+    const entry = (await externalPackageCatalog(ports, workspaceId)).find(item => item.name === "files")!;
+    const module = await db.module.findUniqueOrThrow({ where: { id: installed.moduleId! } });
+    expect(entry.releaseHash).toBe(module.activeHash);
+    expect(entry.installation?.hash).toBe(entry.releaseHash);
+    process.env.DATABASE_URL = `file:${databasePath}`;
+    process.env.CHRONA_DATA_DIR = directory;
+    process.env.CHRONA_RESOURCE_DIR = directory;
+    const snapshot = () => readdirSync(directory, { recursive: true }).map(name => {
+      const path = join(directory, String(name)), stat = statSync(path, { bigint: true });
+      return [String(name), stat.mtimeNs, stat.size, stat.isFile() ? readFileSync(path) : null];
+    });
+    const before = snapshot();
+    const current = await inspectExternalApps();
+    // Other missing fixtures and the paused Remind release still produce catalog warnings.
+    expect(current.status).toBe("warning");
+    expect(current.message).not.toContain("files:");
+    expect(current.message).toContain("pi: Release resources missing");
+    expect(snapshot()).toEqual(before);
+    const repo = join(directory, "platform", "repos", `${module.id}.git`);
+    const git = (...args: string[]) => execFileSync("git", [`--git-dir=${repo}`, ...args], {
+      encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, GIT_AUTHOR_NAME: "Doctor test", GIT_AUTHOR_EMAIL: "doctor@localhost", GIT_COMMITTER_NAME: "Doctor test", GIT_COMMITTER_EMAIL: "doctor@localhost" },
+    }).trim();
+    const tree = git("rev-parse", `${entry.releaseHash}^{tree}`);
+    const activeHash = git("commit-tree", tree, "-m", "Unrelated installed version");
+    await db.module.update({ where: { id: module.id }, data: { activeHash } });
+    const outdatedBefore = snapshot();
+    const outdated = await inspectExternalApps();
+    expect(outdated.status).toBe("warning");
+    expect(outdated.message).toContain("files: bundled release differs from installed version; stop Chrona and run chrona admin install files --update --request-key <new-key>");
+    expect(snapshot()).toEqual(outdatedBefore);
+    await db.module.update({ where: { id: module.id }, data: { activeHash: installed.hash } });
+    writeFileSync(join(code, "module.json"), JSON.stringify({ name: "files", description: "Rejected update", entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [] }));
+    await seedTestModuleRelease(resources, "files");
+    const update = await installExternal(ports, workspaceId, { package: "files", mode: "update", requestKey: "doctor-rejected" });
+    const reason = "Type check index.ts:1 TS2322: Type string is not assignable to number";
+    await db.moduleVersion.update({ where: { moduleId_hash: { moduleId: module.id, hash: update.hash! } }, data: { status: "rejected", report: { tests: [], typecheck: { status: "failed", errors: [{ file: "index.ts", line: 1, code: 2322, message: reason }] } } } });
+    // Doctor sees the build result without requiring a running server to refresh receipts.
+    expect(update).toMatchObject({ status: "building", moduleId: module.id });
+    expect((await externalPackageCatalog(ports, workspaceId)).find(entry => entry.name === "files")?.installation).toMatchObject({ hash: update.hash, error: { reason: "installation_rejected" } });
+    const rejectedBefore = snapshot();
+    const rejected = await inspectExternalApps();
+    expect(rejected).toMatchObject({ key: "externalApps", status: "error" });
+    expect(rejected.message).toContain(`files: update ${update.hash!.slice(0, 8)} was rejected: ${reason}`);
+    expect(rejected.message).not.toContain("files: bundled release differs");
+    expect(await inspectExternalApps()).toEqual(rejected);
+    expect(snapshot()).toEqual(rejectedBefore);
+    await refreshInstallationReceipts(ports, workspaceId);
+    expect((await inspectExternalApps()).message).toContain(`files: update ${update.hash!.slice(0, 8)} was rejected: ${reason}`);
+    writeFileSync(join(code, "module.json"), JSON.stringify({ name: "files", description: "Next update", entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [] }));
+    await seedTestModuleRelease(resources, "files");
+    await installExternal(ports, workspaceId, { package: "files", mode: "update", requestKey: "doctor-next-update" });
+    const next = await inspectExternalApps();
+    expect(next.status).toBe("warning");
+    expect(next.message).not.toContain("was rejected");
+  } finally {
+    await db.$disconnect();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

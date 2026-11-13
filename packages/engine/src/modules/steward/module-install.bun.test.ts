@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { moduleManifestSchema, PREINSTALLED_MODULE_NAMES } from "@chrona/contracts/steward";
 import { testDb } from "./test-db";
 import { isModulePaused } from "./module-availability";
-import { createExternalModuleInstaller, externalPackageCatalog, installExternal, installationId, refreshInstallationReceipts } from "./module-install";
-import { factConsumer } from "./notification-facts";
+import { createExternalModuleInstaller, externalPackageCatalog, installExternal, installationId, recordInstallationResult, refreshInstallationReceipts, rejectionSummary } from "./module-install";
+import { factConsumer, readKernelFacts, selectFactConsumer } from "./notification-facts";
 import { ensureWorkspaceInitialized } from "./module-initialization";
 import { registerBuiltins } from "./module-builtin";
 import { requestRemove, removeApproved } from "./module-remove";
@@ -200,6 +200,42 @@ test("receipts reflect actual approval, paused selection, inactive approval and 
   const failed = await installExternal(f.ports, f.workspaceId, { ...update, requestKey: "retry" });
   expect(failed).toMatchObject({ status: "failed", error: { reason: "installation_rejected" } });
   expect(failed.error?.message).not.toContain("not-for-output");
+});
+
+test.each([
+  { report: { errors: ["First build error", "Second build error"] }, summary: "First build error" },
+  { report: { typecheck: { errors: [{ message: "First type error" }, { message: "Second type error" }] } }, summary: "First type error" },
+  { report: { tests: [{ exitCode: 0, stderr: "harmless" }, { exitCode: 1, stderr: "Test failed token=secret-value" }] }, summary: "Test failed credential=[Redacted]" },
+])("rejection summary uses the first useful error: $summary", ({ report, summary }) => {
+  expect(rejectionSummary(report)).toBe(summary);
+});
+
+test("rejected official update emits one lifecycle notice with its cause and retained version", async () => {
+  const f = await fixture(), context = moduleContext(f.ports, f.workspaceId);
+  const first = await installExternal(f.ports, f.workspaceId, { package: "files", mode: "install", requestKey: "before-rejection" });
+  await buildPending(context);
+  await refreshInstallationReceipts(f.ports, f.workspaceId);
+  await f.resource("files", { description: "Update that fails type checking" });
+  const request = { package: "files" as const, mode: "update" as const, requestKey: "rejected-update" };
+  const candidate = await installExternal(f.ports, f.workspaceId, request);
+  const error = `index.ts:1 TS2322: Type string is not assignable to number ${"x".repeat(400)}`;
+  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: candidate.moduleId!, hash: candidate.hash! } }, data: { status: "rejected", report: { tests: [], typecheck: { status: "failed", errors: [{ file: "index.ts", line: 1, code: 2322, message: error }] } } } });
+  const rejection = { status: "failed", hash: candidate.hash, error: { reason: "installation_rejected", message: error.slice(0, 300) } };
+  expect((await externalPackageCatalog(f.ports, f.workspaceId)).find(item => item.name === "files")?.installation).toMatchObject(rejection);
+  // Catalog observation stays read-only; the tick persists the receipt and notice together.
+  expect(await f.db.moduleInstallation.findUniqueOrThrow({ where: { id: installationId(f.workspaceId, request.requestKey) } })).toMatchObject({ status: "building" });
+  await refreshInstallationReceipts(f.ports, f.workspaceId);
+  await refreshInstallationReceipts({ ...f.ports }, f.workspaceId);
+  const failed = await installExternal(f.ports, f.workspaceId, request);
+  expect(failed).toMatchObject(rejection);
+  await recordInstallationResult({ ...f.ports }, f.workspaceId, failed);
+  const consumer = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "fact-reader", status: "active", activeHash: "reader" } });
+  await selectFactConsumer(f.db, f.workspaceId, consumer.id, f.ports.now());
+  const facts = await readKernelFacts(f.db, f.workspaceId, { kind: "module", moduleId: consumer.id, hash: "reader" });
+  const notices = facts.facts.filter(fact => fact.type === "lifecycle" && fact.data.fact.kind === "module-update-rejected");
+  expect(notices).toHaveLength(1);
+  expect(notices[0]).toMatchObject({ type: "lifecycle", data: { fact: { kind: "module-update-rejected", app: "files", hash: candidate.hash, activeHash: first.hash, error: error.slice(0, 300) } } });
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: first.moduleId! } })).toMatchObject({ activeHash: first.hash });
 });
 
 test("initialization converges from the existing build queue and never reinstalls removed preinstalls", async () => {

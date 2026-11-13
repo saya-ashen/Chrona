@@ -5,6 +5,7 @@ const notices: Record<string, (facts: Args, app: string, error: string) => Notic
   "module-activated": (facts, app) => {
     return { level: "digest", title: `应用 ${app} 已自动${facts.update ? "更新" : "启用"}`, body: `版本 hash: ${String(facts.hash)}\n可在应用历史中查看变更或回滚` };
   },
+  "module-update-rejected": (facts, app, error) => ({ level: "now", title: `应用 ${app} 的更新未通过`, body: `应用 ${app} 的更新未通过：${error.slice(0, 300)}。当前仍在运行旧版本 ${String(facts.activeHash).slice(0, 8)}，它可能与当前 Chrona 不兼容。` }),
   "module-build-failed": (_facts, app) => ({ level: "digest", title: `模块 ${app} 构建失败`, body: "连续构建失败，已停止自动重试。请检查测试报告后重新提交。" }),
   "module-migration-failed": (facts, app) => ({ level: "now", title: facts.restore ? `模块 ${app} 回滚未完成：数据恢复失败` : `模块 ${app} 新版本未启用：数据迁移失败`, body: "旧版本继续运行，请检查迁移报告后重新提交。" }),
   "schedule-failed": (facts, _app, error) => ({ level: "now", title: facts.disconnected ? "日程结果待核对" : "日程未完成", body: facts.disconnected
