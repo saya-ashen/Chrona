@@ -8,7 +8,6 @@ import { callSync, kernelOrigin } from "./module-calls";
 import { createAgentConversations } from "./external/web/agent-conversations";
 import { createRuns } from "./runs";
 import { createTools } from "./tools";
-import { moduleCallbackContractHash } from "./module-tool-contract";
 import { moduleToolCatalog } from "./module-tools";
 
 test("attachment ownership uses the complete private journal, not the recent message window", async () => {
@@ -142,7 +141,7 @@ test("structural Author targets survive Web selection, frozen admission, Run cat
     expect(requests[0]!.filter(target => typeof target === "string" && target.startsWith("author."))).toEqual([]);
     const admission = await f.ports.db.agentRunAdmission.findUniqueOrThrow({ where: { runId: sent.runId! } });
     expect(admission).toMatchObject({ moduleId: web.id, hash: web.activeHash,
-      targets: expect.arrayContaining(manifest.tools.map(tool => ({ target: `author.${tool.name}`, moduleId: author.id, contractHash: moduleCallbackContractHash(tool) }))) });
+      targets: expect.arrayContaining(manifest.tools.map(tool => ({ target: `author.${tool.name}`, moduleId: author.id }))) });
     const runs = createRuns(f.ports, f.workspaceId), run = (await runs.claimNext("foreground"))!;
     expect(run.id).toBe(sent.runId!);
     const endpoint = createTools(f.ports), catalog = await endpoint.catalog(run.token);
@@ -181,7 +180,8 @@ test("structural Author targets survive Web selection, frozen admission, Run cat
     await expect(endpoint.call(subsetRun.token, "m_author_submit", { input: "{}" })).rejects.toMatchObject({ code: "forbidden" });
     await f.ports.db.moduleVersion.update({ where: { id: version.id }, data: { manifest: { ...manifest,
       tools: manifest.tools.map(tool => tool.name === "receipt" ? { ...tool, parameters: { type: "object", properties: {} } } : tool) } } });
-    await expect(endpoint.catalog(subsetRun.token)).rejects.toMatchObject({ code: "conflict" });
+    expect((await endpoint.catalog(subsetRun.token)).map(tool => ({ name: tool.name, exposure: "exposure" in tool ? tool.exposure : undefined })))
+      .toEqual([{ name: "m_author_receipt", exposure: "direct" }]);
     await f.ports.db.moduleVersion.update({ where: { id: version.id }, data: { manifest } });
     await f.ports.db.module.update({ where: { id: web.id }, data: { activeHash: "caller-replaced" } });
     await expect(endpoint.catalog(subsetRun.token)).rejects.toMatchObject({ code: "forbidden" });

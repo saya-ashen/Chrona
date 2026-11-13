@@ -70,7 +70,7 @@ function agent(f: Awaited<ReturnType<typeof fixture>>) {
     loseRun: () => { loseRun = true; }, loseNotify: () => { loseNotify = true; },
     finish: (value = "finished") => { status = value; active = false; }, unknown: () => { status = "unknown"; active = true; },
     text: (text: string) => { items.push({ sequence: (items.at(-1)?.sequence ?? 0) + 1, kind: "progress", payload: { text } }); },
-    verify: (receipt: unknown, error = false) => { items.push({ sequence: (items.at(-1)?.sequence ?? 0) + 1, kind: "tool-result", payload: { type: "tool-result", value: { runId: "run-1", callId: "call-1", target: "mind.report", moduleId: "mind-test", hash: "mind-test-hash", contractHash: "a".repeat(64), status: error ? "failed" : "succeeded", outputState: "complete", output: receipt } } }); },
+    verify: (receipt: unknown, error = false) => { items.push({ sequence: (items.at(-1)?.sequence ?? 0) + 1, kind: "tool-result", payload: { type: "tool-result", value: { runId: "run-1", callId: "call-1", target: "mind.report", moduleId: "mind-test", hash: "mind-test-hash", status: error ? "failed" : "succeeded", outputState: "complete", output: receipt } } }); },
     wait: () => { interactions = [{ id: "question-1", status: "pending", expiresAt: later(60_000), question: { title: "Please sign in", message: "Source access needs your action." } }]; },
   };
 }

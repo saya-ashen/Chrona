@@ -1,7 +1,7 @@
 import { moduleManifestSchema, type ModuleTool, type ModuleToolParameter } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 
-// Mirror normalizedToolInputSchema/moduleCallbackContractHash for persisted manifest tools.
+// Compare normalized input, output and admission metadata for persisted manifest tools.
 // Importing module-calls here would cycle through supervisor -> builtin -> build -> impact.
 function normalizedParameter(parameter: ModuleToolParameter): Record<string, unknown> {
   if ("anyOf" in parameter) return { anyOf: parameter.anyOf.map(normalizedParameter), ...(parameter.description ? { description: parameter.description } : {}) };

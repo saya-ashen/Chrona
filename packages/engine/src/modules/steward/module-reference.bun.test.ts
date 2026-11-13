@@ -51,13 +51,14 @@ test("references expose the current public contracts without runtime execution",
   const index = (await f.call("modules.describe") as { items: unknown[] }).items;
   expect(index).toEqual(expect.arrayContaining([expect.objectContaining({ target: "modules.health", description: expect.any(String) })]));
   expect(JSON.stringify(index)).toContain("inputSchema");
+  for (const reference of index) expect(reference).not.toHaveProperty("contractHash");
   expect(listSystemModules().find(module => module.name === "modules")!.tools.map(tool => tool.name)).toEqual([
     "list", "describe", "health", "admit", "source", "submit", "receipt", "enable", "disable", "rollback", "remove", "operation",
   ]);
   const diagnostics = listSystemModules().find(module => module.name === "modules")!.tools.find(tool => tool.name === "health")!;
   expect(await f.call("modules.describe", { target: "modules.health" })).toMatchObject({ target: "modules.health",
     inputSchema: { type: "object", properties: { moduleId: { type: "string" } } }, outputSchema: { type: "object" },
-    admission: { visibility: diagnostics.visibility, uses: "modules.health" }, contractHash: moduleCallbackContractHash(diagnostics) });
+    admission: { visibility: diagnostics.visibility, uses: "modules.health" } });
   for (const target of ["modules.checkout", "modules.propose", "modules.check", "modules.request-group", "modules.settings-get", "modules.settings-set", "modules.catalog", "modules.upstream"]) {
     await expect(f.call("modules.describe", { target })).rejects.toMatchObject({ code: "not_found" });
   }
@@ -74,7 +75,8 @@ test("system reference, internal inspection, catalogs and calls use the same com
   for (const system of listSystemModules()) for (const tool of system.tools) {
     const target = `${system.name}.${tool.name}`, contract = committedToolContract(target);
     const reference = await interfaceReference(f.ports, f.workspace.id, target);
-    expect(reference).toMatchObject({ inputSchema: contract.input, outputSchema: contract.output, contractHash: moduleCallbackContractHash(tool) });
+    expect(reference).toMatchObject({ inputSchema: contract.input, outputSchema: contract.output });
+    expect(reference).not.toHaveProperty("contractHash");
     const inspected = interfaces.find(item => item.name === system.name)!.tools.find(item => item.name === tool.name)!;
     expect(inspected.inputSchema).toEqual(contract.input);
     expect(inspected.outputSchema).toEqual(contract.output);
@@ -105,10 +107,10 @@ test("reference hash describes the live tool and ignores documentation and objec
   expect(moduleCallbackContractHash({ ...tool, visibility: ["owner"] })).not.toBe(moduleCallbackContractHash(tool));
   expect(moduleCallbackContractHash({ ...tool, output: { type: "string" } })).not.toBe(moduleCallbackContractHash(tool));
   expect(moduleCallbackContractHash({ ...tool, parameters: { ...tool.parameters, required: ["value", "count"] } })).not.toBe(moduleCallbackContractHash(tool));
-  const reference = await f.call("modules.describe", { target: "target.read" }) as { contractHash: string };
+  const reference = await f.call("modules.describe", { target: "target.read" });
+  expect(reference).not.toHaveProperty("contractHash");
   const origin = { workspaceId: f.workspace.id, caller: { kind: "owner" as const, via: null }, chain: [], path: [] };
-  await expect(callSync(f.ports, origin, "target.read", { unexpected: true }, { expectedTarget: { moduleId: module.id, contractHash: reference.contractHash } })).rejects.toMatchObject({ code: "invalid" });
-  await expect(callSync(f.ports, origin, "target.read", { unexpected: true }, { expectedTarget: { moduleId: module.id, contractHash: "0".repeat(64) } })).rejects.toMatchObject({ code: "invalid" });
+  await expect(callSync(f.ports, origin, "target.read", { unexpected: true }, { expectedTarget: { moduleId: module.id } })).rejects.toMatchObject({ code: "invalid" });
 });
 
 test.each(["building", "testing", "pending_review", "rejected", "active", "missing", "malformed", "paused", "migrating", "no-hash"])("references and declarations exclude a non-approved or inactive active pointer: %s", async state => {
@@ -150,7 +152,7 @@ test("exact references do not enumerate unrelated modules or manifests", async (
   const db = f.db.$extends({ query: { $allModels: { async $allOperations({ model, operation, args, query }) { reads.push(`${model}.${operation}`); return query(args); } } } });
   const ports = { ...f.ports, db } as StewardPorts;
   {
-    expect(await interfaceReference(ports, f.workspace.id, "modules.list")).toMatchObject({ target: "modules.list", contractHash: expect.any(String) });
+    expect(await interfaceReference(ports, f.workspace.id, "modules.list")).toMatchObject({ target: "modules.list" });
     expect(await interfaceReference(ports, f.workspace.id, "target.read")).toMatchObject({ source: { hash: "v1" }, outputSchema: {} });
     expect(reads).toEqual(["Module.findFirst", "ModuleVersion.findUnique"]);
   }

@@ -9,7 +9,7 @@ import { createModules } from "../modules";
 import { discoveryAdmission } from "../module-call-admission";
 import { CallError } from "../module-call-error";
 import { listSystemModules } from "../module-registry";
-import { moduleCallbackContractHash, normalizedToolInputSchema } from "../module-tool-contract";
+import { normalizedToolInputSchema } from "../module-tool-contract";
 import type { Caller, Json, Tool } from "../module-call-types";
 import type { SystemModule } from "../module-system-types";
 import type { SystemTool } from "../module-system-tool-types";
@@ -20,12 +20,12 @@ import { json, requireOwner } from "./shared";
 
 type ToolSearchOptions = { workspaceId: string; canRead: (tool: SystemTool | Tool) => boolean; words: string[]; userTools: boolean };
 const searchMatch = ({ canRead, words, userTools }: ToolSearchOptions, target: string, candidate: SystemTool | Tool) => (!userTools || candidate.visibility.some(audience => audience === "owner" || audience === "provider")) && words.every(word => `${target} ${candidate.description}`.toLowerCase().includes(word)) && canRead(candidate);
-type ToolSearchResult = { moduleId?: string; hash?: string; contractHash?: string; target: string; description: string; inputSchema: Record<string, unknown>; outputSchema: Json | null; examples: Json[] | null; sideEffects: string[] | null; errors: Json[] | null; retry: string; idempotent: boolean };
+type ToolSearchResult = { moduleId?: string; hash?: string; target: string; description: string; inputSchema: Record<string, unknown>; outputSchema: Json | null; examples: Json[] | null; sideEffects: string[] | null; errors: Json[] | null; retry: string; idempotent: boolean };
 function searchSystemResult(target: string, candidate: SystemTool): ToolSearchResult { return { target, description: candidate.description, inputSchema: moduleToolContract(candidate).input, outputSchema: moduleToolContract(candidate).output as Json | null, examples: (candidate as { examples?: Json[] }).examples ?? null, sideEffects: "sideEffects" in candidate ? (candidate as { sideEffects?: string[] }).sideEffects ?? null : null, errors: "errors" in candidate ? (candidate as { errors?: Json[] }).errors ?? null : null, retry: candidate.idempotent ? "May be redelivered after an unknown async outcome; target declares idempotent." : "Unknown async outcomes are not redelivered automatically.", idempotent: candidate.idempotent }; }
 function searchModuleResult(target: string, candidate: Tool): ToolSearchResult { return { target, description: candidate.description, inputSchema: normalizedToolInputSchema(candidate), outputSchema: candidate.output, examples: candidate.examples ? candidate.examples as unknown as Json[] : null, sideEffects: candidate.sideEffects ?? null, errors: candidate.errors ? candidate.errors as unknown as Json[] : null, retry: candidate.idempotent ? "May be redelivered after an unknown async outcome; target declares idempotent." : "Unknown async outcomes are not redelivered automatically.", idempotent: candidate.idempotent }; }
 async function searchActiveModuleTools(ports: StewardPorts, options: ToolSearchOptions, found: ToolSearchResult[]) {
   for (const { target, tool, moduleId, source } of await activeModuleReferences(ports, options.workspaceId)) {
-    if (searchMatch(options, target, tool)) found.push({ ...searchModuleResult(target, tool), moduleId, hash: source.hash, contractHash: moduleCallbackContractHash(tool) });
+    if (searchMatch(options, target, tool)) found.push({ ...searchModuleResult(target, tool), moduleId, hash: source.hash });
   }
 }
 async function toolSearch(ports: StewardPorts, workspaceId: string, caller: Caller, query: unknown, userTools = false) {

@@ -683,15 +683,10 @@
                     "moduleId": {
                       "type": "string",
                       "minLength": 1
-                    },
-                    "contractHash": {
-                      "type": "string",
-                      "pattern": "^[a-f0-9]{64}$"
                     }
                   },
                   "required": [
-                    "moduleId",
-                    "contractHash"
+                    "moduleId"
                   ],
                   "additionalProperties": false
                 }

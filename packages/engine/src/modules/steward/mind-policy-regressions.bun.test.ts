@@ -48,7 +48,7 @@ function agent(f: Fixture) {
       expect(args.prompt).toBe(current.prompt);
       return { contextId, runId, active, status: active ? "running" : "finished" };
     }
-    if (target === "agent.read") return { run: { contextId, runId, active, status: active ? "running" : "finished" }, items: receipt && !args.cursor ? [{ sequence: 1, kind: "tool-result", payload: { type: "tool-result", value: { runId, callId: "call-report", target: "mind.report", moduleId: mind.moduleId, hash: mind.hash, contractHash: "a".repeat(64), status: "succeeded", outputState: "complete", output: receipt } } }] : [], nextCursor: receipt ? "opaque:1" : null, ended: !active, interactions: [] };
+    if (target === "agent.read") return { run: { contextId, runId, active, status: active ? "running" : "finished" }, items: receipt && !args.cursor ? [{ sequence: 1, kind: "tool-result", payload: { type: "tool-result", value: { runId, callId: "call-report", target: "mind.report", moduleId: mind.moduleId, hash: mind.hash, status: "succeeded", outputState: "complete", output: receipt } } }] : [], nextCursor: receipt ? "opaque:1" : null, ended: !active, interactions: [] };
     throw new Error(`Unexpected external call: ${target}`);
   };
   return { call, calls, finish(value: unknown) {

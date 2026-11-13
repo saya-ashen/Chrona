@@ -1,7 +1,7 @@
 import { moduleToolContract } from "./module-tool-contract";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
-import { listSystemModules, moduleCallbackContractHash, type Caller, type SystemTool, type Tool } from "./module-calls";
+import { listSystemModules, type Caller, type SystemTool, type Tool } from "./module-calls";
 import { discoveryAdmission } from "./module-call-admission";
 import { StewardError } from "./errors";
 import { isModulePaused } from "./module-availability";
@@ -66,7 +66,7 @@ export async function interfaceReference(ports: StewardPorts, workspaceId: strin
   if (target) {
     const entry = await exactReference(ports, workspaceId, target);
     if (!entry || !canRead(entry.tool)) throw new StewardError("not_found", "Interface reference not found");
-    return { ...referenceContract(target, entry), contractHash: moduleCallbackContractHash(entry.tool) };
+    return referenceContract(target, entry);
   }
   // The index names interfaces; contracts come one target at a time (all of them overflowed the Provider's tool result).
   return (await references(ports, workspaceId)).filter(entry => canRead(entry.tool)).map(({ target, source, tool }) => ({ target, source, description: tool.description }));

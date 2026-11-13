@@ -49,7 +49,7 @@ test("events consumes kernel target binding: two real callback targets, one paus
     const firstCalls = await db.moduleInvocation.findMany({ where: { workspaceId, tool: "receive" } });
     expect(firstCalls).toHaveLength(2);
     const alphaCall = firstCalls.find(call => call.target === "alpha")!;
-    const alphaBinding = { moduleId: alphaCall.targetModuleId!, contractHash: alphaCall.targetContractHash! };
+    const alphaBinding = { moduleId: alphaCall.targetModuleId! };
     expect(alphaBinding.moduleId).toBe(alpha.id);
     expect((await enqueueCall({ tx: db, ports, origin, target: "alpha.receive", raw: alphaCall.args }, { key: alphaCall.key!, reply: true, expectedTarget: alphaBinding })).duplicate).toBe(true);
     await expect(enqueueCall({ tx: db, ports, origin, target: "alpha.receive", raw: alphaCall.args }, { key: alphaCall.key!, reply: true, expectedTarget: { ...alphaBinding, moduleId: beta.id } })).rejects.toThrow("different registered target");

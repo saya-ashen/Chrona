@@ -117,7 +117,7 @@ test("installed identities and contracts are readable; credentials and approvals
   const view = ((await web.call("modules.list", {})).output as { items: unknown[] }).items;
   expect(view).toContainEqual(expect.objectContaining({ id: trader.module.id, name: "trader", activeHash: "trader-1", builtin: false, origin: "external", capabilities: expect.objectContaining({ remove: true }), versions: [expect.objectContaining({ hash: "trader-1", status: "approved" })] }));
   expect((await other.call("modules.list", {})).output).toEqual({ items: view, nextCursor: null });
-  expect((await other.call("modules.describe", { query: "trader.start" } )).output).toMatchObject({ items: [{ target: { moduleId: trader.module.id, tool: "start" }, moduleId: trader.module.id, hash: "trader-1", contractHash: expect.any(String) }] });
+  expect((await other.call("modules.describe", { query: "trader.start" } )).output).toMatchObject({ items: [{ target: { moduleId: trader.module.id, tool: "start" }, moduleId: trader.module.id, hash: "trader-1" }] });
   expect((await other.call("modules.describe", { target: { moduleId: trader.module.id, tool: "start" } })).output).toMatchObject({ target: { moduleId: trader.module.id, tool: "start" }, source: { kind: "module", hash: "trader-1" }, admission: { visibility: ["modules", "owner"], uses: "trader.start" } });
   const credentials = ((await web.call("secrets.list", {})).output as { items: unknown[] }).items;
   const approvals = ((await web.call("approvals.list", {})).output as { items: unknown[] }).items;

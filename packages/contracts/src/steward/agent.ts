@@ -37,7 +37,7 @@ export const contextStreamInput = contextRunTarget.extend({ after: z.number().in
 export const contextOutput = z.object({ contextId: id }).strict();
 export const contextRunOutput = z.object({ runId: id, contextId: id, status: z.string(), active: z.boolean() }).strict();
 export const runToolResultSchema = z.object({
-  runId: id, callId: id, target: routedTargetSchema, moduleId: id, hash: z.string().min(1), contractHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  runId: id, callId: id, target: routedTargetSchema, moduleId: id, hash: z.string().min(1),
   status: z.enum(["succeeded", "failed", "unknown"]), outputState: z.enum(["complete", "filtered", "omitted"]), output: z.json().nullable(),
 }).strict();
 export const contextStreamOutput = z.object({ items: z.array(z.object({ sequence: z.number().int(), at: z.string(), kind: z.string(), payload: z.unknown() }).strict()), after: z.number().int(), ended: z.boolean(), transcript: runtimeTranscriptSchema, interactions: z.array(providerInteractionSchema).max(12) }).strict();

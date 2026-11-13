@@ -260,8 +260,8 @@ export const NOTIFY_INTERFACE = "notify.send";
 export const SYSTEM_MODULES = ["approvals", "modules", "settings", "secrets", "activity", "timers", "agent"] as const;
 /** Longest call path; synchronous calls are refused when the target is already on their path (it is waiting). */
 export const MAX_CALL_DEPTH = 6;
-/** A saved registration may only call this exact app identity and tool contract; this grants no access. */
-export const expectedModuleTargetSchema = z.object({ moduleId: z.string().min(1), contractHash: z.string().regex(/^[a-f0-9]{64}$/).optional() }).strict();
+/** A saved registration may only call this exact app identity; this grants no access. */
+export const expectedModuleTargetSchema = z.object({ moduleId: z.string().min(1) }).strict();
 export type ExpectedModuleTarget = z.infer<typeof expectedModuleTargetSchema>;
 export const moduleCallSchema = z.discriminatedUnion("method", [
   /**
