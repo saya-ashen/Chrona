@@ -1,10 +1,11 @@
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, rmSync, statSync, mkdirSync, writeFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Database } from "bun:sqlite";
 import { afterEach, describe, expect, it } from "bun:test";
 
-import { inspectLocalChrona, repairStaleRuntimeLock } from "./doctor";
+import { ensureSqliteDatabase } from "@chrona/db/sqlite-migrations";
+import { inspectExternalApps, inspectLocalChrona, repairStaleRuntimeLock } from "./doctor";
 
 const originalEnv = { ...process.env };
 
@@ -19,6 +20,7 @@ describe("chrona doctor", () => {
       process.env.DATABASE_URL = `file:${join(directory, "missing.db")}`;
       process.env.CHRONA_CONFIG_DIR = join(directory, "config");
       process.env.PATH = directory;
+      process.env.CHRONA_STEWARD_AGENT = "other";
       process.env.HOST = "127.0.0.1";
       delete process.env.CHRONA_STEWARD_EXECUTION_MODE;
       delete process.env.CHRONA_STEWARD_SANDBOX_BWRAP;
@@ -62,6 +64,7 @@ describe("chrona doctor", () => {
       });
       expect(result.exitCode).toBe(1);
       expect(result.stdout.toString()).toContain("[error] executionMode:");
+      expect(result.stdout.toString()).toContain("[ok] externalApps:");
       expect(result.stdout.toString()).toContain("Remove the setting or explicitly set trusted-local");
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });
@@ -134,4 +137,121 @@ describe("chrona doctor", () => {
       expect.objectContaining({ key: "apiProtection", status: "error" }),
     );
   });
+});
+
+function migrationFixture() {
+  const directory = mkdtempSync(join(tmpdir(), "chrona-doctor-migration-"));
+  const migrationsDir = join(directory, "migrations");
+  mkdirSync(join(migrationsDir, "0001_initial"), { recursive: true });
+  writeFileSync(join(migrationsDir, "0001_initial", "migration.sql"), 'CREATE TABLE "Example" ("id" TEXT PRIMARY KEY);');
+  const path = join(directory, "chrona.db"), databaseUrl = `file:${path}`;
+  process.env.DATABASE_URL = databaseUrl;
+  process.env.CHRONA_CONFIG_DIR = join(directory, "config");
+  process.env.CHRONA_MIGRATIONS_DIR = migrationsDir;
+  return { directory, path, databaseUrl, migrationsDir };
+}
+
+it.each(["valid", "checksum", "name", "untracked", "prefix", "empty", "missing"])("checks migration history: %s without writing the database", scenario => {
+  const f = migrationFixture();
+  try {
+    if (!["missing", "empty", "untracked"].includes(scenario)) ensureSqliteDatabase(f);
+    if (scenario !== "missing") {
+      const db = new Database(f.path);
+      if (scenario === "checksum") db.exec("UPDATE _chrona_migrations SET checksum='x'");
+      if (scenario === "name") db.exec("UPDATE _chrona_migrations SET name='other'");
+      if (scenario === "untracked") db.exec("CREATE TABLE Example (id TEXT)");
+      db.close();
+    }
+    if (scenario === "prefix") {
+      mkdirSync(join(f.migrationsDir, "0002_next"));
+      writeFileSync(join(f.migrationsDir, "0002_next", "migration.sql"), "CREATE TABLE Next (id TEXT);");
+    }
+    const before = scenario === "missing" ? null : statSync(f.path, { bigint: true });
+    const result = inspectLocalChrona().find(check => check.key === "migrationHistory");
+    expect(result?.status).toBe(["checksum", "name", "untracked"].includes(scenario) ? "error" : "ok");
+    if (["checksum", "name"].includes(scenario)) expect(result?.message).toContain("different schema baseline");
+    if (scenario === "untracked") expect(result?.message).toContain("untracked database");
+    if (scenario === "valid") expect(result?.message).toContain("0 pending migrations");
+    if (["prefix", "empty"].includes(scenario)) expect(result?.message).toContain("1 pending migrations");
+    if (before) expect(statSync(f.path, { bigint: true }).mtimeNs).toBe(before.mtimeNs);
+  } finally { rmSync(f.directory, { recursive: true, force: true }); }
+});
+
+it.each([
+  { agent: "pi", version: "0.85.0", command: "/opt/pi", status: "warning" },
+  { agent: undefined, version: "1.5.0", command: "/opt/pi", status: "ok" },
+  { agent: "pi", version: "1.5.0", command: "pi", status: "error" },
+  { agent: "pi", version: "1.5.0", command: undefined, status: "error" },
+  { agent: "pi", version: undefined, command: "/opt/pi", status: "warning" },
+])("checks Pi configuration: $version $command", ({ agent, version, command, status }) => {
+  const f = migrationFixture();
+  try {
+    for (const [key, value] of [["CHRONA_STEWARD_AGENT", agent], ["CHRONA_STEWARD_PI_VERSION", version], ["CHRONA_STEWARD_PI_COMMAND", command]]) {
+      if (value === undefined) delete process.env[key!]; else process.env[key!] = value;
+    }
+    const checks = inspectLocalChrona().filter(check => check.key === "providerPi");
+    expect(checks).toHaveLength(1);
+    expect(checks[0]?.status).toBe(status);
+    if (status === "warning") expect(checks[0]?.message).toContain("Pi completion requires CHRONA_STEWARD_PI_VERSION=1.5.0");
+  } finally { rmSync(f.directory, { recursive: true, force: true }); }
+});
+
+it("fresh official installation uses the bundled release hash as its active version", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "chrona-doctor-install-"));
+  const databasePath = join(directory, "chrona-test.db");
+  ensureSqliteDatabase({ databaseUrl: `file:${databasePath}`, migrationsDir: join(import.meta.dir, "../../../prisma/migrations") });
+  const { PrismaClient } = await import("@chrona/db/generated/prisma/client");
+  const { PrismaBunSqlite } = await import("prisma-adapter-bun-sqlite");
+  const { seedTestModuleRelease } = await import("../../engine/src/modules/steward/module-release-test-fixture");
+  const { testModuleSandbox } = await import("../../engine/src/modules/steward/module-test-process");
+  const { createExternalModuleInstaller, installExternal, externalPackageCatalog, refreshInstallationReceipts } = await import("../../engine/src/modules/steward/module-install");
+  const { buildPending } = await import("../../engine/src/modules/steward/module-build");
+  const { moduleContext } = await import("../../engine/src/modules/steward/module-context");
+  const db = new PrismaClient({ adapter: new PrismaBunSqlite({ url: `file:${databasePath}` }) });
+  try {
+    const workspaceId = "ws_default";
+    await db.workspace.create({ data: { id: workspaceId, name: "Doctor" } });
+    const resources = join(directory, "external"), code = join(resources, "files");
+    mkdirSync(code, { recursive: true });
+    writeFileSync(join(code, "module.json"), JSON.stringify({ name: "files", entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [] }));
+    writeFileSync(join(code, "index.ts"), "// synthetic fixture\n");
+    writeFileSync(join(code, "test.ts"), "// offline fixture\n");
+    await seedTestModuleRelease(resources, "files");
+    const ports: import("../../engine/src/modules/steward/ports").StewardPorts = { db, dataDir: directory, now: () => new Date(), publicUrl: null, moduleExternalResources: resources, sandbox: testModuleSandbox(async () => ({ status: "succeeded", exitCode: 0, output: "{}", error: null })) };
+    ports.moduleExternalInstaller = createExternalModuleInstaller(ports);
+    const request = { package: "files" as const, mode: "install" as const, requestKey: "doctor-install" };
+    const first = await installExternal(ports, workspaceId, request);
+    expect(first.status).toBe("building");
+    await buildPending(moduleContext(ports, workspaceId));
+    await refreshInstallationReceipts(ports, workspaceId);
+    const installed = await installExternal(ports, workspaceId, request);
+    expect(installed.status).toBe("installed");
+    const entry = (await externalPackageCatalog(ports, workspaceId)).find(item => item.name === "files")!;
+    const module = await db.module.findUniqueOrThrow({ where: { id: installed.moduleId! } });
+    expect(entry.releaseHash).toBe(module.activeHash);
+    expect(entry.installation?.hash).toBe(entry.releaseHash);
+    process.env.DATABASE_URL = `file:${databasePath}`;
+    process.env.CHRONA_DATA_DIR = directory;
+    process.env.CHRONA_RESOURCE_DIR = directory;
+    const snapshot = () => readdirSync(directory, { recursive: true }).map(name => {
+      const path = join(directory, String(name)), stat = statSync(path, { bigint: true });
+      return [String(name), stat.mtimeNs, stat.size];
+    });
+    const before = snapshot();
+    const current = await inspectExternalApps();
+    // Other missing fixtures and the paused Remind release still produce catalog warnings.
+    expect(current.status).toBe("warning");
+    expect(current.message).not.toContain("files:");
+    expect(current.message).toContain("pi: Release resources missing");
+    expect(snapshot()).toEqual(before);
+    await db.module.update({ where: { id: module.id }, data: { activeHash: "a".repeat(40) } });
+    const outdatedBefore = snapshot();
+    const outdated = await inspectExternalApps();
+    expect(outdated.status).toBe("warning");
+    expect(outdated.message).toContain("files: bundled release differs from installed version; stop Chrona and run chrona admin install files --update --request-key <new-key>");
+    expect(snapshot()).toEqual(outdatedBefore);
+  } finally {
+    await db.$disconnect();
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
