@@ -105,13 +105,15 @@ async function fixture(withFiles = false) {
 let current: Awaited<ReturnType<typeof fixture>> | undefined;
 afterEach(async () => { await current?.close(); current = undefined; });
 
-// Production auth, routing, manifests and SDK subprocesses; no Provider or kernel ticker.
-// Mind starts with proactive checks disabled, and every case asserts that no Agent Run was created.
+// Production auth, routing, manifests and SDK subprocesses.
+// Mind background review starts enabled, but this fixture has no Provider or kernel ticker.
+// Every case asserts that no Agent Run was created.
 test("Mind owner mutations are durable and replay exact keys across SDK restart", async () => {
   const f = current = await fixture();
   for (const key of [null, "wrong-key"]) expect((await f.request("mind.ui-agenda", {}, key)).status).toBe(401);
   const settings = await f.call("mind.ui-settings");
-  expect(settings.enabled).toBe(false);
+  expect(settings.enabled).toBe(true);
+  expect(settings.notifyEnabled).toBe(false);
   const args = { "request-key": "create-once", title: "等申请材料确认", project: "application", status: "waiting-external" };
   const first = await f.call("mind.note", args);
   expect(first.concern).toMatchObject({ title: args.title, project: args.project, status: args.status });
@@ -197,13 +199,13 @@ test("Mind activation registers its main and settings pages with current contrac
   expect((await read.json()).concerns).toEqual([]);
   const save = await f.request("mind.ui-settings", { "interval-minutes": "30" }, "mind-offline-acceptance", settings);
   expect(save.status, await save.clone().text()).toBe(200);
-  expect(await save.json()).toMatchObject({ enabled: false, intervalMinutes: 30 });
+  expect(await save.json()).toMatchObject({ enabled: true, notifyEnabled: false, intervalMinutes: 30 });
   await f.activate(f.mind);
   const stale = await f.request("mind.ui-settings", {}, "mind-offline-acceptance", settings);
   expect(stale.status, await stale.text()).toBe(409);
   const refreshed = await f.page("settings");
   expect(refreshed.revision).not.toBe(settings.revision);
-  expect(await f.call("mind.ui-settings")).toMatchObject({ enabled: false, intervalMinutes: 30 });
+  expect(await f.call("mind.ui-settings")).toMatchObject({ enabled: true, notifyEnabled: false, intervalMinutes: 30 });
   expect(await f.db.run.count()).toBe(0);
 }, 30_000);
 
