@@ -16,7 +16,6 @@ async function storeEntries(store: string) {
   try { return await readdir(store, { withFileTypes: true }); }
   catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-    console.error(JSON.stringify({ component: "store-gc", event: "store_gc.missing", error: String(error) }));
     return [];
   }
 }
