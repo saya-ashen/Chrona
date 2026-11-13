@@ -1,4 +1,5 @@
-import { chmodSync, mkdtempSync, rmSync, statSync, mkdirSync, writeFileSync, readdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { chmodSync, readFileSync, mkdtempSync, rmSync, statSync, mkdirSync, writeFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Database } from "bun:sqlite";
@@ -196,7 +197,7 @@ it.each([
   } finally { rmSync(f.directory, { recursive: true, force: true }); }
 });
 
-it("fresh official installation uses the bundled release hash as its active version", async () => {
+it.each(["fresh", "local", "outdated", "unfetched", "missing", "invalid"])("compares the bundled release with installed Git ancestry: %s without writing data", async scenario => {
   const directory = mkdtempSync(join(tmpdir(), "chrona-doctor-install-"));
   const databasePath = join(directory, "chrona-test.db");
   ensureSqliteDatabase({ databaseUrl: `file:${databasePath}`, migrationsDir: join(import.meta.dir, "../../../prisma/migrations") });
@@ -211,45 +212,70 @@ it("fresh official installation uses the bundled release hash as its active vers
   try {
     const workspaceId = "ws_default";
     await db.workspace.create({ data: { id: workspaceId, name: "Doctor" } });
-    const resources = join(directory, "external"), code = join(resources, "files");
+    const resources = join(directory, "external"), code = join(resources, "web");
     mkdirSync(code, { recursive: true });
-    writeFileSync(join(code, "module.json"), JSON.stringify({ name: "files", entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [] }));
+    writeFileSync(join(code, "module.json"), JSON.stringify({ name: "web", entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [] }));
     writeFileSync(join(code, "index.ts"), "// synthetic fixture\n");
     writeFileSync(join(code, "test.ts"), "// offline fixture\n");
-    await seedTestModuleRelease(resources, "files");
+    await seedTestModuleRelease(resources, "web");
     const ports: import("../../engine/src/modules/steward/ports").StewardPorts = { db, dataDir: directory, now: () => new Date(), publicUrl: null, moduleExternalResources: resources, sandbox: testModuleSandbox(async () => ({ status: "succeeded", exitCode: 0, output: "{}", error: null })) };
     ports.moduleExternalInstaller = createExternalModuleInstaller(ports);
-    const request = { package: "files" as const, mode: "install" as const, requestKey: "doctor-install" };
+    const request = { package: "web" as const, mode: "install" as const, requestKey: "doctor-install" };
     const first = await installExternal(ports, workspaceId, request);
     expect(first.status).toBe("building");
     await buildPending(moduleContext(ports, workspaceId));
     await refreshInstallationReceipts(ports, workspaceId);
     const installed = await installExternal(ports, workspaceId, request);
     expect(installed.status).toBe("installed");
-    const entry = (await externalPackageCatalog(ports, workspaceId)).find(item => item.name === "files")!;
+    const entry = (await externalPackageCatalog(ports, workspaceId)).find(item => item.name === "web")!;
     const module = await db.module.findUniqueOrThrow({ where: { id: installed.moduleId! } });
+    expect(entry.releaseHash).toBe(entry.git?.commit);
     expect(entry.releaseHash).toBe(module.activeHash);
     expect(entry.installation?.hash).toBe(entry.releaseHash);
     process.env.DATABASE_URL = `file:${databasePath}`;
     process.env.CHRONA_DATA_DIR = directory;
     process.env.CHRONA_RESOURCE_DIR = directory;
+    const repo = join(directory, "platform", "repos", `${module.id}.git`);
+    const git = (...args: string[]) => execFileSync("git", [`--git-dir=${repo}`, ...args], {
+      encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, GIT_AUTHOR_NAME: "Doctor test", GIT_AUTHOR_EMAIL: "doctor@localhost", GIT_COMMITTER_NAME: "Doctor test", GIT_COMMITTER_EMAIL: "doctor@localhost" },
+    }).trim();
+    if (scenario !== "fresh") {
+      const tree = git("rev-parse", `${entry.releaseHash}^{tree}`);
+      const activeHash = scenario === "invalid" ? "a".repeat(40)
+        : git("commit-tree", tree, ...(scenario === "outdated" ? [] : ["-p", entry.releaseHash!]), "-m", "Local customization");
+      await db.module.update({ where: { id: module.id }, data: { activeHash } });
+      if (scenario === "missing") rmSync(repo, { recursive: true });
+    }
+    if (scenario === "unfetched") {
+      writeFileSync(join(code, "index.ts"), "// new bundled release, never fetched into the installed repo\n");
+      const release = await seedTestModuleRelease(resources, "web");
+      const catalog = (await externalPackageCatalog(ports, workspaceId)).find(item => item.name === "web")!;
+      expect(catalog.releaseHash).toBe(release.commit);
+      expect(catalog.releaseHash).toBe(catalog.git?.commit);
+      expect(() => git("cat-file", "-e", `${release.commit}^{commit}`)).toThrow();
+    }
     const snapshot = () => readdirSync(directory, { recursive: true }).map(name => {
       const path = join(directory, String(name)), stat = statSync(path, { bigint: true });
-      return [String(name), stat.mtimeNs, stat.size];
+      return [String(name), stat.mtimeNs, stat.size, stat.isFile() ? readFileSync(path) : null];
     });
     const before = snapshot();
+    if (scenario !== "missing") expect(before.some(([name]) => String(name).startsWith(`platform/repos/${module.id}.git/`))).toBe(true);
     const current = await inspectExternalApps();
     // Other missing fixtures and the paused Remind release still produce catalog warnings.
     expect(current.status).toBe("warning");
-    expect(current.message).not.toContain("files:");
     expect(current.message).toContain("pi: Release resources missing");
+    if (["outdated", "unfetched"].includes(scenario)) {
+      expect(current.message).toContain("web: bundled release differs from installed version; stop Chrona and run chrona admin install web --update --request-key <new-key>");
+      expect(current.message).not.toContain("Could not compare web");
+    } else if (["missing", "invalid"].includes(scenario)) {
+      expect(current.message).toContain("Could not compare web with the bundled release:");
+      expect(current.message).not.toContain("web: bundled release differs");
+    } else {
+      expect(current.message).not.toMatch(/(?:^|; )web:/);
+      expect(current.message).not.toContain("Could not compare web");
+    }
     expect(snapshot()).toEqual(before);
-    await db.module.update({ where: { id: module.id }, data: { activeHash: "a".repeat(40) } });
-    const outdatedBefore = snapshot();
-    const outdated = await inspectExternalApps();
-    expect(outdated.status).toBe("warning");
-    expect(outdated.message).toContain("files: bundled release differs from installed version; stop Chrona and run chrona admin install files --update --request-key <new-key>");
-    expect(snapshot()).toEqual(outdatedBefore);
   } finally {
     await db.$disconnect();
     rmSync(directory, { recursive: true, force: true });
