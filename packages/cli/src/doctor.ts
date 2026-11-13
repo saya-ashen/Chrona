@@ -194,7 +194,17 @@ async function externalAppWarnings(db: PrismaClient) {
     if (entry.error) messages.push(`${entry.name}: ${entry.error}`);
     if (entry.moduleId && entry.releaseHash) {
       const module = await db.module.findUniqueOrThrow({ where: { id: entry.moduleId } });
-      if (entry.releaseHash !== module.activeHash) messages.push(`${entry.name}: bundled release differs from installed version; stop Chrona and run chrona admin install ${entry.name} --update --request-key <new-key>`);
+      if (entry.releaseHash !== module.activeHash) {
+        const repo = join(getChronaDataDir(), "platform", "repos", `${entry.moduleId}.git`);
+        const comparison = spawnSync("git", [`--git-dir=${repo}`, "merge-base", "--is-ancestor", entry.releaseHash, module.activeHash ?? ""], {
+          encoding: "utf8", timeout: 5_000, maxBuffer: 4096, windowsHide: true, stdio: ["ignore", "pipe", "pipe"],
+        });
+        if (comparison.status === 1) messages.push(`${entry.name}: bundled release differs from installed version; stop Chrona and run chrona admin install ${entry.name} --update --request-key <new-key>`);
+        else if (comparison.status !== 0) {
+          const reason = comparison.error?.message || comparison.stderr?.trim() || `Git exited with status ${comparison.status} (signal ${comparison.signal})`;
+          messages.push(`Could not compare ${entry.name} with the bundled release: ${reason}`);
+        }
+      }
     }
   }
   return messages;
