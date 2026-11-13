@@ -42,7 +42,7 @@ async function offlineResources(dataDir: string, name: string) {
 }
 test("admin commands are registered", () => {
   const admin = createProgram().commands.find(c => c.name() === "admin")!;
-  expect(admin.commands.map(c => c.name())).toEqual(["build", "legacy", "git-status", "git-associate", "git-push", "modules", "catalog", "install", "diagnostics", "approvals", "rollback", "disable", "remove", "approve", "reject", "secret-set", "secret-remove"]);
+  expect(admin.commands.map(c => c.name())).toEqual(["build", "legacy", "git-status", "git-associate", "git-push", "modules", "catalog", "install", "diagnostics", "approvals", "rollback", "disable", "enable", "remove", "approve", "reject", "secret-set", "secret-remove"]);
 });
 test("admin build dispatches the request file through the packaged host", async () => {
   const files: string[] = [];
@@ -160,6 +160,26 @@ test.each([40, 64])("admin rollback accepts an approved %i-character hash and di
     await runAdmin("disable", [f.module.name], f.options);
     expect(await f.db.module.findUnique({ where: { id: f.module.id } })).toMatchObject({ status: "paused" });
     expect(await f.db.audit.findFirst({ where: { kind: "module_disabled" } })).toMatchObject({ actorKey: "user", details: { source: "cli" } });
+  } finally { log.mockRestore(); }
+});
+
+test("admin enable respects the runtime lock and resumes with a new activation", async () => {
+  const f = await fixture(), log = spyOn(console, "log").mockImplementation(() => {});
+  try {
+    await runAdmin("disable", [f.module.name], f.options);
+    const paused = await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } });
+    expect(paused.status).toBe("paused");
+    const lock = acquireSqliteRuntimeLock(f.options.databaseUrl);
+    try { await expect(runAdmin("enable", [f.module.name], f.options)).rejects.toThrow("already in use"); }
+    finally { lock.release(); }
+    expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ status: "paused", activationId: paused.activationId });
+    await runAdmin("enable", [f.module.id], f.options);
+    const resumed = await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } });
+    expect(resumed).toMatchObject({ status: "active", activeHash: paused.activeHash });
+    expect(resumed.activationId).not.toBe(paused.activationId);
+    expect(await f.db.run.count()).toBe(0);
+    expect(await f.db.moduleRun.count()).toBe(0);
+    const released = acquireSqliteRuntimeLock(f.options.databaseUrl); released.release();
   } finally { log.mockRestore(); }
 });
 

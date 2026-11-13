@@ -9,7 +9,7 @@ import { getChronaDataDir } from "./start-server";
 import { createModuleRuntimePorts } from "../../integrations/src/steward/module-runtime";
 import { moduleInstallRequestSchema, moduleVersionHashSchema } from "@chrona/contracts/steward";
 
-export type AdminCommand = "diagnostics" | "modules" | "catalog" | "install" | "rollback" | "disable" | "remove" | "approvals" | "approve" | "reject";
+export type AdminCommand = "diagnostics" | "modules" | "catalog" | "install" | "rollback" | "disable" | "enable" | "remove" | "approvals" | "approve" | "reject";
 type AdminApi = ReturnType<ReturnType<typeof createStewardService>["forWorkspace"]>;
 async function changeModule(db: PrismaClient, api: AdminApi, command: AdminCommand, args: string[]) {
   const workspaceId = "ws_default";
@@ -17,6 +17,7 @@ async function changeModule(db: PrismaClient, api: AdminApi, command: AdminComma
   const module = await db.module.findFirst({ where: { workspaceId, OR: [{ id: args[0] }, { name: args[0] }] } });
   if (!module) throw new Error("Module not found");
   if (command === "disable") return api.modules.disable(module.id, "cli");
+  if (command === "enable") return api.modules.lifecycle("enable", module.id, { reason: "cli" }, true);
   if (command === "remove") return api.modules.lifecycle("remove", module.id, { reason: "Removal requested through stopped-service CLI administration" }, true);
   const parsedHash = moduleVersionHashSchema.safeParse(args[1]);
   if (!parsedHash.success) throw new Error("An approved external module version hash is required");

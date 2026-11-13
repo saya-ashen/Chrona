@@ -69,7 +69,19 @@ test("rescue exposes governed recovery controls, never conversations", async () 
   await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: "approved", status: "approved", source: "user", manifest: { ...webManifest, name: "example" }, intent: {}, report: {} } });
   expect((await (await f.request("/api/modules")).json()).items).toContainEqual(expect.objectContaining({ id: module.id }));
   expect((await f.request(`/api/modules/${module.id}/pause`, {})).status).toBe(200);
+  const paused = await f.db.module.findUniqueOrThrow({ where: { id: module.id } });
+  expect(paused.status).toBe("paused");
+  const resumePath = `/api/modules/${module.id}/resume`;
+  expect((await f.app.request(resumePath, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).status).toBe(401);
+  expect((await f.request(resumePath, {}, "wrong-key")).status).toBe(401);
+  expect((await f.request(resumePath, { disableAuth: true })).status).toBe(400);
   expect((await f.db.module.findUniqueOrThrow({ where: { id: module.id } })).status).toBe("paused");
+  const response = await f.request(resumePath, {});
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({ moduleId: module.id, status: "active" });
+  const resumed = await f.db.module.findUniqueOrThrow({ where: { id: module.id } });
+  expect(resumed).toMatchObject({ status: "active", activeHash: paused.activeHash, executionFenceAt: null });
+  expect(resumed.activationId).not.toBe(paused.activationId);
   expect((await f.request(`/api/modules/${module.id}/rollback`, { hash: "missing" })).status).toBe(409);
   expect((await f.request(`/api/modules/${module.id}/rollback`, { hash: "approved", disableAuth: true })).status).toBe(400);
 });
@@ -91,4 +103,5 @@ test("the web page and QQ resolve application-requested approvals like any other
 test("rescue HTML is a required release resource", () => {
   expect(buildArtifacts.resources).toContainEqual({ from: "apps/server/src/static/rescue.html", to: "resources/rescue.html", required: true });
   expect(readFileSync(htmlPath, "utf8")).toContain("Chrona rescue (immutable)");
+  expect(readFileSync(htmlPath, "utf8")).toContain("恢复应用");
 });
