@@ -18,6 +18,17 @@ import { readReleaseMaterial, resolveExternalRelease, type ModuleRelease } from 
 import { assertExternalName } from "./module-identity";
 import { parseInput, StewardError } from "./errors";
 import { isModulePaused, ModuleUnavailableError } from "./module-availability";
+import { rejectedUpdateNotice } from "./module-activation-notice";
+import type { BuildReport } from "./module-context";
+
+export function rejectionSummary(report: unknown): string {
+  const build = report as Partial<BuildReport> | null;
+  const error = build?.errors?.find(error => error.trim())
+    ?? build?.typecheck?.errors?.find(error => error.message.trim())?.message
+    ?? build?.tests?.find(test => test.exitCode !== 0 && test.stderr.trim())?.stderr
+    ?? "Module checks failed; inspect the version report";
+  return redactSensitiveText(error).slice(0, 300);
+}
 
 export const installationId = (workspaceId: string, requestKey: string) => `module-install:${createHash("sha256").update(workspaceId).update("\0").update(requestKey).digest("hex")}`;
 const submissionId = (workspaceId: string, key: string) => `${installationId(workspaceId, key)}:submission`;
@@ -65,7 +76,7 @@ export function createExternalModuleInstaller(ports: StewardPorts): ExternalModu
       submission.phase = "submitted";
       await ports.db.moduleInstallationSubmission.update({ where: { id }, data: submission });
       const result: ModuleInstallResult = { package: request.package, requestKey: request.requestKey, status: "building", moduleId: submission.moduleId, hash: proposal.hash, approvalId: proposal.approvalId ?? null, error: null };
-      return proposal.status === "rejected" ? failure(result, "installation_rejected", proposalRejection(proposal.report.errors)) : installationFacts(ports, workspaceId, result);
+      return proposal.status === "rejected" ? failure(result, "installation_rejected", rejectionSummary(proposal.report)) : installationFacts(ports, workspaceId, result);
     } catch (error) {
       if (submission.phase === "prepared") {
         submission.error = redactSensitiveText(error instanceof Error ? error.message : "Release copy failed").slice(0, 1000);
@@ -109,10 +120,7 @@ async function installationFacts(ports: StewardPorts, workspaceId: string, resul
   const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: result.hash } } });
   if (!version) return failure(result, "version_missing", "The submitted version is missing; inspect diagnostics before retrying", "not_found");
   if (version.status === "approved") return approvedInstallation(result, module.activeHash);
-  if (version.status === "rejected") {
-    const errors = (version.report as { errors?: unknown } | null)?.errors;
-    return failure(result, "installation_rejected", Array.isArray(errors) ? errors.filter(e => typeof e === "string").join("; ") : "Module checks failed; inspect the version report");
-  }
+  if (version.status === "rejected") return failure(result, "installation_rejected", rejectionSummary(version.report));
   if (version.status === "pending_review" || module.status === "migrating") {
     return installationApproval(ports, workspaceId, module.id, result);
   }
@@ -253,13 +261,20 @@ export async function recordInstallationResult(ports: StewardPorts, workspaceId:
     const row = await tx.moduleInstallation.findUniqueOrThrow({ where: { id } });
     if (row.package !== result.package) throw new StewardError("conflict", "Installation receipt identity mismatch");
     await tx.moduleInstallation.update({ where: { id }, data: resultData(result) });
+    if (row.mode === "update" && result.error?.reason === "installation_rejected" && result.moduleId && result.hash) {
+      const module = await tx.module.findFirst({ where: { id: result.moduleId, workspaceId, name: result.package, builtin: false } });
+      if (module) await rejectedUpdateNotice(ports, workspaceId, tx, module, result.hash, result.error.message);
+    }
   });
 }
 export async function externalPackageCatalog(ports: StewardPorts, workspaceId: string) {
   return Promise.all(OFFICIAL_EXTERNAL_MODULE_NAMES.map(async name => {
     const module = await ports.db.module.findUnique({ where: { workspaceId_name: { workspaceId, name } } });
     const pointer = await ports.db.moduleInstallationHead.findUnique({ where: { workspaceId_package: { workspaceId, package: name } }, include: { installation: true } });
-    const installation = pointer ? installationResult(pointer.installation) : null;
+    const receipt = pointer ? installationResult(pointer.installation) : null;
+    // Read current candidate facts even before the next tick reconciles the stored receipt.
+    const installation = receipt && ["building", "pending_approval"].includes(receipt.status) && !isModulePaused(name)
+      ? await installationFacts(ports, workspaceId, receipt) : receipt;
     try {
       const release = await resolveExternalRelease(ports, name);
       return { name, ...releaseCatalogDetails(release), moduleId: module?.id ?? null, installation, error: null };
@@ -275,8 +290,4 @@ function releaseCatalogDetails(release: ModuleRelease) {
 
 function installationFailure(result: ModuleInstallResult, error: unknown): ModuleInstallResult {
   return { ...result, status: error instanceof ModuleUnavailableError ? "unavailable" : "failed", error: { code: error instanceof ModuleUnavailableError ? "unavailable" : error instanceof StewardError ? error.code : "failed", reason: error instanceof Error && "reason" in error ? String(error.reason) : "installation_failed", message: error instanceof Error ? redactSensitiveText(error.message).slice(0, 1000) : "Installation failed" } };
-}
-
-function proposalRejection(errors: string[] | undefined) {
-  return errors?.join("; ") ?? "Official module proposal was rejected";
 }

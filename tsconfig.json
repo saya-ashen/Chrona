@@ -65,6 +65,9 @@
       "@chrona/engine": [
         "./packages/engine/src/index.ts"
       ],
+      "@chrona/engine/catalog": [
+        "./packages/engine/src/catalog.ts"
+      ],
       "@chrona/engine/test-support": [
         "./packages/engine/src/test-support.ts"
       ],

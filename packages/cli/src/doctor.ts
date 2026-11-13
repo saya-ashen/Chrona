@@ -187,17 +187,24 @@ function externalResources(): string {
   return root ? join(root, "external") : fileURLToPath(new URL("../../engine/src/modules/steward/external", import.meta.url));
 }
 
-async function externalAppWarnings(db: PrismaClient) {
+async function externalAppMessages(db: PrismaClient) {
   const catalog = await externalPackageCatalog({ db, dataDir: getChronaDataDir(), now: () => new Date(), publicUrl: null, moduleExternalResources: externalResources() }, "ws_default");
   const messages: string[] = [];
+  let rejected = false;
   for (const entry of catalog) {
     if (entry.error) messages.push(`${entry.name}: ${entry.error}`);
-    if (entry.moduleId && entry.releaseHash) {
+    if (entry.moduleId) {
       const module = await db.module.findUniqueOrThrow({ where: { id: entry.moduleId } });
-      if (entry.releaseHash !== module.activeHash) messages.push(`${entry.name}: bundled release differs from installed version; stop Chrona and run chrona admin install ${entry.name} --update --request-key <new-key>`);
+      const candidate = entry.installation;
+      if (module.activeHash && candidate?.moduleId === module.id && candidate.hash && candidate.hash !== module.activeHash && candidate.error?.reason === "installation_rejected") {
+        rejected = true;
+        messages.push(`${entry.name}: update ${candidate.hash.slice(0, 8)} was rejected: ${candidate.error.message}`);
+      } else if (entry.releaseHash && entry.releaseHash !== module.activeHash) {
+        messages.push(`${entry.name}: bundled release differs from installed version; stop Chrona and run chrona admin install ${entry.name} --update --request-key <new-key>`);
+      }
     }
   }
-  return messages;
+  return { messages, rejected };
 }
 
 export async function inspectExternalApps(): Promise<ChronaDoctorCheck> {
@@ -211,8 +218,8 @@ export async function inspectExternalApps(): Promise<ChronaDoctorCheck> {
   } });
   try {
     // Catalog needs only resource paths and database reads; no supervisor or runtime is created.
-    const messages = await externalAppWarnings(db);
-    return { key, status: messages.length ? "warning" : "ok", message: messages.join("; ") || "Installed external apps match the bundled releases." };
+    const { messages, rejected } = await externalAppMessages(db);
+    return { key, status: rejected ? "error" : messages.length ? "warning" : "ok", message: messages.join("; ") || "Installed external apps match the bundled releases." };
   } catch (error) {
     const message = `Could not inspect external apps: ${error instanceof Error ? error.message : String(error)}`;
     return { key, status: "warning", message };

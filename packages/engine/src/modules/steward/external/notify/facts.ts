@@ -5,6 +5,7 @@ import type { createNotify } from "./notify";
 type LifecycleFact =
   | { kind: "module-paused" | "module-build-failed"; app: string }
   | { kind: "module-activated"; app: string; update: boolean; hash: string }
+  | { kind: "module-update-rejected"; app: string; hash: string; activeHash: string; error: string }
   | { kind: "module-migration-failed"; app: string; restore: boolean }
   | { kind: "schedule-failed"; target: string; status: "failed" | "unknown"; error?: string | null; disconnected?: boolean }
   | { kind: "build-paused"; status: "failed" | "timed_out" | "provider_unavailable" };

@@ -250,6 +250,30 @@ it("fresh official installation uses the bundled release hash as its active vers
     expect(outdated.status).toBe("warning");
     expect(outdated.message).toContain("files: bundled release differs from installed version; stop Chrona and run chrona admin install files --update --request-key <new-key>");
     expect(snapshot()).toEqual(outdatedBefore);
+    await db.module.update({ where: { id: module.id }, data: { activeHash: installed.hash } });
+    writeFileSync(join(code, "module.json"), JSON.stringify({ name: "files", description: "Rejected update", entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [] }));
+    await seedTestModuleRelease(resources, "files");
+    const update = await installExternal(ports, workspaceId, { package: "files", mode: "update", requestKey: "doctor-rejected" });
+    const reason = "Type check index.ts:1 TS2322: Type string is not assignable to number";
+    await db.moduleVersion.update({ where: { moduleId_hash: { moduleId: module.id, hash: update.hash! } }, data: { status: "rejected", report: { tests: [], typecheck: { status: "failed", errors: [{ file: "index.ts", line: 1, code: 2322, message: reason }] } } } });
+    // Doctor sees the build result without requiring a running server to refresh receipts.
+    expect(update).toMatchObject({ status: "building", moduleId: module.id });
+    expect((await externalPackageCatalog(ports, workspaceId)).find(entry => entry.name === "files")?.installation).toMatchObject({ hash: update.hash, error: { reason: "installation_rejected" } });
+    const rejectedBefore = snapshot();
+    const rejected = await inspectExternalApps();
+    expect(rejected).toMatchObject({ key: "externalApps", status: "error" });
+    expect(rejected.message).toContain(`files: update ${update.hash!.slice(0, 8)} was rejected: ${reason}`);
+    expect(rejected.message).not.toContain("files: bundled release differs");
+    expect(await inspectExternalApps()).toEqual(rejected);
+    expect(snapshot()).toEqual(rejectedBefore);
+    await refreshInstallationReceipts(ports, workspaceId);
+    expect((await inspectExternalApps()).message).toContain(`files: update ${update.hash!.slice(0, 8)} was rejected: ${reason}`);
+    writeFileSync(join(code, "module.json"), JSON.stringify({ name: "files", description: "Next update", entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [] }));
+    await seedTestModuleRelease(resources, "files");
+    await installExternal(ports, workspaceId, { package: "files", mode: "update", requestKey: "doctor-next-update" });
+    const next = await inspectExternalApps();
+    expect(next.status).toBe("warning");
+    expect(next.message).not.toContain("was rejected");
   } finally {
     await db.$disconnect();
     rmSync(directory, { recursive: true, force: true });
