@@ -1,7 +1,7 @@
 import { composeDigest, deliveryStatus, foldedBeforeDigest, isDigestDue, localDayKey, RESPONSE_KEY_PREFIX, retryDelayMs, routeNotification, validSettings, type DeliveryOutcome, type Level, type Settings } from "./budget";
 import type { Format, Row, Store } from "./store";
 import { randomUUID } from "node:crypto";
-import { callbackReady, type Directory } from "./registry";
+import { callbackReady, type Directory, type ModuleIdentity, type Callback } from "./registry";
 import { approvalNoticeBody } from "./approval";
 import { lifecycleNotice } from "./lifecycle";
 import { parseSettingsForm, settingsForm } from "./settings-page";
@@ -12,7 +12,8 @@ type CallReply = { callId: string; status: string; output?: unknown; error?: str
 export type CallResult = { callId: string; status: "succeeded" | "failed" | "unknown"; output?: unknown; error?: string };
 type Ports = {
   store: Store; publicUrl: string | null;
-  directory(): Promise<Directory>;
+  listModules(): Promise<ModuleIdentity[]>;
+  describeTools(): Promise<Callback[]>;
   call(target: string, args: Record<string, unknown>, options: { mode: "async"; key: string; reply: boolean; expectedTarget: { moduleId: string; contractHash: string } }): Promise<CallReply>;
   status(callId: string): Promise<CallReply>;
 };
@@ -51,19 +52,27 @@ class NotifyRuntime {
   private readonly base: string;
   private readonly callPort: Ports["call"];
   private readonly statusPort: Ports["status"];
-  private readonly directoryPort: Ports["directory"];
+  private readonly listModules: Ports["listModules"];
+  private readonly describeTools: Ports["describeTools"];
+  private fingerprint: string | null = null;
   private directory: Directory = { modules: [], tools: [] };
-  constructor({ store, publicUrl, call, status, directory }: Ports) {
+  constructor({ store, publicUrl, call, status, listModules, describeTools }: Ports) {
     this.store = store;
     this.base = (publicUrl ?? "").replace(/\/$/, "");
     this.callPort = call;
     this.statusPort = status;
-    this.directoryPort = directory;
+    this.listModules = listModules;
+    this.describeTools = describeTools;
   }
-  async refresh() {
-    const directory = await this.directoryPort();
-    if (!Array.isArray(directory.modules) || !Array.isArray(directory.tools)) throw new Error("Module directory unavailable");
+  async refresh(force = true) {
+    const modules = await this.listModules();
+    if (!Array.isArray(modules)) throw new Error("Module directory unavailable");
+    const fingerprint = JSON.stringify(modules.map(module => JSON.stringify([module.id, module.status, module.activeHash])).sort());
+    const tools = !force && fingerprint === this.fingerprint ? this.directory.tools : await this.describeTools();
+    if (!Array.isArray(tools)) throw new Error("Module directory unavailable");
+    const directory = { modules, tools };
     this.directory = directory;
+    this.fingerprint = fingerprint;
     // Only a successful complete directory proves deletion. A paused owner keeps its registration.
     for (const channel of this.channels()) {
       const owner = directory.modules.find(module => module.id === channel.moduleId && module.name === channel.module);
@@ -359,7 +368,7 @@ class NotifyRuntime {
     return handlers[tool]!();
   }
   async tick(now: Date, kernelFactsReady = true) {
-    await this.refresh();
+    await this.refresh(false);
     await this.recover(now, kernelFactsReady);
     this.digest(now, kernelFactsReady);
     await this.deliverDue(now, kernelFactsReady);

@@ -12,7 +12,8 @@ async function fixture() {
   const directory = { modules: [...alpha.modules, ...beta.modules], tools: [...alpha.tools, ...beta.tools] };
   const calls: { target: string; key: string; callId: string }[] = [];
   let unavailable = false, loseReceipt = false;
-  const ports = { store, publicUrl: null, directory: async () => { if (unavailable) throw new Error("directory offline"); return directory; },
+  const ports = { store, publicUrl: null, listModules: async () => { if (unavailable) throw new Error("directory offline"); return directory.modules; },
+    describeTools: async () => directory.tools,
     call: async (target: string, _args: Record<string, unknown>, options: { key: string }) => {
       const existing = calls.find(call => call.target === target && call.key === options.key);
       if (existing) return { callId: existing.callId, status: "queued" };

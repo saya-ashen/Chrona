@@ -41,7 +41,8 @@ function activityRecords(args: Record<string, unknown>) {
   return args.cursor ? { items: records.slice(100), nextCursor: null } : { items: records.slice(0, 100), nextCursor: "opaque-next-records-page" };
 }
 const deliveries = () => (module.calls as Call[]).filter(call => call.method === "call" && targetName(call.params.target) === "qq.deliver");
-const directoryCalls = () => (module.calls as Call[]).filter(call => call.method === "call" && ["modules.list", "modules.describe"].includes(targetName(call.params.target))).length;
+const directoryCalls = (target?: string) => (module.calls as Call[]).filter(call => call.method === "call"
+  && (target ? targetName(call.params.target) === target : ["modules.list", "modules.describe"].includes(targetName(call.params.target)))).length;
 async function until(condition: () => boolean) { for (let i = 0; i < 200 && !condition(); i++) await new Promise(resolve => setTimeout(resolve, 10)); assert.ok(condition()); }
 try {
   module = await startModule("index.ts", { stubs: { "modules.list": listModules, "modules.describe": () => directoryPage(directory.tools), "activity.records": activityRecords, "activity.facts": () => ({ revision: "test", facts: [] }), "activity.withdrawals": () => ({ withdrawn: [] }) } });
@@ -81,6 +82,38 @@ try {
   let list: { title: string; status: string; channel: string }[] = [];
   for (let i = 0; i < 200 && list[0]?.status !== "sent"; i++) { list = (await tool("list", { limit: 10 })).result.result.items; await new Promise(resolve => setTimeout(resolve, 10)); }
   assert.deepEqual(list.map(item => [item.status, item.channel]), [["sent", "in_app"]]);
+
+  // Successful status calls still force a complete directory refresh.
+  for (let i = 0; i < 2; i++) {
+    const beforeList = directoryCalls("modules.list"), beforeDescribe = directoryCalls("modules.describe");
+    await tool("status", {});
+    assert.equal(directoryCalls("modules.list"), beforeList + 1);
+    assert.equal(directoryCalls("modules.describe"), beforeDescribe + 1);
+  }
+  // Each send schedules a tick; a settled notification proves that pass completed its refresh.
+  async function cacheTick(key: string) {
+    await tool("send", { key, level: "now", title: key, body: "Body", responds: true });
+    let sent = false;
+    for (let i = 0; i < 200 && !sent; i++) {
+      const items = (await tool("list", { limit: 50 })).result.result.items as { title: string; status: string }[];
+      sent = items.some(item => item.title === key && item.status === "sent");
+      if (!sent) await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    assert.ok(sent);
+  }
+  for (let i = 0; i < 3; i++) {
+    const beforeList = directoryCalls("modules.list"), beforeDescribe = directoryCalls("modules.describe");
+    await cacheTick(`cache-${i}`);
+    assert.equal(directoryCalls("modules.list"), beforeList + 1);
+    assert.equal(directoryCalls("modules.describe"), beforeDescribe);
+  }
+  const beforeVersionList = directoryCalls("modules.list"), beforeVersionDescribe = directoryCalls("modules.describe");
+  const originalHash = directory.modules[0]!.activeHash;
+  directory.modules[0]!.activeHash = "updated-version";
+  await cacheTick("cache-version");
+  assert.equal(directoryCalls("modules.list"), beforeVersionList + 1);
+  assert.equal(directoryCalls("modules.describe"), beforeVersionDescribe + 1);
+  directory.modules[0]!.activeHash = originalHash;
 
   // Once qq reports ready, a send goes out as an async qq.deliver call, and its result settles the receipt.
   const qq = { kind: "module", module: "qq", moduleId: "qq-id", hash: "h" };

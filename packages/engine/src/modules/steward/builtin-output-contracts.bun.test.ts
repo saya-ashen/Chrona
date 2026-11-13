@@ -72,7 +72,7 @@ test("actual notify handler results satisfy contracts for success, errors, empty
   const dir = await mkdtemp(join(tmpdir(), "chrona-notify-contracts-"));
   const store = openStore(dir);
   try {
-    const notify = createNotify({ store, publicUrl: null, directory: async () => ({ modules: [], tools: [] }), call: async () => ({ callId: "unused", status: "pending" }), status: async () => ({ callId: "unused", status: "pending" }) });
+    const notify = createNotify({ store, publicUrl: null, listModules: async () => [], describeTools: async () => [], call: async () => ({ callId: "unused", status: "pending" }), status: async () => ({ callId: "unused", status: "pending" }) });
     const owner: NotifyCaller = { kind: "owner", via: "test" };
     const check = (name: string, output: unknown) => {
       const schema = moduleOutputSchema.parse(tools.get(name)?.output);

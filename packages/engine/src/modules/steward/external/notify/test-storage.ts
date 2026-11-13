@@ -17,7 +17,7 @@ export function verifyStoredData(dir: string) {
       assert.deepEqual(store.byKey(row.key), row);
     }
     const unavailable = async (): Promise<never> => { throw new Error("Storage verification must not dispatch calls"); };
-    const notify = createNotify({ store, publicUrl: null, directory: unavailable, call: unavailable, status: unavailable });
+    const notify = createNotify({ store, publicUrl: null, listModules: unavailable, describeTools: unavailable, call: unavailable, status: unavailable });
     const settings = store.settings();
     assert.ok(validSettings(settings));
     const now = new Date();

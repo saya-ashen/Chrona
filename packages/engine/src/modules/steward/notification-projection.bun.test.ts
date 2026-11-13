@@ -12,7 +12,8 @@ const caller: Caller = { kind: "module", module: "transport", moduleId: "transpo
 async function fixture() {
   const dir = await mkdtemp("/tmp/chrona-notification-projection-"), store = openStore(dir);
   cleanups.push(async () => { store.close(); await rm(dir, { recursive: true, force: true }); });
-  const notify = createNotify({ store, publicUrl: null, directory: async () => testDirectory("transport"),
+  const directory = testDirectory("transport");
+  const notify = createNotify({ store, publicUrl: null, listModules: async () => directory.modules, describeTools: async () => directory.tools,
     call: async () => { throw new Error("Projection must not deliver notifications"); },
     status: async () => { throw new Error("Projection must not poll delivery receipts"); } });
   await notify.refresh();

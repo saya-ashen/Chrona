@@ -24,7 +24,8 @@ async function fixture() {
   const calls: Record<string, unknown>[] = [], statuses: string[] = [];
   let rejectDigest = false, pendingDigest = false;
   let onDelivery: ((args: Record<string, unknown>) => Promise<void>) | null = null;
-  const ports = { store, publicUrl: null, directory: async () => testDirectory("transport"),
+  const directory = testDirectory("transport");
+  const ports = { store, publicUrl: null, listModules: async () => directory.modules, describeTools: async () => directory.tools,
     call: async (_target: string, args: Record<string, unknown>) => {
       calls.push(args);
       if (onDelivery) await onDelivery(args);
