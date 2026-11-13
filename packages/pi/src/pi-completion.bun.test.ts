@@ -1,7 +1,8 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, spyOn, test } from "bun:test";
 import { mkdtemp, writeFile, readFile, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { createPiCompletion } from "./pi-completion";
+import { createPiCompletion, piCompletionUnavailable } from "./pi-completion";
+import { piLaunchConfig } from "./pi-launch";
 import { launchPiProcess } from "./pi-process";
 
 const cleanups: (() => Promise<unknown>)[] = [];
@@ -145,6 +146,26 @@ for (const options of [
   await expect(f.complete(f.input)).rejects.toMatchObject({ code: "provider_error" });
   expect(await readFile(f.sent, "utf8").catch(() => null)).toBeNull();
   await expectStoppedAndCleaned(f);
+});
+test("version other than 1.5.0 fails with a logged reason", async () => {
+  const f = await fixture("ok", { version: "0.85.0", pin: "0.85.0" });
+  const log = spyOn(console, "error").mockImplementation(() => {});
+  try {
+    await expect(f.complete(f.input)).rejects.toMatchObject({ code: "provider_error", message: "Module model call: provider_error" });
+    expect(log).toHaveBeenCalledTimes(1);
+    const entry = JSON.parse(String(log.mock.calls[0]![0]));
+    expect(entry).toMatchObject({ component: "pi-completion", event: "completion_failed" });
+    expect(entry.error).toContain("requires CHRONA_STEWARD_PI_VERSION=1.5.0");
+    expect(entry.error).toContain("configured 0.85.0");
+  } finally { log.mockRestore(); }
+});
+test("piCompletionUnavailable accepts a valid 1.5.0 launch config", async () => {
+  const f = await fixture();
+  expect(await piCompletionUnavailable(piLaunchConfig(f.providerOptions))).toBeNull();
+});
+test("piCompletionUnavailable explains an unsupported completion version", async () => {
+  const f = await fixture("ok", { version: "0.85.0", pin: "0.85.0" });
+  expect(await piCompletionUnavailable(piLaunchConfig(f.providerOptions))).toContain("configured 0.85.0");
 });
 test("version mismatch refuses model launch", async () => {
   const f = await fixture("ok", { version: "wrong" });

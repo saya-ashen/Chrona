@@ -18,6 +18,12 @@ const childOf = (state: CompletionState) => state.child;
 // CLI and bundled provider source. There is no CLI max-token flag. Explicit -e
 // still loads with --no-extensions; extension load errors abort print mode.
 const TOKEN_LIMIT_PI_VERSION = "1.5.0";
+
+/** Why completion cannot run with this launch config, or null. */
+export async function piCompletionUnavailable(config: ReturnType<typeof piLaunchConfig>): Promise<string | null> {
+  if (config.version !== TOKEN_LIMIT_PI_VERSION) return `Pi completion requires CHRONA_STEWARD_PI_VERSION=${TOKEN_LIMIT_PI_VERSION} (configured ${config.version})`;
+  return inspectPiLaunch(config);
+}
 function tokenLimitExtension(input: PiCompletionInput, dir: string): string {
   return `import { writeFileSync } from "node:fs";
 export default function (pi) {
@@ -113,21 +119,28 @@ function runPiProcess(config: ReturnType<typeof piLaunchConfig>, input: PiComple
     void process.closed.then(({ code }) => {
       if (!invalid && buffer) parseLine(buffer, input, output, fail);
       if (isExpired()) reject(failure("timeout"));
-      else if (invalid || code !== 0 || !output.result) reject(failure("provider_error"));
+      else if (invalid) reject(Object.assign(failure("provider_error"), { reason: "pi output was invalid or empty" }));
+      else if (code !== 0) reject(Object.assign(failure("provider_error"), { reason: `pi exited with code ${code}` }));
+      else if (!output.result) reject(Object.assign(failure("provider_error"), { reason: "pi output was invalid or empty" }));
       else resolve(output.result);
     }, reject);
     process.stdin.end(input.prompt);
   });
 }
-async function work(config: ReturnType<typeof piLaunchConfig>, input: PiCompletionInput, state: CompletionState, isExpired: () => boolean): Promise<PiCompletionResult> {
-  if (config.version !== TOKEN_LIMIT_PI_VERSION || await inspectPiLaunch(config)) throw failure("provider_error");
+async function work(
+  config: ReturnType<typeof piLaunchConfig>, input: PiCompletionInput, state: CompletionState, isExpired: () => boolean,
+): Promise<PiCompletionResult> {
+  const unavailable = await piCompletionUnavailable(config);
+  if (unavailable) throw Object.assign(failure("provider_error"), { reason: unavailable });
   if (isExpired()) throw failure("timeout");
   state.dir = await mkdtemp(join(tmpdir(), "chrona-model-"));
   await writeFile(join(state.dir, "token-limit.mjs"), tokenLimitExtension(input, state.dir), { mode: 0o600 });
   if (input.system !== undefined) await writeFile(join(state.dir, "system.txt"), input.system, { mode: 0o600 });
   if (isExpired()) throw failure("timeout");
   const result = await runPiProcess(config, input, state.dir, state, isExpired);
-  if (await readFile(join(state.dir, "token-limit.applied"), "utf8") !== String(input.maxOutputTokens)) throw failure("provider_error");
+  if (await readFile(join(state.dir, "token-limit.applied"), "utf8") !== String(input.maxOutputTokens)) {
+    throw Object.assign(failure("provider_error"), { reason: "token limit extension did not apply" });
+  }
   return result;
 }
 function timeoutError(error: unknown, isExpired: () => boolean) {
@@ -160,6 +173,8 @@ export function createPiCompletion(options: PiProviderOptions) {
         workPromise = work(config, input, state, isExpired),
       ]);
     } catch (error) {
+      const reason = (error as { reason?: unknown }).reason;
+      console.error(JSON.stringify({ component: "pi-completion", event: "completion_failed", error: String(reason ?? error).slice(0, 500) }));
       // This evidence reaches the caller only if finally confirms tree closure.
       // A rejected closed promise overrides it and leaves the operation unknown.
       throw Object.assign(failure(input.signal?.aborted ? "cancelled" : timeoutError(error, isExpired) ? "timeout" : "provider_error"), { stopped: true });
