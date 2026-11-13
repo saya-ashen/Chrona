@@ -19,7 +19,7 @@
   "tools": [
     {
       "name": "prepare",
-      "description": "Prepare current-Agent guidance to build/test in its existing workspace, import selected source and binary artifacts, and use fixed owner-entry admission, submit and receipt. Pure; no model, builder, submission or installation.",
+      "description": "Prepare current-Agent guidance for minimal real integration, scoped checks, fixed material submission and a write-ready acceptance worksheet. Pure; save acceptance through write. Installation permission is separate from product acceptance; no automatic continuation.",
       "visibility": [
         "owner"
       ],
@@ -168,13 +168,24 @@
           },
           "prompt": {
             "type": "string"
+          },
+          "acceptance": {
+            "type": "object",
+            "description": "Caller-maintained worksheet for author.write; prepare does not persist it or verify acceptance. Read existing content first and preserve prior evidence.",
+            "properties": {
+              "path": { "type": "string" },
+              "content": { "type": "string" }
+            },
+            "required": ["path", "content"],
+            "additionalProperties": false
           }
         },
         "required": [
           "kind",
           "request",
           "admission",
-          "prompt"
+          "prompt",
+          "acceptance"
         ],
         "additionalProperties": false
       }

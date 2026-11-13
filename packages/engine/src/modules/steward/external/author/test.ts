@@ -170,6 +170,34 @@ try {
   assert.deepEqual(await result("prepare", input(prepare), entry), draft, "preparation is repeatable without effects");
   assert.deepEqual(runtime.calls, [], "prepare never calls discovery, owner admission or Agent");
   assert.deepEqual(await result("list", { path: "" }, provider), { path: "", entries: [] }, "prepare never writes source material");
+  // Persist the exposed template through ordinary selected file tools, then recover it in bounded ranges.
+  const worksheet = (draft as ReturnType<typeof prepareMaterial>).acceptance;
+  await result("write", worksheet, entry);
+  async function readWorksheet() {
+    let content = "", offset = 0;
+    for (;;) {
+      const page = await result("read", { path: worksheet.path, offset }, entry) as { content: string; nextOffset: number; eof: boolean };
+      content += page.content;
+      if (page.eof) return JSON.parse(content);
+      offset = page.nextOffset;
+    }
+  }
+  const acceptance = await readWorksheet();
+  assert.deepEqual(acceptance, JSON.parse(worksheet.content));
+  assert.ok(acceptance.checks.every((row: { status: string; candidateHash: string | null; activeHash: string | null }) =>
+    row.status === "not-run" && row.candidateHash === null && row.activeHash === null));
+  acceptance.receiptId = "receipt-1";
+  acceptance.continuation = { responsible: "Original task owner", nextAction: "Observe receipt-1 and verify the matching active version", blocker: "Awaiting installation permission" };
+  for (const [index, status] of ["pass", "fail", "blocked", "not-run"].entries()) {
+    Object.assign(acceptance.checks[index], { status, candidateHash: "c".repeat(40), activeHash: null, hostVersion: "isolated-test-host",
+      scenario: `Scenario ${index}`, expected: "Requested outcome", observed: status === "pass" ? "Observed outcome" : null,
+      reason: status === "blocked" ? "Awaiting approval" : null, evidence: status === "pass" ? ["test-log.txt"] : [] });
+  }
+  await result("write", { path: worksheet.path, content: JSON.stringify(acceptance) }, entry);
+  assert.deepEqual(await result("prepare", input(prepare), entry), draft, "pure prepare does not replace saved evidence");
+  assert.deepEqual(await readWorksheet(), acceptance, "saved ownership, hash-bound outcomes and blockers survive repeated preparation");
+  assert.deepEqual((await result("list", { path: worksheet.path.slice(0, worksheet.path.lastIndexOf("/")) }, entry) as { entries: unknown[] }).entries, [{ name: "checklist.json", kind: "file" }]);
+  assert.deepEqual(runtime.calls, [], "saving evidence never approves, submits or starts another Run");
   assert.ok((await tool("prepare", input(prepare), provider)).error);
   assert.ok((await tool("stage", input(stage), provider)).error);
   assert.ok((await tool("submit", input(submission), provider)).error);
@@ -197,8 +225,13 @@ try {
   assert.ok((await tool("write", { path: "../escape", content: "no" }, provider)).error);
   assert.ok((await tool("write", { path: "sources/work/huge", content: "x".repeat(65537) }, provider)).error);
   assert.equal((await result("list", { path: "sources/work" }, provider) as { entries: unknown[] }).entries.length, 2);
-  const staged = await result("stage", input(stage)) as { dir: string };
+  const staged = await result("stage", input(stage)) as { dir: string; files: number };
   assert.equal(staged.dir, submission.items[0].dir);
+  assert.equal(staged.files, 2, "acceptance evidence stays outside staged application material");
+  acceptance.continuation.blocker = "Real-host acceptance outstanding";
+  await result("write", { path: worksheet.path, content: JSON.stringify(acceptance) }, entry);
+  assert.deepEqual((await result("list", { path: staged.dir }, entry) as { entries: unknown[] }).entries,
+    [{ name: "index.ts", kind: "file" }, { name: "module.json", kind: "file" }], "updating the worksheet does not mutate staged material");
   assert.deepEqual(await result("submit", input(submission), entry), receipt);
   // Replay must still reach kernel even if local staged files changed or disappeared.
   await rm(join(paths.content, staged.dir), { recursive: true });

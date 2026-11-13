@@ -30,12 +30,15 @@ type Contract = keyof ChronaCalls & KernelTarget;
 type ArgsOf<K extends Contract> = ChronaCalls[K] extends { args: infer A } ? A : never;
 type OutputOf<K extends Contract> = ChronaCalls[K] extends { output: infer O } ? O : never;
 type SyncOptions = CallOptions & { mode?: "sync" };
+// These kernel tools never enqueue routed async work; a Run has its own lifecycle.
+const syncOnlyAgentTargets = ["agent.register", "agent.providers", "agent.run", "agent.read", "agent.write", "agent.stop", "agent.native"] as const;
+type SyncOnlyAgentTarget = typeof syncOnlyAgentTargets[number];
 type Call = {
   <K extends Contract>(target: K, ...rest: object extends ArgsOf<K> ? [args?: ArgsOf<K>, options?: SyncOptions] : [args: ArgsOf<K>, options?: SyncOptions]): Promise<OutputOf<K>>;
-  <K extends Contract>(target: K, args: ArgsOf<K>, options: CallOptions & { mode: "async" }): Promise<CallState>;
-  <S extends CallTarget>(target: S & (S extends Contract ? never : unknown), args: Record<string, unknown>, options: CallOptions & { mode: "async" }): Promise<CallState>;
-  /** A target without a declared contract: the result is unknown unless the caller states what it expects. */
-  <T = unknown, S extends CallTarget = CallTarget>(target: S & (S extends Contract ? never : unknown), args?: Record<string, unknown>, options?: CallOptions): Promise<T>;
+  <K extends Contract>(target: Exclude<K, SyncOnlyAgentTarget>, args: ArgsOf<K>, options: CallOptions & { mode: "async" }): Promise<CallState>;
+  <S extends CallTarget>(target: S & (S extends Contract | SyncOnlyAgentTarget ? never : unknown), args: Record<string, unknown>, options: CallOptions & { mode: "async" }): Promise<CallState>;
+  /** Literal Agent targets require sync. Explicit result generics default S broadly; the runtime guard also covers that escape. */
+  <T = unknown, S extends CallTarget = CallTarget>(target: S & (S extends Contract ? never : unknown), args?: Record<string, unknown>, options?: S extends SyncOnlyAgentTarget ? SyncOptions : CallOptions): Promise<T>;
 };
 type Handler = (event: WireTrigger & { now: string; params: Record<string, string | number | boolean> }) => EventResult | void | Promise<EventResult | void>;
 const handlers = new Map<WireTrigger["kind"], Handler>();
@@ -108,13 +111,16 @@ export const chrona = {
   /**
    * Calls an application tool through Chrona (`target` = {moduleId, tool}); `uses` declares its contract, not runtime admission.
    * sync (default): resolves to the tool's result; a timeout or crash after delivery rejects with code "unknown".
-   * async: needs a `key` (a repeat returns the same call) and resolves at once to { callId, status };
+   * Agent tools only accept sync: run returns admission identity, then read observes progress/completion.
+   * async (other tools): needs a `key` (a repeat returns the same call) and resolves at once to { callId, status };
    * `reply: true` delivers a `call_result` event later. Rejections are ModelError with a code
    * (forbidden, not_found, cycle, unknown, failed, unavailable, invalid).
    */
-  call: ((target: CallTarget, args: Record<string, unknown> = {}, { mode = "sync", ...options }: CallOptions = {}) =>
-    call<{ output?: unknown } & CallState>("call", { target, args, mode, ...options }).then(result => (mode === "sync" ? result.output : result))) as Call,
-  /** State of an async call this module made. */
+  call: ((target: CallTarget, args: Record<string, unknown> = {}, { mode = "sync", ...options }: CallOptions = {}) => {
+    if (mode === "async" && syncOnlyAgentTargets.some(name => name === target)) return Promise.reject(new ModelError("invalid", `${target} is called synchronously (its arguments are never stored)`));
+    return call<{ output?: unknown } & CallState>("call", { target, args, mode, ...options }).then(result => (mode === "sync" ? result.output : result));
+  }) as Call,
+  /** Routed call receipt, including keyed sync calls. Agent run/write/stop retain outputs; Run progress uses agent.read. */
   callStatus: (selector: string | { callId: string } | { target: CallTarget; key: string }) => call<CallState>("callStatus", typeof selector === "string" ? { callId: selector } : selector),
   /**
    * A credential listed in the manifest's `secrets` (v2-16: any module; the user saves it in Settings): a routed call to

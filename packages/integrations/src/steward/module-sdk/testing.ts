@@ -43,6 +43,8 @@ async function callReply(call: Call, { stubs, manifest, seen, completions, bindi
   if (call.method === "callStatus") return { result: { callId: String(call.params.callId), status: "queued" } };
   const address = call.params.target as string | { moduleId: string; tool: string };
   const target = typeof address === "string" ? address : `${Object.entries(bindings).find(([, id]) => id === address.moduleId)?.[0] ?? address.moduleId}.${address.tool}`, args = (call.params.args ?? {}) as Record<string, unknown>;
+  // Match the host before either Agent fixtures or caller stubs can hide an invalid mode.
+  if (call.params.mode === "async" && ["agent.register", "agent.providers", "agent.run", "agent.read", "agent.write", "agent.stop", "agent.native"].some(name => name === address)) return { error: { code: "invalid", message: `${address} is called synchronously (its arguments are never stored)` } };
   if (target.startsWith("agent.") && !findStub(stubs, target)) {
     const result = await agentReply(target, args, completions, call.params.key);
     if (result) return result;

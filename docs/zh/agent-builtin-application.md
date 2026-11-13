@@ -24,6 +24,49 @@ Pi 位于 `external/pi`，是默认预装的普通应用，可按受控生命周
 
 上下文归实际入口应用所有。首次 Run 固定 Provider 登记版本，后续控制和恢复继续使用该绑定；选择新的默认 Provider 不切换已运行任务。没有可用 Provider 时报告不可用，多个可选项时须明确选择。登记提供实际执行端点，不只是展示信息。
 
+## 同步受理与 Run 完成
+
+七个 Agent 工具都只接受 `mode: "sync"`（省略时即为 sync）。`mode: "async"` 会以 `invalid` 拒绝，不会创建异步调用回执；不能再拿返回值当 `callId` 轮询 `callStatus`。SDK 对推断出的已知字面量目标做类型约束；显式结果泛型或动态目标仍可能通过类型检查，运行时统一拒绝非法 Agent async 调用。普通应用的 `{ moduleId, tool }` 目标仍按该应用合同调用。
+
+`agent.run` 同步返回 `{ runId, contextId, status, active }`，表示已受理入队，不表示模型执行完毕，也没有生成文本或异步路由的 `callId`。先持久化由业务操作派生的 key 和完整请求，再发送；收到响应后保存 Run 身份。以下示例中的 `operationId`、`prompt` 由应用提供，持久化由应用自己的数据层完成：
+
+```ts
+const key = `completion:${operationId}`;
+const args = { kind: "completion" as const, prompt, providerOptions: {} };
+const started = await chrona.call("agent.run", args, { mode: "sync", key });
+// 此处保存 started.runId/contextId；后续恢复和继续会话都使用它们。
+let cursor: string | undefined;
+const deadline = Date.now() + 30_000;
+do {
+  const page = await chrona.call("agent.read", {
+    runId: started.runId, ...(cursor ? { cursor } : {}), waitMs: 1000,
+  });
+  // 按 sequence 消费并保存 items；completion 的 payload 是 { text, inputTokens, outputTokens }。
+  // 将消费结果和 nextCursor 一起持久化；Run 状态以 page.run 为准。
+  cursor = page.nextCursor ?? cursor;
+  if (page.ended && !page.nextCursor) break;
+} while (Date.now() < deadline);
+// 到达本地等待上限只表示本次观察结束，不能据此宣布完成或另起 Run。
+```
+
+`ended` 表示执行已结束，不表示分页已读完；仍有 `nextCursor` 时继续读取。成功与否还须检查 `page.run.status`；失败、取消和未知不能当作成功。持续对话复用 `contextId`。`agent.write`（消息或 questionId 绑定的回答）、`agent.stop`、`agent.native` 同样使用同步调用和各自稳定的 `options.key`。`write` 返回 `{ accepted: true }` 只表示输入受理；停止响应必须检查 `stopConfirmed`，未确认停止时保留原 Run 并继续核对。
+
+## 丢回复后的 key 恢复
+
+`callStatus` 查询的是调用回执，`agent.read` 查询的是 Run；两者的状态不是同一生命周期。带 key 的同步 `agent.run/write/stop`（以及 `register`）会保留返回输出，因此即使没有拿到 `callId`，原调用应用也可以查询：
+
+```ts
+const receipt = await chrona.callStatus({ target: "agent.run", key });
+// receipt.status === "succeeded" 时，receipt.output 是原受理结果；
+// 校验并保存其中的 runId/contextId，再用 agent.read 读取当前 Run。
+```
+
+恢复须遵循以下合同：
+
+1. 保存并沿用同一个调用应用、活动版本、目标、key 和完整参数。同步 `agent.run` 用原参数、原 key 再调用，会恢复同一 Run 的受理身份；原始受理状态可能已过时，当前状态仍从 `agent.read` 获取。改参数复用 key 报 `conflict`，换应用版本不能继承原版本回执（`forbidden`）。
+2. `callStatus` 的 `running/unknown/failed` 不是模型运行状态。`not_found` / `Call not found` 只说明未查到该调用回执，不能推出任务已停止或授权换 key 重跑。先核对原目标和 key；已知 `runId` 时直接读原 Run，否则用原请求、原 key 同步恢复受理。原调用若是被拒绝的 async Agent 调用，本来就没有异步回执，应修正模式并保持原业务身份。
+3. `write/stop/native` 的未知效果须核对原 Run 或 Provider 操作；用原 key 恢复仍可能返回 `unknown`，不得因此改 key 重复控制或另起模型。`callStatus` 不保留 `read/providers/native` 的私有返回输出，不能把它当作原生响应或事件数据的恢复接口；需要这些数据时按对应工具合同读取或核对原操作。
+
 ## 登记与回调
 
 登记记录绑定当前 moduleId、批准活动 hash、协议版本及每个执行端点的 contractHash。health/start/status/inject/abort/release 和可选 transcript/native/complete 都是登记应用自己的 kernel-only 工具。配置入口面向 owner，不接收内核 token 或 callback 身份。

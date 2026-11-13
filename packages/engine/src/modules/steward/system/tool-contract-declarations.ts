@@ -12,12 +12,21 @@ export const withdrawalsInput = z.object({ revision: z.string().min(1), keys: z.
 export const consumerOutput = z.object({ moduleId: z.string().nullable(), revision: z.string() });
 
 const readers = ["modules", "owner", "provider"] as const;
+const agentGuidance: Record<keyof typeof kernelAgentInputs, string> = {
+  register: "Register this caller's Provider declaration.",
+  providers: "Discover available Providers and their capabilities before selecting one.",
+  run: "Accept a caller-owned Run and return its identity without waiting for model completion. Persist the call key and exact arguments before sending; recover a lost response with the same key and arguments. Read progress with agent.read.",
+  read: "Read one owned Run. Drain nextCursor even when ended is true; ended describes execution, not pagination. Normalized transcript is a bounded snapshot, not an append-only delta.",
+  write: "Submit input to an owned Run with a stable call key. A repeated key cannot repeat the effect; an unresolved control outcome remains unknown. Preserve the original request and reconcile the Run rather than inventing another key.",
+  stop: "Request cancellation of an owned Run with a stable call key. Keep a pending stop occupied until stopConfirmed is true; agent.read exposes active/unknown status but no stopConfirmed field. Acknowledgement alone is not proof of termination.",
+  native: "Invoke the selected Provider's native interface for an owned Run. Preserve the exact request and key; an unresolved outcome must not be replayed under a new key.",
+};
 
 /** Shared build source and runtime validators; importing declarations never registers handlers. */
 export const publicSystemTools = {
   agent: declaredSystemTools("agent", Object.keys(kernelAgentInputs).map(name => {
     const key = name as keyof typeof kernelAgentInputs;
-    return tool(key, `Kernel Agent ${key}. Provider identity and Run ownership are checked by the kernel.`, {}, [], {
+    return tool(key, `Kernel Agent ${key}. ${agentGuidance[key]} Call synchronously (mode: sync); mode: async is unsupported. callStatus can observe a keyed synchronous invocation receipt, not live Run progress or new stop evidence. Provider identity and Run ownership are checked by the kernel.`, {}, [], {
       visibility: key === "providers" ? ["modules", "owner"] : ["modules"],
       idempotent: ["register", "providers", "read"].includes(key), input: kernelAgentInputs[key], output: kernelAgentOutputs[key],
     });
