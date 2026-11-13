@@ -106,7 +106,7 @@ test("install is bounded, idempotent and explicit; uncertain receipts do not exe
   expect(calls).toBe(1);
   expect(moduleInstallRequestSchema.safeParse({ ...fixtures.install, dir: "/private" }).success).toBe(false);
   expect(moduleInstallRequestSchema.safeParse({ ...fixtures.install, package: "web" }).success).toBe(true);
-  expect((await externalPackageCatalog(f.ports, f.workspaceId)).map(item => item.name)).toEqual(["pi", "web", "notify", "qq", "author", "memory-local", "coding", "coding-web", "mcp", "files", "events", "remind", "mind", "remote-execution"]);
+  expect((await externalPackageCatalog(f.ports, f.workspaceId)).map(item => item.name)).toEqual(["pi", "web", "notify", "qq", "author", "mind", "memory-local", "coding", "coding-web", "mcp", "files", "events", "remind", "remote-execution"]);
   // Other packages' history cannot push this package out of a global latest-N window.
   await f.db.moduleInstallation.createMany({ data: Array.from({ length: 205 }, (_, i) => ({ id: `noise-${i}`, workspaceId: f.workspaceId, package: "mind", mode: "install", requestKey: `noise-${i}`, status: "failed" })) });
   expect((await externalPackageCatalog(f.ports, f.workspaceId)).find(item => item.name === "qq")?.installation).toMatchObject({ requestKey: fixtures.install.requestKey, status: "failed" });
@@ -269,7 +269,7 @@ test.each(["pi", "web", "notify", "other-entry"])("list and interface projection
   expect(await moduleInterfaces(f.ports, f.workspaceId, "modules")).toMatchObject({ origin: "kernel", capabilities: { build: false } });
   await expect(callSync(f.ports, { workspaceId: f.workspaceId, caller: { kind: "owner", via: null }, chain: [], path: [] }, "modules.catalog", {})).rejects.toMatchObject({ code: "not_found" });
   const catalog = await externalPackageCatalog(f.ports, f.workspaceId);
-  expect(catalog.map(item => item.name)).toEqual(["pi", "web", "notify", "qq", "author", "memory-local", "coding", "coding-web", "mcp", "files", "events", "remind", "mind", "remote-execution"]);
+  expect(catalog.map(item => item.name)).toEqual(["pi", "web", "notify", "qq", "author", "mind", "memory-local", "coding", "coding-web", "mcp", "files", "events", "remind", "remote-execution"]);
 });
 
 describe("ordinary Pi browser discovery", () => {

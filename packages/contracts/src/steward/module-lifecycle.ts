@@ -6,8 +6,8 @@ export const RESERVED_ENTRY_NAMES = ["rescue"] as const;
 /** Private kernel host identities routed internally; never installable applications. */
 export const LOCAL_CAPABILITY_NAMES = ["runtime-callback", "workspace-local"] as const;
 export const BUILTIN_MODULE_NAMES = [] as const;
-export const PREINSTALLED_MODULE_NAMES = ["pi", "web", "notify", "qq", "author"] as const;
-export const OPTIONAL_EXTERNAL_MODULE_NAMES = ["memory-local", "coding", "coding-web", "mcp", "files", "events", "remind", "mind", "remote-execution"] as const;
+export const PREINSTALLED_MODULE_NAMES = ["pi", "web", "notify", "qq", "author", "mind"] as const;
+export const OPTIONAL_EXTERNAL_MODULE_NAMES = ["memory-local", "coding", "coding-web", "mcp", "files", "events", "remind", "remote-execution"] as const;
 /** Persisted initialization receipts retain explicit skipped entries for paused packages. */
 const INITIALIZATION_MODULE_NAMES = ["pi", "web", "notify", "qq", "author", "remind", "mind"] as const;
 export const OFFICIAL_EXTERNAL_MODULE_NAMES = [...PREINSTALLED_MODULE_NAMES, ...OPTIONAL_EXTERNAL_MODULE_NAMES] as const;

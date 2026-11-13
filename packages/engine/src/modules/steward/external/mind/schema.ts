@@ -36,7 +36,7 @@ export const settingsSchema = z.object({
   waitingRecheckHours: z.number().int().min(1).max(168),
 }).strict();
 export const DEFAULT_SETTINGS: z.infer<typeof settingsSchema> = {
-  enabled: false, intervalMinutes: 15, dailyWakes: 6, dailyTime: "09:00", quietStart: "22:00", quietEnd: "08:00", timezone: "UTC",
+  enabled: true, intervalMinutes: 15, dailyWakes: 6, dailyTime: "09:00", quietStart: "22:00", quietEnd: "08:00", timezone: "UTC",
   notifyEnabled: false, feedbackMinimum: 5, feedbackHalfLifeDays: 7, waitingRecheckHours: 24,
 };
 export const signalSchema = z.object({

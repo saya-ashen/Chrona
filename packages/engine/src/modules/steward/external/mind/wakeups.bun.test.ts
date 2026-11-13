@@ -27,8 +27,7 @@ async function fixture() {
 test("enable, restart, pause and resume reconcile one durable timer", async () => {
   const f = await fixture();
   const wake = new MindWakeups(f.store, f.call);
-  await wake.sync(); expect(f.writes).toEqual([]);
-  await f.store.update(s => { s.settings.enabled = true; });
+  await wake.sync(); expect(f.writes).toEqual(["timers.set"]);
   await Promise.all([wake.sync(), wake.sync()]);
   expect(f.writes).toEqual(["timers.set"]);
   await new MindWakeups(new MindStore(f.root), f.call).sync();

@@ -1,5 +1,8 @@
 import { afterEach, expect, test } from "bun:test";
-import { PREINSTALLED_MODULE_NAMES, type ModuleInitializationState } from "@chrona/contracts/steward";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { seedTestModuleRelease } from "./module-release-test-fixture";
+import { moduleManifestSchema, PREINSTALLED_MODULE_NAMES, type ModuleInitializationState } from "@chrona/contracts/steward";
 import type { Prisma } from "@chrona/db";
 import { testDb } from "./test-db";
 import { ensureWorkspaceInitialized } from "./module-initialization";
@@ -86,7 +89,38 @@ test("an existing ordinary Notify is skipped without selecting it or installing 
   expect(await f.db.module.count()).toBe(PREINSTALLED_MODULE_NAMES.length);
 });
 
-test("fresh initialization skips optional Mind and paused Remind and retries never install them", async () => {
+test("fresh workspace queues preinstalled Mind while Remind stays skipped", async () => {
+  const f = await fixture();
+  const root = await mkdtemp("/tmp/chrona-mind-preinstall-");
+  closes.push(() => rm(root, { recursive: true, force: true }));
+  f.ports.moduleExternalResources = root;
+  const dir = join(root, "mind");
+  await mkdir(dir);
+  const manifest = moduleManifestSchema.parse({ name: "mind", entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [] });
+  await writeFile(join(dir, "module.json"), JSON.stringify(manifest));
+  await writeFile(join(dir, "index.ts"), "// offline initialization fixture\n");
+  await writeFile(join(dir, "test.ts"), "// offline check fixture\n");
+  await seedTestModuleRelease(root, "mind");
+  await f.db.workspace.update({ where: { id: f.workspaceId }, data: { settings: {} } });
+  await f.db.module.createMany({
+    data: PREINSTALLED_MODULE_NAMES.filter(name => name !== "notify" && name !== "mind").map(name => ({ workspaceId: f.workspaceId, name })),
+  });
+  const submitted: string[] = [];
+  f.ports.moduleExternalInstaller = async ({ request, release }) => {
+    submitted.push(request.package);
+    const module = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: request.package } });
+    return { package: request.package, requestKey: request.requestKey, status: "building", moduleId: module.id,
+      hash: release.hash, approvalId: null, error: null };
+  };
+  const initial = await f.initialize();
+  expect(initial.packages.mind.status).not.toBe("skipped");
+  expect(initial.packages.mind).toMatchObject({ status: "building", attempts: 1, error: null });
+  expect(initial.packages.remind).toMatchObject({ status: "skipped", error: { reason: "module_paused" } });
+  expect(submitted).toEqual(["mind"]);
+  expect(await f.db.module.count({ where: { name: "remind" } })).toBe(0);
+});
+
+test("fresh initialization retains existing Mind and skips paused Remind without reinstalling them", async () => {
   const f = await fixture();
   await f.db.workspace.update({ where: { id: f.workspaceId }, data: { settings: {} } });
   await f.db.module.createMany({ data: PREINSTALLED_MODULE_NAMES.filter(name => name !== "notify").map(name => ({ workspaceId: f.workspaceId, name })) });
@@ -94,24 +128,26 @@ test("fresh initialization skips optional Mind and paused Remind and retries nev
   f.ports.moduleExternalInstaller = async () => { submissions++; throw new Error("Optional app reached preinstaller"); };
   const initial = await f.initialize();
   expect(initial.status).toBe("complete");
-  expect(initial.packages.mind).toMatchObject({ status: "skipped", attempts: 1, moduleId: null, hash: null, error: null });
+  const mind = await f.db.module.findUniqueOrThrow({ where: { workspaceId_name: { workspaceId: f.workspaceId, name: "mind" } } });
+  expect(initial.packages.mind).toMatchObject({ status: "skipped", attempts: 1, moduleId: mind.id, hash: null, error: null });
   expect(initial.packages.remind).toMatchObject({ status: "skipped", attempts: 1, moduleId: null, hash: null, error: { code: "unavailable", reason: "module_paused" } });
   const persisted = (await f.db.workspace.findUniqueOrThrow({ where: { id: f.workspaceId } })).settings as Record<string, unknown>;
   expect(persisted.moduleInitialization).toEqual(initial);
   expect(await ensureWorkspaceInitialized(f.ports, f.workspaceId, { retryFailed: true })).toEqual(initial);
   expect(submissions).toBe(0);
-  expect(await f.db.module.count({ where: { name: { in: ["mind", "remind"] } } })).toBe(0);
+  expect(await f.db.module.count({ where: { name: "mind" } })).toBe(1);
+  expect(await f.db.module.count({ where: { name: "remind" } })).toBe(0);
   expect(await f.db.moduleVersion.count()).toBe(0);
 });
 
-test.each(["mind", "remind"] as const)("an optional %s initialization cannot enqueue a default install or retry", async name => {
+test.each(["remind"] as const)("a paused %s initialization cannot enqueue a default install or retry", async name => {
   const f = await fixture();
   f.state.status = "pending";
   f.state.packages[name] = { ...f.state.packages[name], status: "failed", attempts: 3, error: { code: "failed", reason: "old_failure", message: "old failure" } };
   await f.save();
   const result = await ensureWorkspaceInitialized(f.ports, f.workspaceId, { retryFailed: true });
   expect(result.status).toBe("complete");
-  expect(result.packages[name]).toMatchObject({ status: "skipped", attempts: 3, error: name === "remind" ? { code: "unavailable", reason: "module_paused" } : null });
+  expect(result.packages[name]).toMatchObject({ status: "skipped", attempts: 3, error: { code: "unavailable", reason: "module_paused" } });
   expect(await f.db.module.count({ where: { name } })).toBe(0);
   expect(await f.db.moduleVersion.count()).toBe(0);
   expect((await factConsumer(f.db, f.workspaceId)).moduleId).toBe(f.notify.id);
@@ -133,12 +169,12 @@ test("an existing customized Author is handled without replacement or changing t
   expect(await f.initialize()).toEqual(state);
 });
 
-test("an installed optional Mind is retained without being adopted as a preinstalled app", async () => {
+test("an installed Mind receipt is retained without replacement", async () => {
   const f = await fixture();
   const mind = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "mind", activeHash: "a".repeat(40) } });
   f.state.packages.mind = { ...f.state.packages.mind, status: "installed", moduleId: mind.id, hash: mind.activeHash };
   await f.save();
-  expect((await f.initialize()).packages.mind).toMatchObject({ status: "skipped", moduleId: mind.id, hash: mind.activeHash, error: null });
+  expect((await f.initialize()).packages.mind).toMatchObject({ status: "installed", moduleId: mind.id, hash: mind.activeHash, error: null });
   const persisted = (await f.db.workspace.findUniqueOrThrow({ where: { id: f.workspaceId } })).settings as Record<string, unknown>;
   expect(persisted.moduleInitialization).toEqual(await f.initialize());
   expect(await f.db.module.findUniqueOrThrow({ where: { id: mind.id } })).toEqual(mind);
