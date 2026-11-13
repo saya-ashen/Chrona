@@ -25,7 +25,7 @@ export async function readBoundedFile(path: string, maxBytes = FILE_MAX_BYTES) {
     return bytes.subarray(0, offset);
   } finally { await handle.close(); }
 }
-/** Internal host read: cwd has already been selected by the authenticated Run/owner build. */
+/** Internal host read: cwd has already been selected by the authenticated Run. */
 export async function readWorkspaceFile(cwd: string, path: string) {
   const root = await realpath(cwd);
   const full = await realpath(join(root, path)).catch(() => { throw new StewardError("not_found", `No file ${path} in the working directory`); });

@@ -21,7 +21,6 @@ import { createRuns, createRunSession } from "./runs";
 import { assertExternalName } from "./module-identity";
 import { cancelProviderRun } from "./provider-cancel";
 import { assertBuildQueueSpace, buildQueue } from "./build-queue";
-import type { BuildExecution } from "./build-execution";
 import { createModules } from "./modules";
 import { sessionTranscript } from "./transcript";
 import { transcriptRedactor } from "@chrona/logging/redaction";
@@ -191,13 +190,12 @@ async function start(ports: StewardPorts, workspaceId: string, runId: string, re
 }
 
 type BuildReferences = ReferenceFile[] | (() => Promise<ReferenceFile[]>);
-type BuildAdmission = { key: string; actorKey: string; originSessionId: string | null; request: Request; execution?: BuildExecution };
-/** Shared admission for a conversation and the trusted owner; owner requests never accept host file paths. */
+type BuildAdmission = { key: string; actorKey: string; originSessionId: string | null; request: Request };
+/** Private build admission for a conversation. */
 export function queueBuild(ports: StewardPorts, workspaceId: string, input: BuildAdmission, refs: BuildReferences = []) {
   return serial(workspaceId, () => admitBuild(ports, workspaceId, input, refs));
 }
-async function outstandingCause(db: StewardPorts["db"], workspaceId: string, { request: { cause }, execution }: BuildAdmission) {
-  if (execution && cause) throw new StewardError("invalid", "Owner build execution cannot carry an autonomous cause");
+async function outstandingCause(db: StewardPorts["db"], workspaceId: string, { request: { cause } }: BuildAdmission) {
   if (!cause) return;
   const queue = await buildQueue(db, workspaceId);
   if (!queue.size) return;
@@ -210,23 +208,18 @@ async function outstandingCause(db: StewardPorts["db"], workspaceId: string, { r
     }
   }
 }
-function admissionDetails({ originSessionId, request, execution }: BuildAdmission, fingerprint: string) {
+function admissionDetails({ originSessionId, request }: BuildAdmission) {
   const names = requestModules(request);
   return { originSessionId, name: names[0]!, ...(request.modules ? { modules: names } : {}),
-    ...(request.cause ? { cause: request.cause } : {}), ...(execution ? { fingerprint, execution } : {}) };
+    ...(request.cause ? { cause: request.cause } : {}) };
 }
 async function admitBuild(ports: StewardPorts, workspaceId: string, input: BuildAdmission, refs: BuildReferences) {
-  const { db } = ports, now = ports.now(), { key: requestKey, actorKey, originSessionId, request, execution } = input;
+  const { db } = ports, now = ports.now(), { key: requestKey, actorKey, originSessionId, request } = input;
   for (const name of requestModules(request)) await assertExternalName(db, workspaceId, name, "build");
   const duplicate = await outstandingCause(db, workspaceId, input);
   if (duplicate) return duplicate;
-  const fingerprint = JSON.stringify({ request, execution: execution ?? null });
+  const fingerprint = JSON.stringify({ request });
   const previous = await db.buildRequest.findUnique({ where: { id: requestKey } });
-  if (previous && execution) {
-    if (previous.fingerprint !== fingerprint) throw new StewardError("conflict", "Request key was already used for a different build");
-    const run = await db.run.findFirstOrThrow({ where: { workspaceId, sessionId: previous.sessionId, lane: "build" }, orderBy: { createdAt: "asc" } });
-    return { status: run.status, sessionId: previous.sessionId!, runId: run.id, duplicate: true };
-  }
   const existing = previous?.sessionId ? (await buildQueue(db, workspaceId)).get(previous.sessionId) : undefined;
   if (existing) return { ...existing, sessionId: previous!.sessionId!, duplicate: true };
   const references = Array.isArray(refs) ? refs : await refs();
@@ -240,7 +233,7 @@ async function admitBuild(ports: StewardPorts, workspaceId: string, input: Build
     await tx.buildTargets.create({ data: { sessionId: created.id, name: names[0]!, modules: names } });
     const binding = { sessionId: created.id, fingerprint, cause: request.cause ?? Prisma.DbNull };
     await tx.buildRequest.upsert({ where: { id: requestKey }, create: { id: requestKey, workspaceId, ...binding }, update: { ...binding } });
-    const receipt = { subjectId: created.id, details: admissionDetails(input, fingerprint) };
+    const receipt = { subjectId: created.id, details: admissionDetails(input) };
     await tx.audit.create({ data: { ...receipt, id: `build-targets:${created.id}`, workspaceId, actorKey, kind: "build_targets" } });
     await tx.audit.upsert({ where: { id: requestKey }, update: receipt, create: { ...receipt, id: requestKey, workspaceId, actorKey, kind: "build_request" } });
     return tx.session.update({ where: { id: created.id }, data: { title: `构建模块 ${names.join("、")}` } });
@@ -251,8 +244,7 @@ async function admitBuild(ports: StewardPorts, workspaceId: string, input: Build
     const prompt = await prepareBuild(ports, workspaceId, cwd, request, references);
     const state = await db.$transaction(async tx => {
       for (const name of requestModules(request)) await assertExternalName(tx, workspaceId, name, "build");
-      const queued = await createRuns(ports, workspaceId).enqueue({ sessionId: session.id, lane: "build", trigger: "build", label: session.title, prompt, ...(execution ? { providerId: execution.provider, providerOptions: { model: execution.model } } : {}) }, tx);
-      if (execution) await tx.buildExecutionAdmission.create({ data: { runId: queued.id, ...execution } });
+      await createRuns(ports, workspaceId).enqueue({ sessionId: session.id, lane: "build", trigger: "build", label: session.title, prompt }, tx);
       return (await buildQueue(tx, workspaceId)).get(session.id)!;
     });
     return { ...state, sessionId: session.id, duplicate: false };
@@ -270,10 +262,9 @@ async function supplementFiles(cwd: string, files: ReferenceFile[]) {
   return copied.map(file => `${dir}/${file.path}`);
 }
 
-async function revisionTargets(db: StewardPorts["db"], workspaceId: string, sessionId: string, runId: string, requirements?: string) {
+async function revisionTargets(db: StewardPorts["db"], workspaceId: string, sessionId: string, requirements?: string) {
   if (!requirements) return null;
   await assertBuildQueueSpace(db, workspaceId, sessionId);
-  if (await db.buildExecutionAdmission.findUnique({ where: { runId } })) throw new StewardError("forbidden", "A bounded owner build cannot resume; authorize a new request key instead");
   const targets = await declaredModules(db, workspaceId, sessionId);
   if (!targets?.length) throw new StewardError("conflict", "Build targets are missing");
   for (const name of targets) await assertExternalName(db, workspaceId, name, "build");
@@ -288,7 +279,7 @@ export function controlBuild(ports: StewardPorts, workspaceId: string, sessionId
     if (!session) throw new StewardError("not_found", "Active build conversation not found");
     const latest = await db.run.findFirst({ where: { workspaceId, sessionId, lane: "build" }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] });
     if (!latest) throw new StewardError("not_found", "Build run not found");
-    const targets = await revisionTargets(db, workspaceId, sessionId, latest.id, requirements);
+    const targets = await revisionTargets(db, workspaceId, sessionId, requirements);
     const active = await db.run.findMany({ where: { workspaceId, sessionId, lane: "build", status: { in: ["queued", "running"] } } });
     for (const run of active) await cancelProviderRun(ports, workspaceId, run.id);
     if (!requirements) return { status: "build_stopped", sessionId };

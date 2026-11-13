@@ -2,7 +2,7 @@
 
 文档归类（2026-11-08）：2026-11-04 的历史整合方案与逐步记录。页首已记录步骤 1–7 实施，后文“步骤 4–7 未实施”等属于先前快照，不再独立派工；不据此追加新的验收结论。当前安装/就绪规则见[模块安装与就绪](module-installation-readiness.md)，后续产品验证见[统一开发路线](development-roadmap.md)。
 
-状态：2026-11-04 用户确认（第 4 节各项均选推荐项 A：mind 唤醒 Provider 普通构建自主修复；暂停/回滚失败保留确定性最小通知、mind 只补充；沿用 mind 6 次/24h 与公共构建日预算；仅旧 reflection 与 mind 都启用时自动接管；诊断详情保持模块可读；输出 mismatch 不计入三败熔断）。按第 4 节步骤实施中。步骤 4 已实施（2026-11-04）：mind 读取 modules.health 分页，关注关联来源/revision、静默/拒绝/构建与恢复关闭，decision/report 保留来源及会话关联；data.schema 保持 1。步骤 5 已实施（2026-11-04）：公共 build admission 在串行区按 cause 复用同工作区 queued/running 构建，不读重复请求参考文件、不新增审计或计费；终态允许新建，owner execution 禁带 cause、key 重放不变；cause 写入审计与 request.json，mind 协议关联返回的构建会话。步骤 6 已实施（2026-11-04）：一次性迁移反思偏好与建议记录、取消在途反思，移除独立反思运行、工具与设置入口，保留历史会话和活动读取。
+状态：2026-11-04 用户确认（第 4 节各项均选推荐项 A：mind 唤醒 Provider 普通构建自主修复；暂停/回滚失败保留确定性最小通知、mind 只补充；沿用 mind 6 次/24h 与公共构建日预算；仅旧 reflection 与 mind 都启用时自动接管；诊断详情保持模块可读；输出 mismatch 不计入三败熔断）。按第 4 节步骤实施中。步骤 4 已实施（2026-11-04）：mind 读取 modules.health 分页，关注关联来源/revision、静默/拒绝/构建与恢复关闭，decision/report 保留来源及会话关联；data.schema 保持 1。步骤 5 已实施（2026-11-04）：公共 build admission 在串行区按 cause 复用同工作区 queued/running 构建，不读重复请求参考文件、不新增审计或计费；终态允许新建，原请求 key 重放不变；cause 写入审计与 request.json，mind 协议关联返回的构建会话。步骤 6 已实施（2026-11-04）：一次性迁移反思偏好与建议记录、取消在途反思，移除独立反思运行、工具与设置入口，保留历史会话和活动读取。
 
 步骤 7 已实施（2026-11-04）：activity 按 incident 聚合并区分出错/重连/部分验证/已验证恢复、暂停/恢复与自动回滚措辞；today 增 problems（当前激活的未解决健康问题与下一步）；网页故障面板先给当前摘要（版本与验证状态、连续失败、待验证能力、契约不符、保护动作、截断提示），历史按当前版本/更早的启用/旧记录区分；mind 自行经 web.page-set 登记只读页面。真实浏览器 1440×900、1024×768、390×844 截图无横向滚动。
 
@@ -37,11 +37,7 @@
 - **代码**：`E/module-diagnostics.ts:8-32,61-153`（153 行）；`E/modules.ts:24-36,74-89`；`E/module-build-session.ts:46-63,84-107,124-129`；`C/admin.ts:31-49`（96 行）。
 - **边界更正**：当前详细接口 visibility 含 modules，普通应用无需 uses 也可读取；只有 build Provider 另按可信 `build_request` 逐次缩小目标。恢复文档“仅 owner/Provider/web/mcp”已不符合代码（`E/system/modules.ts:125-126,157-158`，`E/module-calls.ts:89-96`，回归例 `E/module-diagnostics.bun.test.ts:95-109`）。
 
-**显式有界构建不是故障自动重试：**
-- **触发/读事实**：owner 明确提交单模块目标、精确 Provider/model、timeout、提交上限、单次 requestKey；检查配置上限、重复请求、现有工作和目标诊断。在线 `modules.build-owner`/MCP `chrona_build` 与停服 CLI 共用 admission。
-- **写数据**：`Session(source=build)`、`Run(lane=build)`、`Audit.kind=build_request/build_execution/run_claimed/module_submission` 等公共构建记录；会话目录 request.json、current 源码和 references。候选继续写 `ModuleVersion.report/status`，通过公共构建/激活路径处理。
-- **动作/消费者**：调用一次 Provider、处理候选检查；重复 key 返回原结果，不恢复/重试。CLI 要独占数据库锁、无 queued/running run 和 building/testing 候选，不运行普通 tick/内置升级；结果供 owner、构建会话、诊断/活动/版本页消费。检查通过通常自动启用，迁移/新增凭据仍确认。
-- **代码**：`E/owner-build.ts:11-45`；`E/owner-build-run.ts:14-53`（53 行）；`E/module-build-session.ts:154-206`；`C/admin-build.ts:17-44`（44 行）。
+当前创作与构建见[当前对话创作](author-current-conversation.md)和[版本材料](author-version-materials.md)：Agent 在已有 Run 中开发、构建和验证，Author 只接收、导出和提交精确材料。诊断快照不是执行授权，未知结果先核对原回执，不自动重放。
 
 ### 1.3 supervisor、连续失败暂停与日程失败
 
@@ -107,7 +103,7 @@
 | supervisor 计数、重启、pauseFailedModule、rollbackFailedStart、schedules | **事实采集＋行动层保留**；统一失败归属/连续失败策略和暂停实现，删除重复计数决策，不删必要执行记录 |
 | reflection 的触发、prompt、专用 Provider run、suggest 工具/开关 | **删除**；上线改进、重复错误的关注交给 mind；去重/冷却/构建结果关联合并进 mind，而不是复制整份 reflection |
 | mind 的 sense、attention、agenda、直觉/规则、wake/report | **关注层唯一主动判断者**；保留整个用户事务 agenda，健康关注只是有来源引用的一类，不另建监控应用 |
-| 普通 modules.build、owner bounded build、CLI admin build、手动回滚/恢复 | **行动层保留**；自主构建走普通 Provider build；明确授权的 owner 单次构建绝不自动续跑或换 key 重试 |
+| 普通私有构建、手动回滚/恢复 | **行动层保留**；创作使用当前 Author/Agent 工作流；保留预算、幂等与未知结果不自动重放语义 |
 | activity、today、web/MCP | **读模型/入口**；复用事实或关注的公开读取接口，不保存另一份健康结论，不触发模型 |
 
 ### 3.2 事实层：内核持有证据，系统 modules 提供单一读取
@@ -135,10 +131,10 @@
 
 - **modules 契约**：保留 diagnostics 名称与只读语义，增补 activation/source/revision/completeness；抽出 modules 可见的轻摘要供 mind，owner/Provider 按决定读取详情。共享 `packages/contracts/src/steward/index.ts` 只能由主管实施，本文不改。构建诊断继续逐次校验 build_request，快照不是授权。
 - **mind 契约**：note/agenda 增 source/action refs、冷却与关联字段；report 不能仅以“acted”充当动作成功，结果链接实际工具记录。通用网页通过公开工具操作，专门关注面板由 mind 自己向页面服务登记，不让 web 写死 mind 名称/字段。
-- **web/MCP**：应用故障页同时展示运行、待验证能力、未解决问题、已采取保护与修复进度；activity 按 failure/connected/verified/paused/rollback 区分措辞并按 cause 聚合；今日只放重要未解决摘要、用户下一步及链接，不塞日志。MCP 保留 diagnostics/activity/today/build 名称，扩展一致字段；不向 owner 暴露 Provider 能力。
+- **web/MCP**：应用故障页同时展示运行、待验证能力、未解决问题、已采取保护与修复进度；activity 按 failure/connected/verified/paused/rollback 区分措辞并按 cause 聚合；今日只放重要未解决摘要、用户下一步及链接，不塞日志。MCP 保留 diagnostics/activity/today 名称，扩展一致字段；不向 owner 暴露 Provider 能力。
 - **删除面**：同一交付删除 tick.reflect、reflection 系统模块/专用工具/prompt、反思设置声明、工具 allowlist、活跃 source 创建分支及旧 UI 文案/测试；新行为不保留双开兼容开关。历史 source=reflect 与 activity.session.source 作为存储读取格式保留，不重新调度旧反思会话。
 - **迁移**：保留所有既有审计、版本、会话和诊断证据；schema-versioned Audit/agenda 读写即可先落地，不需立即改 SQL 表。若增加索引/投影表需单独数据库迁移。既有自动暂停缺 IDs 无法无损回填，标记待人工选择恢复日程，不自动启用所有 paused 日程。
-- **迁移 suggestion ledger**：一次性读取最近 30 天 reflection_suggested，转换为 mind 的来源/主题冷却/已有 build 链接；不复制错误文本或推断成已修复。进行中的 reflect run 应停止/结算，已启动 build 按原预算完成，不取消/重跑 owner build；移除写入口后保留历史投影。
+- **迁移 suggestion ledger**：一次性读取最近 30 天 reflection_suggested，转换为 mind 的来源/主题冷却/已有 build 链接；不复制错误文本或推断成已修复。进行中的 reflect run 应停止/结算，已启动 build 按原预算完成，不因迁移擅自取消或重跑已有工作；移除写入口后保留历史投影。
 - **迁移偏好**：reflection.enabled 与 mind.enabled 曾独立，不能简单 OR 后扩大主动性；关闭主动行为优先，冲突组合待用户选择。定制 mind/web 不被发行内置覆盖，须合并到活动定制版；这是实施发布步骤，不是本文授权部署。
 - **依赖理由**：应用/关注者 → 通用 modules 事实、schedules/provider/notify/actions；模块提供业务 attention、页面登记，不让内核/通用 UI 认识应用业务。内核只保留真实身份、证据完整性、版本/数据切换、幂等、资源/预算、故障保护等信任根；价值判断、复查/打扰时机和改进目标在可替换 mind/Provider。activity 是审计读模型，不是新判断服务；可信本地前提不变。
 
@@ -152,7 +148,7 @@
 | 2 | 统一失败归属/连续失败策略，incident 增 activation/revision；旧记录只读明确标记；测同 hash 再激活、重启后计数、mismatch、真实退出重复观察不双计 | M / 高：影响重启/熔断，不能削弱现有安全回滚门槛 |
 | 3 | 提供统一只读摘要与 open 问题分页，diagnostics 复用；测 current/history、部分验证、截断、unobserved、workspace 与 build 目标约束、脱敏；无 Provider 调用 | M / 中：契约和查询成本；主管改共享契约 |
 | 4 | mind 加来源关联/冷却/构建关联及 revision 判断，扩展 agenda 数据版本；在假内核中测重复故障、新恶化、修复中、拒绝、首次接管、配额。此提交不切换 reflection | M / 中：重复处理或漏处理，需文件升级/回退测试 |
-| 5 | 公共 build admission 加通用 cause 去重与结果关联；测不同会话同因并发、旧工作结束后重评估、owner key 重放不重试、timeout/提交额度 | M / 高：不能错误合并用户授权或影响 owner 单次约束 |
+| 5 | 公共 build admission 加通用 cause 去重与结果关联；测不同会话同因并发、旧工作结束后重评估、原 key 重放不重试、timeout/提交额度 | M / 高：不能错误合并用户授权或绕过预算 |
 | 6 | 一次性迁移冷却/偏好、结算旧 reflect 后启用 mind 健康关注；同提交删除 reflection 的运行/工具/设置/提示词及被替代测试，只保留历史存储读取。测各种旧开关组合、未完成 build、无 mind/无 Provider 降级 | L / 高：切换漏提醒/扩大主动性；偏好冲突必须先决定 |
 | 7 | activity 修正转换措辞，web/MCP/today 读统一事实与关注；mind 自登记可选面板；测空/加载/错误/待验证/未解决/恢复，1440×900、1024×768、390×844 无横向滚动，MCP/CLI 离线仍可诊断 | M / 中：用户理解和跨入口一致性 |
 
@@ -160,7 +156,7 @@
 
 **需要用户选择（推荐项不是既有授权）：**
 
-1. **自主构建权**：A 保持现有自主改进范围，统一由 mind 唤醒 Provider 普通 build（推荐）；B 健康问题仅提示，由用户明确启动 owner build。二者都保留确定性自动回滚/暂停，迁移/凭据确认不变。
+1. **自主构建权**：A 保持现有自主改进范围，统一由 mind 唤醒 Provider 普通 build（推荐）；B 健康问题仅提示，由用户授权当前会话 Agent 修复并通过 Author 提交材料。二者都保留确定性自动回滚/暂停，迁移/凭据确认不变。
 2. **故障通知归属**：A 暂停/回滚失败保留确定性最小通知＋mind 只补新结论（推荐）；B 所有非审批提醒都经 mind（mind 故障时可能无提醒）。两项均只通过 notify 投递。
 3. **额度**：A 沿用 mind 默认 6 wakes/24h＋公共构建日预算，不设周硬上限（推荐）；B 新增通用自主修复周额度，需给定次数和周界/滚动窗口；C 每次修复构建均要求确认。不能称现有代码已有周上限。
 4. **开关迁移**：A 仅旧 reflection 与 mind 都启用时自动接管，其他组合保持较保守状态并请用户选（推荐）；B 强制统一为某个明确新开关值。不得把 reflection 关闭用户自动升级成自主修复。

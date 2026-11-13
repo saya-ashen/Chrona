@@ -54,7 +54,7 @@ Provider 只提供启动、注入、语义事件、停止和结束结果，并�
 2. 工具与显式资源加载使用内核决定的最小运行约束。具体字段依据当前 piArguments 消费点确定；不加入多个可任意组合的配置轴，不给模块暴露任意扩展路径或 native tool 名单。
 3. 保留 execution 引用用于事件关联；保留预算前置守卫、脱敏、超时、注入竞态、会话恢复、取消与进程退出核实。这些不因“低级化”而删除。
 4. Pi 命令行、版本探测、RPC 编解码、profile 与资源的物理加载留在 Pi 实现。内核传语义约束，不拼 Pi 专用命令。
-5. 同时更新服务端 tick、设备 daemon、owner/admin 构建的实际调用点、fixtures 和测试。不能只让主要聊天路径编译通过。
+5. 同时更新服务端 tick、设备 daemon、普通私有构建的实际调用点、fixtures 和测试。不能只让主要聊天路径编译通过。
 
 验收：相同窄输入可以运行不同业务提示；适配器不生成业务任务策略；没有 execution 的普通运行不会因此丢工具，带 execution 的受限运行不会因此继承个人技能/扩展。
 
@@ -100,7 +100,7 @@ Provider 只提供启动、注入、语义事件、停止和结束结果，并�
 - `packages/engine/src/modules/steward/external/coding/work-v2.ts` 及其现有目标组装 helper：模块自己的工作说明。
 - 上述消费者、fixture、生成契约和对应测试；生成文件只经现有生成脚本更新。
 
-条件触及：owner/admin 构建入口和 prompt 相关测试，只有实际消费新输入或旧提示时修改。版本检查、审批与模块激活算法不在重构目标内。
+条件触及：普通私有构建入口和 prompt 相关测试，只有实际消费新输入或旧提示时修改。版本检查、审批与模块激活算法不在重构目标内。
 
 ## 5. 验证计划
 
@@ -135,7 +135,7 @@ Provider 只提供启动、注入、语义事件、停止和结束结果，并�
 
 - `ProviderRunInput` 必须显式提供 `systemPrompt` 和 `resources: configured | minimal`。Pi 不再按 lane/execution 决定业务提示或资源；execution 继续用于详细事件关联，`executionBudget` 独立执行。
 - 通用执行边界由 domain 常量供服务端与设备端使用；项目规则、原始目标及 coding 说明作为任务数据。coding 原始记录不被派发文本覆盖。
-- 普通会话和 owner 构建显式使用 configured；编码执行显式使用 minimal。没有新增配置开关、执行循环或模块直连 Provider。
+- 普通会话显式使用 configured；编码执行显式使用 minimal。没有新增配置开关、执行循环或模块直连 Provider。
 
 | 旧全局提示内容 | 本轮归属或处理 |
 | --- | --- |

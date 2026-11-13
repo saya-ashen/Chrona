@@ -121,8 +121,7 @@ worktree 的创建/检查/保留/清理由 coding 决定，通过执行设备上
 - 对外统一投影 `origin: kernel/builtin/external` 和实际 `capabilities`，执行端仍逐次校验。
 - 内核/内置拒绝动态 build、propose、组更新、代码 rollback、删除及任意历史候选激活；内置配置和业务数据可修改，支持暂停、重启和诊断。
 - 外置支持受检安装、构建、更新、回滚、停用和确认后的删除；保留数据连续性及一次预交付启动失败回滚规则。
-- 排队前、提交/激活前以及审批恢复后均校验身份；owner build、admin build、request-group 不能绕过。
-- owner 有界构建的单次授权、精确模型、时限和提交上限保持不变；普通编码工作不能冒用该接口。
+- 排队前、提交/激活前以及审批恢复后均校验身份；普通私有构建、候选提交和 request-group 不能绕过。
 
 ### 4.2 发行、安装与恢复
 
@@ -193,7 +192,7 @@ web 页面、notify 渠道、events 订阅、memory 实现和 schedules 继续�
 
 M2 可保持单编码执行；M3 在现有 Run 队列上增加受控容量，不靠无限新增 lane 获得并行。
 
-- 继续保护前台交互、模块构建预算和现有 build FIFO/owner 单次语义。
+- 继续保护前台交互、模块构建预算和普通私有构建的 FIFO 和未知结果不自动重放语义。
 - 同一会话保持所需串行；同一可写项目位置/工作树不得同时交给多个尝试写入。
 - 两个 worker 使用独立 worktree，可在同一设备有界并行；容量、每应用配额和全局预算同时生效。
 - 分解、父子工作和简单依赖由 coding 管理；依赖满足后才申请下一次执行，不复制持久调度队列。
@@ -497,7 +496,7 @@ M1 已通过开发验收；[P1 契约](chrona-workbench-p1-contract.md)、可编
 
 | 类别 | 场景 | 必须结果 |
 | --- | --- | --- |
-| 身份 | build/propose/group/owner/admin 改内置 | 各入口一致拒绝，无可激活候选残留 |
+| 身份 | 普通私有构建、候选提交、group 和审批恢复改内置 | 各入口一致拒绝，无可激活候选残留 |
 | 发行 | 升级、已删除预装、定制外置 | 内置跟随发行，外置不被覆盖/复活 |
 | 初始化 | 中断、缺依赖、QQ 缺凭据、无 memory | 有诊断/待配置状态，基础服务可用 |
 | 生命周期 | 更新/回滚/停用/删除 | 页面、渠道、订阅、定时和执行归属一致 |
@@ -513,7 +512,7 @@ M1 已通过开发验收；[P1 契约](chrona-workbench-p1-contract.md)、可编
 | 回执 | 旧尝试、最终回执丢失 | 不污染新状态，核对已有成果 |
 | 模块 | coding/editor 停用或删除 | 内核继续监管已派执行；未结/未知阻止删除 |
 | 成果 | 执行完成、接受、合并 | 各为独立事实，无隐式 commit/merge/push |
-| 回归 | 普通聊天、构建、Pi 直连 | 既有语义保持，owner build 不自动重试 |
+| 回归 | 普通聊天、构建、Pi 直连 | 既有语义保持，未知结果不自动重放 |
 | UI | 三种 Web 尺寸、Neovim 交互 | 主动作清楚、无溢出、断线和未知状态明确 |
 | 打包 | 全新安装、二进制、执行器包 | 无源码目录依赖、版本/协议不兼容明确报错 |
 
@@ -565,7 +564,7 @@ M1 已通过开发验收；[P1 契约](chrona-workbench-p1-contract.md)、可编
 
 ## 14. 文档、删除与发布边界
 
-协调者同步 Chrona 的 AGENTS.md、architecture、steward-goals、security-simplification、operations、module-dependency-direction、module-recovery、owner-bounded-builds、provider-runtime 和新的执行器/客户端说明。Workbench 同步 README 概览与具体 doc/ 页面、能力表和排错方法。
+协调者同步 Chrona 的 AGENTS.md、architecture、steward-goals、security-simplification、operations、module-dependency-direction、module-recovery、author-current-conversation、author-version-materials、provider-runtime 和新的执行器/客户端说明。Workbench 同步 README 概览与具体 doc/ 页面、能力表和排错方法。
 
 逐项审查并删除生产逻辑中的 preserveCustomization、custom-builtin、rollback builtin、内置普通候选审批、修改基础模块的提示词承诺；历史文档和明确拒绝旧行为的测试可保留旧词。删除被替代的生产路径、契约和测试，不保留兼容开关。
 

@@ -49,7 +49,6 @@
 | 上游来源与合并固定回执 | `ModuleUpstream / ModuleUpstreamMerge`，请求键绑定实际 module/base/commit |
 | 安装请求、最新指针与提交恢复 | `ModuleInstallation / ModuleInstallationHead / ModuleInstallationSubmission` |
 | 已删除应用身份与版本 | `ModuleRemoval`，与删除事务绑定，不能由同名重装替代 |
-| 私有构建的精确执行准入 | `BuildExecutionAdmission`，关联实际 Run |
 | 固定构建目标与请求去重 | `BuildTargets / BuildRequest`，关联真实 Session/Workspace |
 | 提交归属与审核 | `ModuleVersion.buildSessionId / ModuleReview` |
 | 迁移归属与禁止部分回滚 | `ModuleMigration / ModuleActivation.grouped` |
@@ -119,7 +118,6 @@
 
 删除在同一事务保存 `ModuleRemoval` 并删除应用。安装回执和删除身份不随应用删除消失。清空审计后，丢失回复的提交仍可恢复，已删除应用不会被同名同版本重装接管，没有提交证据的请求不会重新执行。材料往返测试通过完整安装入口建立准入，不再直接绕过回执适配器。
 
-私有构建的 Provider、模型、超时和提交次数由 `BuildExecutionAdmission` 固定，工作区请求文件和旧审计不能改写它。请求键、固定目标及构建结果关联仍待后续迁移，此处不声明整个构建控制面已脱离审计。
 
 扩展检查中的 Files/MCP 文件未通过：Files 的临时发行资源含缺失的 `builtin/agent/node_modules` 路径；MCP 的应用 SDK 自测连接失败。二者未计入本批通过范围，也未通过修改普通应用业务绕过。
 

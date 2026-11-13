@@ -259,7 +259,6 @@ model Run {
   agentAdmission AgentRunAdmission?
   agentProvider AgentRunProvider?
   providerLaunch ProviderLaunch?
-  buildAdmission BuildExecutionAdmission?
   invocations ModuleInvocation[]
   events RunEvent[]
   eventSequence Int @default(0)
@@ -825,16 +824,6 @@ model ModuleRemoval {
   createdAt DateTime
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   @@index([workspaceId, name, hash, createdAt])
-}
-
-/// Owner-bound exact execution caps; build workspace files cannot change them.
-model BuildExecutionAdmission {
-  runId String @id
-  provider String
-  model String
-  timeoutMinutes Int
-  maxSubmissions Int
-  run Run @relation(fields: [runId], references: [id], onDelete: Cascade)
 }
 
 model BuildTargets {

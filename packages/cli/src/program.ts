@@ -6,7 +6,7 @@ import { getChronaDataDir } from "./start-server.js";
 import { inspectExternalApps, inspectLocalChrona, repairStaleRuntimeLock } from "./doctor.js";
 
 export type StartCommandOptions = { host?: string; port?: string; open?: boolean };
-type CreateProgramOptions = { startServer?: (options: StartCommandOptions) => Promise<void>; adminBuild?: (file: string) => Promise<unknown> };
+type CreateProgramOptions = { startServer?: (options: StartCommandOptions) => Promise<void> };
 
 export function createProgram(options: CreateProgramOptions = {}): Command {
   const program = new Command().name("chrona").description("Chrona personal steward").version(cliPackage.version);
@@ -46,12 +46,7 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
       for (const check of checks) console.log(`[${check.status}] ${check.key}: ${check.message}`);
       if (checks.some((check) => check.status === "error")) process.exitCode = 1;
     });
-  const admin = program.command("admin").description("Local recovery administration (only build invokes the Provider)");
-  admin.command("build <request-file>").description("Run one explicitly authorized bounded module build while the service is stopped; never activates it")
-    .action(async (file: string) => {
-      if (!options.adminBuild) throw new Error("chrona admin build is only available in packaged Chrona binaries.");
-      await options.adminBuild(file);
-    });
+  const admin = program.command("admin").description("Local recovery administration");
   admin.command("legacy <request-file>").description("Export, verify or explicitly delete selected legacy conversations while the service is stopped")
     .action(async (file: string) => { const { adminLegacy } = await import("./admin-legacy"); await adminLegacy(file); });
   admin.command("git-status <module>").description("Read saved module Git association and local commits without contacting the remote")

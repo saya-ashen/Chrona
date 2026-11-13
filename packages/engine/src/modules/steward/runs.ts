@@ -13,7 +13,6 @@ import { buildSettings, budgetTimezone, runTimeoutMinutes } from "./settings";
 import { audit } from "./audit";
 import { StewardError } from "./errors";
 import { authenticateRun } from "./run-auth";
-import { assertBuildProviderIn, buildExecution } from "./build-execution";
 import { assertExternalName } from "./module-identity";
 import { declaredModules } from "./module-build-targets";
 import { executionPrincipal, executionNeverOfferedIn } from "./execution-state";
@@ -109,27 +108,15 @@ class RunService {
     return true;
   }
   private async claimQueued(tx: Prisma.TransactionClient, run: RunRow, now: Date, builds: ReturnType<typeof buildSettings> | null, ordinaryTimeoutMinutes: number | null) {
-    let execution: Awaited<ReturnType<typeof buildExecution>> = null;
-    if (run.lane === "build") {
-      if (!await this.checkBuildTargets(tx, run, now)) return null;
-      execution = await buildExecution(tx, run.id);
-    }
-    if (execution) {
-      try { await assertBuildProviderIn(tx, this.workspaceId, execution, run.id); }
-      catch {
-        await tx.run.update({ where: { id: run.id }, data: { status: "failed", endedAt: now, error: "Authorized build Provider/model pin is unavailable" } });
-        return null;
-      }
-      builds = { ...builds!, timeoutMinutes: execution.timeoutMinutes, maxSubmissions: execution.maxSubmissions };
-    }
+    if (run.lane === "build" && !await this.checkBuildTargets(tx, run, now)) return null;
     const requestedTimeout = await this.claimTimeout(tx, run, builds, ordinaryTimeoutMinutes);
     if (requestedTimeout === undefined) return null;
     const timeoutMs = await completionTimeout(tx, run.id, requestedTimeout);
     const token = randomBytes(32).toString("hex"), deadlineAt = timeoutMs === null ? null : new Date(now.getTime() + timeoutMs);
     const prompt = builds ? `${run.prompt}\n\nCurrent kernel limits for this run (override earlier numeric build limits): at most ${builds.maxSubmissions} candidate submissions; deadline ${deadlineAt!.toISOString()} (${builds.timeoutMinutes} minutes). Report before the deadline; do not start an automatic continuation.` : run.prompt;
     if (!(await tx.run.updateMany({ where: { id: run.id, status: "queued" }, data: { status: "running", tokenHash: hash(token), startedAt: now, deadlineAt, leaseUntil: deadlineAt, prompt } })).count) return null;
-    await audit(tx, { workspaceId: this.workspaceId, actor: "chrona", kind: "run_claimed", subjectId: run.id, details: { lane: run.lane, ...(builds ? { builds } : {}), ...(execution ? { execution } : {}) } });
-    return { ...run, status: "running", startedAt: now, deadlineAt, leaseUntil: deadlineAt, prompt, token, runId: run.id, ...(execution ? { model: execution.model } : {}) };
+    await audit(tx, { workspaceId: this.workspaceId, actor: "chrona", kind: "run_claimed", subjectId: run.id, details: { lane: run.lane, ...(builds ? { builds } : {}) } });
+    return { ...run, status: "running", startedAt: now, deadlineAt, leaseUntil: deadlineAt, prompt, token, runId: run.id };
   }
   /** Authorize the admitted execution before selecting its stored budget or lane limits. */
   private async claimTimeout(tx: Prisma.TransactionClient, run: RunRow, builds: ReturnType<typeof buildSettings> | null, ordinaryTimeoutMinutes: number | null) {

@@ -730,7 +730,7 @@ listener lookup 搜索所有 active module，函数不带 workspace 参数。当
 - `start`
 - `backup`, `restore`
 - `doctor`
-- `admin build`, `legacy`
+- `admin legacy`
 - `admin modules/catalog/install/diagnostics/approvals`
 - `admin rollback/disable/approve/reject`
 - `admin secret-set/secret-remove`
