@@ -5,13 +5,52 @@ import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { testDb } from "./test-db";
 import { moduleContext } from "./module-context";
 import { startMigration } from "./module-generation";
-import { migrateData } from "./module-migration";
+import { migrateData, recoverMigrations } from "./module-migration";
+import { activateApprovedIn } from "./module-activation";
 import { completeApprovedOperationsIn } from "./module-operation-result";
 import { requestStatus } from "./module-status";
 import type { StewardPorts } from "./ports";
 
 const closes: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const close of closes.splice(0).reverse()) await close(); });
+
+test("a leftover data-old from a committed migration never replaces current data", async () => {
+  await mkdir(".tmp", { recursive: true });
+  const db = testDb(), dataDir = await mkdtemp(join(process.cwd(), ".tmp", "chrona-stale-migration-"));
+  closes.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
+  const workspace = await db.workspace.create({ data: { name: "stale migration recovery" } });
+  const now = new Date("2026-11-05T12:00:00Z");
+  const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => now, sandbox: { available: true, isolated: true, async runModule(input) {
+    await writeFile(join(input.dataDir, "value.txt"), "migrated");
+    return { status: "succeeded", output: "", error: null, exitCode: 0 };
+  } } };
+  const context = moduleContext(ports, workspace.id);
+  const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "old", dataSchema: 1, status: "active" } });
+  const manifest = moduleManifestSchema.parse({ name: module.name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, data: { schema: 2, migrate: "migrate.ts" } });
+  const version = await db.moduleVersion.create({ data: { moduleId: module.id, hash: "next", source: "user", manifest, intent: {}, report: {}, status: "pending_review" } });
+  const live = join(context.platform, "data", module.id), old = join(context.platform, "data-old", module.id);
+  await mkdir(live, { recursive: true });
+  await writeFile(join(live, "value.txt"), "original");
+  await db.$transaction(tx => startMigration(context, tx, module.id, version.hash, { from: 1, to: 2 }));
+  await migrateData(context, { module, version, manifest, from: 1, to: 2 }, "activate");
+  expect(await readFile(join(live, "value.txt"), "utf8")).toBe("migrated");
+
+  // Simulate a committed migration's cleanup being interrupted, then new user writes.
+  await mkdir(old, { recursive: true });
+  await writeFile(join(old, "stale.txt"), "stale data from the previous migration");
+  await writeFile(join(live, "current.txt"), "current user data");
+  const nextManifest = moduleManifestSchema.parse({ ...manifest, data: { schema: 3, migrate: "migrate.ts" } });
+  const nextVersion = await db.moduleVersion.create({ data: { moduleId: module.id, hash: "newer", source: "user", manifest: nextManifest, intent: {}, report: {}, status: "pending_review" } });
+  const payload = { kind: "activate_module", moduleId: module.id, hash: nextVersion.hash };
+  const approval = await db.approval.create({ data: { workspaceId: workspace.id, moduleId: module.id, action: "activate_module", status: "approved", title: "migrate", detail: "migrate", preview: "migrate", payload, resolvedAt: now } });
+  const prepared = await db.$transaction(tx => activateApprovedIn(context, tx, { workspaceId: workspace.id, approvalId: approval.id, payload }));
+  expect(prepared).toBeTruthy();
+  // Crash after admission commits, before migrateData prepares or swaps any directory.
+  now.setTime(now.getTime() + 16 * 60_000);
+  await recoverMigrations(context);
+  expect(await readFile(join(live, "current.txt"), "utf8")).toBe("current user data");
+  await expect(readFile(join(live, "stale.txt"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+});
 
 test.each([false, true])("paused app migration preserves state and data (failure=%s)", async failure => {
   const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-paused-migration-");

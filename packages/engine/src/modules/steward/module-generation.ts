@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { rm } from "node:fs/promises";
+import { join } from "node:path";
 import { Prisma } from "@chrona/db/generated/prisma/client";
 import { BUILTIN_MODULE_NAMES, listenPaths, moduleManifestSchema } from "@chrona/contracts/steward";
 import { audit } from "./audit";
@@ -183,6 +185,11 @@ export async function startMigration(context: ModuleContext, tx: Prisma.Transact
   const { from, to } = schema;
   const module = await assertExternalModule(tx, context.workspaceId, moduleId, "activate");
   await assertExecutionModuleIdle(tx, moduleId);
+  // A module that is not migrating cannot own the old directory yet: any directory left there is from an
+  // earlier, committed migration. recoverMigrations would otherwise restore it over current data.
+  if (module.status !== "migrating") {
+    await rm(join(context.platform, "data-old", moduleId), { recursive: true, force: true });
+  }
   await tx.module.update({ where: { id: moduleId }, data: { status: "migrating" } });
   const previous = await tx.moduleMigration.findUnique({ where: { moduleId } });
   const createdAt = new Date(Math.max(context.ports.now().getTime(), previous ? previous.createdAt.getTime() + 1 : 0));
