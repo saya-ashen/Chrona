@@ -113,7 +113,7 @@ test("a fresh installation without a store has nothing to collect", async () => 
   const log = spyOn(console, "error").mockImplementation(() => {});
   try {
     expect(await collectStore(f.ports, now)).toEqual({ removed: [], kept: 0 });
-    expect(log.mock.calls.map(([line]) => JSON.parse(line).event)).toContain("store_gc.missing");
+    expect(log).not.toHaveBeenCalled();
   } finally { log.mockRestore(); }
 });
 
