@@ -99,8 +99,8 @@ export async function createBrowserAuth(options: { dataDir: string; apiKey?: str
     return c.json({ ok: true });
   });
   for (const operation of ["setup", "login", "password"] as const) router.post(`/${operation}`, async c => {
-    if (!allowAttempt(operation)) { c.header("Retry-After", "300"); return c.json({ error: "Too many authentication attempts; try again later" }, 429); }
     if (operation === "setup" && !setupAuthorized(c, options.apiKey)) return c.json({ error: "Owner setup authorization required" }, 403);
+    if (!allowAttempt(operation)) { c.header("Retry-After", "300"); return c.json({ error: "Too many authentication attempts; try again later" }, 429); }
     if (operation === "password" && !store.authenticated(sessionToken(c))) return c.json({ error: "Password session required" }, 401);
     const value = await input(c);
     if (value === "too_large") return c.json({ error: "Authentication request is too large" }, 413);

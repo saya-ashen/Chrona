@@ -135,6 +135,8 @@ bun run packages/cli/src/index.ts doctor
 - QQ：由官方预装外置 `qq` 模块提供。`CHRONA_QQ_APP_ID` 与 `CHRONA_QQ_SECRET_FILE`（私有文件）由内核保存，模块经声明的 `secrets.get` 按需读取；链接用 `CHRONA_PUBLIC_URL`。`CHRONA_QQ_STATE_DIR` 只在首次升级时用于迁移旧绑定。
 - Owner MCP：`/api/mcp`（Streamable HTTP，无状态，`Authorization: Bearer <API_KEY>`）由内置 `mcp` 模块提供，供用户自己的 Pi / Claude Code 使用。工具与网页 owner 操作相同：`chrona_today`、`chrona_apps`、`chrona_sessions` 等会话工具、`chrona_chat`、`chrona_approvals`、`chrona_approval_resolve`、`chrona_modules`、`chrona_notifications`；通过 `chrona_module_tools` 发现 owner 可用的模块工具，再用 `chrona_module_call` 调用，不直接暴露 Provider 的 `m_*` 工具。客户端应对 `chrona_approval_resolve` 要求逐次确认。
 
+本机回环监听时只接受 Host 为 localhost、回环 IP、CHRONA_PUBLIC_URL 或 ALLOWED_ORIGINS 中的主机名；同机反向代理需把公开域名写进 CHRONA_PUBLIC_URL。
+
 环境变量修改后重启服务。保持 `CHRONA_E2E_TEST_ROUTES` 未设置。开发脚本默认回环监听；修改 `HOST` 对外开放前须配置认证。
 
 ## 停止与中断恢复

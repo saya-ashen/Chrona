@@ -9,6 +9,17 @@ import { createExecutionWorkspaceCleanupHost } from "./execution-workspace-clean
 import type { ProviderAdapter } from "@chrona/contracts/steward";
 import { createPiApplicationHost } from "../../../packages/integrations/src/steward/agent-application-host";
 
+let gitAvailable: Promise<boolean> | undefined;
+function probeGit() {
+  return gitAvailable ??= (async () => {
+    try { return await Bun.spawn(["git", "--version"], { stdout: "ignore", stderr: "ignore" }).exited === 0; }
+    catch (error) {
+      console.error(JSON.stringify({ component: "server", event: "git_probe_failed", error: String(error) }));
+      return false;
+    }
+  })();
+}
+
 type RuntimeOptions = {
   now?: () => Date; onError?: (error: unknown) => void; port?: number; provider?: ProviderAdapter | null;
   dataDir?: string; tickSeconds?: number; chatTimeoutMs?: number;
@@ -95,8 +106,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
     async health() {
       let providerHealth = { name: provider?.name ?? "unconfigured", available: false, sandboxed: false };
       try { if (provider) { const h = await provider.health(); providerHealth = { name: provider.name, available: h.available, sandboxed: h.sandboxed }; } } catch { /* Public health never exposes diagnostic secrets. */ }
-      let git = false;
-      try { git = await Bun.spawn(["git", "--version"], { stdout: "ignore", stderr: "ignore" }).exited === 0; } catch { /* Missing git. */ }
+      const git = await probeGit();
       return { provider: providerHealth, git, moduleSandbox: ports.sandbox?.isolated ?? false };
     },
     start() {
