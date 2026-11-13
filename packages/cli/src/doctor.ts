@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawnSync, type SpawnSyncOptionsWithStringEncoding } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { Database } from "bun:sqlite";
@@ -196,10 +196,13 @@ async function externalAppWarnings(db: PrismaClient) {
       const module = await db.module.findUniqueOrThrow({ where: { id: entry.moduleId } });
       if (entry.releaseHash !== module.activeHash) {
         const repo = join(getChronaDataDir(), "platform", "repos", `${entry.moduleId}.git`);
-        const comparison = spawnSync("git", [`--git-dir=${repo}`, "merge-base", "--is-ancestor", entry.releaseHash, module.activeHash ?? ""], {
-          encoding: "utf8", timeout: 5_000, maxBuffer: 4096, windowsHide: true, stdio: ["ignore", "pipe", "pipe"],
-        });
-        if (comparison.status === 1) messages.push(`${entry.name}: bundled release differs from installed version; stop Chrona and run chrona admin install ${entry.name} --update --request-key <new-key>`);
+        const options: SpawnSyncOptionsWithStringEncoding = { encoding: "utf8", timeout: 5_000, maxBuffer: 4096, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] };
+        const release = spawnSync("git", [`--git-dir=${repo}`, "cat-file", "-e", `${entry.releaseHash}^{commit}`], options);
+        const missingRelease = release.status !== null && release.status !== 0 && !release.error && existsSync(repo);
+        const comparison = release.status === 0
+          ? spawnSync("git", [`--git-dir=${repo}`, "merge-base", "--is-ancestor", entry.releaseHash, module.activeHash ?? ""], options)
+          : release;
+        if (missingRelease || (release.status === 0 && comparison.status === 1)) messages.push(`${entry.name}: bundled release differs from installed version; stop Chrona and run chrona admin install ${entry.name} --update --request-key <new-key>`);
         else if (comparison.status !== 0) {
           const reason = comparison.error?.message || comparison.stderr?.trim() || `Git exited with status ${comparison.status} (signal ${comparison.signal})`;
           messages.push(`Could not compare ${entry.name} with the bundled release: ${reason}`);

@@ -197,7 +197,7 @@ it.each([
   } finally { rmSync(f.directory, { recursive: true, force: true }); }
 });
 
-it.each(["fresh", "local", "outdated", "missing", "invalid"])("compares the bundled release with installed Git ancestry: %s without writing data", async scenario => {
+it.each(["fresh", "local", "outdated", "unfetched", "missing", "invalid"])("compares the bundled release with installed Git ancestry: %s without writing data", async scenario => {
   const directory = mkdtempSync(join(tmpdir(), "chrona-doctor-install-"));
   const databasePath = join(directory, "chrona-test.db");
   ensureSqliteDatabase({ databaseUrl: `file:${databasePath}`, migrationsDir: join(import.meta.dir, "../../../prisma/migrations") });
@@ -247,6 +247,14 @@ it.each(["fresh", "local", "outdated", "missing", "invalid"])("compares the bund
       await db.module.update({ where: { id: module.id }, data: { activeHash } });
       if (scenario === "missing") rmSync(repo, { recursive: true });
     }
+    if (scenario === "unfetched") {
+      writeFileSync(join(code, "index.ts"), "// new bundled release, never fetched into the installed repo\n");
+      const release = await seedTestModuleRelease(resources, "web");
+      const catalog = (await externalPackageCatalog(ports, workspaceId)).find(item => item.name === "web")!;
+      expect(catalog.releaseHash).toBe(release.commit);
+      expect(catalog.releaseHash).toBe(catalog.git?.commit);
+      expect(() => git("cat-file", "-e", `${release.commit}^{commit}`)).toThrow();
+    }
     const snapshot = () => readdirSync(directory, { recursive: true }).map(name => {
       const path = join(directory, String(name)), stat = statSync(path, { bigint: true });
       return [String(name), stat.mtimeNs, stat.size, stat.isFile() ? readFileSync(path) : null];
@@ -257,8 +265,9 @@ it.each(["fresh", "local", "outdated", "missing", "invalid"])("compares the bund
     // Other missing fixtures and the paused Remind release still produce catalog warnings.
     expect(current.status).toBe("warning");
     expect(current.message).toContain("pi: Release resources missing");
-    if (scenario === "outdated") {
+    if (["outdated", "unfetched"].includes(scenario)) {
       expect(current.message).toContain("web: bundled release differs from installed version; stop Chrona and run chrona admin install web --update --request-key <new-key>");
+      expect(current.message).not.toContain("Could not compare web");
     } else if (["missing", "invalid"].includes(scenario)) {
       expect(current.message).toContain("Could not compare web with the bundled release:");
       expect(current.message).not.toContain("web: bundled release differs");
