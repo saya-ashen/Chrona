@@ -120,8 +120,10 @@ export function spawnSupervised(command: string, args: readonly string[] = [], o
       } catch { invalid = true; stop(); }
     }
   });
-  // Pipe errors are absence of evidence, never evidence of a successful stop.
-  control?.on("error", () => { invalid = true; });
+  // A failed stop request cannot invalidate evidence received on the status pipe.
+  control?.on("error", error => {
+    console.error(JSON.stringify({ component: "process-guardian", event: "control.failed", pid: child.pid, error: String(error) }));
+  });
   status?.on("error", () => { invalid = true; stop(); });
   const abort = () => stop();
   options.signal?.addEventListener("abort", abort, { once: true });

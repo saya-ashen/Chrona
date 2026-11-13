@@ -535,7 +535,13 @@ class ModuleSupervisor {
     for (const timer of this.restarts.values()) this.timers.clearTimeout(timer);
     this.restarts.clear();
     const results = await Promise.allSettled([...this.instances.values()].map(async instance => {
-      try { await this.close(instance); } finally { await instance.start?.catch(() => {}); }
+      try { await this.close(instance); }
+      catch (error) {
+        console.error(JSON.stringify({ component: "module-supervisor", event: "module.shutdown.failed",
+          module: instance.manifest.name, moduleId: instance.moduleId, hash: instance.hash, pid: instance.process?.pid ?? null,
+          error: diagnosticText(String(error), 2000) }));
+        throw error;
+      } finally { await instance.start?.catch(() => {}); }
     }));
     const failures = results.flatMap(result => result.status === "rejected" ? [result.reason] : []);
     if (failures.length) throw new AggregateError(failures, "Module shutdown could not confirm descendant stop");

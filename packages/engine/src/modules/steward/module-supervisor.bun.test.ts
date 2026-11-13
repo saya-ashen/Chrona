@@ -437,7 +437,14 @@ test("stop aggregates every unknown owner while still stopping healthy modules",
   second.rejectExit(unknowns[1]!);
   await until(async () => (await moduleIncidents(f.db, f.module.workspaceId, f.module.id)).length === 1 && (await moduleIncidents(f.db, f.module.workspaceId, others[0]!.id)).length === 1);
   expect(healthy.socket.destroyed).toBe(false);
-  await expect(f.supervisor.stop()).rejects.toBeInstanceOf(AggregateError);
+  const logs: string[] = [];
+  const logging = spyOn(console, "error").mockImplementation(line => { logs.push(String(line)); });
+  try { await expect(f.supervisor.stop()).rejects.toBeInstanceOf(AggregateError); }
+  finally { logging.mockRestore(); }
+  expect(logs.map(line => JSON.parse(line))).toEqual([
+    { component: "module-supervisor", event: "module.shutdown.failed", module: "example", moduleId: f.module.id, hash: "v1", pid: f.processes.indexOf(first) + 1, error: String(unknowns[0]) },
+    { component: "module-supervisor", event: "module.shutdown.failed", module: "second", moduleId: others[0]!.id, hash: "v1", pid: f.processes.indexOf(second) + 1, error: String(unknowns[1]) },
+  ]);
   expect(healthy.socket.destroyed).toBe(true);
   for (const moduleId of [f.module.id, others[0]!.id]) expect(f.supervisor.status(moduleId, "v1", true)).toMatchObject({ state: "unknown" });
   expect(f.pending()).toEqual([]);
