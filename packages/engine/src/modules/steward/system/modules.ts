@@ -77,7 +77,7 @@ export const modules: SystemModule = {
     if (name === "health") return health(ports, workspaceId, args);
     if (name === "admit" || name === "submit") return writeCandidates(context, name, args);
     if (name === "source") return json(await candidateSource(ports, workspaceId, caller, args));
-    if (name === "receipt") return json(await checkCandidates(ports, workspaceId, caller, args.receiptId ? args : { admissionId: args.admissionId, requestKey: args.key }));
+    if (name === "receipt") return json(await checkCandidates(ports, workspaceId, caller, args.receiptId ? { receiptId: args.receiptId } : { admissionId: args.admissionId, requestKey: args.requestKey ?? args.key }));
     if (["operation", "rollback", "disable", "enable", "remove"].includes(name)) {
       await requireOwner(ports.db, workspaceId, caller);
       return json(await moduleOperation({ ports, workspaceId, caller, call }, name, args));

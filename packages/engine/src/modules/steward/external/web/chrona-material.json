@@ -1,6 +1,11 @@
 {
   "schema": 1,
   "source": [
+    "DESIGN.md",
+    "LICENSE",
+    "MATERIAL-ADMISSION.md",
+    "THIRD-PARTY-NOTICES.txt",
+    "UI-DEVELOPMENT.md",
     "agent-conversations.bun.test.ts",
     "agent-conversations.ts",
     "app-overview.bun.test.ts",
@@ -17,7 +22,6 @@
     "composition.bun.test.ts",
     "composition.ts",
     "delivery.ts",
-    "DESIGN.md",
     "executable-components.bun.test.ts",
     "executable-components.ts",
     "image.bun.test.ts",
@@ -25,8 +29,9 @@
     "index.ts",
     "inline-settings.bun.test.ts",
     "kernel-client.ts",
-    "LICENSE",
     "lifecycle.bun.test.ts",
+    "material-admission.bun.test.ts",
+    "material-admission.ts",
     "memory.ts",
     "module.json",
     "package.json",
@@ -96,35 +101,35 @@
     "test-attachments.ts",
     "test-content.ts",
     "test-executable.ts",
+    "test-material-admission.ts",
     "test-model-settings.ts",
     "test-settings-page.ts",
     "test-system-pages.ts",
     "test.ts",
-    "THIRD-PARTY-NOTICES.txt",
     "today-health.bun.test.ts",
     "today.bun.test.ts",
     "today.ts",
     "tsconfig.json",
-    "UI-DEVELOPMENT.md",
     "workspace-catalog.bun.test.ts"
   ],
   "artifacts": [
     {
       "path": "pages.js",
-      "sha256": "b934f37bf16ccc0c341513062feffcac682e4629d6095840887382e9cc8b0342",
-      "executable": false
+      "executable": false,
+      "sha256": "b934f37bf16ccc0c341513062feffcac682e4629d6095840887382e9cc8b0342"
     },
     {
       "path": "style.css",
-      "sha256": "b8a0557ca4d0342dfab82f167c939aaaa02542dd1e42af32307a5a3c305cae31",
-      "executable": false
+      "executable": false,
+      "sha256": "b8a0557ca4d0342dfab82f167c939aaaa02542dd1e42af32307a5a3c305cae31"
     }
   ],
   "build": {
     "commands": [
-      "bun run build.ts"
+      "bun install --frozen-lockfile --ignore-scripts --no-progress",
+      "bun run build"
     ],
-    "toolchain": "Bun 1.4.2",
-    "target": "browser"
+    "toolchain": "Bun 1.4.2; scoped material-admission tests 4 pass/17 assertions; full directory tests not all portable (documented)",
+    "target": "Authenticated Web owner exact material admission endpoint; no approval or submission"
   }
 }

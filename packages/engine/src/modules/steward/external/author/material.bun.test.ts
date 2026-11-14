@@ -2,11 +2,12 @@ import { expect, test } from "bun:test";
 import { chmod, link, lstat, mkdir, mkdtemp, open, readFile, readdir, realpath, rename, rm, symlink, truncate, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { AuthorError, parseStage } from "./contracts";
+import { AuthorError, parseStage, parseValidate } from "./contracts";
 import { stagePackage } from "./distribution";
 import { createSourceFiles } from "./files";
 import { digest, MATERIAL_LIMITS, MATERIAL_RECORD, parseExport, parseImport, parseMaterialRecord, validateMaterial } from "./material";
 import { authorTool } from "./workflow";
+import { validateWorkspace } from "./validate";
 
 const build = { commands: ["existing compiler --offline", "existing test command"], toolchain: "host tools already installed", target: "host fixture" };
 const manifest = JSON.stringify({ name: "fixture", entry: { path: "bin/runtime", args: [] }, tools: [] });
@@ -231,3 +232,118 @@ test("source budget reserves the material record before any import is published"
   await expect(files.import(selected)).rejects.toMatchObject({ code: "too_large" });
   await expect(lstat(join(root, "content/sources/imported"))).rejects.toMatchObject({ code: "ENOENT" });
 }));
+
+test("overwrite imports stage a clean replacement and preserve the old tree on invalid input", async () => fixture(async (root, files, input) => {
+  await files.import(input);
+  await files.write(`${input.to}/stale.txt`, "stale");
+  const replacement = parseImport({ ...input, overwrite: true });
+  await files.import(replacement);
+  await expect(lstat(join(root, "content", input.to, "stale.txt"))).rejects.toMatchObject({ code: "ENOENT" });
+  expect(await readdir(join(root, "content/sources"))).toEqual(["imported"]);
+  const before = await readFile(join(root, "content", input.to, "module.json"));
+  await rm(join(input.from, "module.json"));
+  await expect(files.import(replacement)).rejects.toBeInstanceOf(AuthorError);
+  expect(await readFile(join(root, "content", input.to, "module.json"))).toEqual(before);
+}));
+
+test("overwrite exports replace an existing directory completely and reject aliases or private storage", async () => fixture(async (root, files, input, binary) => {
+  await files.import(input);
+  const to = join(root, "exported");
+  await mkdir(to); await writeFile(join(to, "stale.txt"), "stale");
+  const parsed = parseExport({ path: input.to, to, overwrite: true });
+  await files.export(parsed.path, parsed.to, parsed.overwrite);
+  await expect(lstat(join(to, "stale.txt"))).rejects.toMatchObject({ code: "ENOENT" });
+  expect(await readFile(join(to, "bin/runtime"))).toEqual(Buffer.from(binary));
+  await symlink(to, join(root, "alias"));
+  await expect(files.export(input.to, join(root, "alias"), true)).rejects.toMatchObject({ code: "unsafe_source" });
+  await expect(files.export(input.to, join(root, "content/sources/other"), true)).rejects.toThrow(/private application storage/);
+  await expect(files.import({ ...input, to: "../escape", overwrite: true })).rejects.toBeInstanceOf(AuthorError);
+  await rm(join(root, "content", input.to), { recursive: true });
+  await symlink(to, join(root, "content", input.to));
+  await expect(files.import({ ...input, overwrite: true })).rejects.toMatchObject({ code: "unsafe_source" });
+  expect(await readFile(join(to, "bin/runtime"))).toEqual(Buffer.from(binary));
+}));
+
+test("overwrite and validation contracts reject non-boolean flags and invalid paths", async () => fixture(async (root, _files, input) => {
+  for (const overwrite of [null, "true", 1]) {
+    expect(() => parseImport({ ...input, overwrite })).toThrow(AuthorError);
+    expect(() => parseExport({ path: input.to, to: join(root, "out"), overwrite })).toThrow(AuthorError);
+  }
+  expect(parseValidate({ path: "sources/check", runTests: false })).toEqual({ path: "sources/check", runTests: false });
+  for (const input of [{ path: "packages/check/source" }, { path: "sources/check", runTests: "yes" }, { path: "sources/check", extra: true }]) expect(() => parseValidate(input)).toThrow(AuthorError);
+}));
+
+async function validationFixture(action: (files: ReturnType<typeof createSourceFiles>, path: string, root: string) => Promise<void>) {
+  const root = await mkdtemp(join(tmpdir(), "author-validate-"));
+  try {
+    const files = createSourceFiles(root), path = "sources/check";
+    await files.write(`${path}/module.json`, JSON.stringify({ name: "fixture", entry: "index.ts", tools: [{ name: "check", parameters: {} }], pages: [{ id: "home", layout: "document" }] }));
+    await files.write(`${path}/index.ts`, "export {};\n");
+    await action(files, path, root);
+  } finally { await rm(root, { recursive: true, force: true }); }
+}
+
+test("validateWorkspace passes a valid module and discovers a passing local test", async () => validationFixture(async (files, path, root) => {
+  expect(await files.workspacePath(path)).toBe(join(root, path));
+  expect(await validateWorkspace(files, { path })).toMatchObject({ ok: true, path, tests: { ran: false } });
+  await files.write(`${path}/pass.bun.test.ts`, 'import { test, expect } from "bun:test"; test("local pass", () => expect(1).toBe(1));');
+  expect(await validateWorkspace(files, { path })).toMatchObject({ ok: true, tests: { ran: true, ok: true, exitCode: 0 } });
+}));
+
+test("validateWorkspace requires bun.lock for dependencies and devDependencies", async () => validationFixture(async (files, path) => {
+  for (const key of ["dependencies", "devDependencies"]) {
+    await files.write(`${path}/package.json`, JSON.stringify({ [key]: { fixture: "1.0.0" } }));
+    const result = await validateWorkspace(files, { path });
+    expect(result.ok).toBe(false);
+    expect(result.checks).toContainEqual({ name: "dependencies", ok: false, detail: "Dependencies require bun.lock in the workspace." });
+  }
+  await files.write(`${path}/bun.lock`, "{}\n");
+  expect((await validateWorkspace(files, { path })).ok).toBe(true);
+}));
+
+test("validateWorkspace rejects malformed manifests, missing entries and duplicate tool/page identifiers", async () => validationFixture(async (files, path) => {
+  for (const manifest of ["{", "[]", JSON.stringify({ name: "BAD", entry: "index.ts" }), JSON.stringify({ name: "fixture", entry: "../index.ts" }), JSON.stringify({ name: "fixture", entry: "missing.ts" }), JSON.stringify({ name: "fixture", entry: "index.ts", tools: [{ name: "same", parameters: {} }, { name: "same", parameters: {} }] }), JSON.stringify({ name: "fixture", entry: "index.ts", tools: [{ name: "bad", parameters: [] }] }), JSON.stringify({ name: "fixture", entry: "index.ts", pages: [{ id: "same" }, { id: "same" }] }), JSON.stringify({ name: "fixture", entry: "index.ts", pages: [{ id: "home", layout: "invalid" }] })]) {
+    await files.write(`${path}/module.json`, manifest);
+    const result = await validateWorkspace(files, { path });
+    expect(result.ok).toBe(false);
+    expect(result.checks.some(check => check.name === "module.json" && !check.ok)).toBe(true);
+  }
+}));
+
+test("validateWorkspace reports failing test output and supports explicitly skipping tests", async () => validationFixture(async (files, path) => {
+  await files.write(`${path}/fail.test.ts`, 'import { test, expect } from "bun:test"; test("local failure", () => { console.log("x".repeat(20000)); expect(1).toBe(2); });');
+  const result = await validateWorkspace(files, { path });
+  expect(result.ok).toBe(false);
+  expect(result.tests).toMatchObject({ ran: true, ok: false });
+  expect(result.tests!.exitCode).not.toBe(0);
+  expect(Buffer.byteLength(result.tests!.output)).toBeLessThanOrEqual(8192);
+  expect(result.tests!.output.length).toBeGreaterThan(0);
+  expect(await validateWorkspace(files, { path, runTests: false })).toMatchObject({ ok: true, tests: { ran: false } });
+}));
+
+test("validateWorkspace rejects symlinks, special files, oversized trees and missing workspaces", async () => validationFixture(async (files, path, root) => {
+  const target = join(root, path, "unsafe");
+  await symlink(join(root, path, "index.ts"), target);
+  expect((await validateWorkspace(files, { path })).ok).toBe(false);
+  await rm(target);
+  expect(Bun.spawnSync(["mkfifo", target]).exitCode).toBe(0);
+  expect((await validateWorkspace(files, { path })).ok).toBe(false);
+  await rm(target);
+  await writeFile(target, Buffer.alloc(64 * 1024 + 1));
+  expect((await validateWorkspace(files, { path })).ok).toBe(false);
+  expect((await validateWorkspace(files, { path: "sources/missing" })).ok).toBe(false);
+}));
+
+
+test("validateWorkspace supports run paths and recorded binary entries, and reports missing manifests", async () => {
+  await validationFixture(async (files, path, root) => {
+    await files.write(`${path}/module.json`, JSON.stringify({ name: "fixture", run: "index.ts" }));
+    expect((await validateWorkspace(files, { path })).ok).toBe(true);
+    await rm(join(root, path, "module.json"));
+    expect((await validateWorkspace(files, { path })).checks).toContainEqual({ name: "module.json", ok: false, detail: "Missing module.json." });
+  });
+  await fixture(async (_root, files, input) => {
+    await files.import(input);
+    expect((await validateWorkspace(files, { path: input.to })).ok).toBe(true);
+  });
+});

@@ -9,7 +9,8 @@ export const SOURCE_LIMITS = { fileBytes: 64 * 1024, totalBytes: 1024 * 1024, fi
 export type Build = { commands: string[]; toolchain: string; target: string };
 export type Artifact = { path: string; executable?: boolean };
 export type MaterialRecord = { schema: 1; source: string[]; artifacts: (Artifact & { sha256: string })[]; build: Build };
-export type ImportMaterial = { from: string; to: string; source: string[]; artifacts: Artifact[]; build: Build };
+export type ImportMaterial = { from: string; to: string; source: string[]; artifacts: Artifact[]; build: Build; overwrite?: boolean };
+export type ExportMaterial = { path: string; to: string; overwrite?: boolean };
 export const digest = (value: Buffer | string) => createHash("sha256").update(value).digest("hex");
 export function workspaceDirectory(value: unknown): string {
   const path = text(value, 4096);
@@ -54,12 +55,14 @@ function build(value: unknown): Build {
   return { commands: row.commands.map(command => text(command, 8192)), toolchain: text(row.toolchain, 4096), target: text(row.target, 1024) };
 }
 export function parseImport(value: unknown): ImportMaterial {
-  const row = object(value, ["from", "to", "source", "artifacts", "build"]);
-  return { from: workspaceDirectory(row.from), to: sourceDir(row.to), ...selection(row.source, row.artifacts, false), build: build(row.build) };
+  const row = object(value, ["from", "to", "source", "artifacts", "build", "overwrite"], ["from", "to", "source", "artifacts", "build"]);
+  const overwrite = row.overwrite === undefined ? undefined : typeof row.overwrite === "boolean" ? row.overwrite : fail("Expected a boolean overwrite flag.");
+  return { from: workspaceDirectory(row.from), to: sourceDir(row.to), ...selection(row.source, row.artifacts, false), build: build(row.build), ...(overwrite === undefined ? {} : { overwrite }) };
 }
-export function parseExport(value: unknown) {
-  const row = object(value, ["path", "to"]);
-  return { path: submitDir(row.path), to: workspaceDirectory(row.to) };
+export function parseExport(value: unknown): ExportMaterial {
+  const row = object(value, ["path", "to", "overwrite"], ["path", "to"]);
+  const overwrite = row.overwrite === undefined ? undefined : typeof row.overwrite === "boolean" ? row.overwrite : fail("Expected a boolean overwrite flag.");
+  return { path: submitDir(row.path), to: workspaceDirectory(row.to), ...(overwrite === undefined ? {} : { overwrite }) };
 }
 export function parseMaterialRecord(bytes: Buffer): MaterialRecord {
   if (bytes.length > MATERIAL_LIMITS.recordBytes) throw new AuthorError("too_large", "Material record exceeds 1 MiB.");

@@ -345,6 +345,7 @@ export class CoreAdmission {
   cleanupWithdrawn() {
     let deferred = 0;
     for (const request of this.requests()) {
+      if (request.status !== 'pending' && request.snapshot.evidence.length === 0 && request.snapshot.checkpoints.length === 0 && !request.snapshot.target && request.snapshot.related.length === 0 && !request.verdict && Object.keys(request.input).length <= 1) continue;
       if (current(this.store, request)) continue;
       if(request.status==='pending')request.status = 'invalidated';
       request.reason = 'Candidate evidence, target, revision, visibility or source coverage changed';

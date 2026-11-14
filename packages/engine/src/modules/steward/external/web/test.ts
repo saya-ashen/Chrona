@@ -1,4 +1,6 @@
 import { checkSystemPages, checkHealthRendering } from "./test-system-pages";
+import { checkMaterialAdmission } from "./test-material-admission";
+await checkMaterialAdmission();
 import { strict as assert } from "node:assert";
 import { catalog } from "./catalog";
 import { pageErrors } from "./pages";

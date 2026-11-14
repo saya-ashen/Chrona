@@ -3,7 +3,7 @@ import { lstat, mkdir, open, realpath, rename, unlink, opendir, rm, type FileHan
 import { randomUUID } from "node:crypto";
 import { basename, dirname, resolve, sep } from "node:path";
 import { AuthorError, fail, relative, sourceDir, submitDir } from "./contracts";
-import { digest, MATERIAL_LIMITS, MATERIAL_RECORD, parseMaterialRecord, SOURCE_LIMITS, validateMaterial, materialSummary, type ImportMaterial, type MaterialRecord, type MaterialFile } from "./material";
+import { digest, MATERIAL_LIMITS, MATERIAL_RECORD, parseMaterialRecord, SOURCE_LIMITS, validateMaterial, materialSummary, type ImportMaterial, type MaterialRecord, type MaterialFile, workspaceDirectory } from "./material";
 import { publishDirectory } from "./publish";
 export { SOURCE_LIMITS } from "./material";
 export type { MaterialFile } from "./material";
@@ -142,9 +142,9 @@ async function snapshotFiles(scope: Scope, root: FileHandle): Promise<MaterialFi
   await unchanged(scope);
   return files;
 }
-/** Create an invisible sibling, then atomically publish without replacing any entry.
+/** Stage a complete sibling before publication or opt-in replacement.
  * Cleanup is anchored to the parent and only removes the inode this operation created. */
-async function publish(scope: Scope, parent: FileHandle, target: string, write: (temporary: FileHandle) => Promise<void>) {
+async function publish(scope: Scope, parent: FileHandle, target: string, write: (temporary: FileHandle) => Promise<void>, overwrite = false) {
   const temporary = `.author-material-${randomUUID()}`;
   const path = child(parent, temporary);
   await mkdir(path, { mode: 0o700 });
@@ -157,6 +157,19 @@ async function publish(scope: Scope, parent: FileHandle, target: string, write: 
     await unchanged(scope);
     const now = await lstat(path, { bigint: true });
     if (now.ino !== own.ino || now.dev !== own.dev || !now.isDirectory()) throw new AuthorError("conflict", "Material staging directory changed.");
+    if (overwrite === true) {
+      // Only a direct child of the validated parent may be removed. Never follow
+      // a destination symlink, and never remove files in place before staging.
+      if (relative(target).includes("/")) return fail("Expected a direct destination directory.");
+      let existing;
+      try { existing = await lstat(child(parent, target)); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+      if (existing) {
+        if (!existing.isDirectory()) throw new AuthorError("unsafe_source", "Overwrite requires a real destination directory.");
+        await rm(child(parent, target), { recursive: true });
+      }
+      await unchanged(scope);
+    }
     publishDirectory(parent, temporary, target);
     published = true;
   } finally {
@@ -195,17 +208,18 @@ function materialTransfers(scope: SourceScope, external: (path: string) => void)
         files.push({ path: MATERIAL_RECORD, bytes: Buffer.from(`${JSON.stringify(record, null, 2)}\n`) });
         validateMaterial(files);
         const parent = await directory(scope, root, ["sources"], true);
-        await publish(scope, parent, parts[1], temporary => copyFiles(scope, temporary, files));
+        await publish(scope, parent, parts[1], temporary => copyFiles(scope, temporary, files), input.overwrite ?? false);
         return { path: input.to, record: `${input.to}/${MATERIAL_RECORD}`, ...materialSummary(files) };
       });
     },
-    async export(path: string, to: string) {
+    async export(path: string, to: string, overwrite = false) {
+      to = workspaceDirectory(to);
       external(to);
       const parts = submitDir(path).split("/");
       return scope(async (scope, root) => {
         const files = await snapshotFiles(scope, await directory(scope, root, parts));
         const parent = await absoluteDirectory(scope, dirname(to));
-        await publish(scope, parent, basename(to), temporary => copyFiles(scope, temporary, files));
+        await publish(scope, parent, basename(to), temporary => copyFiles(scope, temporary, files), overwrite);
         return { path, to, ...materialSummary(files) };
       });
     },
@@ -222,6 +236,16 @@ export function createSourceFiles(content: string, privateRoots: string[] = []) 
   }
   const scope = <T>(action: (scope: Scope, root: FileHandle) => Promise<T>) => io(async scope => action(scope, await absoluteDirectory(scope, root)));
   return {
+    async workspacePath(path: string): Promise<string> {
+      const parts = sourceDir(path).split("/");
+      return scope(async (scope, rootHandle) => {
+        const workspace = await directory(scope, rootHandle, parts);
+        const actual = await realpath(`/proc/self/fd/${workspace.fd}`);
+        if (actual !== resolve(root, ...parts)) throw new AuthorError("unsafe_source", "Workspace must remain inside the content root.");
+        await unchanged(scope);
+        return actual;
+      });
+    },
     async write(path: string, content: string) {
       const parts = visible(path, true);
       if (typeof content !== "string") return fail("Expected source text.");

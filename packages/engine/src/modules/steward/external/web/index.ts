@@ -12,6 +12,7 @@ import { settingsView, updateSettings, webSettings, webPreferences, WEB_SETTINGS
 import { createPreferences } from "./settings-store";
 import { appOverview, systemApps } from "./app-overview";
 import { attachmentBody, createAttachments, decodeBase64 } from "./attachments";
+import { createMaterialAdmission } from "./material-admission";
 
 // "/" serves the static page (no data). "/api/web/*" is the page's data API: Chrona checks the user's key before it
 // forwards a request here; other applications are reached through routed calls (v2-8).
@@ -23,6 +24,7 @@ const headers = { "cache-control": "no-cache", "x-content-type-options": "nosnif
   "content-security-policy": "default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob:; frame-src blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'" };
 const preferences = createPreferences(chrona.paths.data);
 const call = (target: string, args: Args = {}, options: { key?: string } = {}) => target === "web.settings" ? preferences.tool(args) : applicationCall(target, Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined)), /^modules\.(enable|disable|rollback|remove)$/.test(target) ? { key: typeof args.requestKey === "string" ? args.requestKey : crypto.randomUUID() } : options);
+const admitMaterial = createMaterialAdmission(chrona.paths.data, call, moduleId => applicationCall('apps.overview', {}, {expectedTarget: {moduleId}}));
 const ownSettings = new Map<string, (args: Args) => Promise<unknown>>([
   ["web.ui-settings", args => webSettings(call, preferences, args)],
   ["web.ui-preferences", args => webPreferences(call, args)],
@@ -197,6 +199,8 @@ async function api(request: Request, path: string[]) {
     "GET /system-apps": () => systemApps(call, url.searchParams.get("module") ?? undefined),
     "GET /tools": () => call("modules.describe", { query: url.searchParams.get("query") ?? undefined, audience: "user" }).then(page => (page as { items: unknown }).items),
     "POST /call": () => moduleCall(body),
+    // Authenticated owner HTTP entry only; no app tool can invoke this grant.
+    "POST /material-admission": () => admitMaterial(body),
   };
   if (Object.hasOwn(routes, context.route)) return routes[context.route]!(context);
   for (const route of dynamicRoutes) {

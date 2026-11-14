@@ -125,3 +125,10 @@ export function integer(value: unknown, fallback: number, max: number): number {
   if (!Number.isSafeInteger(value) || (value as number) < 0 || (value as number) > max) return fail("Expected a bounded nonnegative integer.");
   return value as number;
 }
+
+export type Validate = { path: string; runTests?: boolean };
+export function parseValidate(value: unknown): Validate {
+  const row = object(value, ["path", "runTests"], ["path"]);
+  const runTests = row.runTests === undefined ? undefined : typeof row.runTests === "boolean" ? row.runTests : fail("Expected a boolean runTests flag.");
+  return { path: sourceDir(row.path), ...(runTests === undefined ? {} : { runTests }) };
+}

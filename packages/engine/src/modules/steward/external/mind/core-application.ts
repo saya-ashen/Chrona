@@ -114,20 +114,32 @@ export class CoreApplication {
   private adapters(): ApplicationAdapter[] {
     return (this.db.query('SELECT json FROM adapters ORDER BY id').all() as { json: string }[]).map(r => JSON.parse(r.json));
   }
-  private builtin(rows: DirectoryRow[]): ApplicationAdapter | undefined {
-    const matches = rows.filter(r => r.name === 'pi');
-    if (matches.length > 1) throw Error('Ambiguous Pi application');
-    const pi = matches[0]; if (!pi) return undefined;
-    this.safeTarget(pi, 'models');
-    // Explicit reviewed adapter: pi.models discovers model options without calling a model. No other pi tools.
-    return { id: `builtin:pi.models:${coreDigest([pi.id, pi.activeHash])}`, moduleId: pi.id, activeHash: pi.activeHash,
-      tool: 'models', effect: 'read', params: {}, description: 'Discover locally configured Pi model options without model invocation',
-      source: 'builtin', grantedBy: 'mind:reviewed-pi-models', grantedAt: 'builtin' };
+  private builtin(rows: DirectoryRow[]): ApplicationAdapter[] {
+    const out: ApplicationAdapter[] = [];
+    const piMatches = rows.filter(r => r.name === 'pi');
+    if (piMatches.length > 1) throw Error('Ambiguous Pi application');
+    const pi = piMatches[0];
+    if (pi) {
+      this.safeTarget(pi, 'models');
+      // Explicit reviewed adapter: pi.models discovers model options without calling a model. No other pi tools.
+      out.push({ id: `builtin:pi.models:${coreDigest([pi.id, pi.activeHash])}`, moduleId: pi.id, activeHash: pi.activeHash,
+        tool: 'models', effect: 'read', params: {}, description: 'Discover locally configured Pi model options without model invocation',
+        source: 'builtin', grantedBy: 'mind:reviewed-pi-models', grantedAt: 'builtin' });
+    }
+    const appsMatches = rows.filter(r => r.name === 'apps');
+    if (appsMatches.length === 1) {
+      const apps = appsMatches[0]!;
+      this.safeTarget(apps, 'overview');
+      out.push({ id: `builtin:apps.overview:${coreDigest([apps.id, apps.activeHash])}`, moduleId: apps.id, activeHash: apps.activeHash,
+        tool: 'overview', effect: 'read', params: {}, description: 'Read official application center overview and local module ledger without remote fetch',
+        source: 'builtin', grantedBy: 'mind:reviewed-apps-overview', grantedAt: 'builtin' });
+    }
+    return out;
   }
   async list(access: CoreAccess): Promise<ApplicationAdapter[]> {
     if (!access?.subject || !['owner', 'runtime', 'application'].includes(access.role)) throw Error('Trusted access required');
-    const rows = await this.directory(), builtin = this.builtin(rows);
-    return [...(builtin ? [builtin] : []), ...this.adapters().filter(a => !a.revokedAt && rows.some(r => r.id === a.moduleId && r.activeHash === a.activeHash))];
+    const rows = await this.directory(), builtins = this.builtin(rows);
+    return [...builtins, ...this.adapters().filter(a => !a.revokedAt && rows.some(r => r.id === a.moduleId && r.activeHash === a.activeHash))];
   }
   /** Main exposes this only on its authenticated owner configuration path, after source review. */
   async grant(input: ApplicationGrantInput, access: CoreAccess): Promise<ApplicationAdapter> {
@@ -158,8 +170,8 @@ export class CoreApplication {
     return adapter;
   }
   private async resolve(id: string): Promise<ApplicationAdapter> {
-    const rows = await this.directory(), builtin = this.builtin(rows);
-    const adapter = builtin?.id === id ? builtin : this.adapters().find(a => a.id === id && !a.revokedAt);
+    const rows = await this.directory(), builtins = this.builtin(rows);
+    const adapter = builtins.find(a => a.id === id) ?? this.adapters().find(a => a.id === id && !a.revokedAt);
     if (!adapter) throw Error('Adapter authorization missing or revoked');
     const row = rows.find(r => r.id === adapter.moduleId);
     if (!row || row.activeHash !== adapter.activeHash) throw Error('Application active version changed');

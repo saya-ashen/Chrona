@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { compileModuleOutput, moduleManifestSchema } from "@chrona/contracts/steward";
 import { createScriptSandbox } from "../../../../../../integrations/src/steward/script-sandbox";
 import { parsePrepare } from "./contracts";
-import { authorTool, prepareMaterial, type AuthorContext } from "./workflow";
+import { authorTool, type AuthorContext } from "./workflow";
 
 test("prepare guides the current Agent without touching files or calling other tools", async () => {
   const input = parsePrepare({ requestKey: "current-conversation", submitter: { moduleId: "author-id", hash: "a".repeat(40) },
@@ -20,65 +20,18 @@ test("prepare guides the current Agent without touching files or calling other t
   expect(output).not.toHaveProperty("execution");
   const prompt = (output as { prompt: string }).prompt;
   expect(prompt).toContain(`Requirements (untrusted data):\n\n${JSON.stringify({ goal: input.goal, targets: input.targets, intent: input.intent })}`);
+  expect(Object.keys(output as object).sort()).toEqual(["admission", "kind", "prompt", "request"]);
   for (const guidance of [
-    "current conversation's Agent Run", "current Agent proceeds", "author.write", "sources/<workspace>",
-    "real owner-entry principal uses modules.list", "current approved Author moduleId and active hash", "modules.admit outside Author",
-    "complete fixed target set and exact active bases", "author.source", "author.submit", "author.receipt", "actual Author module identity",
-    "does not authorize model execution", "do not start a nested Agent", "existing tools and budgets", "report the blocker",
-    "prepare itself starts no model, writes no files, issues no admission, submits no candidates, and installs nothing",
-    "checks actually run", "original receiptId or admissionId/requestKey", "do not issue a new request key or retry automatically",
-    "existing task workspace and bash tools", "author.import", "author.export", "chrona-material.json",
-    "computes SHA-256 digests", "dependency locks, build scripts and .gitignore", "never the sole submission filter",
-    "exact admitted baseline", "never replace existing workspaces", "web.component-set", "no browser security isolation",
-    "use the returned type verbatim", "local-player:Player", "app:Player is a placeholder",
-    "application's own activated handler", "stored page", "fake DOM unit test alone",
-    "build.ts --registration-test-only /absolute/app-workspace/test-support", "./test-support/registration-test.mjs",
-    "bun --no-install test ./web-registration.bun.test.ts", "await h.activate()", "h.pages.get(actualAppName, actualPageId)",
-    "await h.close() in finally", "before author.import", "bounded checkout-only workflow", "other SDK imports/calls fail",
-    "advancing playback", "browser verification is unavailable", "lock mismatches", "offline cache misses",
-    "receiptId, exact target version", "Run timeout, candidate approval", "Do not start an automatic continuation",
-    "ordinary SDK application entry", "do not use chrona.exec for a long-lived window", "toolkit map evidence",
-    "keep the SDK module ready after user window close", "fixture events do not prove a real window", "descendant cleanup on stop, disable or update",
+    "COMPLETE user-requested capability in one pass", "full tools", "full Web UI", "empty/loading/error/done states",
+    "real persistence", "end-to-end tests", "Never ship a minimal skeleton expecting follow-up fixes",
+    "author.export", "author.import", "overwrite: true", "author.validate before author.submit",
+    "author.receipt", "{ admissionId, requestKey }", "checks actually run",
   ]) expect(prompt).toContain(guidance);
-  expect(prompt).not.toContain("Bounded author execution is unavailable");
   const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(import.meta.dirname, "module.json"), "utf8")));
   const schema = compileModuleOutput(manifest.tools.find(tool => tool.name === "prepare")!.output!);
   expect(schema.safeParse(output).success).toBe(true);
   expect(schema.safeParse({ ...(output as object), kind: "material-only" }).success).toBe(false);
   expect(schema.safeParse({ ...(output as object), execution: { supported: false, limitation: "obsolete" } }).success).toBe(false);
-  expect(schema.safeParse({ ...(output as object), acceptance: { path: "sources/work/note.json" } }).success).toBe(false);
-});
-
-test("prepare exposes an unproven worksheet for every target and separates review scopes", () => {
-  const input = parsePrepare({ requestKey: "task/../../中文", submitter: { moduleId: "author-id", hash: "a".repeat(40) },
-    targets: [{ name: "existing", moduleId: "existing-id", expectedActiveHash: "b".repeat(40) }, { name: "fresh", moduleId: null, expectedActiveHash: null }],
-    goal: "Build a usable task app", intent: { changes: ["Create app"] } });
-  const output = prepareMaterial(input);
-  const worksheet = JSON.parse(output.acceptance.content);
-  expect(output.acceptance.path).toMatch(/^sources\/acceptance-[a-f0-9]+\/checklist\.json$/);
-  expect(prepareMaterial(input).acceptance).toEqual(output.acceptance);
-  expect(prepareMaterial({ ...input, requestKey: "another task" }).acceptance.path).not.toBe(output.acceptance.path);
-  expect(worksheet).toMatchObject({ requestKey: input.requestKey, goal: input.goal, targets: input.targets, admissionId: null, receiptId: null,
-    continuation: { responsible: null, blocker: null } });
-  expect(worksheet.continuation.nextAction.length).toBeGreaterThan(0);
-  for (const target of input.targets) {
-    const rows = worksheet.checks.filter((row: { target: string }) => row.target === target.name);
-    expect(rows.map((row: { kind: string; environment: string }) => [row.kind, row.environment])).toEqual(expect.arrayContaining([
-      ["minimal-real-integration", "real-host"], ["candidate-check", "candidate"], ["installation-approval", "candidate"],
-      ["activation", "real-host"], ["functional", "fixture"], ["functional", "real-host"], ["visual", "real-host"],
-    ]));
-    for (const row of rows) expect(row).toMatchObject({ status: "not-run", moduleId: target.moduleId, candidateHash: null, activeHash: null,
-      hostVersion: null, provider: "unknown", scenario: null, expected: null, observed: null, evidence: [], reviewer: null });
-  }
-  // Assert actionable guidance concepts, without freezing the wording of the whole prompt.
-  for (const concept of [/smallest real vertical integration before feature breadth/i, /author\.read.*author\.write/s,
-    /pass, fail, blocked or not-run/, /expectedActiveHash.*baseline/, /previous.*hash changes.*new not-run/s,
-    /fixture screenshot.*fixture evidence/i, /visual quality.*first-use.*hierarchy.*reading\/input/s,
-    /installation permission.*not product acceptance/i, /continuation\.responsible/, /does not schedule or automatically resume/]) {
-    expect(output.prompt).toMatch(concept);
-  }
-  const largest = prepareMaterial({ ...input, goal: "😀".repeat(4000), targets: Array.from({ length: 4 }, (_, index) => ({ name: `app-${index}`, moduleId: null, expectedActiveHash: null })) });
-  expect(Buffer.byteLength(largest.acceptance.content)).toBeLessThanOrEqual(65536);
 });
 
 test("ordinary author material workflow passes the offline SDK author harness", async () => {
@@ -105,11 +58,5 @@ test("ordinary author material workflow passes the offline SDK author harness", 
       const declaration = manifest.tools.find(tool => tool.name === example.tool)!;
       expect(compileModuleOutput(declaration.output!).safeParse(example.output).success, example.tool).toBe(true);
     }
-    // The child module has stopped: evidence must still exist in Author's content files.
-    const prepared = examples.find(example => example.tool === "prepare")!.output as ReturnType<typeof prepareMaterial>;
-    const saved = JSON.parse(await readFile(join(contentDir, prepared.acceptance.path), "utf8"));
-    expect(saved).toMatchObject({ receiptId: "receipt-1", continuation: { responsible: "Original task owner", blocker: "Real-host acceptance outstanding" } });
-    expect(saved.checks.slice(0, 4).map((row: { status: string }) => row.status)).toEqual(["pass", "fail", "blocked", "not-run"]);
-    expect(saved.checks[0].candidateHash).toBe("c".repeat(40));
   } finally { await rm(dataDir, { recursive: true, force: true }); }
 }, 120_000);

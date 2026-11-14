@@ -5666,6 +5666,22 @@
             "key"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "admissionId": {
+              "type": "string"
+            },
+            "requestKey": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "admissionId",
+            "requestKey"
+          ],
+          "additionalProperties": false
         }
       ]
     },
