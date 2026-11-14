@@ -14,14 +14,15 @@ const tokens = (value: unknown) => typeof value === "number" && Number.isSafeInt
 const timedOut = (state: CompletionState) => state.expired;
 const childOf = (state: CompletionState) => state.child;
 
-// Verified against the locally installed @earendil-works/pi-coding-agent 1.5.0
-// CLI and bundled provider source. There is no CLI max-token flag. Explicit -e
-// still loads with --no-extensions; extension load errors abort print mode.
-const TOKEN_LIMIT_PI_VERSION = "1.5.0";
+// Each entry verified against that @earendil-works/pi-coding-agent CLI and its
+// bundled provider source (1.5.2: real capped completion, 2026-11-14). There is
+// no CLI max-token flag. Explicit -e still loads with --no-extensions; extension
+// load errors abort print mode. Add a version only after the same check.
+export const TOKEN_LIMIT_PI_VERSIONS = ["1.5.0", "1.5.2"];
 
 /** Why completion cannot run with this launch config, or null. */
 export async function piCompletionUnavailable(config: ReturnType<typeof piLaunchConfig>): Promise<string | null> {
-  if (config.version !== TOKEN_LIMIT_PI_VERSION) return `Pi completion requires CHRONA_STEWARD_PI_VERSION=${TOKEN_LIMIT_PI_VERSION} (configured ${config.version})`;
+  if (!TOKEN_LIMIT_PI_VERSIONS.includes(config.version)) return `Pi completion requires CHRONA_STEWARD_PI_VERSION in ${TOKEN_LIMIT_PI_VERSIONS.join(", ")} (configured ${config.version})`;
   return inspectPiLaunch(config);
 }
 function tokenLimitExtension(input: PiCompletionInput, dir: string): string {

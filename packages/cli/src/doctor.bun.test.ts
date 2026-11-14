@@ -184,6 +184,8 @@ it.each([
   { agent: "pi", version: "1.5.0", command: "pi", status: "error" },
   { agent: "pi", version: "1.5.0", command: undefined, status: "error" },
   { agent: "pi", version: undefined, command: "/opt/pi", status: "warning" },
+  { agent: "pi", version: "1.5.2", command: "/opt/pi", status: "ok" },
+  { agent: "pi", version: "1.5.1", command: "/opt/pi", status: "warning" },
 ])("checks Pi configuration: $version $command", ({ agent, version, command, status }) => {
   const f = migrationFixture();
   try {
@@ -193,7 +195,7 @@ it.each([
     const checks = inspectLocalChrona().filter(check => check.key === "providerPi");
     expect(checks).toHaveLength(1);
     expect(checks[0]?.status).toBe(status);
-    if (status === "warning") expect(checks[0]?.message).toContain("Pi completion requires CHRONA_STEWARD_PI_VERSION=1.5.0");
+    if (status === "warning") expect(checks[0]?.message).toContain("Pi completion requires CHRONA_STEWARD_PI_VERSION in 1.5.0, 1.5.2");
   } finally { rmSync(f.directory, { recursive: true, force: true }); }
 });
 

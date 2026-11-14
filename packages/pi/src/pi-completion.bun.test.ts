@@ -147,7 +147,7 @@ for (const options of [
   expect(await readFile(f.sent, "utf8").catch(() => null)).toBeNull();
   await expectStoppedAndCleaned(f);
 });
-test("version other than 1.5.0 fails with a logged reason", async () => {
+test("unverified version fails with a logged reason", async () => {
   const f = await fixture("ok", { version: "0.85.0", pin: "0.85.0" });
   const log = spyOn(console, "error").mockImplementation(() => {});
   try {
@@ -155,12 +155,16 @@ test("version other than 1.5.0 fails with a logged reason", async () => {
     expect(log).toHaveBeenCalledTimes(1);
     const entry = JSON.parse(String(log.mock.calls[0]![0]));
     expect(entry).toMatchObject({ component: "pi-completion", event: "completion_failed" });
-    expect(entry.error).toContain("requires CHRONA_STEWARD_PI_VERSION=1.5.0");
+    expect(entry.error).toContain("requires CHRONA_STEWARD_PI_VERSION in 1.5.0, 1.5.2");
     expect(entry.error).toContain("configured 0.85.0");
   } finally { log.mockRestore(); }
 });
 test("piCompletionUnavailable accepts a valid 1.5.0 launch config", async () => {
   const f = await fixture();
+  expect(await piCompletionUnavailable(piLaunchConfig(f.providerOptions))).toBeNull();
+});
+test("piCompletionUnavailable accepts a verified 1.5.2 launch config", async () => {
+  const f = await fixture("ok", { version: "1.5.2", pin: "1.5.2" });
   expect(await piCompletionUnavailable(piLaunchConfig(f.providerOptions))).toBeNull();
 });
 test("piCompletionUnavailable explains an unsupported completion version", async () => {

@@ -101,9 +101,10 @@ function providerPiCheck(): ChronaDoctorCheck[] {
   const command = process.env.CHRONA_STEWARD_PI_COMMAND ?? "";
   if (!isAbsolute(command)) checks.push({ key, status: "error", message: "Configure CHRONA_STEWARD_PI_COMMAND as an absolute Pi executable path." });
   const version = process.env.CHRONA_STEWARD_PI_VERSION ?? "0.85.0";
-  // Synchronous equivalent of packages/pi/src/pi-completion.ts TOKEN_LIMIT_PI_VERSION.
-  if (version !== "1.5.0") checks.push({ key, status: "warning", message: `Pi completion requires CHRONA_STEWARD_PI_VERSION=1.5.0 (configured ${version}); agent runs work, but bounded model calls by apps are unavailable.` });
-  if (!checks.length) checks.push({ key, status: "ok", message: "Pi 1.5.0 is configured with an absolute command path and supports bounded model calls." });
+  // Synchronous equivalent of packages/pi/src/pi-completion.ts TOKEN_LIMIT_PI_VERSIONS.
+  const verified = ["1.5.0", "1.5.2"];
+  if (!verified.includes(version)) checks.push({ key, status: "warning", message: `Pi completion requires CHRONA_STEWARD_PI_VERSION in ${verified.join(", ")} (configured ${version}); agent runs work, but bounded model calls by apps are unavailable.` });
+  if (!checks.length) checks.push({ key, status: "ok", message: `Pi ${version} is configured with an absolute command path and supports bounded model calls.` });
   return checks;
 }
 
