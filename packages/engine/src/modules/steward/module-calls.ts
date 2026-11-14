@@ -75,7 +75,7 @@ function nextPath(origin: CallOrigin) {
   const name = callerName(origin.caller);
   return { chain: name ? [...origin.chain, name] : origin.chain, path: name ? [...origin.path, name] : origin.path };
 }
-function toolEvent(target: Target, args: Record<string, unknown>, now: Date, caller: Caller, call: { id: string; key: string | null; attempt: number; chain: string[] }): ModuleEvent {
+function toolEvent(target: Target, args: Record<string, unknown>, now: Date, caller: Caller, call: { id: string; key: string | null; attempt: number; chain: string[]; executionRunId?: string }): ModuleEvent {
   return { trigger: { id: target.tool.name, kind: "tool", firedAt: now.toISOString(), args, caller, call }, now: now.toISOString(), params: {} };
 }
 // Which modules are blocked in a sync call, on which targets (per runtime). A module waiting in one event cannot serve
@@ -111,8 +111,15 @@ async function invokeSystemSync({ ports, origin, resolved, args, rowId, rowKey, 
 }
 async function deliverSyncModule({ ports, origin, resolved, target, args, chain, path, now, key, timeoutMs, activationId, rowId, finish, privateTransport }: SyncInvocation & { timeoutMs?: number; rowId: string; finish: (data: Prisma.ModuleInvocationUpdateInput) => Promise<unknown> }) {
   try {
-    return await moduleSupervisor(ports).deliver(resolved.module.id, resolved.module.activeHash, toolEvent(resolved, args, now, origin.caller, { id: rowId, key: key ?? null, attempt: 1, chain: path }), { chain, path, ...(privateTransport ? { private: true } : {}), beforeDelivery: targetFence(ports, origin.workspaceId, resolved, origin.caller), ...(activationId !== undefined ? { activationId } : {}), validateResult: output => moduleOutputError(target, resolved.tool, output), ...(timeoutMs ? { timeoutMs } : {}) });
+    return await moduleSupervisor(ports).deliver(resolved.module.id, resolved.module.activeHash, toolEvent(resolved, args, now, origin.caller, { id: rowId, key: key ?? null, attempt: 1, chain: path, ...(isAgentContextEntry(ports, origin) ? {executionRunId:origin.run!.executionRunId} : {}) }), { chain, path, ...(privateTransport ? { private: true } : {}), beforeDelivery: targetFence(ports, origin.workspaceId, resolved, origin.caller), ...(activationId !== undefined ? { activationId } : {}), validateResult: output => moduleOutputError(target, resolved.tool, output), ...(timeoutMs ? { timeoutMs } : {}) });
   } catch (error) {
+    // Supervisor activation checks can reject before its callback fence runs. Classify a version switch as conflict too.
+    if (stageOf(error) === "unavailable") {
+      const current = await ports.db.module.findFirst({ where: { workspaceId: origin.workspaceId, name: resolved.module.name }, select: { id: true, activeHash: true } });
+      if (!current || current.id !== resolved.module.id || current.activeHash !== resolved.module.activeHash) {
+        error = Object.assign(new CallError("conflict", "Target activation changed before delivery"), { stage: "unavailable" });
+      }
+    }
     const code = deliveryErrorCode(error), detail = privateTransport ? "Private operation failed" : message(error);
     await finish({ status: code === "unknown" ? "unknown" : "failed", error: `${publicCallError(code)}: ${detail}`, errorCode: publicCallError(code), errorReason: publicCallReason((error as { reason?: string }).reason ?? code) ?? null });
     throw new CallError(publicCallError(code), code === "unknown" ? `${target}: outcome unknown (${detail})` : `${target}: ${detail}`, publicCallReason((error as { reason?: string }).reason ?? code));
@@ -153,6 +160,7 @@ async function invokeModuleSync({ ports, origin, resolved, target, args, chain, 
 }
 async function validateSyncRoute(ports: StewardPorts, origin: CallOrigin, target: string, expectedTarget?: ExpectedModuleTarget) {
   const resolved = await resolveTarget(ports.db, origin.workspaceId, target);
+  if (expectedTarget?.hash !== undefined) assertExpectedTarget(resolved, expectedTarget);
   if (resolved instanceof CallError) throw resolved;
   if (!await admitted(ports.db, origin.caller, resolved.tool, origin.workspaceId)) throw new CallError("forbidden", `${target} does not accept calls from this caller`);
   assertExpectedTarget(resolved, expectedTarget);
@@ -195,7 +203,7 @@ function assertProviderHash(actual: string | null, expectedHash?: string) {
 function assertExpectedRequest(requested: RoutedTarget, expected?: ExpectedModuleTarget) {
   if (typeof requested !== "string" && expected && requested.moduleId !== expected.moduleId) throw new CallError("conflict", "Target and expected identity differ");
 }
-/** Private transport and exact version fences are internal kernel options, absent from the SDK wire. */
+/** Private Provider transport/expectedHash remain kernel-only; routed expectedTarget is public. */
 export async function callSync(ports: StewardPorts, origin: CallOrigin, requestedTarget: RoutedTarget, raw: unknown, { timeoutMs, expectedTarget, key, private: privateTransport = false, expectedHash }: { timeoutMs?: number; expectedTarget?: ExpectedModuleTarget; key?: string; private?: boolean; expectedHash?: string } = {}) {
   assertPrivateTransport(origin, privateTransport, expectedHash);
   const digest = requestDigest({ args: raw, mode: "sync" });
@@ -250,11 +258,11 @@ export async function enqueueCall(input: EnqueueInput, options: EnqueueOptions):
     ? client.$transaction(tx => enqueueIn({ ...input, tx }, options))
     : enqueueIn(input, options);
 }
-function checkDuplicateTarget(binding: { targetModuleId: string | null; targetContractHash: string | null }, expectedTarget?: ExpectedModuleTarget) {
+function checkDuplicateTarget(binding: { targetModuleId: string | null; targetHash: string | null }, expectedTarget?: ExpectedModuleTarget) {
   if (!expectedTarget) return;
   const parsed = expectedModuleTargetSchema.safeParse(expectedTarget);
   if (!parsed.success) throw new CallError("invalid", "Invalid expected target identity");
-  if (binding.targetModuleId !== parsed.data.moduleId) throw new CallError("conflict", "Duplicate key belongs to a different registered target");
+  if (binding.targetModuleId !== parsed.data.moduleId || parsed.data.hash !== undefined && binding.targetHash !== parsed.data.hash) throw new CallError("conflict", "Duplicate key belongs to a different registered target or version");
 }
 function duplicateEnqueuedCall(existing: Row, origin: CallOrigin, digest: string, expectedTarget?: ExpectedModuleTarget): EnqueuedCall {
   if (existing.requestDigest !== digest) throw new CallError("conflict", "Call key was already used with different arguments");
@@ -276,7 +284,7 @@ async function enqueueIn({ tx, ports, origin, target: requestedTarget, raw }: En
   if (path.length >= MAX_CALL_DEPTH) throw new CallError("cycle", `Call path too deep (${path.join(" → ")})`);
   const args = resolved instanceof CallError ? raw : validArgs(resolved.tool, raw), now = ports.now();
   const row = await tx.moduleInvocation.create({ data: { workspaceId: origin.workspaceId, caller, ...callerIdentity(origin.caller),
-    target: name.module, targetIdentity: resolved instanceof CallError ? name.module : resolved.module.id, tool: name.tool, args: (args ?? {}) as Prisma.InputJsonValue, key, requestDigest: digest, chain: path, mode: "async", idempotent: resolved instanceof CallError ? false : resolved.tool.idempotent,
+    target: name.module, targetIdentity: resolved instanceof CallError ? name.module : resolved.module.id, targetHash: expectedTarget?.hash ?? null, tool: name.tool, args: (args ?? {}) as Prisma.InputJsonValue, key, requestDigest: digest, chain: path, mode: "async", idempotent: resolved instanceof CallError ? false : resolved.tool.idempotent,
     reply: reply && origin.caller.kind === "module", nextAttemptAt: now, createdAt: now } });
   await bindInvocationTarget(tx, { workspaceId: origin.workspaceId, callId: row.id, resolved, target });
   return { callId: row.id, status: "queued" as const, duplicate: false };
@@ -302,7 +310,7 @@ const backoff = (now: Date, attempts: number) => new Date(now.getTime() + Math.m
 async function deliverModuleRow({ ports, row, resolved, args, caller, path, now, settle, retryOrFail }: { ports: StewardPorts; row: Row; resolved: Target; args: Record<string, unknown>; caller: Caller; path: string[]; now: Date; settle: (data: Prisma.ModuleInvocationUpdateManyMutationInput) => Promise<unknown>; retryOrFail: (error: string) => Promise<unknown> }) {
   try {
     const activationId = (await currentModuleEvolution(ports.db, row.workspaceId, resolved.module.id, resolved.module.activeHash))?.activationId ?? null;
-    const reply = await moduleSupervisor(ports).deliver(resolved.module.id, resolved.module.activeHash, toolEvent(resolved, args, now, caller, { id: row.id, key: row.key, attempt: row.attempts, chain: path }), { chain: [], path, activationId, beforeDelivery: targetFence(ports, row.workspaceId, resolved, caller), validateResult: output => moduleOutputError(`${resolved.module.name}.${resolved.tool.name}`, resolved.tool, output) });
+    const reply = await moduleSupervisor(ports).deliver(resolved.module.id, resolved.module.activeHash, toolEvent(resolved, args, now, caller, { id: row.id, key: row.key, attempt: row.attempts, chain: path, ...(row.runId ? {executionRunId:row.runId} : {}) }), { chain: [], path, activationId, beforeDelivery: targetFence(ports, row.workspaceId, resolved, caller), validateResult: output => moduleOutputError(`${resolved.module.name}.${resolved.tool.name}`, resolved.tool, output) });
     const output = "result" in reply ? reply.result.result ?? null : null;
     try { checkModuleOutput(`${resolved.module.name}.${resolved.tool.name}`, resolved.tool, output); }
     catch (error) {
@@ -313,6 +321,11 @@ async function deliverModuleRow({ ports, row, resolved, args, caller, path, now,
     return settle({ status: "succeeded", output: output as Prisma.InputJsonValue, error: null, finishedAt: ports.now() });
   } catch (error) {
     const stage = stageOf(error);
+    if (stage === "unavailable" && row.targetHash !== null) {
+      const current = await ports.db.module.findFirst({ where: { workspaceId: row.workspaceId, name: row.target }, select: { id: true, activeHash: true } });
+      if (!current || current.id !== row.targetModuleId || current.activeHash !== row.targetHash) return settle({ status: "failed", error: "conflict: queued target version changed before delivery", errorCode: "conflict", finishedAt: ports.now() });
+    }
+    if (stage === "unavailable" && error instanceof CallError && error.code === "conflict") return settle({ status: "failed", error: `conflict: ${message(error)}`, errorCode: "conflict", finishedAt: ports.now() });
     if (stage === "unavailable") return retryOrFail(message(error));
     if (stage === "handler") return settle({ status: "failed", error: message(error), finishedAt: ports.now() });
     // Sent but no answer: the target may have acted. Only an idempotent target is asked again.
@@ -339,10 +352,15 @@ async function deliverRow(ports: StewardPorts, row: Row, token: string) {
   let resolved: Target, caller: Caller, args: Record<string, unknown>;
   try {
     const target = `${row.target}.${row.tool}`, candidate = await resolveTarget(db, row.workspaceId, target);
+    // A removed tool must not hide a changed pinned activation behind not_found/unavailable retries.
+    if (candidate instanceof CallError && row.targetHash !== null) {
+      const current = await db.module.findFirst({ where: { workspaceId: row.workspaceId, name: row.target }, select: { id: true, activeHash: true } });
+      if (!current || current.id !== row.targetModuleId || current.activeHash !== row.targetHash) return settle({ status: "failed", error: "conflict: queued target version changed", errorCode: "conflict", finishedAt: now });
+    }
     // Not there yet (e.g. a built-in still building) or paused: it never got the call, so trying later is safe.
     if (candidate instanceof CallError) return candidate.code === "unavailable" || candidate.code === "not_found" ? retryOrFail(candidate.message) : settle({ status: "failed", error: candidate.message, finishedAt: now });
     resolved = candidate;
-    if (!await checkInvocationTarget(ports, row, resolved)) return settle({ status: "failed", error: "conflict: queued callback target identity or contract changed; register again", finishedAt: now });
+    if (!await checkInvocationTarget(ports, row, resolved)) return settle({ status: "failed", error: "conflict: queued callback target identity or contract changed; register again", errorCode: "conflict", finishedAt: now });
     const callerModule = row.callerModuleId ? await db.module.findUnique({ where: { id: row.callerModuleId } }) : null;
     if (missingCaller(row, callerModule)) return settle({ status: "failed", error: "forbidden: original caller no longer exists", finishedAt: now });
     caller = originOf(row, callerModule);

@@ -4,7 +4,7 @@ import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { assertExternalModule, moduleIdentity } from "./module-identity";
 import { moduleUpstream } from "./module-upstream";
 import { moduleUpstreamRequestSchema } from "@chrona/contracts/steward";
-import { installExternal, externalPackageCatalog, refreshInstallationReceipts } from "./module-install";
+import { installExternal, externalPackageCatalog, refreshInstallationReceipts, rejectionSummary } from "./module-install";
 import { moduleSupervisor } from "./module-supervisor";
 import type { StewardPorts } from "./ports";
 import type { ApprovedAction } from "./ports";
@@ -109,7 +109,8 @@ async function list(context: ModuleContext) {
       health: await moduleHealthSummary(context.ports, workspaceId, row, active),
       versions: versions.map(({ report, ...version }) => {
         const metadata = z.object({ errors: z.array(z.string()).optional(), git: z.object({ commit: z.string().regex(/^[a-f0-9]{40}$/), tree: z.string().regex(/^[a-f0-9]{40}$/) }).optional() }).safeParse(report).data;
-        return { ...version, errors: metadata?.errors?.slice(0, 5).map(error => diagnosticText(error, 300).slice(0, 300)) ?? null, git: metadata?.git ?? null };
+        const errors = metadata?.errors?.length ? metadata.errors : metadata && version.status === "rejected" ? [rejectionSummary(report)] : null;
+        return { ...version, errors: errors?.slice(0, 5).map(error => diagnosticText(error, 300).slice(0, 300)) ?? null, git: metadata?.git ?? null };
       }),
       runs: runs.map(run => ({ ...run, error: run.error === null ? null : diagnosticText(run.error, 1000).slice(0, 1000) })),
     };

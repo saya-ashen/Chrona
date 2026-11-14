@@ -41,7 +41,7 @@ async function fixture() {
   cleanups.push(async () => { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "p0" } });
   const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-11-05T00:00:00Z"), publicUrl: null, moduleBuiltinResources: join(dataDir, "builtin"), moduleExternalResources: join(dataDir, "external") };
-  for (const [root, names] of [[ports.moduleBuiltinResources!, BUILTIN_MODULE_NAMES], [ports.moduleExternalResources!, [...PREINSTALLED_MODULE_NAMES, "memory-local"]]] as const) {
+  for (const [root, names] of [[ports.moduleBuiltinResources!, BUILTIN_MODULE_NAMES], [ports.moduleExternalResources!, [...PREINSTALLED_MODULE_NAMES, "qq", "memory-local"]]] as const) {
     for (const name of names) {
       const dir = join(root, name); await mkdir(dir, { recursive: true });
       await writeFile(join(dir, "module.json"), JSON.stringify(moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [] })));
@@ -106,7 +106,7 @@ test("install is bounded, idempotent and explicit; uncertain receipts do not exe
   expect(calls).toBe(1);
   expect(moduleInstallRequestSchema.safeParse({ ...fixtures.install, dir: "/private" }).success).toBe(false);
   expect(moduleInstallRequestSchema.safeParse({ ...fixtures.install, package: "web" }).success).toBe(true);
-  expect((await externalPackageCatalog(f.ports, f.workspaceId)).map(item => item.name)).toEqual(["pi", "web", "notify", "qq", "author", "mind", "memory-local", "coding", "coding-web", "mcp", "files", "events", "remind", "remote-execution"]);
+  expect((await externalPackageCatalog(f.ports, f.workspaceId)).map(item => item.name)).toEqual(["pi", "web", "notify", "author", "mind", "chat", "qq", "memory-local", "coding", "coding-web", "mcp", "files", "events", "remind", "remote-execution"]);
   // Other packages' history cannot push this package out of a global latest-N window.
   await f.db.moduleInstallation.createMany({ data: Array.from({ length: 205 }, (_, i) => ({ id: `noise-${i}`, workspaceId: f.workspaceId, package: "mind", mode: "install", requestKey: `noise-${i}`, status: "failed" })) });
   expect((await externalPackageCatalog(f.ports, f.workspaceId)).find(item => item.name === "qq")?.installation).toMatchObject({ requestKey: fixtures.install.requestKey, status: "failed" });
@@ -122,7 +122,9 @@ test("initialization persists once, serializes concurrent starts and never resur
     return { package: request.package, requestKey: request.requestKey, status: "installed", moduleId: row.id, hash: release.hash, approvalId: null, error: null };
   };
   const [a, b] = await Promise.all([ensureWorkspaceInitialized(f.ports, f.workspaceId), ensureWorkspaceInitialized(f.ports, f.workspaceId)]);
-  expect(a).toEqual(b); expect(a.status).toBe("complete"); expect(calls).toBe(PREINSTALLED_MODULE_NAMES.length);
+  expect(a).toEqual(b); expect(a.status).toBe("complete"); expect(calls).toBe(6);
+  expect((await f.db.module.findMany({ orderBy: { name: "asc" }, select: { name: true } })).map(module => module.name)).toEqual(["author", "chat", "mind", "notify", "pi", "web"]);
+  expect(Object.keys(a.packages)).not.toContain("qq");
   await f.db.module.deleteMany({ where: { workspaceId: f.workspaceId, name: "pi" } });
   expect((await ensureWorkspaceInitialized({ ...f.ports }, f.workspaceId)).status).toBe("complete");
   expect(calls).toBe(PREINSTALLED_MODULE_NAMES.length);
@@ -137,7 +139,7 @@ test("failed initialization requires explicit retry; interrupted requests keep t
   expect(first.status).toBe("pending"); expect(calls).toBe(PREINSTALLED_MODULE_NAMES.length);
   await ensureWorkspaceInitialized(f.ports, f.workspaceId); expect(calls).toBe(PREINSTALLED_MODULE_NAMES.length);
   const retry = await ensureWorkspaceInitialized(f.ports, f.workspaceId, { retryFailed: true });
-  expect(calls).toBe(PREINSTALLED_MODULE_NAMES.length * 2); expect(retry.packages.qq.attempts).toBe(2);
+  expect(calls).toBe(PREINSTALLED_MODULE_NAMES.length * 2); expect(retry.packages.chat.attempts).toBe(2);
   const waiting = await installExternal({ ...f.ports, moduleExternalInstaller: async ({ request }) => { calls++; return { ...fixtures.unknownInstall, package: request.package, requestKey: request.requestKey }; } }, f.workspaceId, { package: "qq", mode: "install", requestKey: "interrupted" });
   expect(waiting.status).toBe("pending");
   await installExternal(f.ports, f.workspaceId, { package: "qq", mode: "install", requestKey: "interrupted" }); expect(calls).toBe(PREINSTALLED_MODULE_NAMES.length * 2 + 1);
@@ -269,7 +271,7 @@ test.each(["pi", "web", "notify", "other-entry"])("list and interface projection
   expect(await moduleInterfaces(f.ports, f.workspaceId, "modules")).toMatchObject({ origin: "kernel", capabilities: { build: false } });
   await expect(callSync(f.ports, { workspaceId: f.workspaceId, caller: { kind: "owner", via: null }, chain: [], path: [] }, "modules.catalog", {})).rejects.toMatchObject({ code: "not_found" });
   const catalog = await externalPackageCatalog(f.ports, f.workspaceId);
-  expect(catalog.map(item => item.name)).toEqual(["pi", "web", "notify", "qq", "author", "mind", "memory-local", "coding", "coding-web", "mcp", "files", "events", "remind", "remote-execution"]);
+  expect(catalog.map(item => item.name)).toEqual(["pi", "web", "notify", "author", "mind", "chat", "qq", "memory-local", "coding", "coding-web", "mcp", "files", "events", "remind", "remote-execution"]);
 });
 
 describe("ordinary Pi browser discovery", () => {

@@ -125,7 +125,8 @@ test("expectedTarget is an optional strict routed identity contract", () => {
   expect(moduleCallSchema.safeParse({ id: "fixture", method: "call", params }).success).toBe(true);
   const expectedTarget = { moduleId: "module-fixture" };
   expect(moduleCallSchema.safeParse({ id: "fixture", method: "call", params: { ...params, expectedTarget } }).success).toBe(true);
-  for (const expected of [{ ...expectedTarget, extra: true }, { ...expectedTarget, moduleId: "" }]) {
+  expect(moduleCallSchema.safeParse({ id: "fixture", method: "call", params: { ...params, expectedTarget: { ...expectedTarget, hash: "v1" } } }).success).toBe(true);
+  for (const expected of [{ ...expectedTarget, extra: true }, { ...expectedTarget, moduleId: "" }, { ...expectedTarget, hash: "" }, { ...expectedTarget, hash: null }, { ...expectedTarget, hash: 1 }, { hash: "v1" }, { ...expectedTarget, expectedHash: "v1" }]) {
     expect(moduleCallSchema.safeParse({ id: "fixture", method: "call", params: { ...params, expectedTarget: expected } }).success).toBe(false);
   }
 });
@@ -690,4 +691,128 @@ test("ordinary async calls reject absent Notify and other absent apps before que
   }, beta: async () => ({}) });
   expect(output(await f.fire())).toEqual({ errors: ["not_found", "not_found"] });
   expect(await f.db.moduleInvocation.count()).toBe(0);
+});
+
+async function betaV2(f: Awaited<ReturnType<typeof fixture>>) {
+  const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.beta.id, hash: "beta-v1" } } });
+  await f.db.moduleVersion.create({ data: { moduleId: f.beta.id, hash: "beta-v2", manifest: version.manifest!, source: "user", intent: {}, report: {}, status: "approved" } });
+}
+
+test("reviewed hash rejects a version changed since the prior read before any tool dispatch", async () => {
+  const hashes: string[] = [];
+  const f = await fixture({ alpha: async () => ({}), beta: async (_event, _call, input) => { hashes.push(input.codeDir.split("/").at(-1)!); return { result: "approved" }; } });
+  const reviewed = await f.db.module.findUniqueOrThrow({ where: { id: f.beta.id } });
+  const expectedTarget = { moduleId: reviewed.id, hash: reviewed.activeHash! }, origin = kernelOrigin(f.workspace.id);
+  await betaV2(f);
+  await f.db.module.update({ where: { id: f.beta.id }, data: { activeHash: "beta-v2" } });
+  await expect(callSync(f.ports, origin, { moduleId: f.beta.id, tool: "echo" }, {}, { expectedTarget })).rejects.toMatchObject({ code: "conflict" });
+  await expect(enqueueCall({ tx: f.db, ports: f.ports, origin, target: "beta.echo", raw: {} }, { key: "reviewed", expectedTarget })).rejects.toMatchObject({ code: "conflict" });
+  expect(hashes).toEqual([]);
+  expect(await f.db.moduleInvocation.count()).toBe(0);
+  await f.db.module.update({ where: { id: f.beta.id }, data: { activeHash: "beta-v1" } });
+  const result = await callSync(f.ports, origin, "beta.echo", {}, { expectedTarget, key: "reviewed-sync" });
+  expect(result.output).toBe("approved");
+  expect(hashes).toEqual(["beta-v1"]);
+  expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: result.callId } })).toMatchObject({ targetModuleId: reviewed.id, targetHash: "beta-v1" });
+});
+
+test("dispatch fence rejects a hash switch after resolution and allows A to B to A only on resolved A", async () => {
+  for (const restore of [false, true]) {
+    const hashes: string[] = [];
+    const f = await fixture({ alpha: async () => ({}), beta: async (_event, _call, input) => { hashes.push(input.codeDir.split("/").at(-1)!); return { result: "A" }; } });
+    await betaV2(f);
+    // Warm the real supervisor so the hook below occurs in beforeDelivery, after its activation check.
+    await moduleSupervisor(f.ports).deliver(f.beta.id, "beta-v1", { ...startEvent, trigger: { ...startEvent.trigger, id: "echo" } });
+    hashes.length = 0;
+    let reads = 0;
+    f.ports.db = f.db.$extends({ query: { module: { async findFirst({ args, query }) {
+      // Keyless route resolution is the first name read. The second is the real beforeDelivery fence.
+      // Change activation BEFORE the query so the fence observes the new state, not an old snapshot.
+      if (args.where?.name === "beta" && ++reads === 2) {
+        await f.db.module.update({ where: { id: f.beta.id }, data: { activeHash: "beta-v2" } });
+        if (restore) await f.db.module.update({ where: { id: f.beta.id }, data: { activeHash: "beta-v1" } });
+      }
+      return query(args);
+    } } } }) as typeof f.db;
+    const result = callSync(f.ports, kernelOrigin(f.workspace.id), "beta.echo", {}, { expectedTarget: { moduleId: f.beta.id, hash: "beta-v1" } });
+    if (restore) {
+      const receipt = await result;
+      expect(receipt.output).toBe("A");
+      expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: receipt.callId } })).toMatchObject({ targetModuleId: f.beta.id, targetHash: "beta-v1" });
+      expect(hashes).toEqual(["beta-v1"]);
+    } else {
+      await expect(result).rejects.toMatchObject({ code: "conflict" });
+      expect(hashes).toEqual([]);
+    }
+    expect(reads).toBeGreaterThanOrEqual(2);
+  }
+});
+
+test("async pinned command preserves its hash and original replay across activation changes", async () => {
+  let calls = 0;
+  const f = await fixture({ alpha: async () => ({}), beta: async () => { calls++; return { result: "original" }; } });
+  await betaV2(f);
+  const origin = kernelOrigin(f.workspace.id), expectedTarget = { moduleId: f.beta.id, hash: "beta-v1" };
+  const input = { tx: f.db, ports: f.ports, origin, target: "beta.again", raw: { text: "original" } };
+  const options = { key: "pinned-replay", expectedTarget };
+  const queued = await enqueueCall(input, options);
+  await f.db.module.update({ where: { id: f.beta.id }, data: { activeHash: "beta-v2" } });
+  expect(await enqueueCall(input, options)).toMatchObject({ callId: queued.callId, duplicate: true });
+  await expect(enqueueCall(input, { ...options, expectedTarget: { ...expectedTarget, hash: "beta-v2" } })).rejects.toMatchObject({ code: "conflict" });
+  await expect(enqueueCall({ ...input, raw: { text: "changed" } }, options)).rejects.toMatchObject({ code: "conflict" });
+  await runDueCalls(f.ports, f.workspace.id);
+  expect(await callStatus(f.ports, origin, queued.callId)).toMatchObject({ status: "failed", error: expect.stringContaining("conflict") });
+  expect(calls).toBe(0);
+  // A fresh command may execute once A returns; later replay returns its original result even with B active.
+  await f.db.module.update({ where: { id: f.beta.id }, data: { activeHash: "beta-v1" } });
+  const second = await enqueueCall(input, { ...options, key: "pinned-success" });
+  await runDueCalls(f.ports, f.workspace.id);
+  await f.db.module.update({ where: { id: f.beta.id }, data: { activeHash: "beta-v2" } });
+  expect(await enqueueCall(input, { ...options, key: "pinned-success" })).toMatchObject({ callId: second.callId, duplicate: true });
+  expect(await callStatus(f.ports, origin, second.callId)).toMatchObject({ status: "succeeded", output: "original" });
+  await runDueCalls(f.ports, f.workspace.id);
+  expect(calls).toBe(1);
+});
+
+test("pinned calls report conflict when the replacement version removes the tool", async () => {
+  let calls = 0;
+  const f = await fixture({ alpha: async () => ({}), beta: async () => { calls++; return { result: "A" }; } });
+  const origin = kernelOrigin(f.workspace.id), expectedTarget = { moduleId: f.beta.id, hash: "beta-v1" };
+  const queued = await enqueueCall({ tx: f.db, ports: f.ports, origin, target: "beta.echo", raw: {} }, { key: "removed-tool", expectedTarget });
+  const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.beta.id, hash: "beta-v1" } } });
+  const manifest = moduleManifestSchema.parse(version.manifest);
+  manifest.tools = manifest.tools.filter(tool => tool.name !== "echo");
+  await f.db.moduleVersion.create({ data: { moduleId: f.beta.id, hash: "beta-v2", manifest, source: "user", intent: {}, report: {}, status: "approved" } });
+  await f.db.module.update({ where: { id: f.beta.id }, data: { activeHash: "beta-v2" } });
+  await expect(callSync(f.ports, origin, "beta.echo", {}, { expectedTarget })).rejects.toMatchObject({ code: "conflict" });
+  await runDueCalls(f.ports, f.workspace.id);
+  expect(await callStatus(f.ports, origin, queued.callId)).toMatchObject({ status: "failed", error: expect.stringContaining("conflict") });
+  expect(calls).toBe(0);
+});
+
+test("pinned sync replay keeps the original result after upgrade and rejects rebinding its key", async () => {
+  let calls = 0;
+  const f = await fixture({ alpha: async () => ({}), beta: async () => { calls++; return { result: "A" }; } });
+  const origin = kernelOrigin(f.workspace.id), expectedTarget = { moduleId: f.beta.id, hash: "beta-v1" };
+  const options = { key: "original-sync", expectedTarget };
+  const original = await callSync(f.ports, origin, "beta.echo", {}, options);
+  await betaV2(f);
+  await f.db.module.update({ where: { id: f.beta.id }, data: { activeHash: "beta-v2" } });
+  expect(await callSync(f.ports, origin, "beta.echo", {}, options)).toEqual(original);
+  await expect(callSync(f.ports, origin, "beta.echo", {}, { ...options, expectedTarget: { ...expectedTarget, hash: "beta-v2" } })).rejects.toMatchObject({ code: "conflict" });
+  expect(calls).toBe(1);
+});
+
+test("moduleId-only commands remain unpinned and can use a newer active version", async () => {
+  const hashes: string[] = [];
+  const f = await fixture({ alpha: async () => ({}), beta: async (_event, _call, input) => { hashes.push(input.codeDir.split("/").at(-1)!); return { result: "compatible" }; } });
+  const origin = kernelOrigin(f.workspace.id), expectedTarget = { moduleId: f.beta.id };
+  const queued = await enqueueCall({ tx: f.db, ports: f.ports, origin, target: "beta.echo", raw: {} }, { key: "identity-only", expectedTarget });
+  expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: queued.callId } })).toMatchObject({ targetHash: null });
+  await betaV2(f);
+  await f.db.module.update({ where: { id: f.beta.id }, data: { activeHash: "beta-v2" } });
+  await runDueCalls(f.ports, f.workspace.id);
+  expect(await callStatus(f.ports, origin, queued.callId)).toMatchObject({ status: "succeeded", output: "compatible" });
+  expect((await callSync(f.ports, origin, "beta.echo", {}, { expectedTarget })).output).toBe("compatible");
+  expect(hashes).toEqual(["beta-v2", "beta-v2"]);
 });

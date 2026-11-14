@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const MODULE_MATERIAL_FILE = "chrona-material.json";
 export const MODULE_SOURCE_MAX_FILES = 200;
-export const MODULE_SOURCE_MAX_BYTES = 1024 * 1024;
+export const MODULE_SOURCE_MAX_BYTES = 2 * 1024 * 1024;
 export const MODULE_ARTIFACT_MAX_FILES = 1000;
 export const MODULE_ARTIFACT_MAX_FILE_BYTES = 64 * 1024 * 1024;
 export const MODULE_ARTIFACT_MAX_BYTES = 256 * 1024 * 1024;

@@ -47,3 +47,30 @@ test("server host with real SQLite verifies stop/holds and removes only owned in
     expect(result.state).toBe("removed"); expect(existsSync(prepared.cwd)).toBe(false); expect(existsSync(f.project.root)).toBe(true); expect(await f.cleanup.cleanup(f.principal, input)).toEqual(result);
   } finally { await f.db.$disconnect(); }
 });
+
+test("admitted cleanup verifies and settles across a fence, retaining exact replay while rejecting fresh cleanup", async () => {
+  const f = await setup();
+  try {
+    const module = await f.db.module.create({ data: { workspaceId: f.principal.workspaceId, name: "cleanup-owner", activeHash: "original" } });
+    const principal: ExecutionPrincipal = { ...f.principal, caller: { kind: "module", moduleId: module.id, hash: "original" } };
+    await f.db.executionAttempt.update({ where: { id: f.a.id }, data: { moduleId: module.id, callerHash: "original", callerKey: `module:${module.id}` } });
+    let calls = 0;
+    const cleanup = createExecutionWorkspaceCleanup(f.ports, async (request, input, verify) => {
+      calls++;
+      await f.db.module.update({ where: { id: module.id }, data: { executionFenceAt: f.ports.now() } });
+      const { assertExecutionModuleIdle } = await import("./execution-module-guard");
+      await expect(f.db.$transaction(tx => assertExecutionModuleIdle(tx, module.id))).rejects.toMatchObject({ code: "conflict" });
+      await verify();
+      return { workId: input.workId, workspaceRef: request.workspaceRef, state: "removed", reason: "Confirmed synthetic cleanup", previewDigest: null };
+    });
+    const input = { action: "preview" as const, workId: "work", commandKey: "admitted-cleanup" };
+    const result = await cleanup.cleanup(principal, input);
+    expect(await cleanup.cleanup(principal, input)).toEqual(result);
+    expect(calls).toBe(1);
+    await expect(cleanup.cleanup(principal, { ...input, commandKey: "fresh-cleanup" })).rejects.toMatchObject({ code: "forbidden" });
+    const { assertExecutionModuleIdle } = await import("./execution-module-guard");
+    await f.db.$transaction(tx => assertExecutionModuleIdle(tx, module.id));
+    await f.db.module.update({ where: { id: module.id }, data: { activeHash: "replacement" } });
+    await expect(cleanup.cleanup(principal, input)).rejects.toMatchObject({ code: "forbidden" });
+  } finally { await f.db.$disconnect(); }
+});

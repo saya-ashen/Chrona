@@ -40,15 +40,15 @@ async function fixture() {
   return { ports, db, workspaceId: w.id, resource, executions: () => executions };
 }
 
-test("catalog reports missing releases and paused products unavailable and keeps Author in the current preinstalls", async () => {
+test("catalog reports missing releases and paused products unavailable with exactly six current preinstalls", async () => {
   const f = await fixture();
   const catalog = await externalPackageCatalog(f.ports, f.workspaceId);
   for (const name of ["coding", "mind", "remind"]) expect(catalog.find(item => item.name === name)).toMatchObject({ available: false, releaseHash: null, moduleId: null });
-  expect(new Set(PREINSTALLED_MODULE_NAMES.filter(name => !isModulePaused(name)))).toEqual(new Set(["pi", "web", "notify", "qq", "author", "mind"]));
+  expect(new Set(PREINSTALLED_MODULE_NAMES.filter(name => !isModulePaused(name)))).toEqual(new Set(["pi", "web", "notify", "author", "mind", "chat"]));
   expect(await f.db.module.count()).toBe(0);
 });
 
-test.each(["files", "events", "remote-execution"] as const)("optional %s installs, stays removed on restart and explicitly reinstalls through checks", async name => {
+test.each(["qq", "files", "events", "remote-execution"] as const)("optional %s installs, stays removed on restart and explicitly reinstalls through checks", async name => {
   const f = await fixture(); await f.resource(name, name === "files" ? { uses: ["*"] } : {});
   await f.db.module.createMany({ data: PREINSTALLED_MODULE_NAMES.map(name => ({ workspaceId: f.workspaceId, name })) });
   await ensureWorkspaceInitialized(f.ports, f.workspaceId);
@@ -238,15 +238,19 @@ test("rejected official update emits one lifecycle notice with its cause and ret
   expect(await f.db.module.findUniqueOrThrow({ where: { id: first.moduleId! } })).toMatchObject({ activeHash: first.hash });
 });
 
-test("initialization converges from the existing build queue and never reinstalls removed preinstalls", async () => {
+test("initialization activates all six checked releases including owner apps without first approval and never reinstalls removals", async () => {
   const f = await fixture();
-  for (const name of PREINSTALLED_MODULE_NAMES) await f.resource(name);
+  await f.resource("qq");
+  for (const name of PREINSTALLED_MODULE_NAMES) await f.resource(name, ["web", "chat"].includes(name) ? { authority: "owner" } : {});
   const first = await ensureWorkspaceInitialized(f.ports, f.workspaceId);
   expect(first.status).toBe("pending");
   expect(await factConsumer(f.db, f.workspaceId)).toMatchObject({ moduleId: null, revision: "unselected" });
   expect(new Set(Object.keys(first.packages))).toEqual(new Set([...PREINSTALLED_MODULE_NAMES, "remind"]));
   for (const name of PREINSTALLED_MODULE_NAMES) expect(first.packages[name].status).toBe("building");
   expect(first.packages.mind).toMatchObject({ status: "building", error: null });
+  expect(first.packages.chat).toMatchObject({ status: "building", error: null });
+  expect(Object.keys(first.packages)).not.toContain("qq");
+  expect((await f.db.module.findMany({ orderBy: { name: "asc" }, select: { name: true } })).map(module => module.name)).toEqual(["author", "chat", "mind", "notify", "pi", "web"]);
   expect(first.packages.remind).toMatchObject({ status: "skipped", moduleId: null, hash: null, error: { reason: "module_paused" } });
   const authorRelease = await resolveExternalRelease(f.ports, "author");
   expect(first.packages.author).toMatchObject({ requestKey: "initialize:v1:author:1", attempts: 1, hash: authorRelease.hash });
@@ -255,19 +259,28 @@ test("initialization converges from the existing build queue and never reinstall
   expect(f.executions()).toBe(0);
   await buildPending(moduleContext(f.ports, f.workspaceId));
   await buildPending(moduleContext(f.ports, f.workspaceId));
-  expect((await ensureWorkspaceInitialized(f.ports, f.workspaceId)).status).toBe("complete");
+  const complete = await ensureWorkspaceInitialized(f.ports, f.workspaceId);
+  expect(complete.status).toBe("complete");
+  for (const name of PREINSTALLED_MODULE_NAMES) {
+    const installed = complete.packages[name];
+    expect(installed).toMatchObject({ status: "installed", approvalId: null });
+    expect(await f.db.module.findUniqueOrThrow({ where: { id: installed.moduleId! } })).toMatchObject({ activeHash: installed.hash, status: "active", builtin: false });
+    expect(await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: installed.moduleId!, hash: installed.hash! } } })).toMatchObject({ status: "approved" });
+  }
+  expect(await f.db.approval.count()).toBe(0);
+  expect(f.executions()).toBeGreaterThan(0);
   const selected = await factConsumer(f.db, f.workspaceId);
   expect(selected.moduleId).toBe(first.packages.notify.moduleId);
   await ensureWorkspaceInitialized(f.ports, f.workspaceId);
   expect(await factConsumer(f.db, f.workspaceId)).toEqual(selected);
-  await f.db.module.delete({ where: { id: first.packages.qq.moduleId! } });
-  await f.resource("qq", { description: "New release is explicit" });
+  await f.db.module.delete({ where: { id: first.packages.chat.moduleId! } });
+  await f.resource("chat", { description: "New release is explicit" });
   expect((await ensureWorkspaceInitialized(f.ports, f.workspaceId)).status).toBe("complete");
-  expect(await f.db.module.findFirst({ where: { name: "qq" } })).toBeNull();
-  expect((await externalPackageCatalog(f.ports, f.workspaceId)).find(p => p.name === "qq")?.installation).toMatchObject({ requestKey: first.packages.qq.requestKey });
+  expect(await f.db.module.findFirst({ where: { name: "chat" } })).toBeNull();
+  expect((await externalPackageCatalog(f.ports, f.workspaceId)).find(p => p.name === "chat")?.installation).toMatchObject({ requestKey: first.packages.chat.requestKey });
 });
 
-test.each(["pi", "web", "notify", "author"] as const)("failed %s preinstall checks need explicit retry without reinstalling completed apps", async name => {
+test.each(["pi", "web", "notify", "author", "chat"] as const)("failed %s preinstall checks need explicit retry without reinstalling completed apps", async name => {
   const f = await fixture();
   for (const name of PREINSTALLED_MODULE_NAMES) await f.resource(name);
   await f.resource(name, { packages: ["fixture-missing-program"] });
@@ -276,7 +289,7 @@ test.each(["pi", "web", "notify", "author"] as const)("failed %s preinstall chec
   await buildPending(moduleContext(f.ports, f.workspaceId));
   const failed = await ensureWorkspaceInitialized(f.ports, f.workspaceId);
   expect(failed.packages[name].status).toBe("failed");
-  expect(failed.packages.qq.status).toBe("installed");
+  expect(failed.packages.mind.status).toBe("installed");
   expect(failed.status).toBe("pending");
   if (name === "notify") expect(await factConsumer(f.db, f.workspaceId)).toEqual({ moduleId: null, revision: "unselected" });
   expect((await ensureWorkspaceInitialized(f.ports, f.workspaceId)).packages[name].attempts).toBe(1);
@@ -284,7 +297,7 @@ test.each(["pi", "web", "notify", "author"] as const)("failed %s preinstall chec
   await f.resource(name);
   const retry = await ensureWorkspaceInitialized(f.ports, f.workspaceId, { retryFailed: true });
   expect(retry.packages[name]).toMatchObject({ attempts: 2, status: "building" });
-  expect(retry.packages.qq.requestKey).toBe(first.packages.qq.requestKey);
+  expect(retry.packages.mind.requestKey).toBe(first.packages.mind.requestKey);
   await buildPending(moduleContext(f.ports, f.workspaceId));
   await buildPending(moduleContext(f.ports, f.workspaceId));
   const complete = await ensureWorkspaceInitialized(f.ports, f.workspaceId);
@@ -318,18 +331,18 @@ test("a removed submission after a lost receipt is reconciled by its original id
   const f = await fixture();
   for (const name of PREINSTALLED_MODULE_NAMES) await f.resource(name);
   const first = await ensureWorkspaceInitialized(f.ports, f.workspaceId);
-  const requestKey = first.packages.qq.requestKey, moduleId = first.packages.qq.moduleId!;
+  const requestKey = first.packages.chat.requestKey, moduleId = first.packages.chat.moduleId!;
   const id = installationId(f.workspaceId, requestKey);
   await f.db.moduleInstallation.update({ where: { id }, data: { status: "pending", moduleId: null, hash: null, approvalId: null, errorCode: null, errorReason: null, errorMessage: null } });
   await f.db.module.delete({ where: { id: moduleId } });
   const settings = (await f.db.workspace.findUniqueOrThrow({ where: { id: f.workspaceId } })).settings as Record<string, unknown>;
   const state = JSON.parse(JSON.stringify(first));
-  state.packages.qq = { ...state.packages.qq, status: "pending", moduleId: null, hash: null };
+  state.packages.chat = { ...state.packages.chat, status: "pending", moduleId: null, hash: null };
   await f.db.workspace.update({ where: { id: f.workspaceId }, data: { settings: { ...settings, moduleInitialization: state } } });
   await ensureWorkspaceInitialized(f.ports, f.workspaceId);
   const recovered = await ensureWorkspaceInitialized(f.ports, f.workspaceId);
-  expect(recovered.packages.qq).toMatchObject({ status: "skipped", moduleId });
-  expect(await f.db.module.findFirst({ where: { name: "qq" } })).toBeNull();
+  expect(recovered.packages.chat).toMatchObject({ status: "skipped", moduleId });
+  expect(await f.db.module.findFirst({ where: { name: "chat" } })).toBeNull();
   expect(await f.db.moduleInstallationSubmission.count({ where: { id: `${id}:submission` } })).toBe(1);
 });
 
@@ -392,7 +405,7 @@ test("offline official update preserves a local fork and queues the merged commi
   expect(await installExternal(f.ports, f.workspaceId, request)).toEqual(result);
 });
 
-test.each(["pi", "web", "notify", "author"] as const)("preinstalled %s uses checks, stays removed after restart and explicitly reinstalls with a new identity", async name => {
+test.each(["pi", "web", "notify", "author", "chat"] as const)("preinstalled %s uses checks, stays removed after restart and explicitly reinstalls with a new identity", async name => {
   const f = await fixture();
   await f.resource(name, { uses: ["*"] });
   await f.db.module.createMany({ data: PREINSTALLED_MODULE_NAMES.filter(other => other !== name).map(other => ({ workspaceId: f.workspaceId, name: other })) });
@@ -434,4 +447,94 @@ test("corrupt persisted submission phase fails closed instead of inferring a suc
   await expect(installExternal(f.ports, f.workspaceId, request)).rejects.toThrow();
   expect(await f.db.moduleVersion.count()).toBe(1);
   expect((await f.db.moduleInstallation.findUniqueOrThrow({ where: { id } })).status).toBe("pending");
+});
+
+async function initialOwnerWeb() {
+  const f = await fixture();
+  await f.resource("web", { authority: "owner" });
+  await f.db.module.createMany({ data: PREINSTALLED_MODULE_NAMES.filter(name => name !== "web").map(name => ({ workspaceId: f.workspaceId, name })) });
+  const initial = await ensureWorkspaceInitialized(f.ports, f.workspaceId);
+  return { ...f, initial: initial.packages.web };
+}
+
+test.each(["web", "chat", "qq"] as const)("an initializer-shaped request key alone cannot approve an owner %s install", async name => {
+  const f = await fixture();
+  await f.resource(name, { authority: "owner" });
+  const request = { package: name, mode: "install" as const, requestKey: `initialize:v1:${name}:1` };
+  const candidate = await installExternal(f.ports, f.workspaceId, request);
+  await buildPending(moduleContext(f.ports, f.workspaceId));
+  await refreshInstallationReceipts(f.ports, f.workspaceId);
+  expect(await installExternal(f.ports, f.workspaceId, request)).toMatchObject({ status: "pending_approval", approvalId: expect.any(String) });
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: candidate.moduleId! } })).toMatchObject({ activeHash: null });
+});
+
+test.each(["user", "provider", "build"] as const)("a same-name %s candidate cannot acquire bootstrap authority from the bundled commit or intent", async source => {
+  const f = await fixture();
+  await f.resource("web", { authority: "owner" });
+  const release = await resolveExternalRelease(f.ports, "web");
+  const context = moduleContext(f.ports, f.workspaceId);
+  const candidate = await propose(context, { root: f.ports.moduleExternalResources!, dir: "web", sourceCommit: release.hash, gitBundle: release.git!, intent: { changes: [`Official installation ${installationId(f.workspaceId, "initialize:v1:web:1")}`] } }, source);
+  // Initialization preserves the preexisting same-name app, even with exact official bytes.
+  expect((await ensureWorkspaceInitialized(f.ports, f.workspaceId)).packages.web.status).toBe("skipped");
+  await buildPending(context);
+  expect(await f.db.moduleVersion.findFirstOrThrow({ where: { moduleId: candidate.moduleId! } })).toMatchObject({ hash: release.hash, status: "pending_review" });
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: candidate.moduleId! } })).toMatchObject({ activeHash: null });
+  expect(await f.db.approval.findFirstOrThrow({ where: { moduleId: candidate.moduleId! } })).toMatchObject({ status: "open" });
+});
+
+test("a later official owner release with new credentials still requires approval and retains the initial selection", async () => {
+  const f = await initialOwnerWeb(), context = moduleContext(f.ports, f.workspaceId);
+  await buildPending(context);
+  expect((await ensureWorkspaceInitialized(f.ports, f.workspaceId)).status).toBe("complete");
+  await f.resource("web", { authority: "owner", secrets: ["new_key"] });
+  const request = { package: "web" as const, mode: "update" as const, requestKey: "official-update" };
+  await installExternal(f.ports, f.workspaceId, request);
+  await buildPending(context);
+  await refreshInstallationReceipts(f.ports, f.workspaceId);
+  expect(await installExternal(f.ports, f.workspaceId, request)).toMatchObject({ status: "pending_approval", approvalId: expect.any(String) });
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.initial.moduleId! } })).toMatchObject({ activeHash: f.initial.hash });
+});
+
+test.each(["changed-pin", "corrupt-bundle"] as const)("a queued initial owner release falls back to approval after %s", async change => {
+  const f = await initialOwnerWeb();
+  if (change === "changed-pin") await f.resource("web", { authority: "owner", description: "Different bundled commit" });
+  else await writeFile(join(f.ports.dataDir, "module-git", "web.bundle"), "corrupt");
+  await buildPending(moduleContext(f.ports, f.workspaceId));
+  const state = await ensureWorkspaceInitialized(f.ports, f.workspaceId);
+  expect(state.packages.web).toMatchObject({ status: "pending_approval", hash: f.initial.hash, approvalId: expect.any(String) });
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.initial.moduleId! } })).toMatchObject({ activeHash: null });
+});
+
+test("failed privileged bootstrap checks never activate and an explicit second attempt still needs approval", async () => {
+  const f = await initialOwnerWeb(), context = moduleContext(f.ports, f.workspaceId);
+  f.ports.sandbox = testModuleSandbox(async () => ({ status: "failed", exitCode: 1, output: "", error: "Fixture tests failed" }));
+  await buildPending(context);
+  expect((await ensureWorkspaceInitialized(f.ports, f.workspaceId)).packages.web.status).toBe("failed");
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.initial.moduleId! } })).toMatchObject({ activeHash: null });
+  expect(await f.db.approval.count()).toBe(0);
+  f.ports.sandbox = testModuleSandbox(async () => ({ status: "succeeded", exitCode: 0, output: "{}", error: null }));
+  const retry = await ensureWorkspaceInitialized(f.ports, f.workspaceId, { retryFailed: true });
+  expect(retry.packages.web).toMatchObject({ requestKey: "initialize:v1:web:2", attempts: 2, status: "building" });
+  await buildPending(context);
+  expect((await ensureWorkspaceInitialized(f.ports, f.workspaceId)).packages.web).toMatchObject({ status: "pending_approval", approvalId: expect.any(String) });
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.initial.moduleId! } })).toMatchObject({ activeHash: null });
+});
+
+test("receipt refresh between successful checks and review does not strand a trusted initial owner release", async () => {
+  const f = await initialOwnerWeb();
+  let refreshed = false;
+  const db = f.db.$extends({ query: { moduleVersion: { async update({ args, query }) {
+    const result = await query(args);
+    if (args.data.status === "pending_review" && !refreshed) {
+      refreshed = true;
+      const state = await ensureWorkspaceInitialized(f.ports, f.workspaceId);
+      expect(state.packages.web).toMatchObject({ status: "pending_approval", approvalId: null });
+    }
+    return result;
+  } } } }) as StewardPorts["db"];
+  await buildPending(moduleContext({ ...f.ports, db }, f.workspaceId));
+  expect(refreshed).toBe(true);
+  expect((await ensureWorkspaceInitialized(f.ports, f.workspaceId)).packages.web).toMatchObject({ status: "installed", approvalId: null });
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.initial.moduleId! } })).toMatchObject({ activeHash: f.initial.hash });
+  expect(await f.db.approval.count()).toBe(0);
 });

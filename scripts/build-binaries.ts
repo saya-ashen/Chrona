@@ -73,7 +73,7 @@ export function compileArgs(target: BuildTargetName, binaryPath: string) {
 /** Generated contract files belong to the exact module commit shipped in its bundle. */
 export async function prepareReleaseModules(resourcesRoot: string) {
   await buildEntryConversations(resourcesRoot);
-  // Paused application sources are verified as retained materials, without regenerating their retired contracts.
+  // Prepare only current release applications; retained sources are pruned from staging after seed verification.
   await preparePiApplication(resourcesRoot);
   const seedDir = resolve(process.env.CHRONA_MODULE_GIT_SEEDS ?? resolve(ROOT, buildArtifacts.moduleGit.seedDir));
   await stageModuleGitLicense(resourcesRoot, resolve(ROOT, buildArtifacts.moduleGit.seedDir, "LICENSE"), resolve(ROOT, buildArtifacts.moduleGit.seedDir, "THIRD-PARTY-NOTICES.txt"));

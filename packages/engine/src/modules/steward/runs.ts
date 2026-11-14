@@ -64,11 +64,18 @@ export function createRuns(ports: StewardPorts, workspaceId: string) {
 }
 class RunService {
   constructor(private readonly ports: StewardPorts, private readonly workspaceId: string) {}
-  async enqueue(input: EnqueueRun, tx: Prisma.TransactionClient = this.ports.db) {
+  async enqueue(input: EnqueueRun, tx?: Prisma.TransactionClient): Promise<Prisma.RunGetPayload<Record<string, never>>> {
     const { ports, workspaceId } = this;
+    if (!tx) return ports.db.$transaction(writer => this.enqueue(input, writer));
+    await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${workspaceId}`;
     const session = input.sessionId ? await tx.session.findFirst({ where: { id: input.sessionId, workspaceId, status: "active" } }) : null;
     if (input.sessionId && !session) throw new StewardError("not_found", "Active session not found");
     if (!session) throw new StewardError("invalid", "Run requires a session");
+    if (session.source === "module") {
+      const module = session.moduleId ? await tx.module.findFirst({ where: { id: session.moduleId, workspaceId, status: "active", executionFenceAt: null }, select: { id: true, activeHash: true } }) : null;
+      const version = module?.activeHash ? await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } }, select: { status: true } }) : null;
+      if (version?.status !== "approved") throw new StewardError("forbidden", "Run session module is no longer approved and active for new work");
+    }
     const cwd = join(ports.dataDir, "sessions", session.id);
     await mkdir(cwd, { recursive: true });
     // The clock may tie or move backwards; builds still enter FIFO in admission order.

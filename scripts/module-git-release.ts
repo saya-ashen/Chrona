@@ -218,6 +218,11 @@ export async function copyModuleGitRelease(seedDir: string, resourcesRoot: strin
     if (resolve(bundlePath) !== resolve(target, entry.bundle)) await cp(bundlePath, join(target, entry.bundle));
   }
   await writeJson(join(target, "lock.json"), lock);
+  // The distribution contains fixed snapshots only, including when Docker stages in place.
+  const shipped = new Set(["lock.json", "LICENSE", "THIRD-PARTY-NOTICES.txt", ...lock.modules.map(entry => entry.bundle)]);
+  for (const entry of await readdir(target)) {
+    if (!shipped.has(entry)) await rm(join(target, entry), { recursive: true, force: true });
+  }
   return lock;
 }
 

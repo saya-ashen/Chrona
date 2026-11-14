@@ -19,7 +19,7 @@ Chrona 是单一 owner 的个人工具：用户自然交流，Agent 选择方法
 
 当前公开目标为 `modules / approvals / settings / secrets / activity / timers / agent`。通用 Agent 七工具归 kernel，具体执行委托给绑定的已登记 Provider；不存在公开 schedules、projects、history、chat、provider、executions、content 或 memory。完整工具清单在[API 规范](kernel-api-design.md)维护；源码和生成合同确定实际可调用面。
 
-Web、Notify、QQ、Author、Pi、Mind 是普通默认预装应用；可选应用通过受控生命周期安装。初始化不覆盖已有选择、不自动补装删除应用。Remind 仍暂停并保留材料；Mind 默认开启后台照看、默认不推送（仅网页），Editor 已退役。具体适配和验收见[普通应用迁移](application-migration.md)，Mind 的本地部署及版本限制见[实施记录](mind-implementation.md)。
+默认预装普通应用为 Pi、Web、Notify、Author、Mind、Chat；QQ 随发行提供，通过受控生命周期按需安装。当前发行只包含这七个应用的源码和 Git 种子；其他保留源码的应用不进入发行资源，旧目录条目缺少资源时报告不可用。初始化不覆盖已有选择、不自动补装删除应用。Remind 仍暂停并保留材料；Mind 默认开启后台照看、默认不推送（仅网页），Editor 已退役。具体适配和验收见[普通应用迁移](application-migration.md)，Mind 的本地部署及版本限制见[实施记录](mind-implementation.md)。
 
 ## 3. 调用、执行与恢复
 

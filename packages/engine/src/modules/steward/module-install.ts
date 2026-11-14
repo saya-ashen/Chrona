@@ -6,12 +6,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { redactSensitiveText } from "@chrona/logging/redaction";
 import { recordModuleUpstream, submitMergedCommit } from "./module-upstream";
-import { moduleContext } from "./module-context";
+import { moduleContext, type ModuleContext, type ModuleVersion } from "./module-context";
 import { verifyModuleGitBundle } from "./module-git-upstream";
 import { propose } from "./module-proposal";
 import { moduleSourceFiles, storeModuleArtifacts } from "./module-artifacts";
 import { checkoutModule } from "./module-files";
-import { moduleInstallRequestSchema, moduleInstallResultSchema, OFFICIAL_EXTERNAL_MODULE_NAMES, type ModuleInstallRequest, type ModuleInstallResult } from "@chrona/contracts/steward";
+import { moduleInitializationStateSchema, moduleInstallRequestSchema, moduleInstallResultSchema, OFFICIAL_EXTERNAL_MODULE_NAMES, PREINSTALLED_MODULE_NAMES, type ModuleInstallRequest, type ModuleInstallResult } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import type { ExternalModuleInstaller } from "./module-install-types";
 import { readReleaseMaterial, resolveExternalRelease, type ModuleRelease } from "./module-release";
@@ -19,19 +19,16 @@ import { assertExternalName } from "./module-identity";
 import { parseInput, StewardError } from "./errors";
 import { isModulePaused, ModuleUnavailableError } from "./module-availability";
 import { rejectedUpdateNotice } from "./module-activation-notice";
+import { diagnosticText } from "./module-diagnostics";
 import type { BuildReport } from "./module-context";
 
 export function rejectionSummary(report: unknown): string {
   const build = report as Partial<BuildReport> | null;
   const error = build?.errors?.find(error => error.trim())
-    ?? build?.typecheck?.errors?.find(error => error.message.trim())?.message
-    ?? failedTestError(build?.tests)
-    ?? "Module checks failed; inspect the version report";
-  return redactSensitiveText(error).slice(0, 300);
-}
-
-function failedTestError(tests: BuildReport["tests"] | undefined): string | undefined {
-  return tests?.find(test => test.exitCode !== 0 && test.stderr.trim())?.stderr;
+    ?? build?.typecheck?.errors?.find(error => error.message.trim())?.message;
+  const failed = [...(build?.tests ?? []), ...(build?.migration ? [build.migration] : [])].find(test => test.exitCode !== 0 && (test.stderr.trim() || test.stdout.trim()));
+  const message = error ?? (failed?.stderr.trim() ? failed.stderr : failed?.stdout) ?? "Module checks failed; inspect the version report";
+  return diagnosticText(message, 300, !error && !!failed).slice(0, 300);
 }
 
 export const installationId = (workspaceId: string, requestKey: string) => `module-install:${createHash("sha256").update(workspaceId).update("\0").update(requestKey).digest("hex")}`;
@@ -92,6 +89,38 @@ export function createExternalModuleInstaller(ports: StewardPorts): ExternalModu
       throw error;
     } finally { await rm(root, { recursive: true, force: true }); }
   };
+}
+/** Mutable bootstrap evidence is rechecked in the activation transaction; names/intent alone grant nothing. */
+export async function matchesInitialInstallation(context: ModuleContext, version: ModuleVersion, module: { id: string; name: string; activeHash: string | null; status: string }) {
+  const { db, workspaceId } = context;
+  const name = PREINSTALLED_MODULE_NAMES.find(name => name === module.name);
+  if (!name || module.activeHash !== null || module.status !== "active" || version.source !== "user" || version.buildSessionId) return false;
+  const workspace = await db.workspace.findUniqueOrThrow({ where: { id: workspaceId } });
+  const settings = workspace.settings as { moduleInitialization?: unknown } | null;
+  const state = moduleInitializationStateSchema.safeParse(settings?.moduleInitialization).data;
+  const initial = state?.packages[name], requestKey = `initialize:v1:${name}:1`;
+  if (state?.status !== "pending" || initial?.attempts !== 1 || initial.requestKey !== requestKey || !["pending", "building", "pending_approval"].includes(initial.status)) return false;
+  if (initial.moduleId !== module.id || initial.hash !== version.hash) return false;
+  const receipt = await db.moduleInstallation.findUnique({ where: { id: installationId(workspaceId, requestKey) }, include: { submission: true } });
+  const submission = submissionSchema.safeParse(receipt?.submission).data;
+  if (receipt?.workspaceId !== workspaceId || receipt.requestKey !== requestKey || receipt.mode !== "install" || receipt.package !== name || receipt.moduleId !== module.id || receipt.hash !== version.hash || !["building", "pending_approval"].includes(receipt.status) || receipt.approvalId !== null) return false;
+  if (!submission || submission.phase !== "submitted" || submission.moduleId !== module.id || submission.hash !== version.hash || submission.existingVersionId !== null || !attributedVersion(version, submission)) return false;
+  // An unselected/previously active version must not regain release authority through bootstrap.
+  if (await db.moduleActivation.findFirst({ where: { moduleId: module.id } }) || await db.moduleVersion.findFirst({ where: { moduleId: module.id, status: "approved" } })) return false;
+  // A receipt may refresh to pending_approval before a card exists; an actual review/decision remains authoritative.
+  return !await db.approval.findFirst({ where: { workspaceId, moduleId: module.id, action: "activate_module" } });
+}
+/** Only the host's checksum/tree-verified pinned release can carry first-install approval. */
+export async function isTrustedInitialInstallation(context: ModuleContext, version: ModuleVersion, module: Parameters<typeof matchesInitialInstallation>[2]) {
+  if (!await matchesInitialInstallation(context, version, module)) return false;
+  try {
+    // Reuse checksum, pinned commit, source tree, artifact and executable-mode verification.
+    const release = await resolveExternalRelease(context.ports, module.name as ModuleInstallRequest["package"], version.hash);
+    return release.git?.commit === version.hash && JSON.stringify(release.manifest) === JSON.stringify(version.manifest);
+  } catch (error) {
+    console.error(JSON.stringify({ component: "module-install", event: "initial_release.verification_failed", moduleId: module.id, hash: version.hash, error: redactSensitiveText(String(error)) }));
+    return false;
+  }
 }
 async function revalidateInstallationRelease(ports: StewardPorts, name: ModuleInstallRequest["package"], release: Parameters<ExternalModuleInstaller>[0]["release"]) {
   const trusted = await resolveExternalRelease(ports, name);

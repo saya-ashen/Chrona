@@ -15,7 +15,9 @@ async function read(tx: Prisma.TransactionClient, workspaceId: string) {
   const workspace = await tx.workspace.findUniqueOrThrow({ where: { id: workspaceId } });
   const settings = settingsObject(workspace.settings);
   // Corrupt persisted state fails closed: never silently reset and resurrect removed apps.
-  return { settings, state: settings[KEY] === undefined ? null : moduleInitializationStateSchema.parse(settings[KEY]) };
+  const state = settings[KEY] === undefined ? null : moduleInitializationStateSchema.parse(settings[KEY]);
+  const legacy = state !== null && settingsObject(settingsObject(settings[KEY]).packages).chat === undefined;
+  return { settings, state, legacy };
 }
 async function save(ports: StewardPorts, workspaceId: string, state: ModuleInitializationState) {
   await ports.db.$transaction(async tx => {
@@ -48,7 +50,12 @@ async function initialize(ports: StewardPorts, workspaceId: string, options: { r
   await refreshInstallationReceipts(ports, workspaceId);
   const state = await ports.db.$transaction(async tx => {
     const stored = await read(tx, workspaceId);
-    if (stored.state) return stored.state;
+    if (stored.state) {
+      // Persist legacy normalization even for complete receipts, without enqueueing
+      // the newly introduced Chat app or changing the historical QQ ledger.
+      if (stored.legacy) await tx.workspace.update({ where: { id: workspaceId }, data: { settings: { ...stored.settings, [KEY]: stored.state } as Prisma.InputJsonValue } });
+      return stored.state;
+    }
     const initial: ModuleInitializationState = { version: 1, status: "pending", packages: Object.fromEntries(initializationNames.map(name => [name, {
       requestKey: `initialize:v1:${name}:1`, attempts: 1, status: "pending", moduleId: null, hash: null, approvalId: null, error: null,
     }])) as ModuleInitializationState["packages"] };

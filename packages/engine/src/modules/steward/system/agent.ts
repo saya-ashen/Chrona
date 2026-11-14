@@ -5,7 +5,7 @@ import { publicSystemTools } from "./tool-contract-declarations";
 import type { SystemModule } from "../module-system-types";
 import { CallError } from "../module-call-error";
 import { json } from "./shared";
-import { assertExecutionPrincipal } from "../execution-principal";
+import { assertApprovedAgentPrincipal } from "../agent-context-admission";
 import { admitContextPrimitive, ownedRun, view, type ModulePrincipal } from "../agent-context";
 import { assertAgentInterruptPrincipal } from "../agent-context-admission";
 import { contextInteractions } from "../agent-context-read";
@@ -31,7 +31,7 @@ async function read(ports: StewardPorts, principal: ModulePrincipal, args: Retur
     rows = await ports.db.runEvent.findMany({ where: { runId: run.id, sequence: { gt: after }, kind: args.view === "native" ? "raw" : { not: "raw" } }, orderBy: { sequence: "asc" }, take: args.limit });
     if (rows.length || !view(run).active || Date.now() >= until) break;
     await new Promise(resolve => setTimeout(resolve, Math.min(100, until - Date.now())));
-    await assertExecutionPrincipal(ports.db, principal);
+    await assertApprovedAgentPrincipal(ports.db, principal);
     run = await ownedRun(ports.db, principal, args.runId);
   }
   let transcript;
@@ -63,7 +63,7 @@ export const agent: SystemModule = {
     if (name === "providers") return json(await listAgentProviders(ports, workspaceId, kernelAgentInputs.providers.parse(raw)));
     if (caller.kind !== "module") throw new CallError("forbidden", "Agent Runs require their actual module caller");
     const principal = { workspaceId, ownerId: "owner", caller } satisfies ModulePrincipal;
-    if (name !== "stop") await assertExecutionPrincipal(ports.db, principal);
+    if (name === "read") await assertApprovedAgentPrincipal(ports.db, principal);
     if (name === "read") return json(await read(ports, principal, kernelAgentInputs.read.parse(raw)));
     if (!call?.key) throw new CallError("invalid", "Agent commands require a call key");
     if (name === "run") {

@@ -108,6 +108,7 @@ async function sessionRoute({ request, path, body }: ApiContext): Promise<ApiRes
 }
 function readConversation(session: string, part: string): Promise<ApiResult> | typeof NO_ROUTE {
   if (!isAgentConversation(session)) return NO_ROUTE;
+  if (part === "snapshot") return conversations.snapshot(session);
   if (part === "transcript") return conversations.transcript(session);
   if (part === "messages") return conversations.messages(session);
   if (part === "execution") return conversations.execution(session);
@@ -176,6 +177,7 @@ async function api(request: Request, path: string[]) {
   const routes: Record<string, ApiHandler> = {
     "GET /today": () => todayView(call, getSessions),
     "GET /sessions": () => getSessions(),
+    "GET /history": async () => (await getSessions()).slice(0, 100),
     "POST /chat": async () => {
       // Only this entry's conversations accept new messages.
       if (body.session && !isAgentConversation(String(body.session))) throw Object.assign(new Error("此记录不能继续对话，请新建会话。"), { code: "conflict" });

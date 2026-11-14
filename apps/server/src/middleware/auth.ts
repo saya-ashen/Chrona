@@ -2,12 +2,12 @@ import { timingSafeEqual } from "node:crypto";
 import type { MiddlewareHandler } from "hono";
 import { getApiMessages, getPreferredLocale } from "@chrona/i18n";
 import { readEnv } from "../config/env";
-import { isBrowserAuthSameOrigin, type createBrowserAuth } from "../browser-auth";
+import type { createBrowserAuth } from "../browser-auth";
 
 const SKIP_PATHS = ["/api/health", "/health"];
 
 type ApiKeyAuthOptions = {
-  browserAuth?: Pick<Awaited<ReturnType<typeof createBrowserAuth>>, "passwordSet" | "authenticate">;
+  browserAuth?: Pick<Awaited<ReturnType<typeof createBrowserAuth>>, "passwordSet" | "authenticate" | "isSameOrigin">;
   /**
    * Exempts an endpoint that owns a distinct, narrower authentication contract.
    * The caller must mount its endpoint-specific authentication after this middleware.
@@ -51,7 +51,7 @@ export function apiKeyAuth(
     if (matchesBearer(c.req.header("authorization"), expectedKey)) return next();
 
     if (options.browserAuth?.authenticate(c.req.raw)) {
-      if (!isBrowserAuthSameOrigin(c.req.raw)) return c.json({ error: "Same-origin request required" }, 403);
+      if (!options.browserAuth.isSameOrigin(c.req.raw)) return c.json({ error: "Same-origin request required" }, 403);
       return next();
     }
     if (!expectedKey && !options.browserAuth?.passwordSet()) return next();

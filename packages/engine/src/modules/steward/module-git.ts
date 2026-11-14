@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { lstat, mkdir, realpath } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { MODULE_SOURCE_MAX_BYTES, MODULE_SOURCE_MAX_FILES } from "../../../../contracts/src/steward/module-material";
 import { StewardError } from "./errors";
 import { checkoutModule, INSTALLED_DIRS, type ModuleFile } from "./module-files";
 import { restoreModuleArtifacts, storeModuleArtifacts, validateModuleSourceRecord } from "./module-artifacts";
@@ -23,7 +24,7 @@ function git(repo: string, args: string[], input?: Uint8Array): Promise<Buffer> 
   return new Promise((accept, reject) => {
     const child = execFile("git", ["--no-replace-objects", "-c", "core.hooksPath=/dev/null", "-c", "maintenance.auto=false", "-c", "gc.auto=0", "-c", "credential.helper=", "-c", "core.askPass=", "-c", "http.extraHeader=", "-c", "http.followRedirects=false", "--git-dir", repo, ...args], {
       env: { ...env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_TERMINAL_PROMPT: "0", GIT_AUTHOR_NAME: "Chrona", GIT_AUTHOR_EMAIL: "chrona@localhost", GIT_COMMITTER_NAME: "Chrona", GIT_COMMITTER_EMAIL: "chrona@localhost" },
-      encoding: "buffer", timeout: 30_000, maxBuffer: 2 * 1024 * 1024,
+      encoding: "buffer", timeout: 30_000, maxBuffer: 2 * MODULE_SOURCE_MAX_BYTES,
     }, (error, stdout) => {
       if (!error) accept(stdout);
       else reject(Object.assign(new StewardError("conflict", (error as NodeJS.ErrnoException).code === "ENOENT" ? "Git is required for module source repositories" : "Module Git operation failed"), { exitCode: typeof error.code === "number" ? error.code : undefined }));
@@ -61,7 +62,7 @@ function validateFiles(files: ModuleGitFile[]) {
     if (paths.has(file.path)) throw new StewardError("invalid", "Duplicate module source path");
     paths.add(file.path); bytes += file.bytes.byteLength;
   }
-  if (files.length > 200 || bytes > 1024 * 1024) throw new StewardError("invalid", "Module exceeds file limits");
+  if (files.length > MODULE_SOURCE_MAX_FILES || bytes > MODULE_SOURCE_MAX_BYTES) throw new StewardError("invalid", "Module exceeds file limits");
   validateModuleSourceRecord(files);
 }
 async function revision(repo: string, commit: string): Promise<ModuleGitRevision> {
@@ -142,7 +143,7 @@ export async function readModuleSource(input: Repository & { commit: string }): 
   await directory(repo);
   await revision(repo, input.commit);
   const entries = (await git(repo, ["ls-tree", "-rz", input.commit])).toString("utf8").split("\0").filter(Boolean);
-  if (entries.length > 200) throw new StewardError("invalid", "Module exceeds file limits");
+  if (entries.length > MODULE_SOURCE_MAX_FILES) throw new StewardError("invalid", "Module exceeds file limits");
   const files: ModuleGitFile[] = [];
   let total = 0;
   for (const entry of entries) {
@@ -150,7 +151,7 @@ export async function readModuleSource(input: Repository & { commit: string }): 
     if (!["100644", "100755"].includes(mode!) || type !== "blob") throw new StewardError("forbidden", "Unsafe module Git source entry");
     const bytes = await git(repo, ["cat-file", "blob", hash!]);
     total += bytes.byteLength;
-    if (total > 1024 * 1024) throw new StewardError("invalid", "Module exceeds file limits");
+    if (total > MODULE_SOURCE_MAX_BYTES) throw new StewardError("invalid", "Module exceeds file limits");
     files.push({ path: entry.slice(tab + 1), bytes, ...(mode === "100755" ? { executable: true } : {}) });
   }
   validateFiles(files);

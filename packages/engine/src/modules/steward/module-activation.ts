@@ -35,6 +35,7 @@ async function prepareApproved(context: ModuleContext, tx: Prisma.TransactionCli
   const module = await requireModule(context, tx, moduleId);
   if (module.status === "migrating") throw new StewardError("conflict", "Module is migrating");
   await checkApproval(context, tx, action, module.id);
+  if (module.activeHash === hash) return null;
   const version = await approvedVersion(tx, moduleId, hash, restore);
   await assertDynamicModuleActivation(tx, context.workspaceId, moduleId, { hash });
   const manifest = moduleManifestSchema.parse(version.manifest), from = module.dataSchema, to = manifest.data.schema;

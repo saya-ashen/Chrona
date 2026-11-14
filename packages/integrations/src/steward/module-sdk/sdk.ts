@@ -12,14 +12,14 @@ export type Caller = { kind: "module"; module: string; moduleId: string; hash: s
 /** Private wire shape used to settle retained timer receipts. */
 type WireTrigger = { kind: "timer"; id: string; eventId: string; timerId: string; timerRevision: string; scheduledAt: string; firedAt: string; payload: unknown }
   | { kind: "schedule"; id: string; firedAt: string; scheduleId?: string; payload?: Record<string, unknown> }
-  | { kind: "tool"; id: string; firedAt: string; args: Record<string, unknown>; caller?: Caller; call?: { id: string; key: string | null; attempt: number; chain: string[] } }
+  | { kind: "tool"; id: string; firedAt: string; args: Record<string, unknown>; caller?: Caller; call?: { id: string; key: string | null; attempt: number; chain: string[]; /** Kernel-bound original Agent run, absent for ordinary module calls. */ executionRunId?: string } }
   | { kind: "call_result"; id: "call"; firedAt: string; callId: string; target: CallTarget; key: string; status: "succeeded" | "failed" | "unknown"; output?: unknown; error?: string }
   /** Once per active version, and again when a module this one `uses` changes version: register with it here (e.g. web.page-set). */
   | { kind: "activated"; id: "activated"; firedAt: string };
 export type Trigger = Exclude<WireTrigger, { kind: "schedule" }>;
 type EventResult = { result?: unknown };
 export type CallState = { callId: string; status: "queued" | "running" | "waiting" | "succeeded" | "failed" | "unknown"; duplicate?: boolean; output?: unknown; error?: string };
-export type CallOptions = { mode?: "sync" | "async"; key?: string; reply?: boolean; timeoutMs?: number; expectedTarget?: { moduleId: string } };
+export type CallOptions = { mode?: "sync" | "async"; key?: string; reply?: boolean; timeoutMs?: number; expectedTarget?: { moduleId: string; hash?: string } };
 // v2-25: targets with a declared contract (calls.d.ts, generated per build) take typed arguments and give a typed result.
 export type KernelTarget = `${"modules" | "approvals" | "settings" | "secrets" | "activity" | "timers" | "agent" | "runtime-callback" | "workspace-local"}.${string}`;
 export type CallTarget = KernelTarget | { moduleId: string; tool: string };

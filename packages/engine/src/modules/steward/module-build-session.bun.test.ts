@@ -11,6 +11,7 @@ import type { StewardPorts } from "./ports";
 import { testModuleSandbox } from "./module-test-process";
 import { testDb } from "./test-db";
 import { createModules } from "./modules";
+import { json } from "./module-context";
 import { handleModuleCall } from "./module-effects";
 import { sessionTranscript } from "./transcript";
 import { liveRuns } from "./runs";
@@ -630,3 +631,82 @@ test("private queue and run facts report database outcomes without kernel-author
   expect(await f.db.kernelFact.count({ where: { consumedAt: null, payload: { path: "$.data.key", equals: `session-result:${running.id}` } } })).toBe(0);
   expect(f.starts).toHaveLength(0);
 });
+
+async function standaloneDrain(needsApproval: boolean, approve = true) {
+  const f = await fixture(), modules = createModules(f.ports, f.workspaceId);
+  await f.writeModule(f.requester.cwd);
+  const first = await modules.propose({ root: f.requester.cwd, dir: request.name, intent }, "provider");
+  await modules.buildPending();
+  const moduleId = first.moduleId!;
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: moduleId } })).toMatchObject({ activeHash: first.hash });
+  const session = await f.db.session.create({ data: { workspaceId: f.workspaceId, source: "module", moduleId, key: "ordinary-drain" } });
+  const run = await f.db.run.create({ data: { workspaceId: f.workspaceId, sessionId: session.id, lane: "background", trigger: "source", provider: "fixture", prompt: "finish handoff", cwd: f.dataDir, tokenHash: "drain-token", status: "running", startedAt: f.ports.now() } });
+  await writeFile(join(f.requester.cwd, request.name, "index.ts"), entry + "\n// checked update");
+  if (needsApproval) await writeFile(join(f.requester.cwd, request.name, "module.json"), JSON.stringify({ ...manifest, secrets: [{ name: "mail", label: "Mail", fields: [], oauth: { provider: "google", authorizationUrl: "https://mail.example.test/authorize", tokenUrl: "https://mail.example.test/token", scopes: ["mail.read"] } }] }));
+  const next = await modules.propose({ root: f.requester.cwd, dir: request.name, intent }, "provider");
+  await modules.buildPending();
+  const approval = needsApproval ? await f.db.approval.findFirstOrThrow({ where: { moduleId, action: "activate_module", status: "open" } }) : null;
+  if (approval && approve) await expect(f.api.approvals.resolve(approval.id, { decision: "approve" })).rejects.toMatchObject({ code: "conflict" });
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: moduleId } })).toMatchObject({ activeHash: first.hash, executionFenceAt: !approval || approve ? expect.any(Date) : null });
+  expect(await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId, hash: next.hash } } })).toMatchObject({ status: "pending_review" });
+  return { f, modules, moduleId, first, next, run, approval, generationCount: await f.db.generation.count() };
+}
+async function failNewerSubmission({ f, modules, moduleId }: Awaited<ReturnType<typeof standaloneDrain>>) {
+  // Fail this exact newer material during checks; it never becomes a reviewed candidate.
+  const sandbox = f.ports.sandbox!;
+  f.ports.sandbox = testModuleSandbox(async input => (await readFile(join(input.codeDir, "index.ts"), "utf8")).includes("failing submission")
+    ? { status: "failed", output: "", error: "newer candidate failed checks", exitCode: 1 }
+    : sandbox.runModule!(input));
+  await writeFile(join(f.requester.cwd, request.name, "index.ts"), entry + "\n// failing submission");
+  const failed = await modules.propose({ root: f.requester.cwd, dir: request.name, intent }, "provider");
+  await createModules({ ...f.ports }, f.workspaceId).buildPending();
+  expect(await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId, hash: failed.hash } } })).toMatchObject({ status: "rejected" });
+}
+
+for (const newerFails of [false, true]) for (const needsApproval of [false, true]) test(`standalone ${needsApproval ? "approved card" : "autoactivation"} resumes exact checked material after ordinary module drain${newerFails ? " and a newer failed submission" : ""}`, async () => {
+  const setup = await standaloneDrain(needsApproval), { f, modules, moduleId, first, next, run, approval, generationCount } = setup;
+  if (newerFails) await failNewerSubmission(setup);
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: moduleId } })).toMatchObject({ activeHash: first.hash, executionFenceAt: expect.any(Date) });
+  await f.api.runs.finish(run.id, { outcome: "finished", sessionId: null, error: null }, { stopEvidence: "provider_exited" });
+  // Management recovery gets fresh context and reuses the original version and approval.
+  await createModules({ ...f.ports }, f.workspaceId).buildPending();
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: moduleId } })).toMatchObject({ activeHash: next.hash, executionFenceAt: null });
+  expect(await f.db.generation.count()).toBe(generationCount + 1);
+  expect(await f.db.approval.count({ where: { moduleId, action: "activate_module" } })).toBe(needsApproval ? 1 : 0);
+  if (approval) expect(await f.db.approval.findUniqueOrThrow({ where: { id: approval.id } })).toMatchObject({ status: "approved", payload: approval.payload });
+  await modules.checkout(moduleId, next.hash, "recovered-material", f.requester.cwd);
+  expect(await readFile(join(f.requester.cwd, "recovered-material", "index.ts"), "utf8")).toBe(entry + "\n// checked update");
+  const activationCount = await f.db.moduleActivation.count({ where: { moduleId } });
+  const factCount = await f.db.kernelFact.count();
+  await createModules({ ...f.ports }, f.workspaceId).buildPending();
+  expect(await f.db.generation.count()).toBe(generationCount + 1);
+  expect(await f.db.moduleActivation.count({ where: { moduleId } })).toBe(activationCount);
+  expect(await f.db.kernelFact.count()).toBe(factCount);
+}, 30000);
+
+for (const state of ["missing intent", "changed activation", "open", "denied", "expired"] as const) test(`standalone recovery preserves an ineligible ${state} candidate after a newer failed submission`, async () => {
+  const needsApproval = ["open", "denied", "expired"].includes(state);
+  const setup = await standaloneDrain(needsApproval, false), { f, moduleId, first, next, run, approval, generationCount } = setup;
+  if (state === "missing intent") {
+    // Simulate a checked review interrupted before any automatic activation intent was saved.
+    const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId, hash: next.hash } } });
+    const report = { ...(version.report as Record<string, unknown>) };
+    delete report.activationWait;
+    await f.db.moduleVersion.update({ where: { id: version.id }, data: { report: json(report) } });
+  } else if (state === "changed activation") {
+    // A later activation of identical bytes still invalidates the original drain intent.
+    await f.db.module.update({ where: { id: moduleId }, data: { activationId: "later-activation" } });
+  } else if (state === "denied") {
+    await f.api.approvals.resolve(approval!.id, { decision: "deny" });
+  } else if (state === "expired") {
+    await f.db.approval.update({ where: { id: approval!.id }, data: { status: "expired", resolvedAt: f.ports.now() } });
+  }
+  await failNewerSubmission(setup);
+  await f.api.runs.finish(run.id, { outcome: "finished", sessionId: null, error: null }, { stopEvidence: "provider_exited" });
+  for (let tick = 0; tick < 2; tick++) await createModules({ ...f.ports }, f.workspaceId).buildPending();
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: moduleId } })).toMatchObject({ activeHash: first.hash });
+  expect(await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId, hash: next.hash } } })).toMatchObject({ status: "pending_review" });
+  expect(await f.db.generation.count()).toBe(generationCount);
+  expect(await f.db.approval.count({ where: { moduleId, action: "activate_module" } })).toBe(needsApproval ? 1 : 0);
+  if (approval) expect(await f.db.approval.findUniqueOrThrow({ where: { id: approval.id } })).toMatchObject({ status: state });
+}, 30000);

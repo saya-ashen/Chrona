@@ -25,12 +25,12 @@ afterEach(async () => {
   resetEnvCacheForTests();
 });
 function cookieOf(response: Response) { return response.headers.get("set-cookie")!.split(";", 1)[0]!; }
-async function fixture(apiKey?: string) {
+async function fixture(apiKey?: string, publicUrl?: string) {
   let time = 1_800_000_000_000;
   if (apiKey) process.env.API_KEY = apiKey;
   resetEnvCacheForTests();
   const make = async () => {
-    const auth = await createBrowserAuth({ dataDir: root, apiKey, now: () => time });
+    const auth = await createBrowserAuth({ dataDir: root, apiKey, publicUrl, now: () => time });
     const app = new Hono<{ Bindings: ServerBindings }>();
     app.route("/api/auth", auth.router);
     app.use("/api/*", apiKeyAuth({ browserAuth: auth, isExempt: (path, method) => path === "/api/scoped" && method === "POST" }));
@@ -286,6 +286,33 @@ describe("browser auth storage boundaries", () => {
 });
 
 describe("browser auth request boundaries", () => {
+  test("uses the configured HTTPS origin behind a proxy without weakening owner setup or cookie checks", async () => {
+    const publicUrl = "https://chrona.example";
+    const f = await fixture("existing-key", publicUrl);
+    const headers = { origin: publicUrl, referer: `${publicUrl}/`, "sec-fetch-site": "same-origin" };
+    const status = await f.request("/api/auth/status", { headers });
+    expect(status.status).toBe(200);
+    expect(await status.json()).toEqual({ passwordSet: false, authenticated: false, canSetup: false });
+    expect((await f.post("setup", { password }, headers)).status).toBe(403);
+    const setup = await f.post("setup", { password }, { ...headers, authorization: "Bearer existing-key" });
+    expect(setup.status).toBe(200);
+    expect(setup.headers.get("set-cookie")).toContain("Secure");
+    const cookie = cookieOf(setup);
+    expect((await f.request("/api/protected", { headers: { ...headers, cookie } })).status).toBe(200);
+    for (const spoof of [
+      { origin: "https://evil.example", referer: "https://evil.example/", "x-forwarded-host": "evil.example", "x-forwarded-proto": "https" },
+      { referer: "https://evil.example/" },
+      { "sec-fetch-site": "cross-site" },
+      { origin },
+    ] as Record<string, string>[]) {
+      expect((await f.request("/api/protected", { headers: { ...headers, ...spoof, cookie } })).status).toBe(403);
+      expect((await f.post("logout", {}, { ...headers, ...spoof, cookie })).status).toBe(403);
+    }
+    const logout = await f.post("logout", {}, { ...headers, cookie });
+    expect(logout.status).toBe(200);
+    expect(logout.headers.get("set-cookie")).toContain("Secure");
+    expect(logout.headers.get("set-cookie")).toContain("Max-Age=0");
+  });
   test("blocks cross-origin auth and cookie requests including same-site and fetch metadata", async () => {
     const f = await fixture("existing-key");
     for (const headers of [

@@ -80,6 +80,23 @@ test("modules list bounds history, retains the older active description and proj
   } finally { if (previous === undefined) delete process.env[key]; else process.env[key] = previous; }
 });
 
+test.each(["test", "typecheck", "migration"] as const)("modules.list exposes bounded rejected %s failure without raw reports", async phase => {
+  const f = await fixture(), key = "CHRONA_BUILD_DIAGNOSTIC_TOKEN", previous = process.env[key], secret = "synthetic-build-diagnostic-secret";
+  process.env[key] = secret;
+  try {
+    const message = `Cannot use test outside of the test runner. token=${secret}`;
+    const output = {stdout: "", stderr: "source preview ".repeat(100) + message, exitCode: 1};
+    const report = phase === "test" ? {tests: [output]} : phase === "migration" ? {tests: [], migration: output} : {tests: [], typecheck: {status: "failed", errors: [{message}]}};
+    await f.db.moduleVersion.create({data: {moduleId: f.module.id, hash: "rejected-check", manifest: f.manifest, source: "build", status: "rejected", intent: {}, report, createdAt: new Date(1000)}});
+    const app = (await createModules(f.ports, f.workspaceId).list())[0]!;
+    expect(app.versions[0]!.errors?.[0]).toContain("Cannot use test outside of the test runner");
+    expect(app.versions[0]!.errors!.every(error => error.length <= 300 && !error.includes(secret))).toBe(true);
+    expect(app.versions[1]!.errors).toBeNull();
+    expect(app.versions[0]).not.toHaveProperty("report");
+    expect(modulesListOutput.parse(JSON.parse(JSON.stringify([app])))).toHaveLength(1);
+  } finally { if (previous === undefined) delete process.env[key]; else process.env[key] = previous; }
+});
+
 test("unversioned and invalid active manifests remain visible without configuration or readiness inference", async () => {
   const f = await fixture();
   await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: f.module.id, hash: "active" } }, data: { manifest: { ...f.manifest, settings: { secret: "private" } }, report: { errors: [42], git: { commit: "invalid", tree: "invalid" } } } });

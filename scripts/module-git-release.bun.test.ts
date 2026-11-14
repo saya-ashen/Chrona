@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmod, cp, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, cp, mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { expect, test } from "bun:test";
@@ -30,7 +30,7 @@ test("independent unpublished seeds clone offline at their exact commits and unc
   const f = await fixture();
   try {
     const first = await prepareModuleGitRelease(f);
-    expect(first.modules).toHaveLength(14);
+    expect(first.modules.map(module => module.name).sort()).toEqual(["author", "chat", "mind", "notify", "pi", "qq", "web"]);
     expect(first.modules.map(module => module.name)).toEqual(buildArtifacts.moduleGit.modules.map(module => module.name));
     expect(first.modules.some(module => module.name === "editor")).toBe(false);
     const plan = JSON.parse(await readFile(join(f.seedDir, "publish-plan.json"), "utf8"));
@@ -54,7 +54,13 @@ test("independent unpublished seeds clone offline at their exact commits and unc
     const copied = await copyModuleGitRelease(f.seedDir, f.resourcesRoot);
     expect(copied).toEqual(first);
     for (const file of ["LICENSE", "THIRD-PARTY-NOTICES.txt"]) expect(await readFile(join(f.resourcesRoot, "module-git", file))).toEqual(await readFile(join(f.seedDir, file)));
-    expect(await copyModuleGitRelease(join(f.resourcesRoot, "module-git"), f.resourcesRoot)).toEqual(first);
+    const inPlace = join(f.resourcesRoot, "module-git");
+    await mkdir(join(inPlace, "repos"));
+    await writeFile(join(inPlace, "repos", "old-process.txt"), "development history");
+    await writeFile(join(inPlace, "publish-plan.json"), "local paths");
+    await writeFile(join(inPlace, "obsolete.bundle"), "old commits");
+    expect(await copyModuleGitRelease(inPlace, f.resourcesRoot)).toEqual(first);
+    expect((await readdir(inPlace)).sort()).toEqual(["LICENSE", "THIRD-PARTY-NOTICES.txt", "lock.json", ...first.modules.map(entry => entry.bundle)].sort());
     await rm(join(f.seedDir, "THIRD-PARTY-NOTICES.txt"));
     await expect(copyModuleGitRelease(f.seedDir, f.resourcesRoot)).rejects.toThrow("ENOENT");
     await writeFile(join(f.resourcesRoot, "external/web/index.ts"), "// changed\n");
@@ -98,7 +104,7 @@ test("clean seed generation is deterministic and rejects mismatched packaged cod
   try {
     const first = await prepareModuleGitRelease(f), again = await prepareModuleGitRelease(second);
     expect(first).toEqual(again);
-    for (const name of ["coding", "mind"]) {
+    for (const name of ["chat", "mind"]) {
       const source = join(f.resourcesRoot, `external/${name}/contract.js`);
       await writeFile(source, "// generated after seed\n");
       await expect(copyModuleGitRelease(f.seedDir, f.resourcesRoot)).rejects.toThrow(`Module seed differs from packaged source: ${name}`);
@@ -231,7 +237,15 @@ test("explicit material verifies artifacts independently, limits source, and use
       await expect(moduleGitReleaseSource(f.web)).rejects.toThrow();
     }
     await writeFile(recordPath, JSON.stringify(f.record));
-    await writeFile(join(f.web, "index.ts"), Buffer.alloc(MODULE_SOURCE_MAX_BYTES));
+    const initial = await moduleGitReleaseSource(f.web);
+    const otherBytes = initial.filter(file => file.path !== "index.ts").reduce((total, file) => total + file.bytes.byteLength, 0);
+    const source = Buffer.alloc(MODULE_SOURCE_MAX_BYTES - otherBytes, 0x61);
+    expect(source.byteLength).toBeGreaterThan(1024 * 1024);
+    await writeFile(join(f.web, "index.ts"), source);
+    const selected = await moduleGitReleaseSource(f.web);
+    expect(selected.reduce((total, file) => total + file.bytes.byteLength, 0)).toBe(2 * 1024 * 1024);
+    expect(selected.find(file => file.path === "index.ts")!.bytes).toEqual(source);
+    await writeFile(join(f.web, "index.ts"), Buffer.concat([source, Buffer.from("x")]));
     await expect(moduleGitReleaseSource(f.web)).rejects.toThrow("source file limits");
     await writeFile(join(f.web, "index.ts"), "// restored\n");
     await rm(join(f.web, "runtime.bin"));

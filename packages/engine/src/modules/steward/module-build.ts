@@ -1,4 +1,7 @@
+import { onApproved } from "./module-activation";
+import { assertExecutionModuleIdle } from "./execution-module-guard";
 import { requiresCapabilityApproval } from "./module-owner";
+import { isTrustedInitialInstallation, matchesInitialInstallation } from "./module-install";
 import { moduleMaterialDigest, moduleMaterialRecord, snapshotModuleMaterial } from "./module-artifacts";
 import { activationNotice } from "./module-activation-notice";
 export { activationNotice } from "./module-activation-notice";
@@ -67,6 +70,8 @@ async function installBuild(context: ModuleContext, staging: string, version: Mo
   }
 }
 type Review = { version: ModuleVersion; module: Awaited<ReturnType<typeof requireModule>>; report: BuildReport; files: { path: string; bytes: Buffer }[]; needsMigration: boolean };
+/** Only an automatic activation that actually waited for drain may bypass submission order. */
+type DrainReport = BuildReport & { activationWait?: Pick<Review["module"], "activeHash" | "activationId"> };
 function exposedTools(manifest: ReturnType<typeof moduleManifestSchema.parse>) {
   return manifest.tools.filter(tool => tool.visibility.some(value => value === "modules" || value === "kernel")).map(tool => tool.name);
 }
@@ -114,13 +119,16 @@ function addsCredentials(version: ModuleVersion, active: ModuleVersion | null) {
   return requiresCapabilityApproval(manifest, previous);
 }
 /** Checks passed and nothing needs the owner: activate now and tell them afterwards. */
-async function activateChecked(context: ModuleContext, { version, module }: Review, update: boolean) {
+async function activateChecked(context: ModuleContext, { version, module }: Review, update: boolean, initialRelease = false) {
   const { hash } = version, manifest = moduleManifestSchema.parse(version.manifest);
   await fenceExecutionVersionChange(context.ports, context.workspaceId, module.id, hash);
   await context.db.$transaction(async tx => {
     if (await findCandidateSet({ ...context, db: tx as ModuleContext["db"] }, version)) throw new StewardError("conflict", "Fixed candidates activate only through their receipt");
+    const candidate = await tx.moduleVersion.findUnique({ where: { id: version.id } });
+    if (candidate?.status !== "pending_review") throw new StewardError("conflict", "Module candidate is no longer pending review");
     const current = await assertExternalModule(tx, context.workspaceId, module.id, "activate");
-    if (current.status === "migrating" || current.activeHash !== module.activeHash) throw new Error("Module changed during build; submit again");
+    if (current.status === "migrating" || current.activeHash !== module.activeHash || current.activationId !== module.activationId) throw new Error("Module changed during build; submit again");
+    if (initialRelease && !await matchesInitialInstallation({ ...context, db: tx as ModuleContext["db"] }, version, current)) throw new StewardError("conflict", "Initial release installation changed before activation");
     await expireModuleApprovals(context, module.id, tx);
     await tx.moduleVersion.update({ where: { id: version.id }, data: { status: "approved" } });
     await tx.module.update({ where: { id: module.id }, data: { dataSchema: manifest.data.schema } });
@@ -140,8 +148,26 @@ async function requestReview(context: ModuleContext, review: Review): Promise<Pr
   const { db } = context, { version, module, report } = review, { hash } = version;
   const active = module.activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } }) : null;
   await assertExternalModule(db, context.workspaceId, module.id, "activate");
-  if (!await isGroupCandidate(context, version) && !review.needsMigration && !addsCredentials(version, active)) {
-    await activateChecked(context, review, !!active);
+  const initialRelease = !active && addsCredentials(version, active) && await isTrustedInitialInstallation(context, version, module);
+  if (!await isGroupCandidate(context, version) && !review.needsMigration && (!addsCredentials(version, active) || initialRelease)) {
+    try { await activateChecked(context, review, !!active, initialRelease); }
+    catch (error) {
+      // Only unresolved execution is a retryable wait; keep this exact checked version.
+      if (!(error instanceof StewardError) || error.code !== "conflict") throw error;
+      await db.$transaction(async tx => {
+        try { await assertExecutionModuleIdle(tx, module.id); }
+        catch (busy) {
+          if (!(busy instanceof StewardError) || busy.code !== "conflict") throw busy;
+          const current = await assertExternalModule(tx, context.workspaceId, module.id, "activate");
+          if (current.activeHash !== module.activeHash || current.activationId !== module.activationId) throw error;
+          const waiting: DrainReport = { ...report, activationWait: { activeHash: module.activeHash, activationId: module.activationId } };
+          await tx.moduleVersion.updateMany({ where: { id: version.id, status: "pending_review" }, data: { report: json(waiting) } });
+          return;
+        }
+        throw error;
+      });
+      return { moduleId: module.id, hash, status: "pending_review", report };
+    }
     return { moduleId: module.id, hash, status: "approved", report };
   }
   const { preview, parts } = await reviewPreview(context, review, active);
@@ -309,10 +335,20 @@ async function recoverReview(context: ModuleContext, version: ModuleVersion) {
     if (!set || set.state !== "submitted") return;
   }
   const module = await assertExternalModule(db, workspaceId, version.moduleId, "activate");
-  const latest = await db.moduleVersion.findFirst({ where: { moduleId: version.moduleId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] });
-  if (version.status !== "pending_review" || (!fixed && (latest?.id !== version.id || await isGroupCandidate(context, version)))) return;
+  if (version.status !== "pending_review" || (!fixed && await isGroupCandidate(context, version))) return;
   const approvals = await db.approval.findMany({ where: { workspaceId, action: "activate_module" } });
+  const covering = approvals.filter(row => row.moduleId === version.moduleId && approvalCoversVersion(row.payload, version));
+  if (covering.length) {
+    const approved = covering.find(row => row.status === "approved");
+    if (approved) await createApprovals(context, action => onApproved(context, action)).resolve(approved.id, { decision: "approve" }, "recovery");
+    return;
+  }
   if (approvals.some(row => approvalCoversVersion(row.payload, version))) return;
+  const waiting = (version.report as DrainReport | null)?.activationWait;
+  // A later activation (even of the same hash) invalidates the original automatic intent.
+  if (waiting && (!module.executionFenceAt || waiting.activeHash !== module.activeHash || waiting.activationId !== module.activationId)) return;
+  const latest = await db.moduleVersion.findFirst({ where: { moduleId: version.moduleId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] });
+  if (!fixed && !waiting && latest?.id !== version.id) return;
   if (module.activeHash === version.hash) return;
   const review = await recoveredReviewMaterial(context, version, module);
   if (review) await requestReview(context, review);
@@ -328,7 +364,7 @@ async function recoveredReviewMaterial(context: ModuleContext, version: ModuleVe
   return { version, module, report, files, needsMigration };
 }
 const recoveringReviews = new WeakMap<ModuleContext["db"], Set<string>>();
-/** Repair only never-created standalone reviews; a resolved/expired card is a deliberate decision, not a retry. */
+/** Resume exact approved effects or repair never-created reviews; denied/expired cards stay resolved. */
 async function recoverReviews(context: ModuleContext) {
   const { db, workspaceId } = context;
   let running = recoveringReviews.get(db);

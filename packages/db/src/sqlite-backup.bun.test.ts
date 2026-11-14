@@ -245,6 +245,8 @@ describe("SQLite backup and restore", () => {
         ["platform/../../escaped", "5"], ["/platform", "5"], ["platform//empty", "5"],
         ["platform/./relative", "5"], ["sessions/back\\slash", "0"], ["unrecognized", "5"],
         ["sessions/hardlink", "1"], ["sessions/symlink", "2"], ["secrets/special", "6"],
+        ["platform/data/app", "2"], ["platform/data/app/.chrona-restore.json", "2"],
+        ["platform/data/app/.chrona-restore.json", "1"], ["platform/data/../../escaped", "5"],
         ["sessions/extended", "x"], ["sessions/longname", "L"],
       ]) {
         const malicious = Buffer.from(original);

@@ -226,7 +226,7 @@ export const moduleEventSchema = z.object({
      */
     z.object({ kind: z.literal("tool"), id: slug, firedAt: iso, args: z.record(z.string(), z.unknown()),
       caller: callerSchema.optional(),
-      call: z.object({ id: z.string().max(128), key: z.string().max(500).nullable(), attempt: z.number().int().min(1), chain: z.array(slug).max(16) }).strict().optional() }).strict(),
+      call: z.object({ id: z.string().max(128), key: z.string().max(500).nullable(), attempt: z.number().int().min(1), chain: z.array(slug).max(16), executionRunId: z.string().min(1).max(128).optional() }).strict().optional() }).strict(),
     /** The result of an async call this module made with `reply: true` (`id` is always "call"). */
     z.object({ kind: z.literal("call_result"), id: z.literal("call"), firedAt: iso, callId: z.string().max(128), target: routedTargetSchema, key: z.string().max(500),
       status: z.enum(["succeeded", "failed", "unknown"]), output: z.json().optional(), error: z.string().max(2000).optional() }).strict(),
@@ -260,8 +260,8 @@ export const NOTIFY_INTERFACE = "notify.send";
 export const SYSTEM_MODULES = ["approvals", "modules", "settings", "secrets", "activity", "timers", "agent"] as const;
 /** Longest call path; synchronous calls are refused when the target is already on their path (it is waiting). */
 export const MAX_CALL_DEPTH = 6;
-/** A saved registration may only call this exact app identity; this grants no access. */
-export const expectedModuleTargetSchema = z.object({ moduleId: z.string().min(1) }).strict();
+/** A saved registration may bind an exact app version as well as identity; this grants no access. */
+export const expectedModuleTargetSchema = z.object({ moduleId: z.string().min(1), hash: z.string().min(1).optional() }).strict();
 export type ExpectedModuleTarget = z.infer<typeof expectedModuleTargetSchema>;
 export const moduleCallSchema = z.discriminatedUnion("method", [
   /**

@@ -327,6 +327,20 @@ async function reconcileAdmission(options: Runtime, id: string, input: { request
   return result(session, turn, session.messages.find(message => message.id === turn.id)!);
 }
 
+/** Read only the entry-owned persisted journal; never refresh execution or delivery. */
+async function historySnapshot({ dataDir, source }: Runtime, id: string) {
+  if (typeof id !== "string" || !id.startsWith(`${source}-agent:`)) throw failure("not_found", "Web conversation not found");
+  const session = owned(await load(dataDir), id);
+  if (session.source !== source) throw failure("not_found", "Web conversation not found");
+  const turn = session.turns.at(-1), view = turn ? execution(turn) : null;
+  const { title, status, createdAt, lastActivityAt } = session;
+  return {
+    session: { id: session.id, title, status, source: session.source, createdAt, lastActivityAt },
+    messages: session.messages.slice(-100),
+    execution: view ? { ...view, canContinue: view.canContinue && status === "active" } : null,
+  };
+}
+
 /** Business sessions and reply delivery are Web data. Agent owns only execution/context controls. */
 export function createAgentConversations(inputOptions: Options) {
   const options: Runtime = { ...inputOptions, now: inputOptions.now ?? (() => new Date()), source: inputOptions.source ?? "web" };
@@ -340,6 +354,7 @@ export function createAgentConversations(inputOptions: Options) {
     // save it, so they need not wait behind network checks in the writer queue.
     list: async () => (await load(dataDir)).sessions.map(({ messages: _messages, turns: _turns, ...session }) => session).sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt)),
     session: async (id: string) => { const { messages: _messages, turns: _turns, ...session } = owned(await load(dataDir), id); return session; },
+    snapshot: (id: string) => historySnapshot(options, id),
     update: (id: string, input: { title?: string; status?: "ended" }) => serial(async () => {
       const state = await load(dataDir), session = owned(state, id);
       if (input.title !== undefined) { if (!input.title.trim() || input.title.length > 200) throw failure("invalid", "Title must contain 1–200 characters"); session.title = input.title; }

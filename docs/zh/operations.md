@@ -22,6 +22,12 @@
 
 新增 `authority: "owner"` 的应用检查通过后仍须批准精确版本，包括 Web、QQ、MCP；预装不是审批例外。Web 尚未启用时，使用已有的认证救援页处理审批。只看到 building、pending_approval 或连接成功，都不表示入口与业务已可用。
 
+## 当前发行与默认应用（2026-11-13）
+
+全新数据目录默认初始化 Pi、Web、Notify、Author、Mind、Chat 六个普通应用；QQ 是随包提供、需显式安装的可选应用。发行的源码树与 Git 种子只包含这七个应用；Coding、coding-web、MCP、Files、Events、memory-local、Remind、remote-execution 等保留源码不进入本轮发行。旧目录条目缺少发行资源时报告不可用，不因启动恢复暂停或退役应用。
+
+初始化保留已有选择，应用移除后启动不自动补装；重新安装走显式生命周期检查。构建只裁剪 staging 资源，不删除仓库中的保留源码。源码与定向测试结果不代表种子已同步、真实远端已核验或新版本已部署；这些结果分别记录。
+
 ## 此前应用状态（2026-11-09，仅作运维背景）
 
 Agent 是唯一不可变内置应用；Web、Notify、QQ、Author 是普通默认预装应用。Coding 是无界面的普通可选服务，coding-web 是独立可选客户端；使用[客户端协议](coding-peer-clients-protocol.md)和[实施记录](coding-peer-clients-implementation.md)。旧 Editor 应用及安装入口已退役移除，见[退役记录](editor-retirement.md)。Remind 整应用暂停并保留源码；Mind 是普通可选应用，自动检查与通知默认关闭；memory-local 仅暂停定时整理。Editor 清理没有更新现有 3112 部署，下方历史升级和验收不证明清理版本已经部署。

@@ -1,6 +1,7 @@
 import { Prisma } from "@chrona/db";
 import { type ExecutionPrincipal, type WorkCleanupInput, type WorkCleanupReceipt } from "@chrona/contracts/steward";
 import type { ServerWorkspaceRequest, StewardPorts } from "./ports";
+import { assertRetainedExecutionPrincipal } from "./execution-module-guard";
 import { assertExecutionPrincipal } from "./execution-principal";
 import { executionCallerKey, executionDigest, executionScope } from "./execution-state";
 import { executionGrant } from "./execution-claim";
@@ -16,8 +17,8 @@ function conflict(message: string): never { throw new CallError("conflict", mess
 
 /** Durable cleanup commands are transport intents for existing attempts, never an execution queue. */
 export function createExecutionWorkspaceCleanup(ports: StewardPorts, host: WorkspaceCleanupHost) {
-  async function facts(tx: Tx, principal: ExecutionPrincipal, workId: string) {
-    await assertExecutionPrincipal(tx, principal);
+  async function facts(tx: Tx, principal: ExecutionPrincipal, workId: string, retained = false) {
+    await (retained ? assertRetainedExecutionPrincipal : assertExecutionPrincipal)(tx, principal);
     const rows = await tx.executionAttempt.findMany({ where: { ...executionScope(principal), callerKey: executionCallerKey(principal), workId }, include: { run: true }, take: 2 });
     if (rows.length !== 1) conflict("Cleanup execution is missing or ambiguous");
     const row = rows[0]!;
@@ -42,8 +43,8 @@ export function createExecutionWorkspaceCleanup(ports: StewardPorts, host: Works
   }
   async function cleanup(principal: ExecutionPrincipal, input: WorkCleanupInput): Promise<WorkCleanupReceipt> {
     const prepared = await ports.db.$transaction(async tx => {
-      await tx.$executeRaw`UPDATE "ExecutionAttempt" SET "id" = "id" WHERE 0`;
-      await assertExecutionPrincipal(tx, principal);
+      await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${principal.workspaceId}`;
+      await assertRetainedExecutionPrincipal(tx, principal);
       const row = await tx.executionAttempt.findFirst({ where: { ...executionScope(principal), callerKey: executionCallerKey(principal), workId: input.workId } });
       if (!row) throw new CallError("not_found", "Cleanup execution not found");
       const old = await lookup(tx, row.id, input);
@@ -59,12 +60,14 @@ export function createExecutionWorkspaceCleanup(ports: StewardPorts, host: Works
     });
     if (prepared.result) return prepared.result;
     const verify = async () => {
-      const current = await ports.db.$transaction(tx => facts(tx, principal, input.workId));
+      const current = await ports.db.$transaction(tx => facts(tx, principal, input.workId, true));
       if (current.digest !== prepared.digest) conflict("Cleanup admission changed");
       return current.digest;
     };
     const result = await host(prepared.request!, input, verify);
     await ports.db.$transaction(async tx => {
+      await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${principal.workspaceId}`;
+      await assertRetainedExecutionPrincipal(tx, principal);
       const old = await lookup(tx, prepared.request!.attemptId, input);
       if (!old) conflict("Cleanup reservation missing");
       const envelope = old.receipt as Envelope;

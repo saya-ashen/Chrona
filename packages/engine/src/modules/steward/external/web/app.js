@@ -22,7 +22,7 @@ function activeNavigation() {
   const path = location.pathname;
   for (const link of nav.querySelectorAll("a")) {
     const href = link.getAttribute("href");
-    const current = authenticated && (href === path || (href === "/today" && path === "/") || (href === "/chat" && path.startsWith("/sessions/")) || (href === "/apps" && path.startsWith("/apps/")));
+    const current = authenticated && (href === path || (href === "/today" && path === "/") || (href === "/apps" && path.startsWith("/apps/")));
     if (current) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
   }
@@ -137,11 +137,16 @@ async function readPageLinks(requestId) {
   const currentSession = session;
   const apps = nav.querySelector('a[href="/apps"]');
   let pages;
-  try { pages = await web("/pages"); } catch { return; }
+  try { pages = await web("/pages"); }
+  catch (error) { console.error(JSON.stringify({ component: "web-shell", event: "navigation-read-failed", error: error.message })); return; }
   if (!authenticated || currentSession !== session || requestId !== linksRequest) return;
   linksReadAt = Date.now();
   nav.querySelectorAll("a[data-page]").forEach(link => link.remove());
-  for (const page of pages.filter(page => page.purpose !== "settings")) {
+  // Keep one stable Chat destination even when its application is unavailable.
+  // All other entries continue to come from the registered display inventory.
+  const chat = pages.find(page => page.module === "chat" && page.id === "main" && page.purpose !== "settings");
+  const entries = [{ ...chat, module: "chat", id: "main", title: "Chat" }, ...pages.filter(page => page.purpose !== "settings" && !(page.module === "chat" && page.id === "main"))];
+  for (const page of entries) {
     const link = document.createElement("a");
     link.href = pageHref(page); link.dataset.page = ""; link.textContent = page.title;
     link.title = page.title;
@@ -154,14 +159,24 @@ async function readPageLinks(requestId) {
 async function route() {
   if (!authenticated) { await systemPage(loginParams); return; }
   const version = ++navigation;
-  const url = new URL(location.href), parts = url.pathname.split("/").filter(Boolean);
+  const url = new URL(location.href);
+  if (["/chat", "/conversations", "/chat/new", "/history"].includes(url.pathname) || url.pathname.startsWith("/sessions/")) {
+    if (url.pathname === "/chat/new") url.searchParams.set("new", "1");
+    url.pathname = "/p/chat/main";
+    history.replaceState(null, "", url);
+  }
+  const parts = url.pathname.split("/").filter(Boolean);
+  let chatPage = false;
   unmountPage?.(); unmountPage = null;
   shellState();
   main.replaceChildren();
   void pageLinks();
   try {
-    if (parts[0] === "chat" || (parts[0] === "sessions" && parts[1])) await systemPage({ name: "chat", path: url.pathname });
-    else if (parts[0] === "p" && parts[1] && parts[2]) await registeredPage(decodeURIComponent(parts[1]), decodeURIComponent(parts[2]), version);
+    if (parts[0] === "p" && parts[1] && parts[2]) {
+      const module = decodeURIComponent(parts[1]), id = decodeURIComponent(parts[2]);
+      chatPage = module === "chat" && id === "main";
+      await registeredPage(module, id, version);
+    }
     else if (parts[0] === "settings") await systemPage({ name: "settings" });
     else if (parts[0] === "apps" && parts[1] === "system" && parts[2]) await systemPage({ name: "system-app", id: decodeURIComponent(parts[2]), tab: url.searchParams.get("tab") ?? "overview", session: url.searchParams.get("session") ?? "" });
     else if (parts[0] === "apps" && parts[1]) await systemPage({ name: "app", id: decodeURIComponent(parts[1]), tab: url.searchParams.get("tab") ?? "overview", session: "" });
@@ -171,7 +186,10 @@ async function route() {
   } catch (error) {
     if (version !== navigation) return;
     if (error instanceof Unauthorized) return; // request() already handles a 401 from the current session.
-    await systemPage({ name: "error", message: error.message }, version);
+    console.error(JSON.stringify({ component: "web-shell", event: "page-load-failed", path: url.pathname, error: error.message }));
+    await systemPage(chatPage
+      ? { name: "chat-unavailable", message: `Chat 应用页面暂时无法打开：${error.message}。请前往应用检查 Chat 是否已安装、启用并登记主页面。` }
+      : { name: "error", message: error.message }, version);
   }
 }
 function go(path, replace = false) {

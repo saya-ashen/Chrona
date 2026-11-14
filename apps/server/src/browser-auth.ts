@@ -15,11 +15,11 @@ const changeInput = passwordInput.extend({ currentPassword: passwordSchema }).st
 const operationSchemas = { setup: passwordInput, login: passwordInput, password: changeInput };
 type AuthContext = Context<{ Bindings: ServerBindings }>;
 
-/** Cookie authority uses the direct request URL, never CORS configuration or forwarding headers. */
-export function isBrowserAuthSameOrigin(request: Request) {
+/** Cookie authority uses an explicitly configured public origin or the direct URL, never CORS or forwarding headers. */
+export function isBrowserAuthSameOrigin(request: Request, publicOrigin?: string) {
   const site = request.headers.get("sec-fetch-site");
   if (site && site !== "same-origin" && site !== "none") return false;
-  const origin = request.headers.get("origin"), expected = new URL(request.url).origin;
+  const origin = request.headers.get("origin"), expected = publicOrigin ?? new URL(request.url).origin;
   if (origin !== null && origin !== expected) return false;
   const referer = request.headers.get("referer");
   if (!referer) return true; // Non-browser clients may omit browser provenance headers.
@@ -35,9 +35,9 @@ function setupAuthorized(c: AuthContext, apiKey: string | undefined) {
   return provided.length === expected.length && timingSafeEqual(provided, expected);
 }
 function sessionToken(c: AuthContext) { return getCookie(c, COOKIE_NAME); }
-function cookie(c: AuthContext, token: string, clear = false) {
+function cookie(c: AuthContext, token: string, clear = false, publicOrigin?: string) {
   setCookie(c, COOKIE_NAME, token, {
-    httpOnly: true, sameSite: "Strict", path: "/", secure: new URL(c.req.url).protocol === "https:",
+    httpOnly: true, sameSite: "Strict", path: "/", secure: new URL(publicOrigin ?? c.req.url).protocol === "https:",
     maxAge: clear ? 0 : SESSION_MAX_AGE_SECONDS,
     ...(clear ? { expires: new Date(0) } : {}),
   });
@@ -79,12 +79,14 @@ function createAttemptLimiter(now: () => number) {
  * apiKey is used only for first setup; now is an optional clock for isolated expiry/rate-limit tests.
  * Mutations return {ok:true}; errors return {error:string} with 400/401/403/409/413/429.
  */
-export async function createBrowserAuth(options: { dataDir: string; apiKey?: string; now?: () => number }) {
+export async function createBrowserAuth(options: { dataDir: string; apiKey?: string; publicUrl?: string; now?: () => number }) {
+  const publicOrigin = options.publicUrl ? new URL(options.publicUrl).origin : undefined;
+  const isSameOrigin = (request: Request) => isBrowserAuthSameOrigin(request, publicOrigin);
   const now = options.now ?? Date.now, store = await createBrowserAuthStore(options.dataDir, now);
   const router = new Hono<{ Bindings: ServerBindings }>(), allowAttempt = createAttemptLimiter(now);
   router.use("*", async (c, next) => {
     c.header("Cache-Control", "no-store");
-    if (!isBrowserAuthSameOrigin(c.req.raw)) return c.json({ error: "Same-origin request required" }, 403);
+    if (!isSameOrigin(c.req.raw)) return c.json({ error: "Same-origin request required" }, 403);
     await next();
   });
   router.use("*", bodyLimit({ maxSize: MAX_BODY_BYTES, onError: c => c.json({ error: "Authentication request is too large" }, 413) }));
@@ -95,7 +97,7 @@ export async function createBrowserAuth(options: { dataDir: string; apiKey?: str
   router.post("/logout", async c => {
     try { await store.logout(sessionToken(c)); }
     catch (error) { if (error instanceof BrowserAuthError) return c.json({ error: error.message }, error.status); throw error; }
-    cookie(c, "", true);
+    cookie(c, "", true, publicOrigin);
     return c.json({ ok: true });
   });
   for (const operation of ["setup", "login", "password"] as const) router.post(`/${operation}`, async c => {
@@ -111,7 +113,7 @@ export async function createBrowserAuth(options: { dataDir: string; apiKey?: str
       if (operation === "setup") token = await store.setup(parsed.data.password);
       else if (operation === "login") token = await store.login(parsed.data.password);
       else token = await store.change(sessionToken(c), (parsed.data as z.infer<typeof changeInput>).currentPassword, parsed.data.password);
-      cookie(c, token);
+      cookie(c, token, false, publicOrigin);
       return c.json({ ok: true });
     } catch (error) {
       if (error instanceof BrowserAuthError) return c.json({ error: error.message }, error.status);
@@ -120,6 +122,7 @@ export async function createBrowserAuth(options: { dataDir: string; apiKey?: str
   });
   return {
     router,
+    isSameOrigin,
     passwordSet: store.passwordSet,
     authenticate: (request: Request) => store.authenticated(parse(request.headers.get("cookie") ?? "", COOKIE_NAME)[COOKIE_NAME]),
   };

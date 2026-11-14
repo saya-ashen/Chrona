@@ -8,6 +8,11 @@ import { resolveBuiltinRelease, resolveExternalRelease } from "./module-release"
 import { seedTestModuleRelease } from "./module-release-test-fixture";
 import { readModuleFiles } from "./module-preview";
 
+test.each(["mind", "chat"])("shipped %s manifest is accepted by the real installation contract", async name => {
+  const manifest = JSON.parse(await readFile(join(import.meta.dir, "external", name, "module.json"), "utf8"));
+  expect(moduleManifestSchema.safeParse(manifest).success).toBe(true);
+});
+
 const roots: string[] = [];
 afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
 async function fixture(name = "files") {

@@ -5,12 +5,12 @@ import { mkdtempSync } from "node:fs";
 import { chmod, link, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { MODULE_MATERIAL_FILE, MODULE_ARTIFACT_MAX_FILE_BYTES, moduleMaterialSchema } from "../../../../contracts/src/steward/module-material";
+import { MODULE_MATERIAL_FILE, MODULE_SOURCE_MAX_BYTES, MODULE_SOURCE_MAX_FILES, MODULE_ARTIFACT_MAX_FILE_BYTES, moduleMaterialSchema } from "../../../../contracts/src/steward/module-material";
 
 // Engine imports must never inherit a developer/live database URL.
 const databaseRoot = mkdtempSync(join(tmpdir(), "chrona-material-test-db-"));
 process.env.DATABASE_URL = `file:${join(databaseRoot, "test.db")}`;
-const [{ snapshotModuleMaterial, moduleMaterialDigest, moduleSourceFiles, storeModuleArtifacts }, { commitModuleSource, moduleGitPath, readModuleSource, readModuleMaterial, exportModuleSource }, { snapshotModule, ModuleDirectory }, { admitCandidates, submitCandidates, candidateSource }, { testDb }, { moduleContext }, { buildPending }, { ensureVersionMaterial }, { rollback }, { testModuleProcess }, { createExternalModuleInstaller, installExternal }] = await Promise.all([
+const [{ snapshotModuleMaterial, moduleMaterialDigest, moduleSourceFiles, storeModuleArtifacts }, { commitModuleSource, importLegacyModuleSource, moduleGitPath, readModuleSource, readModuleMaterial, exportModuleSource }, { snapshotModule, ModuleDirectory }, { admitCandidates, submitCandidates, candidateSource }, { testDb }, { moduleContext }, { buildPending }, { ensureVersionMaterial }, { rollback }, { testModuleProcess }, { createExternalModuleInstaller, installExternal }] = await Promise.all([
   import("./module-artifacts"), import("./module-git"), import("./module-files"), import("./module-candidates"), import("./test-db"), import("./module-context"), import("./module-build"), import("./module-source"), import("./module-activation"), import("./module-test-process"), import("./module-install"),
 ]);
 const roots: string[] = [];
@@ -89,9 +89,60 @@ test("artifact bounds are separate from the source limit and checked before over
   const { truncate } = await import("node:fs/promises");
   await truncate(join(f.dir, "bin/program"), MODULE_ARTIFACT_MAX_FILE_BYTES + 1);
   await expect(snapshotModuleMaterial(f.root, "submitted")).rejects.toMatchObject({ code: "invalid" });
-  await writeFile(join(f.dir, "index.ts"), Buffer.alloc(1024 * 1024));
+  await writeFile(join(f.dir, "bin/program"), f.binary);
+  await writeFile(join(f.dir, "index.ts"), Buffer.alloc(MODULE_SOURCE_MAX_BYTES));
   await expect(snapshotModuleMaterial(f.root, "submitted")).rejects.toMatchObject({ code: "invalid" });
 });
+test("explicit source at 2 MiB roundtrips through Git and export; one extra byte is rejected", async () => {
+  const f = await fixture(), initial = await snapshotModuleMaterial(f.root, "submitted");
+  const otherBytes = moduleSourceFiles(initial).filter(file => file.path !== "index.ts").reduce((total, file) => total + file.bytes.byteLength, 0);
+  const bytes = Buffer.alloc(MODULE_SOURCE_MAX_BYTES - otherBytes, 0x61);
+  expect(bytes.byteLength).toBeGreaterThan(1024 * 1024);
+  await writeFile(join(f.dir, "index.ts"), bytes);
+  const files = await snapshotModuleMaterial(f.root, "submitted");
+  expect(moduleSourceFiles(files).reduce((total, file) => total + file.bytes.byteLength, 0)).toBe(2 * 1024 * 1024);
+  const revision = await commitModuleSource({ ...f.repository, versionId: "boundary", files, message: "source budget" });
+  expect(await readModuleSource({ ...f.repository, commit: revision.commit })).toEqual(moduleSourceFiles(files));
+  await exportModuleSource({ ...f.repository, commit: revision.commit, root: f.root, dir: "exported" });
+  expect(moduleMaterialDigest(await snapshotModuleMaterial(f.root, "exported"))).toBe(moduleMaterialDigest(files));
+  const oversized = Buffer.concat([bytes, Buffer.from("x")]);
+  await writeFile(join(f.dir, "index.ts"), oversized);
+  await expect(snapshotModuleMaterial(f.root, "submitted")).rejects.toMatchObject({ code: "invalid" });
+  await expect(commitModuleSource({ ...f.repository, versionId: "oversized", files: files.map(file => file.path === "index.ts" ? { ...file, bytes: oversized } : file), message: "oversized" })).rejects.toMatchObject({ code: "invalid" });
+});
+
+test("legacy snapshots and imports share the 2 MiB budget and Git reads reject oversized blobs", async () => {
+  const f = await fixture();
+  await rm(f.dir, { recursive: true }); await mkdir(f.dir);
+  const bytes = Buffer.alloc(MODULE_SOURCE_MAX_BYTES - 2, 0x62);
+  await writeFile(join(f.dir, "module.json"), "{}"); await writeFile(join(f.dir, "index.ts"), bytes);
+  const files = await snapshotModule(f.root, "submitted");
+  expect(files.reduce((total, file) => total + file.bytes.byteLength, 0)).toBe(2 * 1024 * 1024);
+  const revision = await importLegacyModuleSource({ ...f.repository, legacyHash: moduleMaterialDigest(files), files });
+  expect(await readModuleSource({ ...f.repository, commit: revision.commit })).toEqual(files);
+  await exportModuleSource({ ...f.repository, commit: revision.commit, root: f.root, dir: "exported" });
+  expect(await snapshotModule(f.root, "exported")).toEqual(files);
+  await writeFile(join(f.dir, "index.ts"), Buffer.concat([bytes, Buffer.from("x")]));
+  await expect(snapshotModule(f.root, "submitted")).rejects.toMatchObject({ code: "invalid" });
+  const oversized = [{ path: "index.ts", bytes: Buffer.alloc(MODULE_SOURCE_MAX_BYTES + 1) }];
+  await expect(commitModuleSource({ ...f.repository, versionId: "oversized", files: oversized, message: "oversized" })).rejects.toMatchObject({ code: "invalid" });
+  await expect(importLegacyModuleSource({ ...f.repository, legacyHash: moduleMaterialDigest(oversized), files: oversized })).rejects.toMatchObject({ code: "invalid" });
+  // External Git objects bypass submission validation and must still hit the source bound.
+  const repo = moduleGitPath(f.repository.platform, f.repository.moduleId);
+  const blob = execFileSync("git", ["--git-dir", repo, "hash-object", "-w", "--stdin"], { input: oversized[0]!.bytes, encoding: "utf8" }).trim();
+  const tree = execFileSync("git", ["--git-dir", repo, "mktree"], { input: `100644 blob ${blob}\tindex.ts\n`, encoding: "utf8" }).trim();
+  const commit = execFileSync("git", ["--git-dir", repo, "-c", "user.name=Test", "-c", "user.email=test@localhost", "commit-tree", tree], { input: "oversized", encoding: "utf8" }).trim();
+  await expect(readModuleSource({ ...f.repository, commit })).rejects.toMatchObject({ code: "invalid" });
+});
+
+test("source file counts remain bounded independently of bytes", async () => {
+  const f = await fixture();
+  const files = Array.from({ length: MODULE_SOURCE_MAX_FILES + 1 }, (_, index) => ({ path: `file-${index}`, bytes: Buffer.alloc(0) }));
+  await expect(commitModuleSource({ ...f.repository, versionId: "too-many", files, message: "too many files" })).rejects.toMatchObject({ code: "invalid" });
+  expect(moduleMaterialSchema.safeParse({ ...f.record, source: ["module.json", ...files.slice(0, MODULE_SOURCE_MAX_FILES - 2).map(file => file.path)] }).success).toBe(true);
+  expect(moduleMaterialSchema.safeParse({ ...f.record, source: ["module.json", ...files.slice(0, MODULE_SOURCE_MAX_FILES - 1).map(file => file.path)] }).success).toBe(false);
+});
+
 test("corrupt or missing immutable objects stop restoration and are preserved", async () => {
   const f = await fixture(), files = await snapshotModuleMaterial(f.root, "submitted");
   const revision = await commitModuleSource({ ...f.repository, versionId: "first", files, message: "first" });

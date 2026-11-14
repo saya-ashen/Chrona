@@ -126,7 +126,8 @@ async function page(target: CallTarget, options: CallOptions) {
   return { items: result.items, nextCursor: result.nextCursor };
 }
 ${generated ? "" : targets.map(target => `await chrona.call<{ callId: string }>("${target}", {}, { mode: "async", key: "operation" });`).join("\n")}
-await chrona.call<{ value: string }>({ moduleId: "app", tool: "read" }, {});
+await chrona.call<{ value: string }>({ moduleId: "app", tool: "read" }, {}, { expectedTarget: { moduleId: "app", hash: "reviewed-v1" } });
+await chrona.call({ moduleId: "app", tool: "read" }, {}, { mode: "async", key: "pinned", expectedTarget: { moduleId: "app", hash: "reviewed-v1" } });
 await chrona.call<CallState>({ moduleId: "agent", tool: "run" }, {}, { mode: "async", key: "operation" });
 await chrona.call<CallState>("timers.list", {}, { mode: "async", key: "operation" });
 await chrona.call("timers.list", {}, { mode: "async", key: "operation" });
@@ -144,3 +145,19 @@ await chrona.call("timers.list", {}, { mode: "async", key: "operation" });
     if (invalid[index]!.startsWith("await")) expect(checked.report.errors.some(error => error.line === index + 2 && [2322, 2769].includes(error.code))).toBe(true);
   }
 }, 30_000);
+
+test("SDK forwards exact expectedTarget versions for sync and async application calls", async () => {
+  const { root } = await fixture(`import { chrona, on } from "chrona";
+const target = { moduleId: "reviewed-app", tool: "read" };
+on("tool", async event => ({ result: await chrona.call(target, {}, {
+  mode: event.args.mode, key: "original", expectedTarget: { moduleId: target.moduleId, hash: "reviewed-v1" }
+}) }));`);
+  const module = await launch(root);
+  for (const mode of ["sync", "async"]) {
+    await module.send(event({ mode }));
+    expect(module.calls.at(-1)).toMatchObject({ method: "call", params: {
+      target: { moduleId: "reviewed-app", tool: "read" }, args: {}, mode, key: "original",
+      expectedTarget: { moduleId: "reviewed-app", hash: "reviewed-v1" },
+    } });
+  }
+});

@@ -204,3 +204,19 @@ test("a fixed single candidate uses the existing approved data migration and pre
   expect(await readFile(join(data, "value"), "utf8")).toBe("migrated");
   expect(await readFile(join(f.ports.dataDir, "platform/snapshots", member.moduleId, "schema-1", "value"), "utf8")).toBe("original");
 });
+
+for (const kind of ["agent", "control", "cleanup-reserved", "cleanup-unknown"] as const) test(`fixed activation waits for unresolved ${kind} after confirmed Run stop`, async () => {
+  const f = await fixture(1), blocked = await blockExecution(f, "queued");
+  await blocked.stop();
+  const moduleId = f.receipt.members[0]!.moduleId;
+  const approvals = createApprovals(f.context, f.activate);
+  if (kind === "agent") await f.db.agentCommand.create({ data: { id: "unsettled", workspaceId: f.workspace.id, moduleId, hash: baseline, operation: "native", requestDigest: "fixture", output: {}, settled: false } });
+  else await f.db.executionCommand.create({ data: { attemptId: blocked.attempt!.id, commandKey: "unsettled", operation: kind === "control" ? "send" : "workspace-cleanup-confirm", requestDigest: "fixture", effect: kind === "control" ? "unknown" : null, receipt: kind === "cleanup-unknown" ? { result: { state: "unknown" } } : {} } });
+  await expect(approvals.resolve(f.approval.id, { decision: "approve" })).rejects.toMatchObject({ code: "conflict" });
+  await expectUnchanged(f);
+  if (kind === "agent") await f.db.agentCommand.update({ where: { id: "unsettled" }, data: { settled: true } });
+  else await f.db.executionCommand.update({ where: { attemptId_commandKey: { attemptId: blocked.attempt!.id, commandKey: "unsettled" } }, data: { effect: "confirmed", receipt: kind === "control" ? {} : { result: { state: "removed" } } } });
+  await approvals.resolve(f.approval.id, { decision: "approve" });
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: moduleId } })).toMatchObject({ activeHash: f.version.hash, executionFenceAt: null });
+  expect(await f.db.approval.count()).toBe(1);
+});

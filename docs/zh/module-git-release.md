@@ -1,6 +1,6 @@
 # 模块 Git 种子与官方发布
 
-Editor 应用已退役并移除，不再进入官方安装目录、生成契约或发行种子，见[退役记录](editor-retirement.md)。当前应用目录区分唯一内置 Agent、普通默认预装 Web/Notify/QQ/Author，以及 Coding/coding-web 等普通可选应用；仅 Mind、Remind 整应用暂停并保留源码和依赖材料。准确种子集合、来源与发行 commit 以本轮更新后的 `resources/module-git/lock.json` 和 `publish-plan.json` 为准；退役清理后的种子计数和构建验证由协调者补齐，不沿用早期十二、十三或十四份的快照。
+当前发行集合固定为 Pi、Web、Notify、Author、Mind、Chat、QQ 七个普通应用，默认预装前六个，QQ 按需安装。通用 Agent API 归 kernel，Pi 是可停用或移除的普通 Provider 应用。其他应用的源码与依赖材料可以保留在仓库，但不进入发行源码、Git 种子或默认初始化；Remind 仍暂停，Editor 已退役，见[退役记录](editor-retirement.md)。集合以 `build/manifest.ts` 为准；对应种子的来源与发行 commit 由同步后的 `resources/module-git/lock.json` 和 `publish-plan.json` 记录，不能用旧种子快照证明当前发行已完成验证。
 
 2026-11-08 的历史盘点仅 files/events/remind 的 repository 非空，其余为 null；这是当时的锁定元数据，不能承诺当前提交均有公开 upstream。官方仓库命名约定为 `chrona-core/chrona-module-<name>`；离线种子、历史公开仓库与当前提交发布核验分别记录。后续收口见[统一开发路线](development-roadmap.md)。
 
@@ -8,7 +8,7 @@ Editor 应用已退役并移除，不再进入官方安装目录、生成契约�
 
 ## 准备和审阅
 
-默认构建复制资源后，生成当前 Coding 所需契约，给当前种子集合的 staging 模块复制 `resources/module-git/LICENSE`，并给含第三方 bundle 的模块复制 `THIRD-PARTY-NOTICES.txt`，再消费固定种子。Editor 不再是生成或暂存目标。构建不会生成初始提交，也不依赖主仓库 `.git` 或宿主 commit 环境变量。
+默认构建复制资源后，生成当前入口会话材料和 Pi 依赖，给当前种子集合的 staging 模块复制 `resources/module-git/LICENSE`，并给含第三方 bundle 的模块复制 `THIRD-PARTY-NOTICES.txt`，再验证并复制固定种子。验证后按发行清单裁剪 staging 的 external 模块树，只保留上述七个应用；仓库中的其他源码树不受影响。构建不会生成初始提交，也不依赖主仓库 `.git` 或宿主 commit 环境变量。
 
 受版本控制的发行输入是 `resources/module-git/`：`lock.json`、当前集合的完整 `.bundle`、MIT `LICENSE`、`THIRD-PARTY-NOTICES.txt` 和不含本机路径的 `publish-plan.json`。默认构建、Docker、Nix 消费同一历史；`CHRONA_MODULE_GIT_SEEDS` 可显式覆盖种子目录，仍严格验证 checksum、commit 和源码 tree。
 
@@ -56,7 +56,7 @@ bun scripts/module-git-release.ts verify-published /absolute/path/to/seeds
 CHRONA_MODULE_GIT_SEEDS=/absolute/path/to/seeds bun run build
 ```
 
-构建逐项核对 bundle SHA256、完整性、main commit 和源码 tree；源码或生成契约不符时失败，不能静默创建另一条初始历史。以后官方更新先在真实独立仓库提交、更新固定种子，再交付主发行。修改生成 bundle 时，用相同 Bun 版本与参数的 metafile 核对实际依赖，更新第三方通知；第三方原始许可证和版权通知应完整保留。仍分发模块的第三方通知需覆盖其实际依赖，包括 Web 的 React/React DOM/scheduler、json-render、zod 和 Coding 生成契约所含依赖；各依赖保留原许可证。退役 Editor 的历史通知不构成继续打包该应用的理由。
+构建逐项核对 bundle SHA256、完整性、main commit 和源码 tree；源码或生成契约不符时失败，不能静默创建另一条初始历史。以后官方更新先在真实独立仓库提交、更新固定种子，再交付主发行。修改生成 bundle 时，用相同 Bun 版本与参数的 metafile 核对实际依赖，更新第三方通知；第三方原始许可证和版权通知应完整保留。仍分发模块的第三方通知需覆盖其实际依赖，包括 Web 的 React/React DOM/scheduler、json-render 和 zod；各依赖保留原许可证。退役 Editor 的历史通知不构成继续打包该应用的理由。
 
 归档包含 `resources/module-git/{name}.bundle` 与 `lock.json`，bundle 在源码根之外，不混入 `.git`、依赖或数据。运行构建产物、安装依赖与数据备份仍按现有机制保留；Git 只替代重复源码副本。
 

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, mock, test } from "bun:test";
 import { mkdtemp, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ExecutionPrincipal, ExecutionStart } from "@chrona/contracts/steward";
+import { moduleManifestSchema, type ExecutionPrincipal, type ExecutionStart } from "@chrona/contracts/steward";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
 import { createExecutions } from "./execution";
@@ -17,6 +17,7 @@ beforeEach(async () => {
   db = testDb();
   const workspace = await db.workspace.create({ data: { name: "execution-test" } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "coding", activeHash: "hash", status: "active" } });
+  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "hash", manifest: moduleManifestSchema.parse({ name: "coding", entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true }), source: "user", status: "approved", intent: {}, report: {} } });
   principal = { workspaceId: workspace.id, ownerId: "owner", caller: { kind: "module", moduleId: module.id, hash: "hash" } };
   owner = { ...principal, caller: { kind: "owner" } };
   const project = await mkdtemp(join(tmpdir(), "chrona-execution-project-"));
@@ -193,4 +194,30 @@ test.each([{ method: "select" as const, value: 0, options: ["first", "second"] }
   expect(await waiting).toEqual(command.answer);
   await expect(service.answer(principal, { ...command, commandKey: "stale" })).rejects.toMatchObject({ code: "conflict" });
   await channel.close();
+});
+
+test("local control settles across drain while reads, stop, and exact start/control replay retain authority", async () => {
+  const service = createExecutions(ports), ref = await service.start(principal, input), runs = createRuns(ports, principal.workspaceId);
+  await runs.claimNext("background");
+  if (principal.caller.kind !== "module") throw new Error("Fixture module missing");
+  const moduleId = principal.caller.moduleId;
+  const inject = mock(async () => { await db.module.update({ where: { id: moduleId }, data: { executionFenceAt: ports.now() } }); });
+  liveRuns.set(ref.runId, { inject, abort: async () => {}, done: new Promise(() => {}) });
+  const command = { ...ref, op: "send" as const, commandKey: "before-fence", text: "admitted" };
+  await service.send(principal, command);
+  expect(await db.executionCommand.findUniqueOrThrow({ where: { attemptId_commandKey: { attemptId: ref.attemptId, commandKey: command.commandKey } } })).toMatchObject({ effect: "confirmed" });
+  await service.send(principal, command);
+  expect(inject).toHaveBeenCalledTimes(1);
+  expect((await service.start(principal, input)).runId).toBe(ref.runId);
+  expect((await service.get(principal, input.workId)).runId).toBe(ref.runId);
+  expect((await service.list(principal, { limit: 10 })).works).toHaveLength(1);
+  await expect(service.send(principal, { ...command, commandKey: "fresh" })).rejects.toMatchObject({ code: "forbidden" });
+  await expect(service.start(principal, { ...input, commandKey: "fresh", workId: "fresh" })).rejects.toMatchObject({ code: "forbidden" });
+  await service.cancel(principal, { ...ref, op: "cancel", commandKey: "stop-under-fence" });
+  await runs.finish(ref.runId, { outcome: "finished", sessionId: null, error: null }, { stopEvidence: "provider_exited" });
+  const { assertExecutionModuleIdle } = await import("./execution-module-guard");
+  await db.$transaction(tx => assertExecutionModuleIdle(tx, moduleId));
+  await db.module.update({ where: { id: moduleId }, data: { activeHash: "changed" } });
+  await expect(service.start(principal, input)).rejects.toMatchObject({ code: "forbidden" });
+  await expect(service.get(principal, input.workId)).rejects.toMatchObject({ code: "forbidden" });
 });

@@ -3,7 +3,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } f
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { buildBinary, compileArgs, prepareReleaseProcessHelper } from "./build-binaries";
-import { buildArtifacts, buildTargets, currentBuildTarget, type BuildTargetName } from "../build/manifest";
+import { buildArtifacts, buildTargets, currentBuildTarget, omitPausedRuntimeModules, type BuildTargetName } from "../build/manifest";
 import { readElfInterpreter, readElfLibraryPathTags } from "../build/portable-elf";
 import { processCapability, spawnSupervised } from "../packages/process/src/index";
 
@@ -99,11 +99,10 @@ test("release stages a host-native guardian with platform stop evidence and the 
   } finally { rmSync(root, { recursive: true, force: true }); }
 }, 15_000);
 
-test("fixed module seeds preserve paused source materials and regenerate active application artifacts before release verification", async () => {
+test("fixed module seeds package exactly the seven current applications and regenerate active artifacts before release verification", async () => {
   const { cp, mkdtemp, mkdir, readFile, rm, writeFile } = await import("node:fs/promises");
   const { tmpdir } = await import("node:os");
   const { buildArtifacts } = await import("../build/manifest");
-  const { buildExecutionContracts } = await import("../build/execution-contracts");
   const { prepareModuleGitRelease } = await import("./module-git-release");
   const { prepareReleaseModules } = await import("./build-binaries");
   const root = await mkdtemp(join(tmpdir(), "chrona-release-generated-seed-"));
@@ -119,48 +118,33 @@ test("fixed module seeds preserve paused source materials and regenerate active 
       await writeFile(join(dir, "module.json"), JSON.stringify({ name: module.name, entry: "index.ts", keepAlive: true, effects: [], tests: ["test.ts"] }));
       await writeFile(join(dir, "index.ts"), "// entry\n");
     }
-    await buildExecutionContracts(join(resourcesRoot, "external"));
     await cp(join(import.meta.dirname, "../packages/engine/src/modules/steward/external/pi"), join(resourcesRoot, "external/pi"), { recursive: true, filter: path => !path.split(/[\\/]/).some(part => ["node_modules", "vendor", ".git"].includes(part)) });
     const { preparePiApplication } = await import("../build/agent-dependencies");
     await preparePiApplication(resourcesRoot);
     const { buildEntryConversations } = await import("../build/entry-conversations");
     await buildEntryConversations(resourcesRoot);
     const lock = await prepareModuleGitRelease({ root, resourcesRoot, seedDir, hostCommit: "a".repeat(40), hostTimestamp: "1735689600" });
-    const codingContract = await readFile(join(resourcesRoot, "external/coding/contract.js"), "utf8");
+    for (const name of ["coding", "coding-web", "events", "files", "mcp", "memory-local", "remind", "remote-execution", "editor", "unexpected-app"]) {
+      const dir = join(resourcesRoot, "external", name);
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, "module.json"), JSON.stringify({ name, entry: "index.ts" }));
+    }
     process.env.CHRONA_MODULE_GIT_SEEDS = seedDir;
     await prepareReleaseModules(resourcesRoot);
     expect(JSON.parse(await readFile(join(resourcesRoot, "module-git/lock.json"), "utf8"))).toEqual(lock);
-    expect(lock.modules).toHaveLength(14);
-    expect(lock.modules.some(module => module.name === "editor")).toBe(false);
-    expect(await Bun.file(join(resourcesRoot, "module-git/editor.bundle")).exists()).toBe(false);
-    expect(await Bun.file(join(resourcesRoot, "external/editor/module.json")).exists()).toBe(false);
-    expect([...buildArtifacts.pausedModuleResources]).toEqual(["external/remind"]);
-    for (const source of buildArtifacts.pausedModuleResources) {
-      expect(await Bun.file(join(resourcesRoot, source, "module.json")).exists()).toBe(false);
-      // Retained bundles record source provenance, but have no runtime installation tree.
-      expect(await Bun.file(join(resourcesRoot, "module-git", `${source.split("/").pop()}.bundle`)).exists()).toBe(true);
-    }
-    for (const name of ["web", "notify", "qq", "author", "files", "events", "memory-local", "mcp", "mind", "coding", "coding-web", "remote-execution", "pi"]) expect(await Bun.file(join(resourcesRoot, "external", name, "module.json")).exists()).toBe(true);
-    const { BUILTIN_MODULE_NAMES, OPTIONAL_EXTERNAL_MODULE_NAMES, PREINSTALLED_MODULE_NAMES } = await import("@chrona/contracts/steward");
-    for (const module of [{ name: "mind", source: "external/mind" }, { name: "coding", source: "external/coding" }, { name: "coding-web", source: "external/coding-web" }, { name: "remote-execution", source: "external/remote-execution" }] as const) {
-      const { name } = module;
-      expect(buildArtifacts.moduleGit.modules).toContainEqual(module);
+    const current = ["author", "chat", "mind", "notify", "pi", "qq", "web"];
+    expect(lock.modules.map(module => module.name).sort()).toEqual(current);
+    const { readdir } = await import("node:fs/promises");
+    expect((await readdir(join(resourcesRoot, "external"))).sort()).toEqual(current);
+    expect((await readdir(join(resourcesRoot, "module-git"))).filter(name => name.endsWith(".bundle")).sort()).toEqual(current.map(name => `${name}.bundle`));
+    for (const name of current) {
+      expect(await Bun.file(join(resourcesRoot, "external", name, "module.json")).exists()).toBe(true);
       expect(lock.modules.find(module => module.name === name)?.bundle).toBe(`${name}.bundle`);
-      expect(await Bun.file(join(resourcesRoot, "module-git", `${name}.bundle`)).exists()).toBe(true);
-      if (name === "mind") expect(PREINSTALLED_MODULE_NAMES as readonly string[]).toContain(name);
-      else {
-        expect(OPTIONAL_EXTERNAL_MODULE_NAMES as readonly string[]).toContain(name);
-        expect(PREINSTALLED_MODULE_NAMES as readonly string[]).not.toContain(name);
-      }
-      expect(BUILTIN_MODULE_NAMES).not.toContain(name);
     }
-    expect(await readFile(join(resourcesRoot, "external/coding/contract.js"), "utf8")).toBe(codingContract);
-    expect(buildArtifacts.moduleGit.modules).toContainEqual({ name: "mcp", source: "external/mcp" });
-    expect(lock.modules.find(module => module.name === "mcp")?.bundle).toBe("mcp.bundle");
-    expect(await Bun.file(join(resourcesRoot, "module-git/mcp.bundle")).exists()).toBe(true);
-    expect(buildArtifacts.moduleGit.modules).toContainEqual({ name: "author", source: "external/author" });
-    expect(lock.modules.find(module => module.name === "author")?.bundle).toBe("author.bundle");
-    expect(await Bun.file(join(resourcesRoot, "module-git/author.bundle")).exists()).toBe(true);
+    const { BUILTIN_MODULE_NAMES, OPTIONAL_EXTERNAL_MODULE_NAMES, PREINSTALLED_MODULE_NAMES } = await import("@chrona/contracts/steward");
+    expect([...PREINSTALLED_MODULE_NAMES]).toEqual(["pi", "web", "notify", "author", "mind", "chat"]);
+    expect(OPTIONAL_EXTERNAL_MODULE_NAMES).toContain("qq");
+    expect(BUILTIN_MODULE_NAMES).toEqual([]);
     expect(await Bun.file(join(resourcesRoot, "builtin/agent/module.json")).exists()).toBe(false);
     expect(lock.modules.find(module => module.name === "pi")?.bundle).toBe("pi.bundle");
     expect(await Bun.file(join(resourcesRoot, "module-git/pi.bundle")).exists()).toBe(true);
@@ -178,4 +162,24 @@ test("release manifest requires external modules and has no builtin packaging in
   expect(buildArtifacts.resources.some(resource => String(resource.to).startsWith("resources/builtin"))).toBe(false);
   expect(buildArtifacts.moduleGit.modules).toContainEqual({ name: "pi", source: "external/pi" });
   expect(buildArtifacts.moduleGit.modules.some(module => String(module.name) === "agent")).toBe(false);
+});
+
+test("release pruning preserves repository sources and removes every external tree outside the current manifest", async () => {
+  const { cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } = await import("node:fs/promises");
+  const root = await mkdtemp(join(tmpdir(), "chrona-release-pruning-"));
+  try {
+    const source = join(root, "source"), staged = join(root, "staged");
+    const current = ["author", "chat", "mind", "notify", "pi", "qq", "web"];
+    const retained = ["coding", "coding-web", "events", "files", "mcp", "memory-local", "remind", "remote-execution", "editor", "unexpected-app"];
+    for (const name of [...current, ...retained]) {
+      await mkdir(join(source, "external", name), { recursive: true });
+      await writeFile(join(source, "external", name, "module.json"), JSON.stringify({ name }));
+    }
+    await cp(source, staged, { recursive: true });
+    await omitPausedRuntimeModules(staged);
+    await omitPausedRuntimeModules(staged);
+    expect((await readdir(join(staged, "external"))).sort()).toEqual(current);
+    expect((await readdir(join(source, "external"))).sort()).toEqual([...current, ...retained].sort());
+    for (const name of retained) expect(JSON.parse(await readFile(join(source, "external", name, "module.json"), "utf8"))).toEqual({ name });
+  } finally { await rm(root, { recursive: true, force: true }); }
 });

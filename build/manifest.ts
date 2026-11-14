@@ -1,4 +1,4 @@
-import { rm } from "node:fs/promises";
+import { readdir, rm } from "node:fs/promises";
 import { resolve } from "node:path";
 
 export type BuildTargetName = keyof typeof buildTargets;
@@ -17,23 +17,14 @@ export const buildArtifacts = {
     seedDir: "resources/module-git",
     modules: [
       { name: "web", source: "external/web" },
-      { name: "mcp", source: "external/mcp" },
-      { name: "files", source: "external/files" },
       { name: "notify", source: "external/notify" },
-      { name: "events", source: "external/events" },
       { name: "pi", source: "external/pi" },
       { name: "qq", source: "external/qq" },
       { name: "author", source: "external/author" },
-      { name: "remind", source: "external/remind" },
       { name: "mind", source: "external/mind" },
-      { name: "memory-local", source: "external/memory-local" },
-      { name: "coding", source: "external/coding" },
-      { name: "coding-web", source: "external/coding-web" },
-      { name: "remote-execution", source: "external/remote-execution" },
+      { name: "chat", source: "external/chat" },
     ],
   },
-  // Seeds keep provenance for retained sources; these trees must never ship as runtime packages.
-  pausedModuleResources: ["external/remind"],
   resources: [
     { from: "apps/server/src/static/rescue.html", to: "resources/rescue.html", required: true },
     { from: "prisma/schema.prisma", to: "resources/prisma/schema.prisma", required: true },
@@ -66,9 +57,15 @@ export const buildArtifacts = {
   ] satisfies ReleaseResource[],
 } as const;
 
-/** Apply only to staged distribution resources, after verifying all fixed source seeds. */
+/** Apply only to staged distribution resources, after verifying the current release seeds. */
 export async function omitPausedRuntimeModules(resourcesRoot: string): Promise<void> {
-  for (const source of buildArtifacts.pausedModuleResources) await rm(resolve(resourcesRoot, source), { recursive: true, force: true });
+  const externalRoot = resolve(resourcesRoot, "external");
+  const shipped = new Set<string>(buildArtifacts.moduleGit.modules.map(module => module.name));
+  for (const entry of await readdir(externalRoot, { withFileTypes: true })) {
+    if ((entry.isDirectory() || entry.isSymbolicLink()) && !shipped.has(entry.name)) {
+      await rm(resolve(externalRoot, entry.name), { recursive: true, force: true });
+    }
+  }
 }
 
 export const buildTargets = {

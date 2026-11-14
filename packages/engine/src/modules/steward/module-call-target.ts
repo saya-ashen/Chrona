@@ -16,15 +16,16 @@ export function assertExpectedTarget(resolved: Target | CallError, expected?: Ex
   if (!expected) return;
   const parsed = expectedModuleTargetSchema.safeParse(expected);
   if (!parsed.success) throw new CallError("invalid", "Invalid expected target identity");
-  if (resolved instanceof CallError || resolved.module.id !== parsed.data.moduleId) throw new CallError("conflict", "Registered target identity changed; register again");
+  if (resolved instanceof CallError || resolved.module.id !== parsed.data.moduleId ||
+    parsed.data.hash !== undefined && resolved.module.activeHash !== parsed.data.hash) throw new CallError("conflict", "Registered target identity or version changed; register again");
 }
 /** Kernel-only closure used at the supervisor's final never-sent boundary. */
 export function targetFence(ports: StewardPorts, workspaceId: string, resolved: Target, caller: Caller) {
   return async () => {
     const current = await resolveTarget(ports.db, workspaceId, `${resolved.module.name}.${resolved.tool.name}`);
     try {
-      assertExpectedTarget(current, { moduleId: resolved.module.id });
-      if (current instanceof CallError || current.module.activeHash !== resolved.module.activeHash) throw new CallError("conflict", "Target activation changed before delivery");
+      assertExpectedTarget(current, { moduleId: resolved.module.id, hash: resolved.module.activeHash });
+      if (current instanceof CallError) throw current;
       if (!await admitted(ports.db, caller, current.tool, workspaceId)) throw new CallError("forbidden", "Target no longer accepts this caller");
     } catch (error) { throw Object.assign(error instanceof Error ? error : new Error(String(error)), { stage: "unavailable" }); }
   };
@@ -47,7 +48,8 @@ export async function checkInvocationTarget(ports: StewardPorts, row: { id: stri
     if (!previous?.targetBound) return false;
     const current = { moduleId: resolved.module.id };
     const binding = { moduleId: previous.targetModuleId };
-    if (differentBinding(binding, current)) return false;
+    // A reviewed version must survive queueing and retries; unpinned callbacks still follow the active version.
+    if (differentBinding(binding, current) || previous.targetHash !== null && previous.targetHash !== resolved.module.activeHash) return false;
     // Resolve and claim the exact identity inside the transaction. Supervisor rechecks id/hash before sending.
     const active = await resolveTarget(tx, row.workspaceId, `${row.target}.${row.tool}`);
     if (differentActivation(active, resolved)) return false;

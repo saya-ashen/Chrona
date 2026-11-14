@@ -6,10 +6,9 @@ export const RESERVED_ENTRY_NAMES = ["rescue"] as const;
 /** Private kernel host identities routed internally; never installable applications. */
 export const LOCAL_CAPABILITY_NAMES = ["runtime-callback", "workspace-local"] as const;
 export const BUILTIN_MODULE_NAMES = [] as const;
-export const PREINSTALLED_MODULE_NAMES = ["pi", "web", "notify", "qq", "author", "mind"] as const;
-export const OPTIONAL_EXTERNAL_MODULE_NAMES = ["memory-local", "coding", "coding-web", "mcp", "files", "events", "remind", "remote-execution"] as const;
-/** Persisted initialization receipts retain explicit skipped entries for paused packages. */
-const INITIALIZATION_MODULE_NAMES = ["pi", "web", "notify", "qq", "author", "remind", "mind"] as const;
+export const PREINSTALLED_MODULE_NAMES = ["pi", "web", "notify", "author", "mind", "chat"] as const;
+/** QQ ships as an optional app; retained catalog entries are unavailable without release resources. */
+export const OPTIONAL_EXTERNAL_MODULE_NAMES = ["qq", "memory-local", "coding", "coding-web", "mcp", "files", "events", "remind", "remote-execution"] as const;
 export const OFFICIAL_EXTERNAL_MODULE_NAMES = [...PREINSTALLED_MODULE_NAMES, ...OPTIONAL_EXTERNAL_MODULE_NAMES] as const;
 export const moduleVersionHashSchema = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/);
 export const moduleOriginSchema = z.enum(["kernel", "builtin", "external"]);
@@ -46,13 +45,27 @@ export const moduleInstallResultSchema = z.object({
   error: z.object({ code: z.enum(["invalid", "forbidden", "conflict", "not_found", "failed", "unavailable"]), reason: z.string(), message: z.string() }).strict().nullable(),
 }).strict();
 export type ModuleInstallResult = z.infer<typeof moduleInstallResultSchema>;
+const initializationPackageSchema = z.object({
+  requestKey: z.string(), attempts: z.number().int().min(1), status: z.enum(["pending", "building", "pending_approval", "installed", "failed", "unavailable", "skipped"]),
+  moduleId: z.string().nullable(), hash: z.string().nullable(), approvalId: z.string().nullable(), error: moduleInstallResultSchema.shape.error,
+}).strict();
+const initializationPackagesSchema = z.object({
+  pi: initializationPackageSchema, web: initializationPackageSchema, notify: initializationPackageSchema,
+  author: initializationPackageSchema, mind: initializationPackageSchema, remind: initializationPackageSchema,
+});
+// Only the exact historical receipt gains Chat. Missing or malformed entries still fail
+// validation; QQ remains evidence, including an interrupted installation's receipt.
+const legacyInitializationPackagesSchema = initializationPackagesSchema.extend({ qq: initializationPackageSchema }).strict().transform(packages => ({
+  ...packages,
+  chat: { requestKey: "initialize:v1:chat:1", attempts: 1, status: "skipped" as const, moduleId: null, hash: null, approvalId: null, error: null },
+}));
 /** Private initialization receipt parsing; not a public installation tool contract. */
 export const moduleInitializationStateSchema = z.object({
   version: z.literal(1), status: z.enum(["pending", "complete"]),
-  packages: z.record(z.enum(INITIALIZATION_MODULE_NAMES), z.object({
-    requestKey: z.string(), attempts: z.number().int().min(1), status: z.enum(["pending", "building", "pending_approval", "installed", "failed", "unavailable", "skipped"]),
-    moduleId: z.string().nullable(), hash: z.string().nullable(), approvalId: z.string().nullable(), error: moduleInstallResultSchema.shape.error,
-  }).strict()),
+  packages: z.union([
+    initializationPackagesSchema.extend({ chat: initializationPackageSchema, qq: initializationPackageSchema.optional() }).strict(),
+    legacyInitializationPackagesSchema,
+  ]),
 }).strict();
 export type ModuleInitializationState = z.infer<typeof moduleInitializationStateSchema>;
 

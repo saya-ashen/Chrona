@@ -19,10 +19,13 @@ const emptyToday = { approvals: [], problems: [], upcoming: [], updates: [], app
 const settings = { settings: { timezone: "Asia/Shanghai", moduleModel: null } };
 const fixtureApp = { id: "fixture-id", name: "fixture", status: "active", activeHash: "active", origin: "external", capabilities: {}, health: {} };
 const links: { module: string; moduleId: string; id: string; title: string; purpose?: "settings" }[] = [
+  { module: "chat", moduleId: "chat-id", id: "main", title: "Chat" },
+  { module: "chat", moduleId: "chat-id", id: "main", title: "重复的 Chat 主页面" },
   ...["document", "workspace"].map(id => ({ module: "fixture", moduleId: "fixture-id", id, title: id === "document" ? "文档应用" : "编码工作台" })),
   { module: "fixture", moduleId: "fixture-id", id: "preferences", title: "应用偏好", purpose: "settings" },
 ];
 function registered(id: string) {
+  if (id === "chat") return { module: "chat", moduleId: "chat-id", id: "main", title: "Chat", revision: 1, layout: "document", data: {}, spec: { root: "chat", elements: { chat: { type: "Text", props: { text: "Chat 应用内容" } } } } };
   const documentSpec = { root: "doc", elements: {
     doc: { type: "fixture:Document", props: { title: "文档应用内容" }, children: ["body", "action"] },
     body: { type: "Text", props: { text: "模块注册的普通文档页" } },
@@ -93,6 +96,7 @@ const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
   if (!authenticated) return json({ message: "Unauthorized" }, 401);
   if (endpoint === "/events") return new Response(new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode(": connected\n\n")); } }), { headers: { "content-type": "text/event-stream" } });
   if (endpoint === "/pages") return json(links);
+  if (endpoint === "/pages/chat/main") return json(registered("chat"));
   if (endpoint === "/pages/fixture/slow") { await new Promise<void>(resolve => { delayed = resolve; }); return json(registered("workspace")); }
   if (endpoint === "/pages/fixture/broken") return json({ message: "受控页面故障" }, 500);
   if (endpoint === "/pages/fixture/old-session") { await new Promise<void>(resolve => { delayedUnauthorized = resolve; }); return json({ message: "old session expired" }, 401); }
@@ -271,7 +275,139 @@ async function logoutCookie(migrationContext: BrowserContext, migration: Browser
   await migrationContext.close();
   password = initialPassword; canSetup = true; sessions.clear();
 }
+// Test the shell/renderer boundary independently of the application's implementation.
+// The fixture Chat consumes ?new=1 itself, exactly as a registered application can.
+// eslint-disable-next-line complexity, max-lines-per-function, max-statements -- Keep the isolated routing fixture and its browser lifecycle assertions together.
+async function chatRouting() {
+  const renderer = `
+    export function registeredDeps(page, web) {
+      return { call: (target, args) => web('/call', { method: 'POST', body: { target, args, page: { module: page.module, id: page.id, revision: page.revision } } }) };
+    }
+    export function mount(element, page, deps) {
+      element.textContent = 'Chat 应用内容';
+      const url = new URL(location.href);
+      if (url.searchParams.get('new') === '1') {
+        void deps.call('chat.new', { url: url.pathname + url.search + url.hash });
+        url.searchParams.delete('new');
+        history.replaceState(null, '', url);
+      }
+      return () => {};
+    }
+    export function mountSystem(element, params) {
+      element.textContent = JSON.stringify(params);
+      return () => {};
+    }
+  `;
+  let fixtureAuth = true, manifestStatus = 200, inventoryMissing = false, holdManifest = false;
+  let release: (() => void) | undefined;
+  const delegated: { target: string; args: { url: string }; page: { module: string; id: string } }[] = [];
+  const requested: string[] = [];
+  const fixture = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(request) {
+    const path = new URL(request.url).pathname;
+    requested.push(path);
+    if (path === "/app.js") return new Response(app, { headers: { "content-type": "text/javascript" } });
+    if (path === "/pages.js") return new Response(renderer, { headers: { "content-type": "text/javascript" } });
+    if (path === "/style.css") return new Response("");
+    if (path === "/api/auth/status") return Response.json({ passwordSet: true, authenticated: fixtureAuth, canSetup: false });
+    if (path === "/api/auth/logout") { fixtureAuth = false; return Response.json({ ok: true }); }
+    if (path === "/api/web/events") return new Response(new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode(": connected\n\n")); } }));
+    if (path === "/api/web/pages") return Response.json(inventoryMissing ? [] : links);
+    if (path === "/api/web/pages/chat/main") {
+      const status = manifestStatus;
+      if (holdManifest) await new Promise<void>(resolve => { release = resolve; });
+      return Response.json(status === 200 ? registered("chat") : { message: status === 404 ? "Chat 主页面未登记" : "Chat 应用已停用" }, { status });
+    }
+    if (path === "/api/web/call") { delegated.push(await request.json() as typeof delegated[number]); return Response.json({ ok: true }); }
+    if (path.startsWith("/api/")) throw new Error(`Unexpected routing fixture request: ${path}`);
+    return new Response(index, { headers: { "content-type": "text/html", "content-security-policy": csp } });
+  } });
+  const context = await browser.createBrowserContext(), page = await context.newPage();
+  page.on("pageerror", error => failures.push(String(error)));
+  const current = () => page.$$eval('header a[aria-current="page"]', links => links.map(link => link.getAttribute("href")));
+  const settled = () => page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  const chatNav = async () => {
+    await page.waitForSelector('header a[href="/p/chat/main"]');
+    assert.deepEqual(await page.$$eval('header a', links => links.filter(link => link.getAttribute("href") === "/p/chat/main").map(link => link.textContent)), ["Chat"]);
+    assert.equal(await page.$$('header a[href="/chat"], header a[href="/conversations"], header a[href="/history"], header a[href^="/sessions/"]').then(links => links.length), 0);
+  };
+  try {
+    await page.goto(new URL("/chat?entry=direct#latest", fixture.url).href);
+    await text(page, "Chat 应用内容");
+    assert.equal(new URL(page.url()).pathname + new URL(page.url()).search + new URL(page.url()).hash, "/p/chat/main?entry=direct#latest");
+    await chatNav(); assert.deepEqual(await current(), ["/p/chat/main"]);
+    for (const alias of ["/chat?draft=a%20b#latest", "/conversations?draft=a%20b#latest"]) {
+      const previousLength = await page.evaluate(() => history.length);
+      await navigate(page, alias, "Chat 应用内容");
+      assert.equal(new URL(page.url()).pathname + new URL(page.url()).search + new URL(page.url()).hash, "/p/chat/main?draft=a%20b#latest");
+      assert.equal(await page.evaluate(() => history.length), previousLength + 1, "alias replaces its entry without adding another history entry");
+      assert.deepEqual(await current(), ["/p/chat/main"]);
+    }
+    for (const path of ["/chat/new?keep=two&new=0#draft", "/p/chat/main?keep=two&new=1#draft"]) {
+      const before = delegated.length;
+      const call = page.waitForResponse(response => response.url().endsWith("/api/web/call"));
+      await navigate(page, path, "Chat 应用内容"); await call;
+      await page.waitForFunction(() => !new URL(location.href).searchParams.has("new"));
+      assert.equal(delegated.length, before + 1, "Chat owns one new-session delegation");
+      assert.deepEqual(delegated.at(-1), { target: "chat.new", args: { url: "/p/chat/main?keep=two&new=1#draft" }, page: { module: "chat", id: "main", revision: 1 } });
+      await navigate(page, "/today?from=chat", '"name":"today"');
+      await page.goBack(); await text(page, "Chat 应用内容");
+      assert.equal(new URL(page.url()).search, "?keep=two");
+      assert.equal(delegated.length, before + 1, "browser back cannot delegate the consumed new flag again");
+    }
+    checks.push("one Chat nav, canonical aliases preserve queries, and Chat owns one-time new delegation");
+    for (const path of ["/history?filter=web#latest", "/sessions/legacy-id?tab=messages", "/sessions/id%20with%20spaces"]) {
+      await navigate(page, "/today", '"name":"today"');
+      const before = delegated.length;
+      const previousLength = await page.evaluate(() => history.length);
+      await navigate(page, path, "Chat 应用内容");
+      const original = new URL(path, fixture.url), redirected = new URL(page.url());
+      assert.equal(redirected.pathname + redirected.search + redirected.hash, "/p/chat/main" + original.search + original.hash);
+      assert.equal(await page.evaluate(() => history.length), previousLength + 1, "legacy redirect replaces the navigation entry");
+      assert.equal(delegated.length, before, "legacy redirects do not create a Chat session");
+      assert.deepEqual(await current(), ["/p/chat/main"]);
+      await chatNav();
+      await page.reload(); await text(page, "Chat 应用内容");
+      assert.equal(delegated.length, before, "reload does not create a Chat session");
+    }
+    assert(!requested.some(path => path === "/api/web/history" || path.startsWith("/api/web/sessions")), "legacy routes never request old conversation data");
+    checks.push("history and legacy session routes redirect to Chat without reading old conversations");
+    inventoryMissing = true;
+    // Refresh the display snapshot immediately; no real 30-second wait.
+    await page.evaluate(() => { const now = Date.now; Date.now = () => now() + 31000; });
+    for (const status of [404, 409, 503]) {
+      manifestStatus = status;
+      await navigate(page, "/chat", '"name":"chat-unavailable"');
+      const unavailable = JSON.parse(await page.$eval("main", main => main.textContent!)) as { name: string; message: string };
+      assert(unavailable.message.includes("Chat 应用页面暂时无法打开"));
+      assert(unavailable.message.includes(status === 404 ? "Chat 主页面未登记" : "Chat 应用已停用"));
+      assert(unavailable.message.includes("请前往应用"));
+      assert.deepEqual(await current(), ["/p/chat/main"]); await chatNav();
+    }
+    checks.push("missing inventory/manifest and unavailable Chat render an explicit system-page failure");
+    manifestStatus = 200; holdManifest = true;
+    const pending = page.waitForRequest(request => request.url().endsWith("/api/web/pages/chat/main"));
+    await page.evaluate(() => document.querySelector<HTMLAnchorElement>('header a[href="/p/chat/main"]')!.click()); await pending;
+    await navigate(page, "/today", '"name":"today"');
+    const staleResponse = page.waitForResponse(response => response.url().endsWith("/api/web/pages/chat/main"));
+    assert(release); release(); await staleResponse; await settled();
+    await text(page, '"name":"today"'); assert.deepEqual(await current(), ["/today"]);
+    const loggedOutPending = page.waitForRequest(request => request.url().endsWith("/api/web/pages/chat/main"));
+    await page.evaluate(() => document.querySelector<HTMLAnchorElement>('header a[href="/p/chat/main"]')!.click()); await loggedOutPending;
+    await page.click("#logout"); await text(page, '"name":"login"');
+    const loggedOutResponse = page.waitForResponse(response => response.url().endsWith("/api/web/pages/chat/main"));
+    assert(release); release(); await loggedOutResponse; await settled();
+    await text(page, '"name":"login"');
+    assert.equal(await page.$eval("body", body => body.className), "web-shell-login");
+    assert.equal(await page.$$("header a[data-page]").then(links => links.length), 0);
+    fixtureAuth = true; holdManifest = false; manifestStatus = 401;
+    await page.reload(); await text(page, '"name":"login"');
+    assert.equal(await page.$eval("body", body => body.className), "web-shell-login");
+    assert(!requested.includes("/api/web/chat"), "the shell never falls back to the old composer endpoint");
+    checks.push("Chat manifest navigation/auth races and 401 preserve the current route and login shell");
+  } finally { release?.(); await context.close(); fixture.stop(true); }
+}
 try {
+  await chatRouting();
   await failedStatus();
   await firstSetup();
   const { migrationContext, migration } = await bootstrapMigration();
@@ -298,7 +434,7 @@ try {
     await page.waitForSelector('header a[data-page]');
     assert.deepEqual(today.active, ["/today"]);
     await capture(page, `today-${width}`);
-    for (const [path, expected, current] of [["/chat", "新会话", "/chat"], ["/apps", "应用", "/apps"], ["/apps/missing", "没有这个应用", "/apps"], ["/apps/system/agent", "系统能力内容", "/apps"], ["/activity", "活动", "/activity"], ["/settings", "保存内核额度", "/settings"]]) {
+    for (const [path, expected, current] of [["/chat", "Chat 应用内容", "/p/chat/main"], ["/apps", "应用", "/apps"], ["/apps/missing", "没有这个应用", "/apps"], ["/apps/system/agent", "系统能力内容", "/apps"], ["/activity", "活动", "/activity"], ["/settings", "保存内核额度", "/settings"]]) {
       await navigate(page, path!, expected!);
       const state = await geometry(page, false, `${width}: ${path}`);
       assert.deepEqual(state.active, [current]); assert.equal(state.accent, today.accent); assert.equal(state.bg, today.bg);

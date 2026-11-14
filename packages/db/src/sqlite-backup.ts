@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   copyFileSync,
   existsSync,
@@ -289,6 +290,20 @@ function restoreWithLock(
   return { sourcePath: prepared.sourcePath, backupPath: prepared.databasePath, recoveryPath: prepared.recoveryPath };
 }
 
+/** The archive validator permits only regular files/directories inside this private stage. */
+function stampRestoredAppDirectories(stage: string): void {
+  const appData = resolve(stage, "platform", "data");
+  if (!lstatSync(appData, { throwIfNoEntry: false })?.isDirectory()) return;
+  // Apps use this shared generation to notice that private state came from a restore.
+  const marker = `${JSON.stringify({ version: 1, id: randomUUID(), restoredAt: new Date().toISOString() })}\n`;
+  for (const app of readdirSync(appData, { withFileTypes: true })) {
+    if (!app.isDirectory()) continue;
+    const path = resolve(appData, app.name, ".chrona-restore.json");
+    writeFileSync(path, marker, { mode: 0o600 });
+    secureGeneratedFile(path);
+  }
+}
+
 export function restoreSqliteDatabase(
   databaseUrl: string,
   inputPath: string,
@@ -308,6 +323,12 @@ export function restoreSqliteDatabase(
       throw new Error("Chrona platform, sessions or secrets directories are non-empty or unsafe. Pass --force to replace them.");
     }
     const stage = stageDataFiles(options.dataDir, `${resolve(inputPath)}.tar`);
+    try {
+      stampRestoredAppDirectories(stage);
+    } catch (error) {
+      rmSync(stage, { recursive: true, force: true });
+      throw error;
+    }
     let result: ReturnType<typeof restoreWithLock> | undefined;
     replaceDataFiles(options.dataDir, stage, () => {
       result = restoreWithLock(lock, databaseUrl, inputPath, options);

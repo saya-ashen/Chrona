@@ -106,6 +106,67 @@ async function writeTypes(name: string, dir: string, target: string, entries: Ma
   return Object.fromEntries([...entries].map(([key, entry]) => [key, `./types/${portable(relative(dir, useSource ? entry : entry.replace(/\.[cm]?tsx?$/, ".d.ts")))}`]));
 }
 
+/** Canonicalize Bun's variable chunk names without merging distinct module instances. */
+export async function canonicalizeModuleChunks(outputs: readonly Pick<Bun.BuildArtifact, "path" | "kind">[]): Promise<void> {
+  const chunks = new Set(outputs.filter(output => output.kind === "chunk").map(output => resolve(output.path)));
+  if (!chunks.size) return;
+  const files = new Map(await Promise.all(outputs.filter(output => output.kind === "chunk" || output.kind === "entry-point").map(async output => {
+    const path = resolve(output.path), text = await readFile(path, "utf8");
+    const source = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+    const imports: { start: number; end: number; path: string }[] = [];
+    function visit(node: ts.Node) {
+      const specifier = ts.isImportDeclaration(node) || ts.isExportDeclaration(node) ? node.moduleSpecifier
+        : ts.isCallExpression(node) && (node.expression.kind === ts.SyntaxKind.ImportKeyword || ts.isIdentifier(node.expression) && node.expression.text === "require") ? node.arguments[0] : undefined;
+      if (specifier && ts.isStringLiteralLike(specifier) && specifier.text.startsWith(".")) {
+        const dependency = resolve(dirname(path), specifier.text);
+        if (chunks.has(dependency)) imports.push({ start: specifier.getStart(source), end: specifier.end, path: dependency });
+      }
+      ts.forEachChild(node, visit);
+    }
+    visit(source);
+    return [path, { text, imports: imports.sort((a, b) => a.start - b.start) }] as const;
+  })));
+  // Anchor identity in stable entry paths and the first traversal of import sites
+  // in source order. Bun's chunk names and output enumeration never order this
+  // walk; repeated imports of the same original chunk retain a single identity.
+  let common = dirname(files.keys().next().value!);
+  while ([...files.keys()].some(path => !path.startsWith(common + sep))) common = dirname(common);
+  const identities = new Map<string, string>();
+  function identify(path: string, identity: string) {
+    if (identities.has(path)) return;
+    identities.set(path, identity);
+    files.get(path)!.imports.forEach((specifier, index) => identify(specifier.path, `${identity}/${index}`));
+  }
+  for (const path of [...files.keys()].filter(path => !chunks.has(path)).sort()) identify(path, JSON.stringify(portable(relative(common, path))));
+  const rewritten = new Map<string, { path: string; text: string }>();
+  const visiting: string[] = [];
+  function rewrite(path: string): { path: string; text: string } {
+    const done = rewritten.get(path);
+    if (done) return done;
+    if (visiting.includes(path)) throw new Error(`Cannot canonicalize cyclic module chunks: ${[...visiting, path].map(file => portable(file)).join(" -> ")}`);
+    visiting.push(path);
+    const file = files.get(path)!;
+    let text = file.text;
+    for (const specifier of file.imports.toReversed()) {
+      const dependency = rewrite(specifier.path);
+      const target = portable(relative(dirname(path), dependency.path));
+      text = text.slice(0, specifier.start) + JSON.stringify(target.startsWith(".") ? target : `./${target}`) + text.slice(specifier.end);
+    }
+    const identity = identities.get(path);
+    if (identity === undefined) throw new Error(`Cannot canonicalize module chunk unreachable from an entrypoint: ${portable(path)}`);
+    const result = { path: chunks.has(path) ? join(dirname(path), `chunk-${createHash("sha256").update(JSON.stringify([identity, text])).digest("hex")}.js`) : path, text };
+    visiting.pop();
+    rewritten.set(path, result);
+    return result;
+  }
+  // Resolve the entire graph before touching files, so unsupported cycles leave
+  // the original build intact. Only module specifiers change, never string data.
+  for (const path of files.keys()) rewrite(path);
+  for (const file of rewritten.values()) await writeFile(file.path, file.text);
+  const retained = new Set([...rewritten.values()].map(file => file.path));
+  for (const path of chunks) if (!retained.has(path)) await rm(path);
+}
+
 /**
  * Ship ordinary packages with bundled runtime exports and their real type graph.
  * Third-party implementation dependencies are bundled, with their licenses; no
@@ -133,6 +194,7 @@ export async function assembleModuleDependencies(moduleDir: string, sourceRoot =
       });
     } }], outdir: join(target, "runtime"), naming: { entry: "[dir]/[name].js", chunk: "chunk-[hash].js" } });
     if (!built.success) throw new AggregateError(built.logs, `Module dependency bundle failed: ${name}`);
+    await canonicalizeModuleChunks(built.outputs);
     // Bun's entry paths are relative to their common ancestor.
     let common = dirname([...runtimeEntries.values()][0]!);
     while ([...runtimeEntries.values()].some(entry => !entry.startsWith(common + sep))) common = dirname(common);

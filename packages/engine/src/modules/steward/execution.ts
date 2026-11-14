@@ -7,6 +7,7 @@ import type { StewardPorts } from "./ports";
 import { CallError } from "./module-calls";
 import { createRuns, createRunSession, liveRuns } from "./runs";
 import { createProviderControl, validateExecutionAnswer } from "./provider-channel";
+import { assertRetainedExecutionPrincipal } from "./execution-module-guard";
 import { assertExecutionPrincipal } from "./execution-principal";
 import { isExecutionControlValidationError, markExecutionControlRejected } from "./execution-control-error";
 import { registerWorkspaceModule } from "./local-workspace";
@@ -34,7 +35,7 @@ async function unique(tx: Prisma.TransactionClient, principal: ExecutionPrincipa
 /** Bind a fresh context or the exact caller's stopped context; owner read authority alone cannot resume it. */
 async function executionSessionIn(ports: StewardPorts, tx: Prisma.TransactionClient, principal: ExecutionPrincipal, ref: ExecutionStart["resumeFrom"], project: ExecutionProjectGrant) {
   if (!ref) {
-    const session = await createRunSession(tx, principal.workspaceId, "module", ports.now(), principal.caller.kind === "module" ? { moduleId: principal.caller.moduleId } : {});
+    const session = await createRunSession(tx, principal.workspaceId, principal.caller.kind === "module" ? "module" : "web", ports.now(), principal.caller.kind === "module" ? { moduleId: principal.caller.moduleId } : {});
     return { sessionId: session.id, logDir: join(ports.dataDir, "sessions", session.id) };
   }
   const source = await unique(tx, principal, { id: ref.attemptId, runId: ref.runId, workId: ref.workId,
@@ -52,20 +53,21 @@ async function assertLatestContext(tx: Prisma.TransactionClient, sessionId: stri
 }
 export function createExecutions(ports: StewardPorts): ExecutionPorts {
   async function read(principal: ExecutionPrincipal, where: Prisma.ExecutionAttemptWhereInput) {
-    return ports.db.$transaction(async tx => { await assertExecutionPrincipal(tx, principal); return executionView(await unique(tx, principal, where)); });
+    return ports.db.$transaction(async tx => { await assertRetainedExecutionPrincipal(tx, principal); return executionView(await unique(tx, principal, where)); });
   }
   return {
     async start(principal, input) {
       const store = events(ports);
       const result = await ports.db.$transaction(async tx => {
         await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${principal.workspaceId}`;
-        await assertExecutionPrincipal(tx, principal);
+        await assertRetainedExecutionPrincipal(tx, principal);
         const callerKey = executionCallerKey(principal), requestDigest = executionDigest(input);
         const existing = await tx.executionAttempt.findUnique({ where: { workspaceId_ownerId_callerKey_commandKey: { workspaceId: principal.workspaceId, ownerId: principal.ownerId, callerKey, commandKey: input.commandKey } }, include: { run: true } });
         if (existing) {
           if (existing.requestDigest !== requestDigest || principal.caller.kind === "module" && existing.callerHash !== principal.caller.hash) throw new CallError("conflict", "Start key belongs to a different request or module version");
           return { view: executionView(existing), queued: false };
         }
+        await assertExecutionPrincipal(tx, principal);
         const project = await trustedExecutionProject(ports, principal, input.projectRef);
         if (await tx.executionAttempt.count({ where: { ...executionScope(principal), callerKey, workId: input.workId } })) throw new CallError("conflict", "Work already has an execution");
         const session = await executionSessionIn(ports, tx, principal, input.resumeFrom, project);
@@ -90,7 +92,7 @@ export function createExecutions(ports: StewardPorts): ExecutionPorts {
     lookupStart: (principal, commandKey) => read(principal, { commandKey }),
     async resultSource(principal, input) {
       const snapshot = await ports.db.$transaction(async tx => {
-        await assertExecutionPrincipal(tx, principal);
+        await assertRetainedExecutionPrincipal(tx, principal);
         const row = await unique(tx, principal, { id: input.attemptId, runId: input.runId, workId: input.workId });
         const delivery = row.targetBinding && row.stopConfirmedAt ? await tx.executionDelivery.findUnique({ where: { attemptId: row.id } }) : null;
         const changes = (delivery?.final as import("@chrona/contracts/steward").ExecutionDeliveryFinal | null)?.changes;
@@ -101,12 +103,12 @@ export function createExecutions(ports: StewardPorts): ExecutionPorts {
       const changes = row.stopConfirmedAt && !row.targetBinding
         ? await runtimeCall<import("@chrona/contracts/steward").ExecutionResultSource["changes"]>(ports, principal.workspaceId, "workspace-local.result", { attemptId: row.id })
         : snapshot.changes;
-      await assertExecutionPrincipal(ports.db, principal);
+      await assertRetainedExecutionPrincipal(ports.db, principal);
       return { ...executionRef(row), baseline: executionBaseline(row.baseline), ...(changes ? { changes } : {}) };
     },
     async list(principal, input) {
       return ports.db.$transaction(async tx => {
-        await assertExecutionPrincipal(tx, principal);
+        await assertRetainedExecutionPrincipal(tx, principal);
         if (input.after) await unique(tx, principal, { id: input.after });
         const rows = await tx.executionAttempt.findMany({ where: { ...executionScope(principal), ...(input.after ? { id: { gt: input.after } } : {}) }, include: { run: true }, orderBy: { id: "asc" }, take: input.limit + 1 });
         const page = rows.slice(0, input.limit);
@@ -131,7 +133,7 @@ async function admitExecutionControl(ports: StewardPorts, principal: ExecutionPr
   try {
     return await ports.db.$transaction(async tx => {
       await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${principal.workspaceId}`;
-      await assertExecutionPrincipal(tx, principal);
+      await assertRetainedExecutionPrincipal(tx, principal);
       let row = await unique(tx, principal, { id: input.attemptId, workId: input.workId, runId: input.runId });
       const digest = executionDigest(input);
       const receipt = await tx.executionCommand.findUnique({ where: { attemptId_commandKey: { attemptId: row.id, commandKey: input.commandKey } } });
@@ -139,6 +141,7 @@ async function admitExecutionControl(ports: StewardPorts, principal: ExecutionPr
         if (receipt.operation !== input.op || receipt.requestDigest !== digest) throw new CallError("conflict", "Command key was used for a different request");
         return { row, replay: true };
       }
+      if (input.op !== "cancel") await assertExecutionPrincipal(tx, principal);
       await assertLiveControl(ports, tx, row, input);
       const now = ports.now();
       const command = { attemptId: row.id, commandKey: input.commandKey, operation: input.op, requestDigest: digest, receipt: { accepted: true, effect: "unknown" }, effect: "unknown", createdAt: now };
@@ -163,8 +166,15 @@ async function controlExecution(ports: StewardPorts, principal: ExecutionPrincip
     const application = await admitApplicationControl(ports, principal, input);
     if (application) return executionView(application);
     const result = await admitExecutionControl(ports, principal, input);
-    if (!result.replay) await deliverExecutionControl(ports, principal, input, result.row);
-    return input.op === "cancel" ? ports.db.$transaction(async tx => { await assertExecutionPrincipal(tx, principal); return executionView(await unique(tx, principal, { id: result.row.id })); }) : executionView(result.row);
+    if (!result.replay) {
+      await deliverExecutionControl(ports, principal, input, result.row);
+      await ports.db.$transaction(async tx => {
+        await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${principal.workspaceId}`;
+        await assertRetainedExecutionPrincipal(tx, principal);
+        await tx.executionCommand.update({ where: { attemptId_commandKey: { attemptId: result.row.id, commandKey: input.commandKey } }, data: { effect: "confirmed", receipt: { accepted: true, effect: "confirmed" } } });
+      });
+    }
+    return input.op === "cancel" ? ports.db.$transaction(async tx => { await assertRetainedExecutionPrincipal(tx, principal); return executionView(await unique(tx, principal, { id: result.row.id })); }) : executionView(result.row);
   }
 
 type Attempt = Prisma.ExecutionAttemptGetPayload<{ include: { run: true } }>;

@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { seedTestModuleRelease } from "./module-release-test-fixture";
-import { moduleManifestSchema, PREINSTALLED_MODULE_NAMES, type ModuleInitializationState } from "@chrona/contracts/steward";
+import { moduleInitializationStateSchema, moduleManifestSchema, PREINSTALLED_MODULE_NAMES, type ModuleInitializationState } from "@chrona/contracts/steward";
 import type { Prisma } from "@chrona/db";
 import { testDb } from "./test-db";
 import { ensureWorkspaceInitialized } from "./module-initialization";
@@ -89,21 +89,21 @@ test("an existing ordinary Notify is skipped without selecting it or installing 
   expect(await f.db.module.count()).toBe(PREINSTALLED_MODULE_NAMES.length);
 });
 
-test("fresh workspace queues preinstalled Mind while Remind stays skipped", async () => {
+test.each(["mind", "chat"] as const)("fresh workspace queues preinstalled %s while Remind stays skipped", async name => {
   const f = await fixture();
   const root = await mkdtemp("/tmp/chrona-mind-preinstall-");
   closes.push(() => rm(root, { recursive: true, force: true }));
   f.ports.moduleExternalResources = root;
-  const dir = join(root, "mind");
+  const dir = join(root, name);
   await mkdir(dir);
-  const manifest = moduleManifestSchema.parse({ name: "mind", entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [] });
+  const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [] });
   await writeFile(join(dir, "module.json"), JSON.stringify(manifest));
   await writeFile(join(dir, "index.ts"), "// offline initialization fixture\n");
   await writeFile(join(dir, "test.ts"), "// offline check fixture\n");
-  await seedTestModuleRelease(root, "mind");
+  await seedTestModuleRelease(root, name);
   await f.db.workspace.update({ where: { id: f.workspaceId }, data: { settings: {} } });
   await f.db.module.createMany({
-    data: PREINSTALLED_MODULE_NAMES.filter(name => name !== "notify" && name !== "mind").map(name => ({ workspaceId: f.workspaceId, name })),
+    data: PREINSTALLED_MODULE_NAMES.filter(preinstalled => preinstalled !== "notify" && preinstalled !== name).map(name => ({ workspaceId: f.workspaceId, name })),
   });
   const submitted: string[] = [];
   f.ports.moduleExternalInstaller = async ({ request, release }) => {
@@ -113,10 +113,10 @@ test("fresh workspace queues preinstalled Mind while Remind stays skipped", asyn
       hash: release.hash, approvalId: null, error: null };
   };
   const initial = await f.initialize();
-  expect(initial.packages.mind.status).not.toBe("skipped");
-  expect(initial.packages.mind).toMatchObject({ status: "building", attempts: 1, error: null });
+  expect(initial.packages[name].status).not.toBe("skipped");
+  expect(initial.packages[name]).toMatchObject({ status: "building", attempts: 1, error: null });
   expect(initial.packages.remind).toMatchObject({ status: "skipped", error: { reason: "module_paused" } });
-  expect(submitted).toEqual(["mind"]);
+  expect(submitted).toEqual([name]);
   expect(await f.db.module.count({ where: { name: "remind" } })).toBe(0);
 });
 
@@ -195,4 +195,46 @@ test.each(["installed", "pending"] as const)("Pi removed after %s initialization
   expect(await f.db.module.count({ where: { name: "pi" } })).toBe(0);
   expect(submissions).toBe(0);
   expect((await f.initialize()).packages.pi).toEqual(result.packages.pi);
+});
+
+test.each(["complete", "pending"] as const)("legacy %s initialization preserves QQ and skips Chat without resurrecting removed apps", async status => {
+  const f = await fixture();
+  const { chat: _chat, ...packages } = f.state.packages;
+  const qq = { ...packages.notify, requestKey: "initialize:v1:qq:3", attempts: 3,
+    status: status === "complete" ? "installed" as const : "building" as const,
+    moduleId: "removed-qq", hash: "b".repeat(40), approvalId: "legacy-qq-approval" };
+  packages.pi = { ...packages.pi, status: status === "complete" ? "installed" : "pending", moduleId: "removed-pi", hash: "a".repeat(40) };
+  const legacy = { version: 1, status, packages: { ...packages, qq } };
+  const parsed = moduleInitializationStateSchema.parse(legacy);
+  expect(parsed.packages.qq).toEqual(qq);
+  expect(parsed.packages.chat).toMatchObject({ status: "skipped", moduleId: null });
+  await f.db.workspace.update({ where: { id: f.workspaceId }, data: { settings: { otherSetting: "preserved", moduleInitialization: legacy } as Prisma.InputJsonValue } });
+  let submissions = 0;
+  f.ports.moduleExternalInstaller = async () => { submissions++; throw new Error("Legacy receipt reached installer"); };
+  const result = await ensureWorkspaceInitialized(f.ports, f.workspaceId, { retryFailed: true });
+  expect(result.status).toBe("complete");
+  expect(result.packages.qq).toEqual(qq);
+  expect(result.packages.chat).toEqual(parsed.packages.chat);
+  expect(result.packages.pi).toMatchObject({ status: status === "complete" ? "installed" : "skipped", moduleId: "removed-pi" });
+  const persisted = (await f.db.workspace.findUniqueOrThrow({ where: { id: f.workspaceId } })).settings;
+  expect(persisted).toEqual({ otherSetting: "preserved", moduleInitialization: result });
+  expect(await ensureWorkspaceInitialized(f.ports, f.workspaceId, { retryFailed: true })).toEqual(result);
+  expect(await f.db.module.count({ where: { name: { in: ["pi", "qq", "chat"] } } })).toBe(0);
+  expect(await f.db.moduleInstallation.count()).toBe(0);
+  expect(submissions).toBe(0);
+});
+
+test.each(["missing-web", "missing-qq", "malformed-qq", "malformed-chat"] as const)("invalid legacy receipt (%s) fails without resetting persisted state", async kind => {
+  const f = await fixture();
+  const packages: Record<string, Prisma.JsonValue> = { ...f.state.packages, qq: { ...f.state.packages.notify } };
+  delete packages.chat;
+  if (kind === "missing-web") delete packages.web;
+  if (kind === "missing-qq") delete packages.qq;
+  if (kind === "malformed-qq") packages.qq = { status: "installed" };
+  if (kind === "malformed-chat") packages.chat = { status: "skipped" };
+  const settings = { moduleInitialization: { version: 1, status: "complete", packages } };
+  await f.db.workspace.update({ where: { id: f.workspaceId }, data: { settings: settings as Prisma.InputJsonValue } });
+  await expect(f.initialize()).rejects.toThrow();
+  expect((await f.db.workspace.findUniqueOrThrow({ where: { id: f.workspaceId } })).settings).toEqual(settings);
+  expect(await f.db.moduleInstallation.count()).toBe(0);
 });

@@ -5,9 +5,10 @@ import { tmpdir } from "node:os";
 import { moduleManifestSchema, type AgentProviderRegistration, type ProviderRunInput, type ProviderTranscriptItem } from "@chrona/contracts/steward";
 import { agent } from "./system/agent";
 import { registerAgentProvider } from "./agent-provider";
-import { startLocalProvider } from "./local-runtime";
+import { startLocalProvider, stopAgentRuns } from "./local-runtime";
 import { createRegisteredProviderClient } from "./agent-client";
-import { createRuns } from "./runs";
+import { createRuns, liveRuns } from "./runs";
+import { admitContextPrimitive, type ModulePrincipal } from "./agent-context";
 import { callSync, kernelOrigin, CallError } from "./module-calls";
 import { createProviderChannel } from "./provider-channel";
 import { moduleSupervisor } from "./module-supervisor";
@@ -26,7 +27,12 @@ const declaration: AgentProviderRegistration = {
   capabilities: { conversation: true, completion: true, native: true, images: false, interactions: false, resume: true },
   endpoints: { health: "health", start: "start", status: "status", inject: "inject", abort: "abort", release: "release", native: "native", complete: "complete", transcript: "transcript" },
 };
-async function fixture() {
+function latch() {
+  let resolve!: () => void;
+  const promise = new Promise<void>(done => { resolve = done; });
+  return { promise, resolve };
+}
+async function fixture(onControl?: (name: string) => Promise<void>) {
   registerSystemModules();
   const db = testDb({ injectedAgent: false }), dataDir = await mkdtemp(join(tmpdir(), "chrona-provider-kernel-"));
   const databases = await db.$queryRawUnsafe<{ name: string; file: string }[]>("PRAGMA database_list");
@@ -38,6 +44,7 @@ async function fixture() {
     if (event.trigger.kind !== "tool") return {};
     const { id: name, args } = event.trigger;
     requests.push({ name, args });
+    if (name === "native" || name === "inject") await onControl?.(name);
     if (name === "health") return { result: { name: "offline", supportsRunModel: true, complete: true, available: true, sandboxed: false, error: null } };
     if (name === "native") {
       if (nativeFails) throw new CallError("unknown", "Backend operation response lost");
@@ -50,7 +57,7 @@ async function fixture() {
     return { result: {} };
   });
   const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => new Date(), sandbox: { available: true, isolated: false, startModule: peer.startModule } };
-  cleanups.push(async () => { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); await rm(dirname(databases.find(row => row.name === "main")!.file), { recursive: true, force: true }); });
+  cleanups.push(async () => { await stopAgentRuns(ports); await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); await rm(dirname(databases.find(row => row.name === "main")!.file), { recursive: true, force: true }); });
   const startProperties = Object.fromEntries(["operationId", "runId", "token", "lane", "cwd", "sessionDir", "prompt", "systemPrompt", "resources", "callbacks", "model", "configurationRevision"].map(key => [key, string]));
   Object.assign(startProperties, { sessionId: { type: ["string", "null"] }, deadline: { type: ["string", "null"] }, providerOptions: object, searchTools: { type: "boolean" }, execution: object, executionBudget: object, images: { type: "array", items: object }, extraTools: { type: "array", items: string }, hostPaths: { type: "array", items: string }, content: { type: "array", items: object } });
   const backend = await db.module.create({ data: { workspaceId, name: "test-backend", status: "active", activeHash: "backend-v1" } });
@@ -59,7 +66,7 @@ async function fixture() {
   const backendCaller = { kind: "module" as const, module: backend.name, moduleId: backend.id, hash: backend.activeHash! };
   async function installCaller(name: string) {
     const row = await db.module.create({ data: { workspaceId, name, status: "active", activeHash: "caller-v1" } });
-    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: ["agent.run", "agent.native", "agent.read", "agent.stop"], model: { tier: "any", maxCalls: 2, maxOutputTokens: 20 } });
+    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: ["agent.run", "agent.native", "agent.read", "agent.write", "agent.stop"], model: { tier: "any", maxCalls: 2, maxOutputTokens: 20 } });
     await db.moduleVersion.create({ data: { moduleId: row.id, hash: row.activeHash!, manifest, source: "user", status: "approved", intent: {}, report: {} } });
     return { kind: "module" as const, module: name, moduleId: row.id, hash: row.activeHash! };
   }
@@ -73,7 +80,14 @@ async function fixture() {
     const input: ProviderRunInput = { runId, token: claimed!.token, lane: row.lane as "background", cwd: row.cwd, sessionDir: join(dataDir, "sessions", row.sessionId!, ".chrona", "sessions"), sessionId: null, prompt: row.prompt, systemPrompt: "system", resources: "configured", deadline: row.deadlineAt };
     return input;
   }
-  return { db, ports, workspaceId, backendCaller, caller, installCaller, invoke, run, claim, requests, setTranscript: (value: ProviderTranscriptItem[]) => { transcript = value; }, failNative: () => { nativeFails = true; }, unconfirmedStop: () => { confirmStop = false; } };
+  async function fence() {
+    await db.$transaction(async tx => {
+      await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${workspaceId}`;
+      await tx.module.update({ where: { id: caller.moduleId }, data: { executionFenceAt: ports.now() } });
+    });
+  }
+  const principal: ModulePrincipal = { workspaceId, ownerId: "owner", caller };
+  return { db, ports, workspaceId, backendCaller, caller, principal, installCaller, invoke, run, claim, fence, requests, setTranscript: (value: ProviderTranscriptItem[]) => { transcript = value; }, failNative: () => { nativeFails = true; }, unconfirmedStop: () => { confirmStop = false; } };
 }
 
 test("kernel boots without a provider and reports explicit unavailability", async () => {
@@ -110,8 +124,10 @@ test("native retries through the public gateway ignore JSON object order and pre
   expect(f.requests.filter(row => row.name === "native")).toHaveLength(1);
   await expect(invoke({ runId: admitted.runId, request: { type: "future_command", nested: { z: [2, 1], a: { b: 3, a: 4 } } } })).rejects.toMatchObject({ code: "conflict" });
   expect(f.requests.filter(row => row.name === "native")).toHaveLength(1);
-  await handle.abort(); await handle.done;
-});
+  const callbackId = String(f.requests.find(row => row.name === "start")!.args.callbacks);
+  await callSync(f.ports, { ...kernelOrigin(f.workspaceId), caller: f.backendCaller }, "runtime-callback.event", { callbackId, event: { kind: "settled", operationId: admitted.runId, outcome: { outcome: "finished", sessionId: null, error: null } } });
+  await handle.done;
+}, 10000);
 
 test("native forwards the existing bound operation, isolates owners, masks output, and never replays unknown effects", async () => {
   const f = await fixture();
@@ -235,4 +251,109 @@ test("provider discovery keeps exact id filtering when a cursor is supplied", as
   const f = await fixture();
   await registerAgentProvider(f.ports, f.workspaceId, f.backendCaller, declaration);
   expect(await f.invoke("providers", { id: "missing", cursor: "a" })).toEqual({ items: [], nextCursor: null });
+});
+
+for (const name of ["native", "write"] as const) test(`${name} settles its admitted effect when drain begins during the backend await`, async () => {
+  const entered = latch(), resume = latch();
+  const endpoint = name === "native" ? "native" : "inject";
+  const f = await fixture(async control => { if (control === endpoint) { entered.resolve(); await resume.promise; } });
+  await registerAgentProvider(f.ports, f.workspaceId, f.backendCaller, declaration);
+  const admitted = await f.run(`drain-${name}`), input = await f.claim(admitted.runId);
+  const handle = await startLocalProvider(f.ports, f.workspaceId, input);
+  liveRuns.set(admitted.runId, handle);
+  const requestKey = `drain-${name}-once`, request = { type: "during_drain" };
+  const args = name === "native" ? { runId: admitted.runId, request } : { runId: admitted.runId, input: { kind: "message", text: "already admitted" } };
+  const command = name === "native" ? { runId: admitted.runId, request, requestKey } : { runId: admitted.runId, message: "already admitted", requestKey };
+  const pending = f.invoke(name, args, requestKey);
+  try {
+    await entered.promise;
+    await f.fence();
+  } finally { resume.resolve(); }
+  const result = await pending;
+  expect(result).toEqual(name === "native" ? { response: { operationId: admitted.runId, request, apiKey: "[redacted]" } } : { accepted: true });
+  expect(await f.invoke(name, args, requestKey)).toEqual(result);
+  // Use a fresh primitive call so the replay must come from the durable receipt, not the live handle.
+  const replay = () => admitContextPrimitive(f.ports, f.principal, name, command);
+  const original = await replay();
+  expect(original).toMatchObject({ perform: false, ...(name === "native" ? { result } : {}) });
+  // Repeated settlement cannot replace an already completed response.
+  await admitContextPrimitive(f.ports, f.principal, name, command, true, { result: "replacement" });
+  expect(await replay()).toEqual(original);
+  await expect(admitContextPrimitive(f.ports, f.principal, name, { ...command, requestKey: "not-admitted" }, true)).rejects.toMatchObject({ code: "not_found" });
+  await expect(admitContextPrimitive(f.ports, f.principal, name, { ...command, requestKey: "fresh-effect" })).rejects.toMatchObject({ code: "forbidden" });
+  expect(f.requests.filter(row => row.name === endpoint)).toHaveLength(1);
+  expect(await f.db.run.count()).toBe(1);
+  expect(await f.invoke("stop", { runId: admitted.runId }, `drain-${name}-stop`)).toMatchObject({ active: false, stopConfirmed: true });
+  await handle.done;
+  liveRuns.delete(admitted.runId);
+}, 10000);
+
+test("an uncertain native effect stays unknown after drain and settlement binds the exact receipt identity", async () => {
+  const f = await fixture();
+  await registerAgentProvider(f.ports, f.workspaceId, f.backendCaller, declaration);
+  const admitted = await f.run("unknown-drain");
+  await f.claim(admitted.runId);
+  const args = { runId: admitted.runId, request: { type: "lost_reply" } }, command = { ...args, requestKey: "unknown-drain-once" };
+  // A persisted reservation with no response models a host lost after effect admission.
+  expect(await admitContextPrimitive(f.ports, f.principal, "native", command)).toMatchObject({ perform: true });
+  await f.fence();
+  const replay = () => admitContextPrimitive(f.ports, f.principal, "native", command);
+  await expect(replay()).rejects.toMatchObject({ code: "unknown" });
+  await expect(admitContextPrimitive(f.ports, f.principal, "native", { ...command, request: { type: "changed" } }, true)).rejects.toMatchObject({ code: "conflict" });
+  await expect(admitContextPrimitive(f.ports, { ...f.principal, caller: { ...f.principal.caller, hash: "caller-v2" } }, "native", command, true)).rejects.toMatchObject({ code: "forbidden" });
+  const intruder = await f.installCaller("receipt-intruder");
+  await expect(admitContextPrimitive(f.ports, { ...f.principal, caller: intruder }, "native", command, true)).rejects.toMatchObject({ code: "not_found" });
+  const otherWorkspace = await f.db.workspace.create({ data: { name: "other receipt workspace" } });
+  await expect(admitContextPrimitive(f.ports, { ...f.principal, workspaceId: otherWorkspace.id }, "native", command, true)).rejects.toMatchObject({ code: "not_found" });
+  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: f.caller.moduleId, hash: f.caller.hash } }, data: { status: "draft" } });
+  await expect(admitContextPrimitive(f.ports, f.principal, "native", command, true)).rejects.toMatchObject({ code: "forbidden" });
+  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: f.caller.moduleId, hash: f.caller.hash } }, data: { status: "approved" } });
+  await f.db.module.update({ where: { id: f.caller.moduleId }, data: { status: "paused" } });
+  await expect(admitContextPrimitive(f.ports, f.principal, "native", command, true)).rejects.toMatchObject({ code: "forbidden" });
+  await f.db.module.update({ where: { id: f.caller.moduleId }, data: { status: "active" } });
+  await expect(replay()).rejects.toMatchObject({ code: "unknown" });
+  expect(f.requests.filter(row => row.name === "native")).toHaveLength(0);
+  expect(await f.db.run.count()).toBe(1);
+}, 10000);
+
+test("drain blocks public and low-level admission while old reads, stops, and queued completion remain available", async () => {
+  const f = await fixture();
+  await registerAgentProvider(f.ports, f.workspaceId, f.backendCaller, declaration);
+  const admitted = await f.run("queued-before-drain"), cancelled = await f.run("stop-before-claim");
+  await f.fence();
+  expect(await f.run("queued-before-drain")).toEqual(admitted);
+  await expect(f.run("fresh-during-drain")).rejects.toMatchObject({ code: "forbidden" });
+  await expect(f.run("continue-during-drain", { contextId: admitted.contextId })).rejects.toMatchObject({ code: "forbidden" });
+  const runs = createRuns(f.ports, f.workspaceId);
+  const enqueue = { sessionId: admitted.contextId, lane: "background" as const, trigger: "source" as const, prompt: "bypass attempt" };
+  await expect(runs.enqueue(enqueue)).rejects.toMatchObject({ code: "forbidden" });
+  await expect(f.db.$transaction(tx => runs.enqueue(enqueue, tx))).rejects.toMatchObject({ code: "forbidden" });
+  expect(await f.db.run.count()).toBe(2);
+  expect(await f.invoke("read", { runId: admitted.runId })).toMatchObject({ run: { runId: admitted.runId, status: "queued" } });
+  expect(await f.invoke("stop", { runId: cancelled.runId }, "stop-during-drain")).toMatchObject({ active: false, stopConfirmed: true });
+  const input = await f.claim(admitted.runId), handle = await startLocalProvider(f.ports, f.workspaceId, input);
+  await f.invoke("stop", { runId: admitted.runId }, "stop-claimed-during-drain");
+  await handle.done;
+  expect(await f.invoke("read", { runId: admitted.runId })).toMatchObject({ ended: true });
+  expect(await runs.claimNext("background")).toBeNull();
+  expect(await f.db.run.count()).toBe(2);
+  expect((await f.db.module.findUniqueOrThrow({ where: { id: f.caller.moduleId } })).executionFenceAt).not.toBeNull();
+}, 10000);
+
+test("low-level module-session admission requires the owning approved active module", async () => {
+  const f = await fixture();
+  await registerAgentProvider(f.ports, f.workspaceId, f.backendCaller, declaration);
+  const session = await f.db.session.create({ data: { workspaceId: f.workspaceId, key: "low-level-module", source: "module", moduleId: f.caller.moduleId } });
+  const runs = createRuns(f.ports, f.workspaceId);
+  const enqueue = { sessionId: session.id, lane: "background" as const, trigger: "source" as const, prompt: "ordinary module session" };
+  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: f.caller.moduleId, hash: f.caller.hash } }, data: { status: "draft" } });
+  await expect(runs.enqueue(enqueue)).rejects.toMatchObject({ code: "forbidden" });
+  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: f.caller.moduleId, hash: f.caller.hash } }, data: { status: "approved" } });
+  await f.db.module.update({ where: { id: f.caller.moduleId }, data: { status: "paused" } });
+  await expect(runs.enqueue(enqueue)).rejects.toMatchObject({ code: "forbidden" });
+  await f.db.module.update({ where: { id: f.caller.moduleId }, data: { status: "active" } });
+  const run = await runs.enqueue(enqueue);
+  expect((await runs.claimNext("background"))?.runId).toBe(run.id);
+  await runs.finish(run.id, { outcome: "finished", sessionId: null, error: null }, { stopEvidence: "provider_exited" });
+  expect(await f.db.run.count()).toBe(1);
 });

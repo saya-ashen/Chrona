@@ -111,7 +111,7 @@
   "artifacts": [
     {
       "path": "pages.js",
-      "sha256": "560bdf93f21f033bb8b01185a687423c325c5a076c2bb60cda3b4a4be030082e",
+      "sha256": "b934f37bf16ccc0c341513062feffcac682e4629d6095840887382e9cc8b0342",
       "executable": false
     },
     {

@@ -1,7 +1,21 @@
 {
   "name": "chrona-mind",
   "private": true,
+  "scripts": {
+    "build": "bun run build.ts",
+    "test": "bun run test:core && bun run test:ui",
+    "test:core": "bun test --timeout 20000 ./core-*.bun.test.ts",
+    "test:ui": "bun test --timeout 20000 ./workspace-*.bun.test.ts*",
+    "test:sources": "bun test --timeout 20000 ./core-sources*.bun.test.ts"
+  },
   "dependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.2",
+    "happy-dom": "21.0.4"
   }
 }

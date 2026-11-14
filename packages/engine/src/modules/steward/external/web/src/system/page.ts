@@ -13,6 +13,7 @@ export type SystemParams =
   | { name: "login"; message?: string; mode?: LoginMode }
   | { name: "activity"; module: string }
   | { name: "chat"; path: string }
+  | { name: "chat-unavailable"; message: string }
   | ({ name: "app" | "system-app" } & DetailRoute)
   | { name: "error"; message: string };
 
@@ -23,6 +24,7 @@ export function systemPage(params: SystemParams): { data: Record<string, { tool:
     case "settings": return { data: settingsData, spec: settingsSpec };
     case "login": return { data: {}, spec: () => loginSpec(params.message, params.mode) };
     case "activity": return { data: activityData(params.module), spec: state => activitySpec(state, params.module) };
+    case "chat-unavailable": return { data: {}, spec: () => { const b = builder(); return b.finish("Chat 暂不可用", [b.text(params.message, "error"), b.link("检查应用", "/apps")]); } };
     case "chat": return { data: chatData, spec: state => chatSpec(state, params.path) };
     case "app": return { data: detailData(params, false), spec: state => detailSpec(state, params) };
     case "system-app": return { data: detailData(params, true), spec: state => detailSpec(state, params, true) };

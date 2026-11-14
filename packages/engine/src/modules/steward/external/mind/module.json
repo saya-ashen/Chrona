@@ -1,23 +1,51 @@
 {
   "name": "mind",
-  "description": "Evidence-driven personal follow-up: private concerns and projects, exact source associations, bounded daily suggestions and restart-safe Agent reasoning.",
+  "description": "Chrona 核心主动智能：从真实使用证据理解用户、推进持续目标、调查能力缺口并核对实际成果；支持纠正、暂停和遗忘。",
   "entry": "index.ts",
   "keepAlive": true,
   "activated": true,
+  "authority": "owner",
   "effects": [],
   "uses": [
+    "modules.list",
     "modules.describe",
-    "files.read",
+    "modules.health",
+    "modules.receipt",
+    "modules.admit",
+    "agent.run",
+    "agent.read",
+    "agent.stop",
     "timers.list",
     "timers.set",
     "timers.cancel",
-    "agent.run",
-    "agent.read",
+    "web.component-set",
     "web.page-set",
+    "chat.observations",
+    "chat.snapshot",
+    "chat.observation-inventory",
+    "chat.observation-scope",
     "notify.send",
-    "mind.agenda",
-    "mind.propose",
-    "mind.report"
+    "mind.context",
+    "mind.detail",
+    "mind.remember",
+    "mind.pursue",
+    "mind.control",
+    "mind.feedback",
+    "mind.progress",
+    "mind.action",
+    "mind.artifact",
+    "author.prepare",
+    "author.export",
+    "author.read",
+    "author.write",
+    "author.list",
+    "author.stage",
+    "author.receipt",
+    "author.source",
+    "mind.applications",
+    "mind.delivery",
+    "author.submit",
+    "pi.models"
   ],
   "data": {
     "schema": 1
@@ -27,2552 +55,618 @@
   ],
   "tools": [
     {
-      "name": "ui-sources",
-      "description": "Owner: read or replace up to four Files source paths (one per line). Reads at most 2000 characters per file; exact Files identity and read contract are bound at configuration. Empty text pauses source reads.",
-      "visibility": [
-        "owner"
-      ],
+      "name": "updates",
+      "description": "Read current Mind outcomes and blockers for an original conversation. Only the bound Chat application may query its own source roots; no execution or external notification.",
+      "visibility": ["modules"],
       "idempotent": true,
-      "sideEffects": [
-        "Writes bounded private application state; suggestions grant no permission."
-      ],
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "paths": {
-            "type": "string",
-            "description": "maxLength: 1000"
-          }
-        }
-      },
-      "output": {
-        "type": "object",
-        "required": [
-          "sources",
-          "paths",
-          "errors"
-        ],
-        "properties": {
-          "sources": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "required": [
-                "path",
-                "moduleId",
-                "version",
-                "error"
-              ],
-              "properties": {
-                "path": {
-                  "type": "string"
-                },
-                "moduleId": {
-                  "type": "string"
-                },
-                "contractHash": {
-                  "type": "string"
-                },
-                "version": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "error": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                }
-              },
-              "additionalProperties": false
-            }
-          },
-          "paths": {
-            "type": "string"
-          },
-          "errors": {
-            "type": "string"
-          }
-        },
-        "additionalProperties": false
-      }
+      "parameters": {"type":"object","properties":{"conversationId":{"type":"string"},"epoch":{"type":"string"},"scopeRevision":{"type":"number"}},"required":["conversationId","epoch","scopeRevision"]},
+      "output": {"type":"object","properties":{"json":{"type":"string"}},"required":["json"]}
     },
     {
-      "name": "agenda",
-      "description": "Mind reasoning only: read private concerns and suggestions with cursor pagination. Responses fit 230 KiB encoded including the result wrapper; follow nextCursor until limited is false. Refresh after a cursor conflict.",
+      "name": "context",
+      "description": "Read sourced user understanding, ongoing goals and source coverage. Scope is bounded; no Agent execution. Missing coverage remains unknown.",
       "visibility": [
+        "owner",
         "modules"
       ],
       "idempotent": true,
-      "sideEffects": [],
       "parameters": {
         "type": "object",
         "properties": {
-          "cursor": {
-            "type": "string",
-            "description": "maxLength: 80"
+          "query": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
           },
           "limit": {
-            "type": "number",
-            "description": "minimum: 1; maximum: 100"
+            "type": "number"
+          },
+          "maxBytes": {
+            "type": "number"
           }
-        }
+        },
+        "required": []
       },
       "output": {
         "type": "object",
-        "required": [
-          "concerns",
-          "proposals",
-          "runtime",
-          "stats",
-          "cursor",
-          "nextCursor",
-          "limited",
-          "total"
-        ],
         "properties": {
-          "concerns": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "required": [
-                "id",
-                "revision",
-                "title",
-                "goal",
-                "project",
-                "status",
-                "priority",
-                "userExplicit",
-                "dueAt",
-                "revisitAt",
-                "silentUntil",
-                "expectedProgressAt",
-                "progressAt",
-                "awaiting",
-                "links",
-                "escalation",
-                "lastCheckedAt",
-                "lastAssessment",
-                "createdAt",
-                "updatedAt"
-              ],
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "revision": {
-                  "type": "integer"
-                },
-                "title": {
-                  "type": "string"
-                },
-                "goal": {
-                  "type": "string"
-                },
-                "project": {
-                  "type": "string"
-                },
-                "status": {
-                  "type": "string",
-                  "enum": [
-                    "watching",
-                    "acting",
-                    "waiting-user",
-                    "waiting-external",
-                    "done",
-                    "dropped"
-                  ]
-                },
-                "priority": {
-                  "type": "string",
-                  "enum": [
-                    "low",
-                    "normal",
-                    "critical"
-                  ]
-                },
-                "userExplicit": {
-                  "type": "boolean"
-                },
-                "dueAt": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "revisitAt": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "silentUntil": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "expectedProgressAt": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "progressAt": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "awaiting": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "required": [
-                      "source",
-                      "moduleId",
-                      "event",
-                      "ref",
-                      "thread",
-                      "from",
-                      "domain",
-                      "textAll"
-                    ],
-                    "properties": {
-                      "source": {
-                        "type": "string"
-                      },
-                      "moduleId": {
-                        "type": "string"
-                      },
-                      "event": {
-                        "type": "string"
-                      },
-                      "ref": {
-                        "type": "string"
-                      },
-                      "thread": {
-                        "type": "string"
-                      },
-                      "from": {
-                        "type": "string"
-                      },
-                      "domain": {
-                        "type": "string"
-                      },
-                      "textAll": {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      }
-                    },
-                    "additionalProperties": false
-                  }
-                },
-                "links": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "required": [
-                      "source",
-                      "moduleId",
-                      "ref",
-                      "version",
-                      "checkedAt",
-                      "conclusion"
-                    ],
-                    "properties": {
-                      "source": {
-                        "type": "string"
-                      },
-                      "moduleId": {
-                        "type": "string"
-                      },
-                      "ref": {
-                        "type": "string"
-                      },
-                      "version": {
-                        "type": "string"
-                      },
-                      "checkedAt": {
-                        "type": "string"
-                      },
-                      "conclusion": {
-                        "type": "string"
-                      }
-                    },
-                    "additionalProperties": false
-                  }
-                },
-                "escalation": {
-                  "type": "string",
-                  "enum": [
-                    "none",
-                    "early",
-                    "day-before",
-                    "final"
-                  ]
-                },
-                "lastCheckedAt": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "lastAssessment": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "required": [
-                        "at",
-                        "conclusion",
-                        "decisionId"
-                      ],
-                      "properties": {
-                        "at": {
-                          "type": "string"
-                        },
-                        "conclusion": {
-                          "type": "string"
-                        },
-                        "decisionId": {
-                          "type": "string"
-                        }
-                      },
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "createdAt": {
-                  "type": "string"
-                },
-                "updatedAt": {
-                  "type": "string"
-                }
-              },
-              "additionalProperties": false
-            }
-          },
-          "proposals": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "required": [
-                "id",
-                "title",
-                "goal",
-                "project",
-                "reason",
-                "source",
-                "moduleId",
-                "signalIds",
-                "status",
-                "concernId",
-                "createdAt",
-                "updatedAt"
-              ],
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "title": {
-                  "type": "string"
-                },
-                "goal": {
-                  "type": "string"
-                },
-                "project": {
-                  "type": "string"
-                },
-                "reason": {
-                  "type": "string"
-                },
-                "source": {
-                  "type": "string"
-                },
-                "moduleId": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "signalIds": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                "status": {
-                  "type": "string",
-                  "enum": [
-                    "pending",
-                    "accepted",
-                    "dismissed"
-                  ]
-                },
-                "concernId": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "createdAt": {
-                  "type": "string"
-                },
-                "updatedAt": {
-                  "type": "string"
-                }
-              },
-              "additionalProperties": false
-            }
-          },
-          "runtime": {
-            "type": "object",
-            "required": [
-              "nextCheckAt",
-              "lastCheckAt",
-              "lastDailyDate",
-              "currentDecisionId",
-              "lastError",
-              "wakeError",
-              "phase",
-              "runId",
-              "interactions"
-            ],
-            "properties": {
-              "nextCheckAt": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "lastCheckAt": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "lastDailyDate": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "currentDecisionId": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "lastError": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "wakeError": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "phase": {
-                "type": "string",
-                "enum": [
-                  "idle",
-                  "prepared",
-                  "running",
-                  "waiting",
-                  "unknown"
-                ]
-              },
-              "runId": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "interactions": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "required": [
-                    "id",
-                    "title",
-                    "message",
-                    "expiresAt"
-                  ],
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "expiresAt": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
-                }
-              }
-            },
-            "additionalProperties": false
-          },
-          "stats": {
-            "type": "object",
-            "required": [
-              "open",
-              "pendingProposals",
-              "unmatched",
-              "wakes24h",
-              "trustworthyReports"
-            ],
-            "properties": {
-              "open": {
-                "type": "integer"
-              },
-              "pendingProposals": {
-                "type": "integer"
-              },
-              "unmatched": {
-                "type": "integer"
-              },
-              "wakes24h": {
-                "type": "integer"
-              },
-              "trustworthyReports": {
-                "type": "integer"
-              }
-            },
-            "additionalProperties": false
-          },
-          "cursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "nextCursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "limited": {
-            "type": "boolean"
-          },
-          "total": {
-            "type": "integer"
+          "json": {
+            "type": "string"
           }
         },
+        "required": [
+          "json"
+        ],
         "additionalProperties": false
-      }
+      },
+      "sideEffects": []
     },
     {
-      "name": "ui-agenda",
-      "description": "Owner: private agenda with cursor pagination. Responses fit 230 KiB encoded including result. Follow nextCursor while limited; refresh after records change.",
+      "name": "overview",
+      "description": "Owner workspace: current understanding, continuing work, actual results, coverage and execution budget.",
       "visibility": [
         "owner"
       ],
       "idempotent": true,
-      "sideEffects": [],
       "parameters": {
         "type": "object",
         "properties": {
-          "cursor": {
-            "type": "string",
-            "description": "maxLength: 80"
-          },
           "limit": {
-            "type": "number",
-            "description": "minimum: 1; maximum: 100"
+            "type": "number"
+          },
+          "after": {
+            "type": "string"
           }
-        }
+        },
+        "required": []
       },
       "output": {
         "type": "object",
-        "required": [
-          "concerns",
-          "proposals",
-          "runtime",
-          "stats",
-          "cursor",
-          "nextCursor",
-          "limited",
-          "total"
-        ],
         "properties": {
-          "concerns": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "required": [
-                "id",
-                "revision",
-                "title",
-                "goal",
-                "project",
-                "status",
-                "priority",
-                "userExplicit",
-                "dueAt",
-                "revisitAt",
-                "silentUntil",
-                "expectedProgressAt",
-                "progressAt",
-                "awaiting",
-                "links",
-                "escalation",
-                "lastCheckedAt",
-                "lastAssessment",
-                "createdAt",
-                "updatedAt"
-              ],
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "revision": {
-                  "type": "integer"
-                },
-                "title": {
-                  "type": "string"
-                },
-                "goal": {
-                  "type": "string"
-                },
-                "project": {
-                  "type": "string"
-                },
-                "status": {
-                  "type": "string",
-                  "enum": [
-                    "watching",
-                    "acting",
-                    "waiting-user",
-                    "waiting-external",
-                    "done",
-                    "dropped"
-                  ]
-                },
-                "priority": {
-                  "type": "string",
-                  "enum": [
-                    "low",
-                    "normal",
-                    "critical"
-                  ]
-                },
-                "userExplicit": {
-                  "type": "boolean"
-                },
-                "dueAt": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "revisitAt": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "silentUntil": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "expectedProgressAt": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "progressAt": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "awaiting": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "required": [
-                      "source",
-                      "moduleId",
-                      "event",
-                      "ref",
-                      "thread",
-                      "from",
-                      "domain",
-                      "textAll"
-                    ],
-                    "properties": {
-                      "source": {
-                        "type": "string"
-                      },
-                      "moduleId": {
-                        "type": "string"
-                      },
-                      "event": {
-                        "type": "string"
-                      },
-                      "ref": {
-                        "type": "string"
-                      },
-                      "thread": {
-                        "type": "string"
-                      },
-                      "from": {
-                        "type": "string"
-                      },
-                      "domain": {
-                        "type": "string"
-                      },
-                      "textAll": {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      }
-                    },
-                    "additionalProperties": false
-                  }
-                },
-                "links": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "required": [
-                      "source",
-                      "moduleId",
-                      "ref",
-                      "version",
-                      "checkedAt",
-                      "conclusion"
-                    ],
-                    "properties": {
-                      "source": {
-                        "type": "string"
-                      },
-                      "moduleId": {
-                        "type": "string"
-                      },
-                      "ref": {
-                        "type": "string"
-                      },
-                      "version": {
-                        "type": "string"
-                      },
-                      "checkedAt": {
-                        "type": "string"
-                      },
-                      "conclusion": {
-                        "type": "string"
-                      }
-                    },
-                    "additionalProperties": false
-                  }
-                },
-                "escalation": {
-                  "type": "string",
-                  "enum": [
-                    "none",
-                    "early",
-                    "day-before",
-                    "final"
-                  ]
-                },
-                "lastCheckedAt": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "lastAssessment": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "required": [
-                        "at",
-                        "conclusion",
-                        "decisionId"
-                      ],
-                      "properties": {
-                        "at": {
-                          "type": "string"
-                        },
-                        "conclusion": {
-                          "type": "string"
-                        },
-                        "decisionId": {
-                          "type": "string"
-                        }
-                      },
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "createdAt": {
-                  "type": "string"
-                },
-                "updatedAt": {
-                  "type": "string"
-                }
-              },
-              "additionalProperties": false
-            }
-          },
-          "proposals": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "required": [
-                "id",
-                "title",
-                "goal",
-                "project",
-                "reason",
-                "source",
-                "moduleId",
-                "signalIds",
-                "status",
-                "concernId",
-                "createdAt",
-                "updatedAt"
-              ],
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "title": {
-                  "type": "string"
-                },
-                "goal": {
-                  "type": "string"
-                },
-                "project": {
-                  "type": "string"
-                },
-                "reason": {
-                  "type": "string"
-                },
-                "source": {
-                  "type": "string"
-                },
-                "moduleId": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "signalIds": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                "status": {
-                  "type": "string",
-                  "enum": [
-                    "pending",
-                    "accepted",
-                    "dismissed"
-                  ]
-                },
-                "concernId": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "createdAt": {
-                  "type": "string"
-                },
-                "updatedAt": {
-                  "type": "string"
-                }
-              },
-              "additionalProperties": false
-            }
-          },
-          "runtime": {
-            "type": "object",
-            "required": [
-              "nextCheckAt",
-              "lastCheckAt",
-              "lastDailyDate",
-              "currentDecisionId",
-              "lastError",
-              "wakeError",
-              "phase",
-              "runId",
-              "interactions"
-            ],
-            "properties": {
-              "nextCheckAt": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "lastCheckAt": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "lastDailyDate": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "currentDecisionId": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "lastError": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "wakeError": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "phase": {
-                "type": "string",
-                "enum": [
-                  "idle",
-                  "prepared",
-                  "running",
-                  "waiting",
-                  "unknown"
-                ]
-              },
-              "runId": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "interactions": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "required": [
-                    "id",
-                    "title",
-                    "message",
-                    "expiresAt"
-                  ],
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "expiresAt": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
-                }
-              }
-            },
-            "additionalProperties": false
-          },
-          "stats": {
-            "type": "object",
-            "required": [
-              "open",
-              "pendingProposals",
-              "unmatched",
-              "wakes24h",
-              "trustworthyReports"
-            ],
-            "properties": {
-              "open": {
-                "type": "integer"
-              },
-              "pendingProposals": {
-                "type": "integer"
-              },
-              "unmatched": {
-                "type": "integer"
-              },
-              "wakes24h": {
-                "type": "integer"
-              },
-              "trustworthyReports": {
-                "type": "integer"
-              }
-            },
-            "additionalProperties": false
-          },
-          "cursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "nextCursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "limited": {
-            "type": "boolean"
-          },
-          "total": {
-            "type": "integer"
+          "json": {
+            "type": "string"
           }
         },
+        "required": [
+          "json"
+        ],
         "additionalProperties": false
-      }
-    },
-    {
-      "name": "decisions",
-      "description": "Owner: reasoning decisions newest first, verified reports and notification receipts; limit 1–100. Follow nextCursor while limited to read all records. Encoded result wrapper is bounded to 230 KiB; refresh after records change.",
-      "visibility": [
-        "owner"
-      ],
-      "idempotent": true,
-      "sideEffects": [],
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "cursor": {
-            "type": "string",
-            "description": "maxLength: 80"
-          },
-          "limit": {
-            "type": "number",
-            "description": "minimum: 1; maximum: 100"
-          }
-        }
       },
-      "output": {
-        "type": "object",
-        "required": [
-          "decisions",
-          "cursor",
-          "nextCursor",
-          "limited",
-          "total"
-        ],
-        "properties": {
-          "decisions": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "required": [
-                "id",
-                "at",
-                "kind",
-                "concernIds",
-                "signalIds",
-                "revisions",
-                "sourceKinds",
-                "phase",
-                "contextId",
-                "runId",
-                "tools",
-                "report",
-                "finishedAt",
-                "error",
-                "interactions",
-                "notification"
-              ],
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "at": {
-                  "type": "string"
-                },
-                "kind": {
-                  "type": "string",
-                  "enum": [
-                    "manual",
-                    "daily",
-                    "signal",
-                    "deadline",
-                    "review"
-                  ]
-                },
-                "concernIds": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                "signalIds": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                "revisions": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "integer"
-                  }
-                },
-                "sourceKinds": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "required": [
-                      "source",
-                      "kind"
-                    ],
-                    "properties": {
-                      "source": {
-                        "type": "string"
-                      },
-                      "kind": {
-                        "type": "string"
-                      }
-                    },
-                    "additionalProperties": false
-                  }
-                },
-                "phase": {
-                  "type": "string",
-                  "enum": [
-                    "prepared",
-                    "running",
-                    "waiting",
-                    "unknown",
-                    "completed",
-                    "unreported",
-                    "failed"
-                  ]
-                },
-                "contextId": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "runId": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "tools": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "enum": [
-                      "mind.agenda",
-                      "mind.propose",
-                      "mind.report"
-                    ]
-                  }
-                },
-                "report": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "required": [
-                        "reportId",
-                        "result",
-                        "verified"
-                      ],
-                      "properties": {
-                        "reportId": {
-                          "type": "string"
-                        },
-                        "result": {
-                          "type": "object",
-                          "required": [
-                            "summary",
-                            "concerns",
-                            "feedback"
-                          ],
-                          "properties": {
-                            "summary": {
-                              "type": "string"
-                            },
-                            "concerns": {
-                              "type": "array",
-                              "items": {
-                                "type": "object",
-                                "required": [
-                                  "id",
-                                  "revision",
-                                  "conclusion",
-                                  "signalIds"
-                                ],
-                                "properties": {
-                                  "id": {
-                                    "type": "string"
-                                  },
-                                  "revision": {
-                                    "type": "integer"
-                                  },
-                                  "conclusion": {
-                                    "type": "string"
-                                  },
-                                  "signalIds": {
-                                    "type": "array",
-                                    "items": {
-                                      "type": "string"
-                                    }
-                                  }
-                                },
-                                "additionalProperties": false
-                              }
-                            },
-                            "feedback": {
-                              "type": "object",
-                              "required": [
-                                "newEvidence",
-                                "progress",
-                                "internal",
-                                "redundant",
-                                "unavailable",
-                                "userVisible"
-                              ],
-                              "properties": {
-                                "newEvidence": {
-                                  "type": "boolean"
-                                },
-                                "progress": {
-                                  "type": "boolean"
-                                },
-                                "internal": {
-                                  "type": "boolean"
-                                },
-                                "redundant": {
-                                  "type": "boolean"
-                                },
-                                "unavailable": {
-                                  "type": "boolean"
-                                },
-                                "userVisible": {
-                                  "type": "boolean"
-                                }
-                              },
-                              "additionalProperties": false
-                            }
-                          },
-                          "additionalProperties": false
-                        },
-                        "verified": {
-                          "type": "boolean"
-                        }
-                      },
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "finishedAt": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "error": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "interactions": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "required": [
-                      "id",
-                      "title",
-                      "message",
-                      "expiresAt"
-                    ],
-                    "properties": {
-                      "id": {
-                        "type": "string"
-                      },
-                      "title": {
-                        "type": "string"
-                      },
-                      "message": {
-                        "type": "string"
-                      },
-                      "expiresAt": {
-                        "type": "string"
-                      }
-                    },
-                    "additionalProperties": false
-                  }
-                },
-                "notification": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "required": [
-                        "key",
-                        "status",
-                        "body"
-                      ],
-                      "properties": {
-                        "key": {
-                          "type": "string"
-                        },
-                        "status": {
-                          "type": "string",
-                          "enum": [
-                            "pending",
-                            "unknown",
-                            "accepted",
-                            "unavailable"
-                          ]
-                        },
-                        "body": {
-                          "type": "string"
-                        }
-                      },
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                }
-              },
-              "additionalProperties": false
-            }
-          },
-          "cursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "nextCursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "limited": {
-            "type": "boolean"
-          },
-          "total": {
-            "type": "integer"
-          }
-        },
-        "additionalProperties": false
-      }
+      "sideEffects": []
     },
     {
-      "name": "ui-dismiss",
-      "description": "Owner: dismiss exactly one pending suggestion by id with a stable request-key. No operation selector or caller identity arguments.",
+      "name": "detail",
+      "description": "Read one item with its actual evidence and saved local artifacts.",
       "visibility": [
-        "owner"
+        "owner",
+        "modules"
       ],
       "idempotent": true,
-      "sideEffects": [
-        "Writes bounded private application state; suggestions grant no permission."
-      ],
       "parameters": {
         "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
         "required": [
-          "request-key",
           "id"
-        ],
-        "properties": {
-          "request-key": {
-            "type": "string",
-            "description": "minLength: 1; maxLength: 160"
-          },
-          "id": {
-            "type": "string",
-            "description": "minLength: 1; maxLength: 128"
-          }
-        }
+        ]
       },
       "output": {
         "type": "object",
-        "required": [
-          "proposal"
-        ],
         "properties": {
-          "proposal": {
-            "type": "object",
-            "required": [
-              "id",
-              "title",
-              "goal",
-              "project",
-              "reason",
-              "source",
-              "moduleId",
-              "signalIds",
-              "status",
-              "concernId",
-              "createdAt",
-              "updatedAt"
-            ],
-            "properties": {
-              "id": {
-                "type": "string"
-              },
-              "title": {
-                "type": "string"
-              },
-              "goal": {
-                "type": "string"
-              },
-              "project": {
-                "type": "string"
-              },
-              "reason": {
-                "type": "string"
-              },
-              "source": {
-                "type": "string"
-              },
-              "moduleId": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "signalIds": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "status": {
-                "type": "string",
-                "enum": [
-                  "pending",
-                  "accepted",
-                  "dismissed"
-                ]
-              },
-              "concernId": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "createdAt": {
-                "type": "string"
-              },
-              "updatedAt": {
-                "type": "string"
-              }
-            },
-            "additionalProperties": false
+          "json": {
+            "type": "string"
           }
         },
+        "required": [
+          "json"
+        ],
         "additionalProperties": false
-      }
+      },
+      "sideEffects": []
     },
     {
-      "name": "note",
-      "description": "Owner: create or edit a concern, stop it with done/dropped, or accept a proposal. request-key is required. Time fields are ISO or empty to clear; awaiting and links are strict JSON arrays. Links are evidence metadata, never permissions.",
+      "name": "settings",
+      "description": "Owner: read or versioned update learning, background, notification and retention settings; grants no tool permissions.",
       "visibility": [
         "owner"
       ],
       "idempotent": true,
-      "sideEffects": [
-        "Writes bounded private application state; suggestions grant no permission."
-      ],
       "parameters": {
         "type": "object",
-        "required": [
-          "request-key"
-        ],
         "properties": {
-          "request-key": {
-            "type": "string",
-            "description": "minLength: 1; maxLength: 160"
-          },
-          "id": {
-            "type": "string",
-            "description": "minLength: 1; maxLength: 128"
-          },
-          "title": {
-            "type": "string",
-            "description": "minLength: 1; maxLength: 200"
-          },
-          "goal": {
-            "type": "string",
-            "description": "maxLength: 1200"
-          },
-          "project": {
-            "type": "string",
-            "description": "maxLength: 100"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "watching",
-              "acting",
-              "waiting-user",
-              "waiting-external",
-              "done",
-              "dropped"
-            ]
-          },
-          "priority": {
-            "type": "string",
-            "enum": [
-              "low",
-              "normal",
-              "critical"
-            ]
-          },
-          "user-explicit": {
-            "type": "boolean"
-          },
-          "due-at": {
+          "patch": {
             "type": "string"
           },
-          "revisit-at": {
-            "type": "string"
-          },
-          "silent-until": {
-            "type": "string"
-          },
-          "expected-progress-at": {
-            "type": "string"
-          },
-          "progress-at": {
-            "type": "string"
-          },
-          "awaiting": {
-            "type": "string",
-            "description": "maxLength: 20000"
-          },
-          "links": {
-            "type": "string",
-            "description": "maxLength: 32000"
-          },
-          "proposal-id": {
-            "type": "string",
-            "description": "minLength: 1; maxLength: 128"
+          "revision": {
+            "type": "number"
           }
-        }
+        },
+        "required": []
       },
       "output": {
         "type": "object",
-        "required": [
-          "concern"
-        ],
         "properties": {
-          "concern": {
-            "type": "object",
-            "required": [
-              "id",
-              "revision",
-              "title",
-              "goal",
-              "project",
-              "status",
-              "priority",
-              "userExplicit",
-              "dueAt",
-              "revisitAt",
-              "silentUntil",
-              "expectedProgressAt",
-              "progressAt",
-              "awaiting",
-              "links",
-              "escalation",
-              "lastCheckedAt",
-              "lastAssessment",
-              "createdAt",
-              "updatedAt"
-            ],
-            "properties": {
-              "id": {
-                "type": "string"
-              },
-              "revision": {
-                "type": "integer"
-              },
-              "title": {
-                "type": "string"
-              },
-              "goal": {
-                "type": "string"
-              },
-              "project": {
-                "type": "string"
-              },
-              "status": {
-                "type": "string",
-                "enum": [
-                  "watching",
-                  "acting",
-                  "waiting-user",
-                  "waiting-external",
-                  "done",
-                  "dropped"
-                ]
-              },
-              "priority": {
-                "type": "string",
-                "enum": [
-                  "low",
-                  "normal",
-                  "critical"
-                ]
-              },
-              "userExplicit": {
-                "type": "boolean"
-              },
-              "dueAt": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "revisitAt": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "silentUntil": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "expectedProgressAt": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "progressAt": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "awaiting": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "required": [
-                    "source",
-                    "moduleId",
-                    "event",
-                    "ref",
-                    "thread",
-                    "from",
-                    "domain",
-                    "textAll"
-                  ],
-                  "properties": {
-                    "source": {
-                      "type": "string"
-                    },
-                    "moduleId": {
-                      "type": "string"
-                    },
-                    "event": {
-                      "type": "string"
-                    },
-                    "ref": {
-                      "type": "string"
-                    },
-                    "thread": {
-                      "type": "string"
-                    },
-                    "from": {
-                      "type": "string"
-                    },
-                    "domain": {
-                      "type": "string"
-                    },
-                    "textAll": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    }
-                  },
-                  "additionalProperties": false
-                }
-              },
-              "links": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "required": [
-                    "source",
-                    "moduleId",
-                    "ref",
-                    "version",
-                    "checkedAt",
-                    "conclusion"
-                  ],
-                  "properties": {
-                    "source": {
-                      "type": "string"
-                    },
-                    "moduleId": {
-                      "type": "string"
-                    },
-                    "ref": {
-                      "type": "string"
-                    },
-                    "version": {
-                      "type": "string"
-                    },
-                    "checkedAt": {
-                      "type": "string"
-                    },
-                    "conclusion": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
-                }
-              },
-              "escalation": {
-                "type": "string",
-                "enum": [
-                  "none",
-                  "early",
-                  "day-before",
-                  "final"
-                ]
-              },
-              "lastCheckedAt": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "lastAssessment": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "required": [
-                      "at",
-                      "conclusion",
-                      "decisionId"
-                    ],
-                    "properties": {
-                      "at": {
-                        "type": "string"
-                      },
-                      "conclusion": {
-                        "type": "string"
-                      },
-                      "decisionId": {
-                        "type": "string"
-                      }
-                    },
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "createdAt": {
-                "type": "string"
-              },
-              "updatedAt": {
-                "type": "string"
-              }
-            },
-            "additionalProperties": false
+          "json": {
+            "type": "string"
           }
         },
+        "required": [
+          "json"
+        ],
         "additionalProperties": false
-      }
+      },
+      "sideEffects": [
+        "Writes versioned private Mind state or performs the specifically guarded local effect"
+      ]
     },
     {
-      "name": "propose",
-      "description": "Authenticated modules suggest a bounded pending concern for owner review; no activation. request-key, title and reason required. signal-ids is a JSON array, max 20, limited to the source caller's own signals. This tool cannot dismiss suggestions.",
+      "name": "remember",
+      "description": "Record a sourced goal/preference/constraint/habit/environment. input JSON uses actionKey,expectedVisibilityRevision,expectedRevision,id?,kind,value,scope,explicitness,supportingRefs,opposingRefs?. User evidence required for explicit. scope is {} or an object with only projectId/sessionId string identifiers.",
       "visibility": [
+        "owner",
         "modules"
       ],
       "idempotent": true,
-      "sideEffects": [
-        "Writes bounded private application state; suggestions grant no permission."
-      ],
       "parameters": {
         "type": "object",
-        "required": [
-          "request-key",
-          "title",
-          "reason"
-        ],
         "properties": {
-          "request-key": {
-            "type": "string",
-            "description": "minLength: 1; maxLength: 160"
-          },
-          "title": {
-            "type": "string",
-            "description": "minLength: 1; maxLength: 200"
-          },
-          "goal": {
-            "type": "string",
-            "description": "maxLength: 1200"
-          },
-          "project": {
-            "type": "string",
-            "description": "maxLength: 100"
-          },
-          "reason": {
-            "type": "string",
-            "description": "minLength: 1; maxLength: 1200"
-          },
-          "signal-ids": {
-            "type": "string",
-            "description": "maxLength: 4000"
+          "input": {
+            "type": "string"
           }
-        }
+        },
+        "required": [
+          "input"
+        ]
       },
       "output": {
         "type": "object",
-        "required": [
-          "proposal"
-        ],
         "properties": {
-          "proposal": {
-            "type": "object",
-            "required": [
-              "id",
-              "title",
-              "goal",
-              "project",
-              "reason",
-              "source",
-              "moduleId",
-              "signalIds",
-              "status",
-              "concernId",
-              "createdAt",
-              "updatedAt"
-            ],
-            "properties": {
-              "id": {
-                "type": "string"
-              },
-              "title": {
-                "type": "string"
-              },
-              "goal": {
-                "type": "string"
-              },
-              "project": {
-                "type": "string"
-              },
-              "reason": {
-                "type": "string"
-              },
-              "source": {
-                "type": "string"
-              },
-              "moduleId": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "signalIds": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "status": {
-                "type": "string",
-                "enum": [
-                  "pending",
-                  "accepted",
-                  "dismissed"
-                ]
-              },
-              "concernId": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "createdAt": {
-                "type": "string"
-              },
-              "updatedAt": {
-                "type": "string"
-              }
-            },
-            "additionalProperties": false
+          "json": {
+            "type": "string"
           }
         },
+        "required": [
+          "json"
+        ],
         "additionalProperties": false
-      }
+      },
+      "sideEffects": [
+        "Writes versioned private Mind state or performs the specifically guarded local effect"
+      ]
     },
     {
-      "name": "signal",
-      "description": "Authenticated source modules push versioned observations. Real caller supplies source/moduleId; arguments cannot impersonate them. Exact event/ref/thread/from/domain matching with AND text conditions only requests verification. event-id dedupes within the caller.",
+      "name": "pursue",
+      "description": "Create or merge continuing outcome. input JSON actionKey,expectedVisibilityRevision,expectedRevision,semanticKey,goal,completionCriteria,scope,reason,evidenceRefs,understandingRefs?. Ordinary questions need no pursuit. scope is {} or an object with only projectId/sessionId string identifiers.",
       "visibility": [
+        "owner",
         "modules"
       ],
       "idempotent": true,
-      "sideEffects": [
-        "Writes bounded private application state; suggestions grant no permission."
-      ],
       "parameters": {
         "type": "object",
-        "required": [
-          "request-key",
-          "event-id",
-          "event",
-          "ref",
-          "version",
-          "occurred-at"
-        ],
         "properties": {
-          "request-key": {
-            "type": "string",
-            "description": "minLength: 1; maxLength: 160"
-          },
-          "event-id": {
-            "type": "string",
-            "description": "minLength: 1; maxLength: 128"
-          },
-          "event": {
-            "type": "string",
-            "description": "minLength: 1; maxLength: 128"
-          },
+          "input": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "json": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "json"
+        ],
+        "additionalProperties": false
+      },
+      "sideEffects": [
+        "Writes versioned private Mind state or performs the specifically guarded local effect"
+      ]
+    },
+    {
+      "name": "control",
+      "description": "Correct, pause, resume or end actual current item. input JSON kind,id,expectedRevision,expectedVisibilityRevision,operation,actionKey,evidenceRefs?,value?. Caller authority and user evidence checked.",
+      "visibility": [
+        "owner",
+        "modules"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "json": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "json"
+        ],
+        "additionalProperties": false
+      },
+      "sideEffects": [
+        "Writes versioned private Mind state or performs the specifically guarded local effect"
+      ]
+    },
+    {
+      "name": "feedback",
+      "description": "Explicit user useful/not-useful/reject/restart feedback; input JSON targetKind,targetId,expectedRevision,expectedVisibilityRevision,value,scope,actionKey,evidenceRefs?. Silence never feedback. scope is {} or an object with only projectId/sessionId string identifiers.",
+      "visibility": [
+        "owner",
+        "modules"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "json": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "json"
+        ],
+        "additionalProperties": false
+      },
+      "sideEffects": [
+        "Writes versioned private Mind state or performs the specifically guarded local effect"
+      ]
+    },
+    {
+      "name": "forget",
+      "description": "Owner: withdraw evidence, understanding, source object or session from Mind only. input JSON target,expectedVisibilityRevision,actionKey. Does not erase original Chat/Provider/external effects.",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "json": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "json"
+        ],
+        "additionalProperties": false
+      },
+      "sideEffects": [
+        "Writes versioned private Mind state or performs the specifically guarded local effect"
+      ]
+    },
+    {
+      "name": "progress",
+      "description": "Current Mind run only: save a candidate outcome, never verified completion. input JSON pursuitId,expectedRevision,expectedVisibilityRevision,summary,artifactRefs,originalReceiptRef,evidenceRefs,desiredStatus,nextStep?,waitReason?,actionKey.",
+      "visibility": [
+        "owner",
+        "modules"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "json": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "json"
+        ],
+        "additionalProperties": false
+      },
+      "sideEffects": [
+        "Writes versioned private Mind state or performs the specifically guarded local effect"
+      ]
+    },
+    {
+      "name": "action",
+      "description": "Create a version/actor-guarded local document, or invoke an owner-reviewed granted application read with target=application-read, adapterId and params. Both require pursuitId, expectedRevision, expectedVisibilityRevision and actionKey; returned canonical artifact refs may support independent result verification.",
+      "visibility": [
+        "owner",
+        "modules"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "json": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "json"
+        ],
+        "additionalProperties": false
+      },
+      "sideEffects": [
+        "Writes versioned private Mind state or performs the specifically guarded local effect"
+      ]
+    },
+    {
+      "name": "artifact",
+      "description": "Read exact persisted local document content and digest; original pursuit access remains required.",
+      "visibility": [
+        "owner",
+        "modules"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
           "ref": {
-            "type": "string",
-            "description": "minLength: 1; maxLength: 128"
-          },
-          "version": {
-            "type": "string",
-            "description": "minLength: 1; maxLength: 128"
-          },
-          "thread": {
-            "type": "string",
-            "description": "maxLength: 200"
-          },
-          "from": {
-            "type": "string",
-            "description": "maxLength: 200"
-          },
-          "domain": {
-            "type": "string",
-            "description": "maxLength: 200"
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "event",
-              "summary"
-            ]
-          },
-          "text": {
-            "type": "string",
-            "description": "maxLength: 2000"
-          },
-          "occurred-at": {
-            "type": "string",
-            "description": "pattern: ^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d))"
-          },
-          "progress-at": {
-            "type": "string",
-            "description": "pattern: ^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d))"
+            "type": "string"
           }
-        }
+        },
+        "required": [
+          "ref"
+        ]
       },
       "output": {
         "type": "object",
-        "required": [
-          "signalId",
-          "associations",
-          "duplicate"
-        ],
         "properties": {
-          "signalId": {
+          "json": {
             "type": "string"
-          },
-          "associations": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "duplicate": {
-            "type": "boolean"
           }
         },
-        "additionalProperties": false
-      }
-    },
-    {
-      "name": "report",
-      "description": "Current Mind reasoning only: submit one final structured report JSON with request-key and decision-id. Accepted candidates count only after this current Agent run's successful tool-result receipt and terminal success are verified. Owners cannot forge reports.",
-      "visibility": [
-        "modules"
-      ],
-      "idempotent": true,
-      "sideEffects": [
-        "Writes bounded private application state; suggestions grant no permission."
-      ],
-      "parameters": {
-        "type": "object",
         "required": [
-          "request-key",
-          "decision-id",
-          "result"
+          "json"
         ],
-        "properties": {
-          "request-key": {
-            "type": "string",
-            "description": "minLength: 1; maxLength: 160"
-          },
-          "decision-id": {
-            "type": "string",
-            "description": "minLength: 1; maxLength: 128"
-          },
-          "result": {
-            "type": "string",
-            "description": "minLength: 1; maxLength: 32000"
-          }
-        }
+        "additionalProperties": false
       },
-      "output": {
-        "type": "object",
-        "required": [
-          "accepted",
-          "reportId",
-          "decisionId",
-          "pendingVerification"
-        ],
-        "properties": {
-          "accepted": {
-            "type": "boolean",
-            "const": true
-          },
-          "reportId": {
-            "type": "string"
-          },
-          "decisionId": {
-            "type": "string"
-          },
-          "pendingVerification": {
-            "type": "boolean",
-            "const": true
-          }
-        },
-        "additionalProperties": false
-      }
+      "sideEffects": []
     },
     {
       "name": "check",
-      "description": "Owner explicitly requests one bounded foreground review, or reconciles the outstanding reasoning run. Unknown work retains capacity; this does not create a parallel run.",
+      "description": "Owner asks for one source synchronization and bounded background check; does not grant new permissions.",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "json": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "json"
+        ],
+        "additionalProperties": false
+      },
+      "sideEffects": [
+        "Writes versioned private Mind state or performs the specifically guarded local effect"
+      ]
+    },
+    {
+      "name": "verdict",
+      "description": "记录当前独立验收 Run 的具体条件核对；真实调用身份及持久工具结果匹配后才可使用。",
       "visibility": [
         "owner"
       ],
       "idempotent": false,
-      "sideEffects": [
-        "May create or reconcile a durably keyed Agent reasoning run."
-      ],
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "input"
+        ]
       },
       "output": {
         "type": "object",
-        "required": [
-          "runtime"
-        ],
         "properties": {
-          "runtime": {
-            "type": "object",
-            "required": [
-              "nextCheckAt",
-              "lastCheckAt",
-              "lastDailyDate",
-              "currentDecisionId",
-              "lastError",
-              "wakeError",
-              "phase",
-              "runId",
-              "interactions"
-            ],
-            "properties": {
-              "nextCheckAt": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "lastCheckAt": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "lastDailyDate": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "currentDecisionId": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "lastError": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "wakeError": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "phase": {
-                "type": "string",
-                "enum": [
-                  "idle",
-                  "prepared",
-                  "running",
-                  "waiting",
-                  "unknown"
-                ]
-              },
-              "runId": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "interactions": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "required": [
-                    "id",
-                    "title",
-                    "message",
-                    "expiresAt"
-                  ],
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "expiresAt": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
-                }
-              }
-            },
-            "additionalProperties": false
+          "json": {
+            "type": "string"
           }
         },
+        "required": [
+          "json"
+        ],
         "additionalProperties": false
       }
     },
     {
-      "name": "ui-settings",
-      "description": "Owner read {} or save scalar Mind preferences. Background review starts enabled; notifications stay off until notify-enabled. interval-minutes 5–120, daily-wakes 1–24, quiet times HH:mm, IANA timezone. notify-enabled is optional and defaults false.",
+      "name": "recovery",
+      "description": "Owner-only: inspect backup restore guard, or explicitly authorize this exact restored memory after reviewing potentially outdated forget records. input JSON restoreId, expectedVisibilityRevision, decision: authorize-restored-memory. Not selected for autonomous agents.",
       "visibility": [
         "owner"
       ],
       "idempotent": true,
-      "sideEffects": [
-        "Writes bounded private application state; suggestions grant no permission."
-      ],
       "parameters": {
         "type": "object",
         "properties": {
-          "enabled": {
-            "type": "boolean"
-          },
-          "interval-minutes": {
-            "type": "string",
-            "description": "Decimal integer string; local range is validated by Mind."
-          },
-          "daily-wakes": {
-            "type": "string",
-            "description": "Decimal integer string; local range is validated by Mind."
-          },
-          "daily-time": {
-            "type": "string",
-            "description": "pattern: ^([01]\\d|2[0-3]):[0-5]\\d$"
-          },
-          "quiet-start": {
-            "type": "string",
-            "description": "pattern: ^([01]\\d|2[0-3]):[0-5]\\d$"
-          },
-          "quiet-end": {
-            "type": "string",
-            "description": "pattern: ^([01]\\d|2[0-3]):[0-5]\\d$"
-          },
-          "timezone": {
-            "type": "string",
-            "description": "minLength: 1; maxLength: 100"
-          },
-          "notify-enabled": {
-            "type": "boolean"
-          },
-          "feedback-minimum": {
-            "type": "string",
-            "description": "Decimal integer string; local range is validated by Mind."
-          },
-          "feedback-half-life-days": {
-            "type": "string",
-            "description": "Decimal integer string; local range is validated by Mind."
-          },
-          "waiting-recheck-hours": {
-            "type": "string",
-            "description": "Decimal integer string; local range is validated by Mind."
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "sideEffects": [
+        "Mind recovery authorization"
+      ],
+      "output": {
+        "type": "object",
+        "properties": {
+          "json": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "json"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "admission-verdict",
+      "description": "独立语义验收 Run 返回与真实来源及候选绑定的判断；普通应用与调用参数不能授予身份。",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "json": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "json"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "applications",
+      "description": "List reviewed exact application read adapters. input JSON operation list (default), or owner-only grant with moduleId, activeHash, tool, effect read, exact params and reviewed description; revoke with adapterId. Autonomous agents cannot grant or revoke. Use mind.action target application-read for a current pursuit and real persisted response.",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
           }
         }
       },
       "output": {
         "type": "object",
-        "required": [
-          "enabled",
-          "intervalMinutes",
-          "dailyWakes",
-          "dailyTime",
-          "quietStart",
-          "quietEnd",
-          "timezone",
-          "notifyEnabled",
-          "feedbackMinimum",
-          "feedbackHalfLifeDays",
-          "waitingRecheckHours"
-        ],
         "properties": {
-          "enabled": {
-            "type": "boolean"
-          },
-          "intervalMinutes": {
-            "type": "integer"
-          },
-          "dailyWakes": {
-            "type": "integer"
-          },
-          "dailyTime": {
+          "json": {
             "type": "string"
-          },
-          "quietStart": {
-            "type": "string"
-          },
-          "quietEnd": {
-            "type": "string"
-          },
-          "timezone": {
-            "type": "string"
-          },
-          "notifyEnabled": {
-            "type": "boolean"
-          },
-          "feedbackMinimum": {
-            "type": "integer"
-          },
-          "feedbackHalfLifeDays": {
-            "type": "integer"
-          },
-          "waitingRecheckHours": {
-            "type": "integer"
           }
         },
+        "required": [
+          "json"
+        ],
         "additionalProperties": false
-      }
+      },
+      "sideEffects": [
+        "Owner may configure or revoke exact reviewed application reads"
+      ]
+    },
+    {
+      "name": "delivery",
+      "description": "Current kernel-bound worker: prepare exact NEW Author material with pursuit/revisions, actionKey, author identity, admissionId, requestKey, items (name, dir, intent, materialDigest), criteria; finish for authenticated proof capture. Actual owner/approved Web only: list (limit,after), detail/submit/reconcile/withdraw/forget (id). Explicit submit verifies original admission and stages; unknown replies query the original receipt. Activation never completes the goal. No JSON owner/access fields.",
+      "visibility": [
+        "owner",
+        "modules"
+      ],
+      "idempotent": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "json": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "json"
+        ],
+        "additionalProperties": false
+      },
+      "sideEffects": [
+        "Persists exact private delivery preparation and authenticated stage/admission proof",
+        "Only an explicit actual-owner submit transports the original staged material to Author; reconcile reads its original receipt"
+      ]
     }
   ]
 }

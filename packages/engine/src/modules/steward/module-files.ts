@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { constants, type BigIntStats } from "node:fs";
 import { lstat, mkdir, open, readdir, realpath, rm, type FileHandle } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { MODULE_SOURCE_MAX_BYTES, MODULE_SOURCE_MAX_FILES } from "../../../../contracts/src/steward/module-material";
 import { StewardError } from "./errors";
 
 export type ModuleFile = { path: string; bytes: Uint8Array; executable?: boolean };
@@ -191,8 +192,8 @@ export async function snapshotModule(root: string, path: string): Promise<Module
         const child = await dir.directory(entry.name);
         try { await walk(child, relative + "/"); } finally { await child.close(); }
       } else {
-        if (files.length >= 200) throw new StewardError("invalid", "Module exceeds file limits");
-        const file = await dir.read(entry.name, 1024 * 1024 - total);
+        if (files.length >= MODULE_SOURCE_MAX_FILES) throw new StewardError("invalid", "Module exceeds file limits");
+        const file = await dir.read(entry.name, MODULE_SOURCE_MAX_BYTES - total);
         total += file.bytes.byteLength;
         // Preserve the legacy snapshot/hash representation.
         files.push({ path: relative, bytes: file.bytes });

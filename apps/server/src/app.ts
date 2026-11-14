@@ -83,7 +83,7 @@ export async function createServerApp(options: { steward?: StewardRuntime } = {}
   await steward.initialize();
   const api = createApiRouter({ steward });
   const allowedOrigins = getAllowedOrigins();
-  const browserAuth = await createBrowserAuth({ dataDir: steward.ports.dataDir, apiKey: readEnv().API_KEY });
+  const browserAuth = await createBrowserAuth({ dataDir: steward.ports.dataDir, apiKey: readEnv().API_KEY, publicUrl: process.env.CHRONA_PUBLIC_URL });
   app.route("/api/auth", browserAuth.router);
 
   app.use("/api/*", async (c, next) => {

@@ -464,6 +464,8 @@ test("public pause fences caller and receiver before idle conflict, then exact d
   for (const side of ["caller", "receiver"] as const) {
     const f = await fixture(); await f.service.admit(f.principal, f.input);
     const d = (await f.service.poll(f.receiver)).deliveries[0]!, moduleId = side === "caller" ? f.caller.id : f.app.id;
+    const module = side === "caller" ? f.caller : f.app;
+    await f.db.moduleVersion.create({ data: { moduleId, hash: module.activeHash!, manifest: moduleManifestSchema.parse({ name: module.name, entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [] }), source: "user", status: "approved", intent: {}, report: {} } });
     const context = moduleContext(f.ports, f.principal.workspaceId);
     await expect(requestStatus(context, moduleId, "paused", "test drain")).rejects.toMatchObject({ code: "conflict" });
     const fenced = await f.db.module.findUniqueOrThrow({ where: { id: moduleId } });

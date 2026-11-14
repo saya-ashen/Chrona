@@ -4,7 +4,7 @@ import { providerAnswerSchema, type ExecutionPrincipal } from "@chrona/contracts
 import type { StewardPorts } from "./ports";
 import { CallError } from "./module-call-error";
 import { createProviderControl } from "./provider-channel";
-import { assertExecutionPrincipal } from "./execution-principal";
+import { assertApprovedAgentPrincipal } from "./agent-context-admission";
 import { selectContextTools } from "./agent-context-tools";
 import { contextInteractions } from "./agent-context-read";
 import { selectAgentProvider, providerView, type ProviderBinding } from "./agent-provider";
@@ -14,6 +14,7 @@ import { executeContextCommand, type ContextCommand } from "./agent-context-admi
 export { ownedContext, ownedRun, view, type ModulePrincipal } from "./agent-context-state";
 
 async function readContextPrimitive(ports: StewardPorts, principal: ModulePrincipal, name: string, args: Record<string, unknown>) {
+  await assertApprovedAgentPrincipal(ports.db, principal);
   const run = await ownedRun(ports.db, principal, String(args.runId));
   if (name === "get") return view(run);
   const after = Number(args.after), limit = Number(args.limit);
@@ -40,7 +41,7 @@ async function selectContextProvider(ports: StewardPorts, principal: ModulePrinc
 async function registeredRunReceipt(ports: StewardPorts, principal: ModulePrincipal, args: Record<string, unknown>) {
   const prior = await ports.db.agentCommand.findUnique({ where: { id: `agent-command:${contextDigest([principal.workspaceId, principal.caller.moduleId, "run", args.requestKey])}` } });
   if (!prior) return;
-  await assertExecutionPrincipal(ports.db, principal);
+  await assertApprovedAgentPrincipal(ports.db, principal);
   if (prior.hash !== principal.caller.hash || prior.requestDigest !== contextRequestDigest(args)) throw new CallError("conflict", "Agent request identity changed");
   return prior;
 }
