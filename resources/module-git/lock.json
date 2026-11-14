@@ -5,9 +5,9 @@
       "name": "web",
       "repository": null,
       "branch": "main",
-      "commit": "513a34775043eedbd91a56b4e33c7892573da2f3",
+      "commit": "5144d7a92fa781a1d77e9e77ff91edeee0569667",
       "bundle": "web.bundle",
-      "bundleSha256": "d43bf1d7c2dc9f2ea751c4fa0cfd7db7e6e68487acc2ba4535d614d5a52af57b"
+      "bundleSha256": "2325755adb725dd87a1054567526a9add67e5826d271b6aed12720833845410f"
     },
     {
       "name": "notify",
@@ -21,9 +21,9 @@
       "name": "pi",
       "repository": null,
       "branch": "main",
-      "commit": "46779dc4172c0af11d407aa080d8e6607f374717",
+      "commit": "365909c4df085885bb8ab4ed953df4a2951d459f",
       "bundle": "pi.bundle",
-      "bundleSha256": "dc3fac8900296201499eef31e14d06dbf3ec97a8f8a692659e7a5c2ae74bc0e8"
+      "bundleSha256": "6902876b8ea3038428ecd00a3e8a948f3f6d345da8d4f69e41ccb275dde230b3"
     },
     {
       "name": "qq",
@@ -37,25 +37,25 @@
       "name": "author",
       "repository": null,
       "branch": "main",
-      "commit": "df4675fb0d286106024555e46c824d4cf0ae4cc7",
+      "commit": "239b232968e45c9880e534dfbda926124b0f1c8a",
       "bundle": "author.bundle",
-      "bundleSha256": "83665477b02c83f0e91c3b7427fe76ef8dfdda0dacf8a1036ac4fa89df993f31"
+      "bundleSha256": "240cf317af5941f2c825794f265edb2fec7da2bfd8e92b5cc2b3976224ee34ff"
     },
     {
       "name": "mind",
       "repository": null,
       "branch": "main",
-      "commit": "675f1149b3306844001f5071dd96d0527ec7ad78",
+      "commit": "763a65119030c44e199ad8052fa8408dae28cda4",
       "bundle": "mind.bundle",
-      "bundleSha256": "eadc040ea8021b5a0d7cb84705648f4cc7a74ed6bdfc4a485e3a4899c6f872fd"
+      "bundleSha256": "7d8f1deb4a7db4d2fc433ffb0c9fe0b2f2bc60956d7399513f443560dcfdd058"
     },
     {
       "name": "chat",
       "repository": null,
       "branch": "main",
-      "commit": "deb007ada672c0352691a94107d9cfa078c6e37f",
+      "commit": "491a752fc37ab5daafd4dc7c66fc07523f7985eb",
       "bundle": "chat.bundle",
-      "bundleSha256": "8d05553b2f978addc791d6267f302cbc61290d9fea155b3025077d278793c4a3"
+      "bundleSha256": "875d87e5149d76646e0895452a3cc334e1bd95cfe062bbea6ebba02c36a6f3b0"
     }
   ]
 }
