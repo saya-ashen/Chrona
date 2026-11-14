@@ -51,6 +51,7 @@
     "index.ts",
     "LICENSE",
     "module.json",
+    "offline-entry.ts",
     "package.json",
     "README.md",
     "test.ts",
