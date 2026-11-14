@@ -19,6 +19,7 @@ test.each([false, true])("restart reconciles only a persisted stop receipt (conf
   cleanups.push(() => rm(dataDir, { recursive: true, force: true }), () => db.$disconnect());
   const workspace = await db.workspace.create({ data: { name: "recovery" } });
   const application = await db.module.create({ data: { workspaceId: workspace.id, name: "entry", activeHash: "version" } });
+  await db.moduleVersion.create({ data: { moduleId: application.id, hash: "version", status: "approved", source: "user", manifest: { name: "entry", entry: "index.ts", effects: [], tools: [], tests: ["test.ts"] }, intent: {}, report: {} } });
   const principal = { workspaceId: workspace.id, ownerId: "owner", caller: { kind: "module" as const, moduleId: application.id, hash: "version" } };
   const calls: string[] = [];
   const peer = testModuleProcess(async event => {

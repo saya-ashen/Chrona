@@ -8,13 +8,14 @@ import { createExecutions } from "./execution";
 import { createRuns } from "./runs";
 import { createExecutionEventStore } from "./execution-event-store";
 import { executionRunInput } from "./execution-context";
-import type { ExecutionPrincipal } from "@chrona/contracts/steward";
+import { moduleManifestSchema, type ExecutionPrincipal } from "@chrona/contracts/steward";
 const databases: ReturnType<typeof testDb>[] = [];
 afterEach(async () => { for (const db of databases.splice(0)) await db.$disconnect(); });
 async function fixture() {
   const db = testDb(); databases.push(db);
   const workspaceId = (await db.workspace.create({ data: { name: "coding-context" } })).id;
   const module = await db.module.create({ data: { workspaceId, name: "coding", activeHash: "hash", status: "active" } });
+  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "hash", manifest: moduleManifestSchema.parse({ name: "coding", entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true }), source: "user", status: "approved", intent: {}, report: {} } });
   const project = await mkdtemp(join(tmpdir(), "chrona-coding-context-project-"));
   await writeFile(join(project, "AGENTS.md"), "Fixture project rules");
   await db.preference.create({ data: { workspaceId, text: "PRIVATE PERSONAL PREFERENCE", topic: "private", origin: "user" } });

@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { MODULE_SOURCE_MAX_BYTES } from "../../../../contracts/src/steward/module-material";
 import { checkoutModule, snapshotModule } from "./module-files";
 
 const roots: string[] = [];
@@ -28,7 +29,7 @@ test("snapshots reject symlinks and oversized files", async () => {
   await symlink(join(root, "module", "index.ts"), join(root, "module", "link.ts"));
   await expect(snapshotModule(root, "module")).rejects.toMatchObject({ code: "forbidden" });
   await rm(join(root, "module", "link.ts"));
-  await writeFile(join(root, "module", "large.bin"), new Uint8Array(1024 * 1024 + 1));
+  await writeFile(join(root, "module", "large.bin"), new Uint8Array(MODULE_SOURCE_MAX_BYTES + 1));
   await expect(snapshotModule(root, "module")).rejects.toMatchObject({ code: "invalid" });
 });
 

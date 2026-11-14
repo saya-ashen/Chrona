@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, mock, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ExecutionPrincipal, ExecutionStart, ExecutionView } from "@chrona/contracts/steward";
+import { moduleManifestSchema, type ExecutionPrincipal, type ExecutionStart, type ExecutionView } from "@chrona/contracts/steward";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
 import { createExecutions } from "./execution";
@@ -20,6 +20,7 @@ beforeEach(async () => {
   await mkdir(project);
   const workspaceId = (await db.workspace.create({ data: { name: "continuation-test" } })).id;
   const module = await db.module.create({ data: { workspaceId, name: "coding", activeHash: "hash", status: "active" } });
+  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "hash", manifest: moduleManifestSchema.parse({ name: "coding", entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true }), source: "user", status: "approved", intent: {}, report: {} } });
   principal = { workspaceId, ownerId: "owner", caller: { kind: "module", moduleId: module.id, hash: "hash" } };
   ports = { db, now: () => new Date("2026-11-05T12:00:00Z"), dataDir: join(root, "data"), publicUrl: null,
     resolveExecutionProject: async (_, projectRef) => ({ projectRef, executor: "server", canonicalPath: project, baseline: "commit:fixture" }),

@@ -18,6 +18,7 @@ import { notice, notices } from "./test-notices";
 import { modulesListOutput } from "./system-outputs";
 import { callSync, listSystemModules } from "./module-calls";
 import { RUN_LIMITS } from "@chrona/contracts/steward";
+import { MODULE_SOURCE_MAX_BYTES } from "../../../../contracts/src/steward/module-material";
 import { approvalNoticeBody } from "./external/notify/approval";
 
 const cleanups: (() => Promise<unknown>)[] = [];
@@ -997,7 +998,7 @@ test.each(["../escape", "/tmp", "price-watch/../price-watch", "price-watch/.git"
 test.each(["symlink", "bytes", "files"])("reject unsafe module contents: %s", async kind => {
   const f = await fixture();
   if (kind === "symlink") await symlink(join(f.dir, "index.ts"), join(f.dir, "linked.ts"));
-  if (kind === "bytes") await writeFile(join(f.dir, "big"), Buffer.alloc(1024 * 1024));
+  if (kind === "bytes") await writeFile(join(f.dir, "big"), Buffer.alloc(MODULE_SOURCE_MAX_BYTES + 1));
   if (kind === "files") for (let i = 0; i < 198; i++) await writeFile(join(f.dir, `extra-${i}`), "");
   await expect(f.propose()).rejects.toThrow();
   expect(await f.db.module.count()).toBe(0);

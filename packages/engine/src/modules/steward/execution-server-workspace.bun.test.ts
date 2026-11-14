@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtemp, readFile, readdir, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ExecutionPrincipal, ExecutionStartV2 } from "@chrona/contracts/steward";
+import { moduleManifestSchema, type ExecutionPrincipal, type ExecutionStartV2 } from "@chrona/contracts/steward";
 import type { PreparedServerWorkspace, ServerWorkspaceRequest, StewardPorts } from "./ports";
 import { localDirectoryIdentity, prepareLockedLocalWorkspace } from "@chrona/workspaces";
 import { createServerWorkspacePreparer } from "../../../../../apps/server/src/execution-server-workspace";
@@ -33,6 +33,7 @@ async function fixture() {
   const db = testDb(); databases.push(db);
   const workspaceId = (await db.workspace.create({ data: { name: "server-test" } })).id;
   const module = await db.module.create({ data: { workspaceId, name: "coding", activeHash: "hash", status: "active" } });
+  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "hash", manifest: moduleManifestSchema.parse({ name: "coding", entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true }), source: "user", status: "approved", intent: {}, report: {} } });
   const principal: ExecutionPrincipal = { workspaceId, ownerId: "owner", caller: { kind: "module", moduleId: module.id, hash: "hash" } };
   const calls: ServerWorkspaceRequest[] = []; let locks = 0;
   let afterPrepare: ((request: ServerWorkspaceRequest, prepared: PreparedServerWorkspace) => Promise<void>) | undefined;
