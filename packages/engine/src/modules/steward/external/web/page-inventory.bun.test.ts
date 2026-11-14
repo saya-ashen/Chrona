@@ -116,7 +116,7 @@ test("Web wiring completes list and user discovery pages through its existing SD
   const call = entry.slice(entry.indexOf("const call ="), entry.indexOf("\nconst ownSettings"));
   const pages = entry.slice(entry.indexOf("const pages = createPages("), entry.indexOf('\non("tool"'));
   const script = new Bun.Transpiler({ loader: "ts" }).transformSync(`${adapter}\n${call}\n${pages}\nglobalThis.wiredPages = pages;`);
-  const wired = runInNewContext(`${script}\nglobalThis.wiredPages;`, { chrona: sdk, createPages }) as ReturnType<typeof createPages>;
+  const wired = runInNewContext(`${script}\nglobalThis.wiredPages;`, { chrona: sdk, createPages, createMaterialAdmission: () => ({}) }) as ReturnType<typeof createPages>;
   for (const module of ["alpha", "beta"]) await wired.tool("page-set", input, { kind: "module", module, moduleId: `${module}-id` });
   requests.length = 0;
   expect((await wired.list()).map(page => page.module)).toEqual(["alpha", "beta"]);
