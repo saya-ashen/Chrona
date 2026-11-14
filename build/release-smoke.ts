@@ -265,7 +265,7 @@ export async function assertModuleTypecheck(resources: string) {
     const contracts = Object.fromEntries(web.tools.filter(tool => tool.visibility.some(who => who === "modules" || who === "owner"))
       .map(tool => [`web.${tool.name}`, { input: tool.parameters, output: tool.output ?? null }]));
     await writeFile(join(sdk, "calls.json"), JSON.stringify(contracts));
-    const child = Bun.spawn(["bun", "--no-install", join(resources, "module-typecheck/check.ts"), join(resources, "external/files"), sdk], { stdout: "pipe", stderr: "pipe" });
+    const child = Bun.spawn(["bun", "--no-install", join(resources, "module-typecheck/check.ts"), join(resources, "external/notify"), sdk], { stdout: "pipe", stderr: "pipe" });
     const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
     if (code !== 0) throw new Error(`Module type check failed (exit ${code}): ${stdout.slice(-500)} ${stderr.slice(-500)}`);
   } finally {

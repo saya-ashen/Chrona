@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "modules": [
+    {
+      "name": "web",
+      "proposedRepository": "chrona-core/chrona-module-web",
+      "localRepository": "/tmp/claude-1000/-home-saya-workspace-Chrona/32ee6f1a-71a9-4122-a2cf-026e97172cd3/scratchpad/build/resources/module-git/repos/web.git",
+      "branch": "main",
+      "commit": "513a34775043eedbd91a56b4e33c7892573da2f3"
+    },
+    {
+      "name": "notify",
+      "proposedRepository": "chrona-core/chrona-module-notify",
+      "localRepository": "/tmp/claude-1000/-home-saya-workspace-Chrona/32ee6f1a-71a9-4122-a2cf-026e97172cd3/scratchpad/build/resources/module-git/repos/notify.git",
+      "branch": "main",
+      "commit": "c4f00470de6d8bd25affb38c10584214c9c4faa0"
+    },
+    {
+      "name": "pi",
+      "proposedRepository": "chrona-core/chrona-module-pi",
+      "localRepository": "/tmp/claude-1000/-home-saya-workspace-Chrona/32ee6f1a-71a9-4122-a2cf-026e97172cd3/scratchpad/build/resources/module-git/repos/pi.git",
+      "branch": "main",
+      "commit": "46779dc4172c0af11d407aa080d8e6607f374717"
+    },
+    {
+      "name": "qq",
+      "proposedRepository": "chrona-core/chrona-module-qq",
+      "localRepository": "/tmp/claude-1000/-home-saya-workspace-Chrona/32ee6f1a-71a9-4122-a2cf-026e97172cd3/scratchpad/build/resources/module-git/repos/qq.git",
+      "branch": "main",
+      "commit": "9adea757a3c6d3830783f46fcdd0e8a37062080b"
+    },
+    {
+      "name": "author",
+      "proposedRepository": "chrona-core/chrona-module-author",
+      "localRepository": "/tmp/claude-1000/-home-saya-workspace-Chrona/32ee6f1a-71a9-4122-a2cf-026e97172cd3/scratchpad/build/resources/module-git/repos/author.git",
+      "branch": "main",
+      "commit": "df4675fb0d286106024555e46c824d4cf0ae4cc7"
+    },
+    {
+      "name": "mind",
+      "proposedRepository": "chrona-core/chrona-module-mind",
+      "localRepository": "/tmp/claude-1000/-home-saya-workspace-Chrona/32ee6f1a-71a9-4122-a2cf-026e97172cd3/scratchpad/build/resources/module-git/repos/mind.git",
+      "branch": "main",
+      "commit": "675f1149b3306844001f5071dd96d0527ec7ad78"
+    },
+    {
+      "name": "chat",
+      "proposedRepository": "chrona-core/chrona-module-chat",
+      "localRepository": "/tmp/claude-1000/-home-saya-workspace-Chrona/32ee6f1a-71a9-4122-a2cf-026e97172cd3/scratchpad/build/resources/module-git/repos/chat.git",
+      "branch": "main",
+      "commit": "deb007ada672c0352691a94107d9cfa078c6e37f"
+    }
+  ]
+}
