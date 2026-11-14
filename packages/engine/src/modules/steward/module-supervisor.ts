@@ -414,7 +414,7 @@ class ModuleSupervisor {
     delete instance.scope.moduleRunId; delete instance.scope.eventKey; delete instance.scope.chain; delete instance.scope.path;
     if (!isClosing(instance) && !instance.manifest.keepAlive) instance.idle = this.timers.setTimeout(() => { void instance.queue.then(() => this.close(instance)).catch(error => this.failure(instance, String(error))).catch(() => {}); }, this.idleMs);
   }
-  private async recordEventResult(input: { instance: Instance; event: ModuleEvent; workspaceId: string; runId: string; reply: Reply; private?: boolean; validateResult?: DeliveryOptions["validateResult"] }) {
+  private async recordEventResult(input: { instance: Instance; event: ModuleEvent; workspaceId: string; runId: string; reply: Reply; private?: boolean; retainOutput?: boolean; validateResult?: DeliveryOptions["validateResult"] }) {
     const { instance, event, workspaceId, runId, reply, validateResult } = input;
     if ("error" in reply) throw staged(Object.assign(new Error(reply.error), { code: reply.errorCode, reason: reply.errorReason }), "handler");
     const outputError = validateResult?.(reply.result.result ?? null) ?? null;
@@ -422,7 +422,7 @@ class ModuleSupervisor {
       await this.ports.db.moduleRun.update({ where: { id: runId }, data: { exitCode: 1, error: input.private ? "Private operation returned an invalid result" : outputError.slice(0, 1000) } });
       return;
     }
-    await this.ports.db.moduleRun.update({ where: { id: runId }, data: { exitCode: 0, output: input.private ? {} : reply.result } });
+    await this.ports.db.moduleRun.update({ where: { id: runId }, data: { exitCode: 0, ...(input.retainOutput === false ? {} : { output: input.private ? {} : reply.result }) } });
     this.backoffFailures.set(keyOf(instance.moduleId, instance.hash, instance.activationId), 0);
     await recordModuleRecovery(this.ports, { workspaceId, moduleId: instance.moduleId, hash: instance.hash, activationId: instance.activationId, triggerId: triggerKey(event), runId }).catch(error => console.error(JSON.stringify({ component: "module-supervisor", event: "recovery_diagnostic.persist_failed", moduleId: instance.moduleId, hash: instance.hash, error: diagnosticText(String(error), 300) })));
   }
@@ -440,7 +440,7 @@ class ModuleSupervisor {
     }
     return module;
   }
-  private async deliverEvent(instance: Instance, event: ModuleEvent, { chain = [], path = [], timeoutMs, validateResult, beforeDelivery, dispatch, private: privateTransport }: DeliveryOptions): Promise<Reply> {
+  private async deliverEvent(instance: Instance, event: ModuleEvent, { chain = [], path = [], timeoutMs, validateResult, beforeDelivery, dispatch, private: privateTransport, retainOutput }: DeliveryOptions): Promise<Reply> {
     const { moduleId, hash } = instance, module = await this.assertCurrentActivation(instance);
     // Admission/metadata rejection is not a real execution result.
     await this.validateTrigger(instance, event);
@@ -452,7 +452,7 @@ class ModuleSupervisor {
     instance.scope.chain = chain; instance.scope.path = path;
     try {
       const reply = await this.sendEvent(instance, event, module.workspaceId, timeoutMs, dispatch);
-      await this.recordEventResult({ instance, event, workspaceId: module.workspaceId, runId: run.id, reply, validateResult, private: privateTransport });
+      await this.recordEventResult({ instance, event, workspaceId: module.workspaceId, runId: run.id, reply, validateResult, private: privateTransport, retainOutput });
       return reply;
     } catch (error) {
       if ((error as { staleActivation?: boolean }).staleActivation) throw error;

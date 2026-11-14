@@ -109,9 +109,9 @@ async function invokeSystemSync({ ports, origin, resolved, args, rowId, rowKey, 
     throw failure;
   }
 }
-async function deliverSyncModule({ ports, origin, resolved, target, args, chain, path, now, key, timeoutMs, activationId, rowId, finish, privateTransport }: SyncInvocation & { timeoutMs?: number; rowId: string; finish: (data: Prisma.ModuleInvocationUpdateInput) => Promise<unknown> }) {
+async function deliverSyncModule({ ports, origin, resolved, target, args, chain, path, now, key, timeoutMs, activationId, rowId, finish, privateTransport, transient }: SyncInvocation & { timeoutMs?: number; rowId: string; finish: (data: Prisma.ModuleInvocationUpdateInput) => Promise<unknown>; transient: boolean }) {
   try {
-    return await moduleSupervisor(ports).deliver(resolved.module.id, resolved.module.activeHash, toolEvent(resolved, args, now, origin.caller, { id: rowId, key: key ?? null, attempt: 1, chain: path, ...(isAgentContextEntry(ports, origin) ? {executionRunId:origin.run!.executionRunId} : {}) }), { chain, path, ...(privateTransport ? { private: true } : {}), beforeDelivery: targetFence(ports, origin.workspaceId, resolved, origin.caller), ...(activationId !== undefined ? { activationId } : {}), validateResult: output => moduleOutputError(target, resolved.tool, output), ...(timeoutMs ? { timeoutMs } : {}) });
+    return await moduleSupervisor(ports).deliver(resolved.module.id, resolved.module.activeHash, toolEvent(resolved, args, now, origin.caller, { id: rowId, key: key ?? null, attempt: 1, chain: path, ...(isAgentContextEntry(ports, origin) ? {executionRunId:origin.run!.executionRunId} : {}) }), { chain, path, ...(privateTransport ? { private: true } : {}), ...(transient ? { retainOutput: false } : {}), beforeDelivery: targetFence(ports, origin.workspaceId, resolved, origin.caller), ...(activationId !== undefined ? { activationId } : {}), validateResult: output => moduleOutputError(target, resolved.tool, output), ...(timeoutMs ? { timeoutMs } : {}) });
   } catch (error) {
     // Supervisor activation checks can reject before its callback fence runs. Classify a version switch as conflict too.
     if (stageOf(error) === "unavailable") {
@@ -143,9 +143,12 @@ async function invokeModuleSync({ ports, origin, resolved, target, args, chain, 
   if (!graph) { graph = new Map(); waiting.set(ports.db, graph); }
   // A detached Agent entry has an identity, but no originating module event waiting on it.
   const name = isAgentContextEntry(ports, origin) ? null : callerName(origin.caller), edges = graph;
+  // A keyless module-to-module read can never be replayed, so its result is not kept.
+  // Agent tool calls keep theirs: Run transcripts show them.
+  const transient = !key && resolved.tool.idempotent === true && origin.caller.kind === "module" && !isAgentContextEntry(ports, origin);
   await addWaitEdge(edges, name, resolved.module.name, target, finish);
   let reply;
-  try { reply = await deliverSyncModule({ ports, origin, resolved, target, args, chain, path, now, key, timeoutMs, activationId, rowId, finish, privateTransport }); }
+  try { reply = await deliverSyncModule({ ports, origin, resolved, target, args, chain, path, now, key, timeoutMs, activationId, rowId, finish, privateTransport, transient }); }
   finally { if (name) removeWaitEdge(edges, name, resolved.module.name); }
   const output = "result" in reply ? reply.result.result ?? null : null;
   try { checkModuleOutput(target, resolved.tool, output); }
@@ -155,7 +158,7 @@ async function invokeModuleSync({ ports, origin, resolved, target, args, chain, 
     if (issues) await recordModuleOutputMismatch(ports.db, { workspaceId: origin.workspaceId, moduleId: resolved.module.id, activationId, hash: resolved.module.activeHash, tool: resolved.tool.name, callId: rowId, issues, now: ports.now() });
     throw error;
   }
-  await finish({ status: "succeeded", output: output as Prisma.InputJsonValue });
+  await finish({ status: "succeeded", output: transient ? Prisma.DbNull : output as Prisma.InputJsonValue });
   return { callId: rowId, output: output as Json };
 }
 async function validateSyncRoute(ports: StewardPorts, origin: CallOrigin, target: string, expectedTarget?: ExpectedModuleTarget) {

@@ -23,7 +23,7 @@ export function isHandlerRejection(error: unknown) {
 export type Process = ReturnType<NonNullable<NonNullable<StewardPorts["sandbox"]>["startModule"]>>;
 export type Timers = Pick<typeof globalThis, "setTimeout" | "clearTimeout">;
 export type Options = { timers?: Timers; idleMs?: number; backoffMs?: number };
-export type DeliveryOptions = { private?: boolean; chain?: string[]; path?: string[]; timeoutMs?: number; activationId?: string | null; beforeDelivery?: () => Promise<void>; dispatch?: (send: () => void) => Promise<void>; validateResult?: (result: unknown) => string | null };
+export type DeliveryOptions = { private?: boolean; /** false: record the run, not its result. */ retainOutput?: boolean; chain?: string[]; path?: string[]; timeoutMs?: number; activationId?: string | null; beforeDelivery?: () => Promise<void>; dispatch?: (send: () => void) => Promise<void>; validateResult?: (result: unknown) => string | null };
 export type Instance = {
   moduleId: string; hash: string; activationId: string | null; manifest: ModuleManifest; scope: CallScope;
   queue: Promise<unknown>; start?: Promise<void>; httpReady?: ReturnType<typeof moduleHttpReady>;

@@ -24,9 +24,9 @@ async function fixture(handlers: { alpha: Handler; beta: Handler }) {
   const workspace = await db.workspace.create({ data: { name: "calls" } });
   const manifests = {
     alpha: { name: "alpha", entry: "index.ts", tests: ["test.ts"], effects: [],
-      uses: ["beta.echo", "beta.private", "beta.hidden", "beta.bounce", "beta.crash", "beta.again", "modules.contributions"], tools: [tool("pong"), tool("start")] },
+      uses: ["beta.echo", "beta.look", "beta.private", "beta.hidden", "beta.bounce", "beta.crash", "beta.again", "modules.contributions"], tools: [tool("pong"), tool("start")] },
     beta: { name: "beta", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["alpha.pong"],
-      tools: [tool("echo", { visibility: ["modules", "kernel"] }), tool("private", { visibility: ["kernel"] }), tool("hidden", { visibility: ["owner"] }), tool("bounce", { visibility: ["modules", "kernel"] }), tool("crash", { visibility: ["modules", "kernel"] }), tool("again", { idempotent: true, visibility: ["modules", "kernel"] }), tool("unlisted")],
+      tools: [tool("echo", { visibility: ["modules", "kernel"] }), tool("look", { idempotent: true }), tool("private", { visibility: ["kernel"] }), tool("hidden", { visibility: ["owner"] }), tool("bounce", { visibility: ["modules", "kernel"] }), tool("crash", { visibility: ["modules", "kernel"] }), tool("again", { idempotent: true, visibility: ["modules", "kernel"] }), tool("unlisted")],
     },
   };
   const modules: Record<string, { id: string }> = {};
@@ -328,6 +328,22 @@ test("A calls B through Chrona: B sees the real caller and the call is recorded"
   expect(await f.db.moduleCall.count({ where: { method: "call", status: { not: "rejected" } } })).toBe(0);
 });
 
+test("keyless app-to-app reads keep the call and run status but not the result; keyed reads keep it for replay", async () => {
+  const body = "x".repeat(4096);
+  const f = await fixture({
+    alpha: async (event, call) => ({ result: await call("call", { target: "beta.look", args: { text: "page" }, ...(event.trigger.id === "start" ? { key: "read-k1" } : {}) } as never) }),
+    beta: async () => ({ result: { body } }),
+  });
+  expect(output(await f.fire("pong"))).toMatchObject({ result: { output: { body } } });
+  expect(output(await f.fire("start"))).toMatchObject({ result: { output: { body } } });
+  const [keyless, keyed] = await f.db.moduleInvocation.findMany({ where: { tool: "look" }, orderBy: { createdAt: "asc" } });
+  expect(keyless).toMatchObject({ status: "succeeded", output: null });
+  expect(keyed).toMatchObject({ status: "succeeded", key: "read-k1", output: { body } });
+  const runs = await f.db.moduleRun.findMany({ where: { moduleId: f.beta.id, triggerId: "tool:look" }, orderBy: { createdAt: "asc" } });
+  expect(runs).toHaveLength(2);
+  expect(runs[0]).toMatchObject({ exitCode: 0, output: null });
+  expect(runs[1]).toMatchObject({ exitCode: 0, output: { result: { body } } });
+});
 test("declared app outputs fail synchronously with callee diagnostics and no lifecycle incident", async () => {
   const f = await fixture({ alpha: async (_event, call) => ({ result: await call("call", { target: "beta.echo", args: {} } as never) }), beta: async () => ({ result: { wrong: "secret payload" } }) });
   const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.beta.id, hash: "beta-v1" } } });
@@ -587,7 +603,7 @@ test("approved owner authority reaches owner and modules tools but not kernel-on
   expect(results["beta.private"]).toMatchObject({ error: { code: "forbidden" } });
   expect(await f.db.moduleCall.findMany({ where: { method: "call" }, select: { status: true, error: true } })).toEqual([{ status: "rejected", error: "forbidden" }]);
   // Discovery uses the same visibility rule, independent of declared target contracts.
-  expect((results["modules.describe"]!.result!.output as { items: { target: { moduleId: string; tool: string } | string }[] }).items.flatMap(entry => typeof entry.target !== "string" && entry.target.moduleId === f.beta.id ? [`beta.${entry.target.tool}`] : [])).toEqual(["beta.again", "beta.bounce", "beta.crash", "beta.echo", "beta.hidden", "beta.unlisted"]);
+  expect((results["modules.describe"]!.result!.output as { items: { target: { moduleId: string; tool: string } | string }[] }).items.flatMap(entry => typeof entry.target !== "string" && entry.target.moduleId === f.beta.id ? [`beta.${entry.target.tool}`] : [])).toEqual(["beta.again", "beta.bounce", "beta.crash", "beta.echo", "beta.hidden", "beta.look", "beta.unlisted"]);
 });
 
 test("a module can call a modules-visible tool absent from uses; retired contributions stay unavailable", async () => {
