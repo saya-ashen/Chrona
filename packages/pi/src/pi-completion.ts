@@ -15,7 +15,8 @@ const timedOut = (state: CompletionState) => state.expired;
 const childOf = (state: CompletionState) => state.child;
 
 // Each entry verified against that @earendil-works/pi-coding-agent CLI and its
-// bundled provider source (1.5.2: real capped completion, 2026-11-14). There is
+// bundled provider source (1.5.2, 2026-11-14: real run, hook fired and wrote the
+// cap; a proxy that ignores the cap is still refused by validMessage). There is
 // no CLI max-token flag. Explicit -e still loads with --no-extensions; extension
 // load errors abort print mode. Add a version only after the same check.
 export const TOKEN_LIMIT_PI_VERSIONS = ["1.5.0", "1.5.2"];
