@@ -59,7 +59,7 @@ export function deliveryRuntimeHooks(delivery:()=>CoreDelivery,proof:()=>CoreDel
    for(const r of records()){
     try{
      // Rejected or active receipts are settled; polling them every tick would never stop.
-     if(r.receipt?.state==='rejected'||r.observation.startsWith('active'))continue;
+     if(r.receipt?.state==='rejected'||r.receipt?.members.every(i=>i.selected&&r.directory.some(m=>m.id===i.moduleId&&m.name===i.name&&m.status==='active'&&m.activeHash===i.hash)))continue;
      if(r.status==='submit-unknown'||r.receipt)await delivery().reconcile(r.id,coordinator);
      else if(!r.withdrawn&&r.status==='coordinator-ready'&&maySubmit(r.pursuitId))
       await delivery().submit(r.id,coordinator,()=>maySubmit(r.pursuitId));
