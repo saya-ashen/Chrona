@@ -237,7 +237,7 @@ export function createSourceFiles(content: string, privateRoots: string[] = []) 
   const scope = <T>(action: (scope: Scope, root: FileHandle) => Promise<T>) => io(async scope => action(scope, await absoluteDirectory(scope, root)));
   return {
     async workspacePath(path: string): Promise<string> {
-      const parts = sourceDir(path).split("/");
+      const parts = submitDir(path).split("/");
       return scope(async (scope, rootHandle) => {
         const workspace = await directory(scope, rootHandle, parts);
         const actual = await realpath(`/proc/self/fd/${workspace.fd}`);

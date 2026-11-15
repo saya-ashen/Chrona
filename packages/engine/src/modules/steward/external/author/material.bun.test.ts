@@ -5,12 +5,12 @@ import { tmpdir } from "node:os";
 import { AuthorError, parseStage, parseValidate } from "./contracts";
 import { stagePackage } from "./distribution";
 import { createSourceFiles } from "./files";
-import { digest, MATERIAL_LIMITS, MATERIAL_RECORD, parseExport, parseImport, parseMaterialRecord, validateMaterial } from "./material";
+import { digest, MATERIAL_LIMITS, MATERIAL_RECORD, materialSummary, parseExport, parseImport, parseMaterialRecord, validateMaterial } from "./material";
 import { authorTool } from "./workflow";
 import { validateWorkspace } from "./validate";
 
 const build = { commands: ["existing compiler --offline", "existing test command"], toolchain: "host tools already installed", target: "host fixture" };
-const manifest = JSON.stringify({ name: "fixture", entry: { path: "bin/runtime", args: [] }, tools: [] });
+const manifest = JSON.stringify({ name: "fixture", entry: { path: "bin/runtime", args: [] }, tools: [], keepAlive: true, effects: [] });
 async function fixture(action: (root: string, files: ReturnType<typeof createSourceFiles>, input: ReturnType<typeof parseImport>, binary: Buffer) => Promise<void>) {
   const root = await mkdtemp(join(tmpdir(), "author-material-"));
   try {
@@ -270,14 +270,15 @@ test("overwrite and validation contracts reject non-boolean flags and invalid pa
     expect(() => parseExport({ path: input.to, to: join(root, "out"), overwrite })).toThrow(AuthorError);
   }
   expect(parseValidate({ path: "sources/check", runTests: false })).toEqual({ path: "sources/check", runTests: false });
-  for (const input of [{ path: "packages/check/source" }, { path: "sources/check", runTests: "yes" }, { path: "sources/check", extra: true }]) expect(() => parseValidate(input)).toThrow(AuthorError);
+  expect(parseValidate({ path: "packages/check/source" })).toEqual({ path: "packages/check/source" });
+  for (const input of [{ path: "packages/check/provenance.json" }, { path: "sources/check", runTests: "yes" }, { path: "sources/check", extra: true }]) expect(() => parseValidate(input)).toThrow(AuthorError);
 }));
 
 async function validationFixture(action: (files: ReturnType<typeof createSourceFiles>, path: string, root: string) => Promise<void>) {
   const root = await mkdtemp(join(tmpdir(), "author-validate-"));
   try {
     const files = createSourceFiles(root), path = "sources/check";
-    await files.write(`${path}/module.json`, JSON.stringify({ name: "fixture", entry: "index.ts", tools: [{ name: "check", parameters: {} }], pages: [{ id: "home", layout: "document" }] }));
+    await files.write(`${path}/module.json`, JSON.stringify({ name: "fixture", entry: "index.ts", tools: [{ name: "check", description: "Check fixture", parameters: { type: "object" }, output: {} }], effects: [] }));
     await files.write(`${path}/index.ts`, "export {};\n");
     await action(files, path, root);
   } finally { await rm(root, { recursive: true, force: true }); }
@@ -290,12 +291,12 @@ test("validateWorkspace passes a valid module and discovers a passing local test
   expect(await validateWorkspace(files, { path })).toMatchObject({ ok: true, tests: { ran: true, ok: true, exitCode: 0 } });
 }));
 
-test("validateWorkspace requires bun.lock for dependencies and devDependencies", async () => validationFixture(async (files, path) => {
+test("validateWorkspace requires bun.lock for every package.json", async () => validationFixture(async (files, path) => {
   for (const key of ["dependencies", "devDependencies"]) {
     await files.write(`${path}/package.json`, JSON.stringify({ [key]: { fixture: "1.0.0" } }));
     const result = await validateWorkspace(files, { path });
     expect(result.ok).toBe(false);
-    expect(result.checks).toContainEqual({ name: "dependencies", ok: false, detail: "Dependencies require bun.lock in the workspace." });
+    expect(result.checks).toContainEqual({ name: "dependencies", ok: false, detail: "package.json requires bun.lock in the workspace (including empty packages)." });
   }
   await files.write(`${path}/bun.lock`, "{}\n");
   expect((await validateWorkspace(files, { path })).ok).toBe(true);
@@ -335,10 +336,10 @@ test("validateWorkspace rejects symlinks, special files, oversized trees and mis
 }));
 
 
-test("validateWorkspace supports run paths and recorded binary entries, and reports missing manifests", async () => {
+test("validateWorkspace rejects obsolete run paths, supports recorded native entries and reports missing manifests", async () => {
   await validationFixture(async (files, path, root) => {
     await files.write(`${path}/module.json`, JSON.stringify({ name: "fixture", run: "index.ts" }));
-    expect((await validateWorkspace(files, { path })).ok).toBe(true);
+    expect((await validateWorkspace(files, { path })).ok).toBe(false);
     await rm(join(root, path, "module.json"));
     expect((await validateWorkspace(files, { path })).checks).toContainEqual({ name: "module.json", ok: false, detail: "Missing module.json." });
   });
@@ -347,3 +348,149 @@ test("validateWorkspace supports run paths and recorded binary entries, and repo
     expect((await validateWorkspace(files, { path: input.to })).ok).toBe(true);
   });
 });
+
+test("no-test materials stay locally usable with truthful skipped test results", async () => validationFixture(async (files, path) => {
+  expect(await validateWorkspace(files, { path })).toMatchObject({ ok: true, tests: { ran: false, ok: null, exitCode: null, reason: "no_tests" } });
+  expect(await validateWorkspace(files, { path, runTests: false })).toMatchObject({ ok: true, tests: { ran: false, ok: null, exitCode: null, reason: "not_requested" } });
+  await files.write(`${path}/module.json`, "{}");
+  expect(await validateWorkspace(files, { path })).toMatchObject({ ok: false, tests: { ran: false, ok: null, exitCode: null, reason: "checks_failed" } });
+  expect(await validateWorkspace(files, { path: "sources/missing" })).toMatchObject({ ok: false, tests: { ran: false, ok: null, exitCode: null, reason: "checks_failed" } });
+}));
+
+test("declared standalone test.ts and shell scripts execute alongside JavaScript Bun suites", async () => validationFixture(async (files, path) => {
+  const manifest = JSON.parse((await files.read(`${path}/module.json`)).content);
+  manifest.tests = ["test.ts", "check.sh"];
+  await files.write(`${path}/module.json`, JSON.stringify(manifest));
+  await files.write(`${path}/test.ts`, 'console.log("DECLARED_TS");');
+  await files.write(`${path}/check.sh`, 'echo DECLARED_SH\n');
+  await files.write(`${path}/action.spec.js`, 'import { test } from "bun:test"; test("suite", () => console.log("BUN_SUITE"));');
+  const result = await validateWorkspace(files, { path });
+  expect(result).toMatchObject({ ok: true, tests: { ran: true, ok: true, exitCode: 0, reason: null } });
+  for (const marker of ["DECLARED_TS", "DECLARED_SH", "BUN_SUITE"]) expect(result.tests.output).toContain(marker);
+  await files.write(`${path}/test.ts`, 'console.log("declared failure"); process.exit(7);');
+  expect(await validateWorkspace(files, { path })).toMatchObject({ ok: false, tests: { ran: true, ok: false, exitCode: 7, reason: "failed" } });
+  manifest.tests = ["missing.ts"];
+  await files.write(`${path}/module.json`, JSON.stringify(manifest));
+  expect(await validateWorkspace(files, { path })).toMatchObject({ ok: false, tests: { ran: false, reason: "checks_failed" } });
+}));
+
+test("stage reuses exact-snapshot checks, leaves invalid material unstaged and never runs tests", async () => validationFixture(async (files, path, root) => {
+  const input = parseStage({ name: "fixture", from: path, to: "packages/checked", provenance: { kind: "local", label: "local checks" } });
+  const original = (await files.read(`${path}/module.json`)).content;
+  await files.write(`${path}/package.json`, "{}");
+  await expect(stagePackage(files, input)).rejects.toThrow("bun.lock");
+  await expect(lstat(join(root, input.to))).rejects.toMatchObject({ code: "ENOENT" });
+  await files.write(`${path}/bun.lock`, "{}\n");
+  const manifest = JSON.parse(original);
+  delete manifest.tools[0].output;
+  await files.write(`${path}/module.json`, JSON.stringify(manifest));
+  await expect(stagePackage(files, input)).rejects.toThrow("output schema");
+  await expect(lstat(join(root, input.to))).rejects.toMatchObject({ code: "ENOENT" });
+  await files.write(`${path}/module.json`, original);
+  await files.write(`${path}/fail.test.ts`, 'throw new Error("tests only run when requested");');
+  const staged = await stagePackage(files, input);
+  const checked = await validateWorkspace(files, { path: staged.dir, runTests: false });
+  expect(staged.checks.every(check => check.ok)).toBe(true);
+  expect(checked.checks.filter(check => check.name !== "workspace")).toEqual(staged.checks);
+  expect(checked.tests).toMatchObject({ ran: false, ok: null, reason: "not_requested" });
+  await files.write(`${path}/module.json`, "{}");
+  expect((await validateWorkspace(files, { path: staged.dir, runTests: false })).ok).toBe(true);
+  expect(await validateWorkspace(files, { path: staged.dir })).toMatchObject({ ok: false, tests: { ran: true, ok: false } });
+}));
+
+test("snapshot tests retain selected imports without rewriting recorded source or stage digests", async () => fixture(async (root, files, input) => {
+  const workspace = input.from;
+  const module = JSON.parse(await readFile(join(workspace, "module.json"), "utf8"));
+  module.tests = ["test.ts"];
+  await writeFile(join(workspace, "module.json"), JSON.stringify(module));
+  await mkdir(join(workspace, "lib"));
+  await writeFile(join(workspace, "lib/helper.ts"), "export const value = 42;\n");
+  await writeFile(join(workspace, "test.ts"), [
+    'import { value } from "./lib/helper.ts";',
+    'if (value !== 42) throw new Error("selected import failed");',
+    'await Bun.write("module.json", "{}"); await Bun.write("test-output", "temporary");',
+    'console.log("SNAPSHOT_IMPORT_PASSED");',
+  ].join("\n"));
+  const imported = await files.import({ ...input, source: [...input.source, "test.ts", "lib/helper.ts"] });
+  const staged = await stagePackage(files, parseStage({ name: "fixture", from: input.to, to: "packages/stable", provenance: { kind: "local", label: "snapshot checks" } }));
+  const metadata = (await files.read(staged.metadata)).content;
+  for (const path of [input.to, staged.dir]) {
+    const result = await validateWorkspace(files, { path });
+    expect(result).toMatchObject({ ok: true, tests: { ran: true, ok: true } });
+    expect(result.tests.output).toContain("SNAPSHOT_IMPORT_PASSED");
+    expect(materialSummary(await files.snapshot(path)).materialDigest).toBe(imported.materialDigest);
+    await expect(files.read(`${path}/test-output`)).rejects.toMatchObject({ code: "not_found" });
+  }
+  expect((await files.read(staged.metadata)).content).toBe(metadata);
+  const exported = await files.export(staged.dir, join(root, "exported-after-tests"));
+  expect(exported.materialDigest).toBe(staged.materialDigest);
+}));
+
+test("local manifest checks catch common kernel entry/tool/lock mismatches", async () => validationFixture(async (files, path) => {
+  const original = JSON.parse((await files.read(`${path}/module.json`)).content);
+  const patches = [
+    { entry: "lib/index.ts" }, { entry: { path: "index.ts" } }, { entry: { path: "index.ts", runtime: "bun --no-install" } },
+    { entry: { path: "index.ts", runtime: "bun", args: [12] } },
+    { effects: ["network", "network"] }, { effects: ["filesystem"] }, { name: "modules" }, { pages: [] },
+    { tools: [] }, { tools: [{ ...original.tools[0], output: undefined }] },
+    { tools: [{ ...original.tools[0], parameters: { type: "object", additionalProperties: false } }] },
+    { tools: [{ ...original.tools[0], visibility: ["provider", "provider"] }] },
+  ];
+  for (const patch of patches) {
+    await files.write(`${path}/module.json`, JSON.stringify({ ...original, ...patch }));
+    expect((await validateWorkspace(files, { path, runTests: false })).ok, JSON.stringify(patch)).toBe(false);
+  }
+  await files.write(`${path}/module.json`, JSON.stringify({ ...original, entry: { path: "index.ts", runtime: "bun", args: ["--no-install"] }, tests: [] }));
+  expect((await validateWorkspace(files, { path })).ok).toBe(true);
+  await files.write(`${path}/pyproject.toml`, "[project]\nname = 'fixture'\n");
+  expect((await validateWorkspace(files, { path })).checks).toContainEqual({ name: "dependencies", ok: false, detail: "pyproject.toml requires uv.lock in the workspace." });
+  await files.write(`${path}/uv.lock`, "version = 1\n");
+  expect((await validateWorkspace(files, { path })).ok).toBe(true);
+}));
+
+test("declared suite-like filenames retain standalone execution order", async () => validationFixture(async (files, path) => {
+  const manifest = JSON.parse((await files.read(`${path}/module.json`)).content);
+  manifest.tests = ["setup_test.ts", "verify.ts"];
+  await files.write(`${path}/module.json`, JSON.stringify(manifest));
+  await files.write(`${path}/setup_test.ts`, 'await Bun.write("setup-marker", "ready"); console.log("SETUP_ONCE");');
+  await files.write(`${path}/verify.ts`, 'if (await Bun.file("setup-marker").text() !== "ready") process.exit(1); console.log("VERIFIED_AFTER_SETUP");');
+  const result = await validateWorkspace(files, { path });
+  expect(result).toMatchObject({ ok: true, tests: { ran: true, ok: true } });
+  expect(result.tests.output.indexOf("SETUP_ONCE")).toBeLessThan(result.tests.output.indexOf("VERIFIED_AFTER_SETUP"));
+  expect(result.tests.output.match(/SETUP_ONCE/g)).toHaveLength(1);
+}));
+
+test("later runner startup failures preserve evidence that an earlier script ran", async () => validationFixture(async (files, path) => {
+  const manifest = JSON.parse((await files.read(`${path}/module.json`)).content);
+  manifest.tests = ["test.ts", "next.sh"];
+  await files.write(`${path}/module.json`, JSON.stringify(manifest));
+  await files.write(`${path}/test.ts`, 'import { rm } from "node:fs/promises"; console.log("FIRST_SCRIPT_RAN"); await rm(process.cwd(), { recursive: true });');
+  await files.write(`${path}/next.sh`, 'echo should-not-start\n');
+  const result = await validateWorkspace(files, { path });
+  expect(result).toMatchObject({ ok: false, tests: { ran: true, ok: false, exitCode: null, reason: "runner_error" } });
+  expect(result.tests.output).toContain("FIRST_SCRIPT_RAN");
+}));
+
+test("malformed UTF-8 test output stays within the returned byte limit", async () => validationFixture(async (files, path) => {
+  const manifest = JSON.parse((await files.read(`${path}/module.json`)).content);
+  manifest.tests = ["test.ts"];
+  await files.write(`${path}/module.json`, JSON.stringify(manifest));
+  await files.write(`${path}/test.ts`, 'process.stdout.write(Buffer.alloc(8192, 255));');
+  const result = await validateWorkspace(files, { path });
+  expect(result).toMatchObject({ ok: true, tests: { ran: true, ok: true } });
+  expect(Buffer.byteLength(result.tests.output)).toBeLessThanOrEqual(8192);
+  expect(result.tests.output.length).toBeGreaterThan(0);
+}));
+
+test("local timeout bounds shell descendants holding output pipes", async () => validationFixture(async (files, path) => {
+  const manifest = JSON.parse((await files.read(`${path}/module.json`)).content);
+  manifest.tests = ["wait.sh"];
+  await files.write(`${path}/module.json`, JSON.stringify(manifest));
+  await files.write(`${path}/wait.sh`, '"' + process.execPath + '" --no-install -e \'process.stdout.write(Buffer.alloc(8192, 255))\'\nsleep 120\necho should-not-complete\n');
+  const started = Date.now();
+  const result = await validateWorkspace(files, { path });
+  expect(result).toMatchObject({ ok: false, tests: { ran: true, ok: false, reason: "timeout" } });
+  expect(result.tests.output).toContain("Test timeout after 30s");
+  expect(Buffer.byteLength(result.tests.output)).toBeLessThanOrEqual(8192);
+  expect(Date.now() - started).toBeLessThan(35_000);
+}), 40_000);

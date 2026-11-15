@@ -19,6 +19,10 @@ const accepted = [
   { id: "call-1", method: "callStatus", params: { callId: "operation-1" } },
   { id: "call-1", result: { output: [{ id: "module-1" }] } },
   { id: "call-1", error: { code: "unavailable", message: "Not ready" } },
+  ...["not_dispatched", "submission_refused"].flatMap(reason => [
+    { id: "call-proof", error: { code: "unavailable", message: "Refused", reason } },
+    { id: "event-proof", error: "Refused", errorCode: "unavailable", errorReason: reason },
+  ]),
 ];
 const rejected = [
   { type: "auth", version: 2, token },
@@ -31,6 +35,8 @@ const rejected = [
   { id: "", ping: true },
   { id: "call-1", method: "call", params: { target: "modules.list", owner: "injected" } },
   { id: "call-1", error: { code: "arbitrary", message: "Invalid error" } },
+  { id: "call-proof", error: { code: "unavailable", message: "Refused", reason: "arbitrary" } },
+  { id: "event-proof", error: "Refused", errorCode: "unavailable", errorReason: "arbitrary" },
 ];
 
 test("committed wire JSON validates handshakes, HTTP origins and application messages", () => {

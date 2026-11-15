@@ -150,7 +150,7 @@ export const moduleManifestSchema = z.object({
    * Module tools this module calls through Chrona (`chrona.call`); approved with the version like any capability.
    * `"*"`: every tool open to the user (`owner` visibility), for entry modules that offer all apps to the user (web, MCP).
    */
-  uses: z.array(z.union([interfaceRefSchema, z.literal("*")])).max(40).default([]),
+  uses: z.array(z.union([interfaceRefSchema, z.literal("*")])).default([]),
   /** Explicit owner authority, granted only through checked version activation. */
   authority: z.literal("owner").optional(),
   /**

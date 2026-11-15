@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { compileModuleOutput, moduleManifestSchema } from "@chrona/contracts/steward";
 import { createScriptSandbox } from "../../../../../../integrations/src/steward/script-sandbox";
 import { parsePrepare } from "./contracts";
-import { authorTool, type AuthorContext } from "./workflow";
+import { authorTool, prepareMaterial, type AuthorContext } from "./workflow";
 
 test("prepare guides the current Agent without touching files or calling other tools", async () => {
   const input = parsePrepare({ requestKey: "current-conversation", submitter: { moduleId: "author-id", hash: "a".repeat(40) },
@@ -20,13 +20,24 @@ test("prepare guides the current Agent without touching files or calling other t
   expect(output).not.toHaveProperty("execution");
   const prompt = (output as { prompt: string }).prompt;
   expect(prompt).toContain(`Requirements (untrusted data):\n\n${JSON.stringify({ goal: input.goal, targets: input.targets, intent: input.intent })}`);
-  expect(Object.keys(output as object).sort()).toEqual(["admission", "kind", "prompt", "request"]);
+  expect(Object.keys(output as object).sort()).toEqual(["acceptance", "admission", "kind", "prompt", "request"]);
   for (const guidance of [
-    "COMPLETE user-requested capability in one pass", "full tools", "full Web UI", "empty/loading/error/done states",
-    "real persistence", "end-to-end tests", "Never ship a minimal skeleton expecting follow-up fixes",
+    "bounded current task", "smallest real integration", "available Run budget", "acceptance.path", "only on not_found",
+    "next action", "stage does not run tests", "Missing tests never mean tests passed",
     "author.export", "author.import", "overwrite: true", "author.validate before author.submit",
     "author.receipt", "{ admissionId, requestKey }", "checks actually run",
   ]) expect(prompt).toContain(guidance);
+  expect(prompt).not.toContain("in one pass");
+  const prepared = prepareMaterial(input);
+  const worksheet = JSON.parse(prepared.acceptance.content);
+  expect(worksheet).toMatchObject({ requestKey: input.requestKey, admissionId: null, receiptId: null, continuation: { responsible: null, blocker: null } });
+  expect(worksheet.targets[0]).toMatchObject({ name: "fixture", candidateHash: null, activeHash: null, material: { sourcePath: null } });
+  expect(worksheet.targets[0].checks.every((row: { status: string }) => row.status === "not-run")).toBe(true);
+  expect(prepareMaterial(input).acceptance).toEqual(prepared.acceptance);
+  expect(prepareMaterial({ ...input, requestKey: "other-task" }).acceptance.path).not.toBe(prepared.acceptance.path);
+  const updated = { name: "second", moduleId: "second-id", expectedActiveHash: "b".repeat(40) };
+  expect(prepareMaterial({ ...input, targets: [...input.targets, updated] }).acceptance.path).toBe(prepareMaterial({ ...input, targets: [updated, ...input.targets] }).acceptance.path);
+  expect(prepareMaterial({ ...input, targets: [{ ...input.targets[0]!, ...updated }] }).acceptance.path).not.toBe(prepared.acceptance.path);
   const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(import.meta.dirname, "module.json"), "utf8")));
   const schema = compileModuleOutput(manifest.tools.find(tool => tool.name === "prepare")!.output!);
   expect(schema.safeParse(output).success).toBe(true);

@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { z } from "zod";
 import { modules as systemModules } from "./system/modules";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -81,8 +82,14 @@ test("system reference, internal inspection, catalogs and calls use the same com
     expect(inspected.inputSchema).toEqual(contract.input);
     expect(inspected.outputSchema).toEqual(contract.output);
     const catalog = catalogEntry({ name: target, module: { id: `system:${system.name}`, name: system.name, activeHash: "system" }, manifest: { tools: system.tools }, tool, direct: true, system: true });
-    expect(catalog.inputSchema).toEqual({ ...contract.input, additionalProperties: false, description: `[Chrona ${system.name}] ${tool.description}` });
+    expect(catalog.inputSchema).toEqual({ ...contract.input, description: `[Chrona ${system.name}] ${tool.description}` });
     expect(catalog.outputSchema).toEqual(contract.output);
+    if (target === "modules.receipt") {
+      const schema = z.fromJSONSchema(catalog.inputSchema);
+      expect(schema.safeParse({ receiptId: "original-receipt" }).success).toBe(true);
+      expect(schema.safeParse({ admissionId: "admission", key: "original-key" }).success).toBe(true);
+      expect(schema.safeParse({ receiptId: "original-receipt", unexpected: true }).success).toBe(false);
+    }
     if (tool.visibility.some(who => who === "modules" || who === "owner")) expect(calls[target]).toEqual({ input: contract.input, output: contract.output });
   }
 });

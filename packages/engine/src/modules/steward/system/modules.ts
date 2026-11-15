@@ -60,7 +60,8 @@ async function health(ports: StewardPorts, workspaceId: string, args: Record<str
 async function writeCandidates({ ports, workspaceId, caller, call }: Parameters<SystemModule["handle"]>[0], name: "admit" | "submit", args: Record<string, unknown>) {
   if (!call?.key) throw new CallError("invalid", "Material writes require a call key");
   const input = { ...args, requestKey: call.key };
-  return json(name === "admit" ? await admitCandidates(ports, workspaceId, caller, input) : await submitCandidates(ports, workspaceId, caller, input));
+  // The sync invocation owns publication for this key, including competing direct calls.
+  return json(name === "admit" ? await admitCandidates(ports, workspaceId, caller, input) : await submitCandidates(ports, workspaceId, caller, input, { invocationId: call.mode === "sync" ? call.id : undefined }));
 }
 /** Fixed materials and governed lifecycle; authoring, distribution and application preferences belong to applications. */
 export const modules: SystemModule = {

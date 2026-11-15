@@ -15,7 +15,7 @@ const prepare = { requestKey: "material-1", submitter: { moduleId: "author-id", 
 const submission = { admissionId: "admission-1", requestKey: "material-1", items: [{ name: "fixture", dir: "packages/release/source", intent }] };
 const source = { admissionId: "admission-1", moduleId: "fixture-id", hash: version, to: "sources/imported" };
 const stage = { name: "fixture", from: "sources/work", to: "packages/release", provenance: { kind: "local", label: "Offline fixture" } };
-const manifestText = JSON.stringify({ name: "fixture", entry: "index.ts", tools: [] });
+const manifestText = JSON.stringify({ name: "fixture", entry: "index.ts", tools: [], keepAlive: true, effects: [] });
 const owner = { kind: "owner" as const, via: null }, provider = { kind: "provider" as const, runId: "r" };
 const input = (value: unknown) => ({ input: JSON.stringify(value) });
 const root = await mkdtemp(join(tmpdir(), "author-source-"));
@@ -27,11 +27,25 @@ try {
   assert.deepEqual(await files.list("."), { path: "", entries: [] });
   await assert.rejects(files.list("sources"), { code: "not_found" });
   const prepared = prepareMaterial(parsePrepare(prepare));
-  assert.deepEqual(Object.keys(prepared).sort(), ["admission", "kind", "prompt", "request"]);
+  assert.deepEqual(Object.keys(prepared).sort(), ["acceptance", "admission", "kind", "prompt", "request"]);
   assert.deepEqual(prepared.admission, { requestKey: prepare.requestKey, submitter: prepare.submitter, targets: prepare.targets });
   assert.deepEqual(prepared.request, { goal: prepare.goal, targets: prepare.targets, intent: prepare.intent });
-  assert.match(prepared.prompt, /COMPLETE user-requested capability in one pass/);
+  assert.match(prepared.prompt, /bounded current task/);
   assert.match(prepared.prompt, /author.validate before author.submit/);
+  await assert.rejects(files.read(prepared.acceptance.path), { code: "not_found" });
+  await files.write(prepared.acceptance.path, prepared.acceptance.content);
+  const saved = JSON.parse(prepared.acceptance.content);
+  saved.continuation.nextAction = "Check the original receipt after approval";
+  await files.write(prepared.acceptance.path, JSON.stringify(saved));
+  const resumed = createSourceFiles(content);
+  let persisted = "", offset = 0;
+  let range;
+  do {
+    range = await resumed.read(prepareMaterial(parsePrepare(prepare)).acceptance.path, offset);
+    persisted += range.content;
+    offset = range.nextOffset;
+  } while (!range.eof);
+  assert.equal(JSON.parse(persisted).continuation.nextAction, saved.continuation.nextAction, "fresh context resumes saved work without replacing evidence");
   assert.equal(prepared.kind, "material-preparation");
   for (const bad of [
     { ...prepare, cwd: "/host" }, { ...prepare, execution: { model: "fake" } },
@@ -118,7 +132,7 @@ try {
   await assert.rejects(files.snapshot("sources/many"), { code: "too_large" });
 
   const deepEntry = `${Array.from({ length: 13 }, (_, i) => `d${i}`).join("/")}/index.ts`;
-  await files.write("sources/deep/module.json", JSON.stringify({ name: "fixture", entry: deepEntry }));
+  await files.write("sources/deep/module.json", JSON.stringify({ name: "fixture", entry: { path: deepEntry, runtime: "bun" }, keepAlive: true, effects: [] }));
   await files.write(`sources/deep/${deepEntry}`, "export const deep = true;");
   const deep = await stagePackage(files, parseStage({ ...stage, from: "sources/deep", to: "packages/deep" }));
   assert.equal(await readFile(join(content, deep.dir, deepEntry), "utf8"), "export const deep = true;");

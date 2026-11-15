@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { candidateAdmissionInputSchema, candidateCheckInputSchema, candidateReceiptSchema, candidateSourceInputSchema, candidateSubmitInputSchema, type CandidateReceipt, type CandidateSubmitInput, type CandidateAdmissionOutput, type CandidateSourceOutput } from "../../../../contracts/src/steward/module-candidates";
 import type { Caller } from "./module-call-types";
+import { CallError } from "./module-call-error";
 import type { StewardPorts } from "./ports";
 import { parseInput, StewardError } from "./errors";
 import { json, moduleContext, type ModuleContext } from "./module-context";
@@ -17,7 +18,7 @@ export { findCandidateSet } from "./module-candidate-records";
 async function confinedMaterial<T>(operation: () => Promise<T>): Promise<T> {
   try { return await operation(); }
   catch (error) {
-    if (error instanceof StewardError) throw error;
+    if (error instanceof StewardError || error instanceof CallError) throw error;
     const code = (error as NodeJS.ErrnoException).code;
     throw new StewardError(code === "ENOENT" ? "not_found" : "invalid", "Candidate material is unavailable or unsafe");
   }
@@ -97,6 +98,14 @@ async function replay(context: ModuleContext, db: CandidateDb, caller: Caller, i
 function exactItems(admission: CandidateAdmissionRecord, input: CandidateSubmitInput) {
   if (admission.input.targets.length !== input.items.length || !admission.input.targets.every(target => input.items.some(item => item.name === target.name))) throw new StewardError("conflict", "Submit exactly the complete admitted target set");
 }
+/** Only the claimed system invocation can prove refusal; publication fences exclude competing direct calls. */
+async function submissionRefusal<T>(proof: boolean, operation: () => Promise<T>): Promise<T> {
+  try { return await operation(); }
+  catch (error) {
+    if (proof && error instanceof StewardError && error.code !== "conflict" && !("reason" in error)) throw new CallError(error.code, error.message, "submission_refused");
+    throw error;
+  }
+}
 async function freezeItems(context: ModuleContext, admission: CandidateAdmissionRecord, input: CandidateSubmitInput) {
   const root = await ownContent(context, admission.input.submitter.moduleId);
   const frozen = [];
@@ -113,27 +122,43 @@ async function freezeItems(context: ModuleContext, admission: CandidateAdmission
   }
   return frozen;
 }
+async function submissionInvocation(db: CandidateDb, workspaceId: string, caller: Caller, input: CandidateSubmitInput) {
+  if (caller.kind !== "module") return null;
+  return db.moduleInvocation.findFirst({
+    where: { workspaceId, caller: `module:${caller.moduleId}`, callerHash: caller.hash,
+      targetIdentity: "system:modules", tool: "submit", key: input.requestKey, mode: "sync" },
+    select: { id: true, status: true, errorReason: true },
+  });
+}
 /** Freeze all bytes and Git revisions before exposing any version to the checker. */
-export async function submitCandidates(ports: StewardPorts, workspaceId: string, caller: Caller, raw: unknown): Promise<CandidateReceipt> {
+export async function submitCandidates(
+  ports: StewardPorts, workspaceId: string, caller: Caller, raw: unknown,
+  { invocationId }: { invocationId?: string } = {},
+): Promise<CandidateReceipt> {
   const input = parseInput(candidateSubmitInputSchema, raw), context = moduleContext(ports, workspaceId);
   const initial = await ports.db.$transaction(async tx => {
     const previous = await replay(context, tx, caller, input);
     if (previous) return { previous };
-    const admission = await authorizedAdmission(context, tx, caller, input.admissionId);
+    if (invocationId) {
+      const invocation = await submissionInvocation(tx, workspaceId, caller, input);
+      if (invocation?.id !== invocationId || invocation.status !== "running") throw new StewardError("conflict", "Candidate submission invocation is not current");
+    }
+    const admission = await submissionRefusal(!!invocationId, () => authorizedAdmission(context, tx, caller, input.admissionId));
     if (admission.receiptId) throw new StewardError("conflict", "Candidate admission was already consumed");
     exactItems(admission, input);
-    await assertCandidateAdmissionIn(context, tx, admission, caller);
+    await submissionRefusal(!!invocationId, () => assertCandidateAdmissionIn(context, tx, admission, caller));
     return { admission };
   });
   if (initial.previous) return initial.previous;
-  const frozen = await confinedMaterial(() => freezeItems(context, initial.admission!, input));
+  // Classify explicit material refusals before confinedMaterial translates raw I/O errors.
+  const frozen = await confinedMaterial(() => submissionRefusal(!!invocationId, () => freezeItems(context, initial.admission!, input)));
   // Identity can change while application content is being read. No runnable rows exist yet.
   const completed = await ports.db.$transaction(async tx => {
     const previous = await replay(context, tx, caller, input);
     if (previous) return previous;
-    const admission = await authorizedAdmission(context, tx, caller, input.admissionId);
+    const admission = await submissionRefusal(!!invocationId, () => authorizedAdmission(context, tx, caller, input.admissionId));
     if (admission.receiptId) throw new StewardError("conflict", "Candidate admission was already consumed");
-    await assertCandidateAdmissionIn(context, tx, admission, caller);
+    await submissionRefusal(!!invocationId, () => assertCandidateAdmissionIn(context, tx, admission, caller));
     return null;
   });
   if (completed) return completed;
@@ -150,11 +175,21 @@ export async function submitCandidates(ports: StewardPorts, workspaceId: string,
   return ports.db.$transaction(async tx => {
     const previous = await replay(context, tx, caller, input);
     if (previous) return previous;
+    // The routed invocation owns this key until a terminal outcome, and after a
+    // proven refusal. Run interruption can leave its handler executing as unknown.
+    // Fence publication so direct calls already freezing cannot invalidate proof.
+    const invocation = await submissionInvocation(tx, workspaceId, caller, input);
+    if (invocation && invocation.id !== invocationId && (
+      invocation.status !== "succeeded" && invocation.status !== "failed" || invocation.errorReason === "submission_refused"
+    )) throw new StewardError("conflict", "Candidate submission belongs to a routed invocation");
     const admission = await authorizedAdmission(context, tx, caller, input.admissionId);
     if (admission.receiptId) throw new StewardError("conflict", "Candidate admission was already consumed");
     await assertCandidateAdmissionIn(context, tx, admission, caller);
     const receiptId = candidateRequestId("submission", workspaceId, caller, input.requestKey);
-    const set: CandidateSet = { receiptId, admissionId: input.admissionId, requestKey: input.requestKey, submitter: admission.input.submitter, members: [], state: "submitted", approvalId: null };
+    const set: CandidateSet = {
+      receiptId, admissionId: input.admissionId, requestKey: input.requestKey,
+      submitter: admission.input.submitter, members: [], state: "submitted", approvalId: null,
+    };
     for (const [index, item] of frozen.entries()) {
       const revision = revisions[index]!;
       if (await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: item.moduleId, hash: revision.commit } } })) throw new StewardError("conflict", "Candidate version already exists; terminal versions cannot be resubmitted");

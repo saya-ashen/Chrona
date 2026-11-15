@@ -112,7 +112,8 @@ async function invokeSystemSync({ ports, origin, resolved, args, rowId, rowKey, 
 async function deliverSyncModule({ ports, origin, resolved, target, args, chain, path, now, key, timeoutMs, activationId, rowId, finish, privateTransport, transient }: SyncInvocation & { timeoutMs?: number; rowId: string; finish: (data: Prisma.ModuleInvocationUpdateInput) => Promise<unknown>; transient: boolean }) {
   try {
     return await moduleSupervisor(ports).deliver(resolved.module.id, resolved.module.activeHash, toolEvent(resolved, args, now, origin.caller, { id: rowId, key: key ?? null, attempt: 1, chain: path, ...(isAgentContextEntry(ports, origin) ? {executionRunId:origin.run!.executionRunId} : {}) }), { chain, path, ...(privateTransport ? { private: true } : {}), ...(transient ? { retainOutput: false } : {}), beforeDelivery: targetFence(ports, origin.workspaceId, resolved, origin.caller), ...(activationId !== undefined ? { activationId } : {}), validateResult: output => moduleOutputError(target, resolved.tool, output), ...(timeoutMs ? { timeoutMs } : {}) });
-  } catch (error) {
+  } catch (caught) {
+    let error = caught;
     // Supervisor activation checks can reject before its callback fence runs. Classify a version switch as conflict too.
     if (stageOf(error) === "unavailable") {
       const current = await ports.db.module.findFirst({ where: { workspaceId: origin.workspaceId, name: resolved.module.name }, select: { id: true, activeHash: true } });
@@ -120,9 +121,16 @@ async function deliverSyncModule({ ports, origin, resolved, target, args, chain,
         error = Object.assign(new CallError("conflict", "Target activation changed before delivery"), { stage: "unavailable" });
       }
     }
-    const code = deliveryErrorCode(error), detail = privateTransport ? "Private operation failed" : message(error);
-    await finish({ status: code === "unknown" ? "unknown" : "failed", error: `${publicCallError(code)}: ${detail}`, errorCode: publicCallError(code), errorReason: publicCallReason((error as { reason?: string }).reason ?? code) ?? null });
-    throw new CallError(publicCallError(code), code === "unknown" ? `${target}: outcome unknown (${detail})` : `${target}: ${detail}`, publicCallReason((error as { reason?: string }).reason ?? code));
+    const stage = stageOf(error), deliveryCode = deliveryErrorCode(error), code = publicCallError(deliveryCode);
+    const detail = privateTransport ? "Private operation failed" : message(error);
+    let reason = publicCallReason((error as { reason?: string }).reason ?? deliveryCode);
+    // Only this newly claimed invocation's supervisor can prove it was never sent.
+    if (stage === "unavailable") reason = code === "conflict" ? undefined : "not_dispatched";
+    // A handler may rethrow an unrelated nested call's not_dispatched after acting itself.
+    // submission_refused instead relies on the trusted application forwarding the same submission's refusal.
+    else if (reason === "not_dispatched" || reason === "submission_refused" && (stage !== "handler" || code === "unknown")) reason = undefined;
+    await finish({ status: code === "unknown" ? "unknown" : "failed", error: `${code}: ${detail}`, errorCode: code, errorReason: reason ?? null });
+    throw new CallError(code, code === "unknown" ? `${target}: outcome unknown (${detail})` : `${target}: ${detail}`, reason);
   }
 }
 function removeWaitEdge(edges: Map<string, string[]>, name: string, target: string) {

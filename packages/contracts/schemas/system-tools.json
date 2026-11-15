@@ -2244,6 +2244,42 @@
                                 "properties": {
                                   "kind": {
                                     "type": "string",
+                                    "const": "module-update-rejected"
+                                  },
+                                  "app": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 256
+                                  },
+                                  "hash": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 256
+                                  },
+                                  "activeHash": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 256
+                                  },
+                                  "error": {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "app",
+                                  "hash",
+                                  "activeHash",
+                                  "error"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
                                     "const": "module-migration-failed"
                                   },
                                   "app": {
@@ -5223,8 +5259,7 @@
             "properties": {
               "name": {
                 "type": "string",
-                "maxLength": 64,
-                "pattern": "^[a-z][a-z0-9-]*$"
+                "pattern": "^[a-z][a-z0-9-]{1,40}$"
               },
               "moduleId": {
                 "anyOf": [
@@ -5307,8 +5342,7 @@
             "properties": {
               "name": {
                 "type": "string",
-                "maxLength": 64,
-                "pattern": "^[a-z][a-z0-9-]*$"
+                "pattern": "^[a-z][a-z0-9-]{1,40}$"
               },
               "moduleId": {
                 "anyOf": [
@@ -5438,8 +5472,7 @@
             "properties": {
               "name": {
                 "type": "string",
-                "maxLength": 64,
-                "pattern": "^[a-z][a-z0-9-]*$"
+                "pattern": "^[a-z][a-z0-9-]{1,40}$"
               },
               "dir": {
                 "type": "string",
@@ -5559,8 +5592,7 @@
             "properties": {
               "name": {
                 "type": "string",
-                "maxLength": 64,
-                "pattern": "^[a-z][a-z0-9-]*$"
+                "pattern": "^[a-z][a-z0-9-]{1,40}$"
               },
               "moduleId": {
                 "type": "string",
@@ -5753,8 +5785,7 @@
             "properties": {
               "name": {
                 "type": "string",
-                "maxLength": 64,
-                "pattern": "^[a-z][a-z0-9-]*$"
+                "pattern": "^[a-z][a-z0-9-]{1,40}$"
               },
               "moduleId": {
                 "type": "string",

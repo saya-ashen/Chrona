@@ -252,7 +252,6 @@
     },
     "uses": {
       "default": [],
-      "maxItems": 40,
       "type": "array",
       "items": {
         "anyOf": [

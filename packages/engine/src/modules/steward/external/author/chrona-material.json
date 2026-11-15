@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "source": [
+    "LICENSE",
+    "README.md",
+    "author.bun.test.ts",
+    "contracts.ts",
+    "distribution.ts",
+    "files.ts",
+    "index.ts",
+    "kernel-client.ts",
+    "material.bun.test.ts",
+    "material.ts",
+    "module.json",
+    "publish.ts",
+    "test.ts",
+    "validate.ts",
+    "workflow.ts"
+  ],
+  "artifacts": [],
+  "build": {
+    "commands": [],
+    "toolchain": "Bun with the Chrona SDK supplied by the host; source-only application",
+    "target": "trusted-local host"
+  }
+}

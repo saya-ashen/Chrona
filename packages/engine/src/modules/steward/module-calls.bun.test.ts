@@ -1,11 +1,13 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, spyOn, test } from "bun:test";
 import "./module-effects";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";
 import { moduleManifestSchema, moduleCallSchema, type ModuleEvent } from "@chrona/contracts/steward";
 import { moduleSupervisor } from "./module-supervisor";
 import { testModuleProcess } from "./module-test-process";
 import { testDb } from "./test-db";
-import { admitted, callStatus, callSync, callsSettled, enqueueCall, kernelOrigin, moduleToolExampleError, runDueCalls, validateToolArgs } from "./module-calls";
+import { admitted, CallError, callStatus, callSync, callsSettled, enqueueCall, kernelOrigin, moduleToolExampleError, runDueCalls, validateToolArgs } from "./module-calls";
 import { callModuleTool, moduleToolCatalog } from "./module-tools";
 import { moduleIncidents, recordModuleFailure } from "./module-diagnostics";
 import { registerSystemModules } from "./system-modules";
@@ -173,6 +175,120 @@ test("a saved sync target survives a schema update while waiting in the supervis
   expect(await second).toMatchObject({ value: { output: 42 } });
   expect(calls).toBe(2);
   expect(await f.db.moduleInvocation.findMany({ orderBy: { createdAt: "asc" }, select: { status: true } })).toEqual([{ status: "succeeded" }, { status: "succeeded" }]);
+});
+
+test("new unsent sync calls persist and replay proof without granting it to duplicate conflicts", async () => {
+  const f = await fixture({ alpha: async () => ({}), beta: async () => ({}) });
+  let starts = 0;
+  const startModule = f.ports.sandbox!.startModule!;
+  f.ports.sandbox!.startModule = () => { starts++; throw new Error("runtime unavailable"); };
+  const origin = { ...kernelOrigin(f.workspace.id), caller: { kind: "module" as const, module: "alpha", moduleId: f.alpha.id, hash: "alpha-v1" } };
+  const target = { moduleId: f.beta.id, tool: "echo" }, options = { key: "unsent", expectedTarget: { moduleId: f.beta.id, hash: "beta-v1" } };
+  await expect(callSync(f.ports, origin, target, {}, options)).rejects.toMatchObject({ code: "unavailable", reason: "not_dispatched" });
+  expect(await f.db.moduleInvocation.findFirstOrThrow({ where: { key: "unsent" } })).toMatchObject({ status: "failed", errorCode: "unavailable", errorReason: "not_dispatched", attempts: 1 });
+  f.ports.sandbox!.startModule = startModule;
+  await expect(callSync(f.ports, origin, target, {}, options)).rejects.toMatchObject({ code: "unavailable", reason: "not_dispatched" });
+  await expect(callSync(f.ports, origin, target, { text: "changed" }, options)).rejects.toMatchObject({ code: "conflict", reason: undefined });
+  await expect(callSync(f.ports, origin, target, {}, { ...options, expectedTarget: { moduleId: "another" } })).rejects.toMatchObject({ code: "conflict", reason: undefined });
+  await expect(callSync(f.ports, origin, target, {}, { ...options, expectedTarget: { moduleId: f.beta.id, hash: "beta-v2" } })).rejects.toMatchObject({ code: "conflict", reason: undefined });
+  await expect(callSync(f.ports, { ...origin, caller: { ...origin.caller, hash: "alpha-v2" } }, target, {}, options)).rejects.toMatchObject({ code: "forbidden", reason: undefined });
+  expect(starts).toBe(1);
+  expect(await f.db.moduleInvocation.count()).toBe(1);
+  expect(f.processes).toHaveLength(0);
+});
+
+test("pre-claim routing failures carry no dispatch proof", async () => {
+  const f = await fixture({ alpha: async () => ({}), beta: async () => ({}) });
+  const origin = kernelOrigin(f.workspace.id);
+  await expect(callSync(f.ports, origin, "beta.echo", {}, { expectedTarget: { moduleId: "reinstalled" } })).rejects.toMatchObject({ code: "conflict", reason: undefined });
+  await f.db.module.update({ where: { id: f.beta.id }, data: { status: "paused" } });
+  await expect(callSync(f.ports, origin, "beta.echo", {}, { key: "not-claimed" })).rejects.toMatchObject({ code: "unavailable", reason: undefined });
+  expect(await f.db.moduleInvocation.count()).toBe(0);
+  expect(f.processes).toHaveLength(0);
+});
+
+test("claimed activation conflicts stay unmarked on failure and replay", async () => {
+  let release!: () => void, entered!: () => void, calls = 0;
+  const blocked = new Promise<void>(resolve => { release = resolve; }), started = new Promise<void>(resolve => { entered = resolve; });
+  const f = await fixture({ alpha: async () => ({}), beta: async () => { calls++; entered(); await blocked; return { result: 42 }; } });
+  const origin = kernelOrigin(f.workspace.id);
+  const first = callSync(f.ports, origin, "beta.echo", {});
+  await started;
+  const second = callSync(f.ports, origin, "beta.echo", {}, { key: "activation-conflict" }).then(value => ({ value }), error => ({ error }));
+  try {
+    for (let i = 0; i < 100 && await f.db.moduleInvocation.count() < 2; i++) await Bun.sleep(1);
+    expect(await f.db.moduleInvocation.count()).toBe(2);
+    await f.db.module.update({ where: { id: f.beta.id }, data: { activeHash: "beta-v2" } });
+  } finally { release(); }
+  await first;
+  expect(await second).toMatchObject({ error: { code: "conflict", reason: undefined } });
+  expect(await f.db.moduleInvocation.findFirstOrThrow({ where: { key: "activation-conflict" } })).toMatchObject({ status: "failed", errorCode: "conflict", errorReason: null });
+  await expect(callSync(f.ports, origin, { moduleId: f.beta.id, tool: "echo" }, {}, { key: "activation-conflict" })).rejects.toMatchObject({ code: "conflict", reason: undefined });
+  expect(calls).toBe(1);
+});
+
+test("sync lost replies persist unknown without proof and never redispatch on replay", async () => {
+  let calls = 0;
+  const f = await fixture({ alpha: async () => ({}), beta: async (_event, _call, input) => {
+    calls++;
+    f.processes.find(process => process.input === input)!.kill();
+    await new Promise(() => {});
+  } });
+  const origin = kernelOrigin(f.workspace.id), options = { key: "lost-reply" };
+  await expect(callSync(f.ports, origin, "beta.echo", {}, options)).rejects.toMatchObject({ code: "unknown", reason: undefined });
+  expect(await f.db.moduleInvocation.findFirstOrThrow({ where: { key: options.key } })).toMatchObject({ status: "unknown", errorCode: "unknown", errorReason: null });
+  await expect(callSync(f.ports, origin, "beta.echo", {}, options)).rejects.toMatchObject({ code: "unknown", reason: undefined });
+  expect(calls).toBe(1);
+});
+
+test.each([
+  { code: "unavailable", reason: "not_dispatched", expected: undefined },
+  { code: "unavailable", reason: "submission_refused", expected: "submission_refused" },
+  { code: "unknown", reason: "submission_refused", expected: undefined },
+  { code: "timeout", reason: "submission_refused", expected: undefined },
+  { code: "unavailable", reason: "unconfigured", expected: "unconfigured" },
+] as const)("handler $code/$reason persists and replays only valid reasons", async ({ code, reason, expected }) => {
+  let calls = 0;
+  const f = await fixture({ alpha: async () => ({}), beta: async () => { calls++; throw new CallError(code, "Structured handler failure", reason); } });
+  const origin = kernelOrigin(f.workspace.id), options = { key: "handler-proof" }, expectedCode = code === "timeout" ? "unknown" : code;
+  for (let attempt = 0; attempt < 2; attempt++) await expect(callSync(f.ports, origin, "beta.echo", {}, options)).rejects.toMatchObject({ code: expectedCode, reason: expected });
+  expect(await f.db.moduleInvocation.findFirstOrThrow({ where: { key: options.key } })).toMatchObject({ status: expectedCode === "unknown" ? "unknown" : "failed", errorCode: expectedCode, errorReason: expected ?? null });
+  expect(calls).toBe(1);
+});
+
+test.each(["not_dispatched", "submission_refused"] as const)("real SDK receives inner %s and scopes its rethrow at the outer handler", async reason => {
+  let innerCalls = 0;
+  const f = await fixture({ alpha: async () => { innerCalls++; throw new CallError("unavailable", "Inner refusal", "submission_refused"); }, beta: async () => ({}) });
+  const runtime = createScriptSandbox({ executionMode: "trusted-local", dataDir: f.ports.dataDir });
+  const peerStart = f.ports.sandbox!.startModule!;
+  f.ports.sandbox = { ...runtime.health, startModule: input => {
+    if (input.codeDir.endsWith("alpha-v1")) {
+      if (reason === "not_dispatched") throw new Error("Inner runtime unavailable");
+      return peerStart(input);
+    }
+    return runtime.startModule(input);
+  } };
+  const codeDir = join(f.ports.dataDir, "platform/store/beta-v1");
+  await mkdir(codeDir, { recursive: true });
+  const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.beta.id, hash: "beta-v1" } } });
+  await writeFile(join(codeDir, "module.json"), JSON.stringify(version.manifest));
+  await writeFile(join(codeDir, "index.ts"), `import { on, chrona, ModelError } from "chrona";
+    on("tool", async event => {
+      try { await chrona.call({ moduleId: chrona.dependencies.alpha, tool: "pong" }, {}, { mode: "sync", key: event.args.text }); }
+      catch (error) {
+        if (!(error instanceof ModelError)) throw error;
+        if (event.args.text === "observe") return { result: { code: error.code, reason: error.reason } };
+        throw error;
+      }
+    });`);
+  const origin = kernelOrigin(f.workspace.id);
+  expect((await callSync(f.ports, origin, "beta.echo", { text: "observe" })).output).toEqual({ code: "unavailable", reason });
+  const expected = reason === "submission_refused" ? reason : undefined, options = { key: "outer-forward" };
+  for (let attempt = 0; attempt < 2; attempt++) await expect(callSync(f.ports, origin, "beta.echo", { text: "forward" }, options)).rejects.toMatchObject({ code: "unavailable", reason: expected });
+  expect(await f.db.moduleInvocation.findFirstOrThrow({ where: { target: "beta", key: options.key } })).toMatchObject({ status: "failed", errorReason: expected ?? null });
+  expect(await f.db.moduleInvocation.findMany({ where: { target: "alpha" }, select: { errorReason: true } })).toEqual([{ errorReason: reason }, { errorReason: reason }]);
+  expect(await f.db.moduleRun.count({ where: { moduleId: f.beta.id } })).toBe(2);
+  expect(innerCalls).toBe(reason === "submission_refused" ? 2 : 0);
 });
 
 test("missing callbacks keep explicit never-sent attribution across several unavailable retries", async () => {
@@ -448,26 +564,33 @@ test("a sync call back into a module that is waiting is refused as a cycle, not 
 test("a sync call into a module that waits on the caller in another event is refused (cross-event deadlock)", async () => {
   let release!: () => void;
   const gate = new Promise<void>(resolve => { release = resolve; });
+  let betaEntered!: () => void, echoQueued!: () => void;
+  const betaReady = new Promise<void>(resolve => { betaEntered = resolve; });
+  const echoReady = new Promise<void>(resolve => { echoQueued = resolve; });
   let betaReply: unknown;
   const f = await fixture({
     // alpha's tool event waits on beta.echo; beta answers only after its own other event called alpha.
     alpha: async (event, call) => event.trigger.id === "pong" ? { result: "pong" } : { result: await call("call", { target: "beta.echo", args: {} } as never) },
     beta: async (event, call) => {
-      if (event.trigger.id === "bounce") { await gate; betaReply = await call("call", { target: "alpha.pong", args: {} } as never); return { result: betaReply }; }
+      if (event.trigger.id === "bounce") { betaEntered(); await gate; betaReply = await call("call", { target: "alpha.pong", args: {} } as never); return { result: betaReply }; }
       return { result: "echo" };
     },
   });
-  const started = Date.now();
+  const supervisor = moduleSupervisor(f.ports), deliver = supervisor.deliver.bind(supervisor);
+  const observed = spyOn(supervisor, "deliver").mockImplementation((moduleId, hash, event, options) => {
+    if (moduleId === f.beta.id && event.trigger.id === "echo") echoQueued();
+    return deliver(moduleId, hash, event, options);
+  });
+  cleanups.push(async () => { observed.mockRestore(); });
   // beta is busy in "bounce" (Chrona's async call) when alpha starts waiting on beta.echo; then bounce calls alpha.
   await enqueueCall({ tx: f.db, ports: f.ports, origin: kernelOrigin(f.workspace.id), target: "beta.bounce", raw: {} }, { key: "bounce" });
   const delivering = runDueCalls(f.ports, f.workspace.id);
-  await Bun.sleep(50);
+  await betaReady;
   const alpha = f.fire("start");
-  await Bun.sleep(50);
+  await echoReady;
   release(); await delivering;
   expect(output(await alpha)).toMatchObject({ result: { output: "echo" } });
   expect(betaReply).toMatchObject({ error: { code: "cycle" } });
-  expect(Date.now() - started).toBeLessThan(5000);
 });
 
 test("async calls are stored under the caller's key, delivered once and answered with call_result and callStatus", async () => {

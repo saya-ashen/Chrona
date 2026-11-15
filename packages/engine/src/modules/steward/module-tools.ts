@@ -54,9 +54,10 @@ function toolset({ module, manifest }: Resolved) {
 }
 export function catalogEntry(resolved: Resolved) {
   const { tool } = resolved;
+  const inputSchema: Record<string, unknown> = { ...moduleToolContract(tool).input, description: `[${resolved.system ? "Chrona" : "module"} ${resolved.module.name}] ${tool.description}` };
   return { name: resolved.name, exposure: resolved.direct ? "direct" as const : "deferred" as const, namespace: toolset(resolved),
     description: tool.description,
-    inputSchema: { ...moduleToolContract(tool).input, additionalProperties: false, description: `[${resolved.system ? "Chrona" : "module"} ${resolved.module.name}] ${tool.description}` },
+    inputSchema,
     outputSchema: moduleToolContract(tool).output, examples: "examples" in tool ? tool.examples ?? null : null,
     sideEffects: "sideEffects" in tool ? tool.sideEffects ?? null : null, errors: "errors" in tool ? tool.errors ?? null : null,
     idempotent: tool.idempotent,

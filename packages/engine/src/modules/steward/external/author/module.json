@@ -19,7 +19,7 @@
   "tools": [
     {
       "name": "prepare",
-      "description": "Prepare complete-first authoring guidance and admission metadata for the current Agent Run. Input JSON: {requestKey,submitter:{moduleId,hash},targets:[{name,moduleId,expectedActiveHash}],goal,intent:{changes,preserves}}.",
+      "description": "Prepare bounded current-task guidance, admission metadata and a stable write-ready resume worksheet for the current Agent Run. No files or model runs are started.",
       "visibility": [
         "owner"
       ],
@@ -168,13 +168,30 @@
           },
           "prompt": {
             "type": "string"
+          },
+          "acceptance": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "content": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path",
+              "content"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
           "kind",
           "request",
           "admission",
-          "prompt"
+          "prompt",
+          "acceptance"
         ],
         "additionalProperties": false
       }
@@ -222,7 +239,7 @@
     },
     {
       "name": "read",
-      "description": "Read a UTF-8 source or staged file in a bounded range. Offsets and limit count UTF-16 code units; limit is 1–2000. Rejects files over 64 KiB.",
+      "description": "Read a UTF-8 source or staged file in a bounded range. Offsets and limit count UTF-16 code units; limit is 1\u20132000. Rejects files over 64 KiB.",
       "visibility": [
         "provider",
         "modules",
@@ -337,7 +354,7 @@
     },
     {
       "name": "stage",
-      "description": "Atomically copy complete recorded source and binary artifacts into a new package stage, preserving executable modes and declared provenance. Verifies manifest name and entry; kernel checks remain required. No overwrite.",
+      "description": "Freeze complete material in a new package stage, preserving binaries, modes and caller-declared provenance. Reuses validate structural checks on the exact staged snapshot and returns checks; no tests are run. Kernel checks remain required. No overwrite.",
       "visibility": [
         "owner"
       ],
@@ -347,7 +364,7 @@
         "properties": {
           "input": {
             "type": "string",
-            "description": "JSON {name,from:\"sources/workspace\",to:\"packages/stage\",provenance:{kind:\"local\",label}|{kind:\"kernel-source\",moduleId,hash,ref,materialDigest}}. Provenance is caller-declared."
+            "description": "JSON {name,from:\"sources/workspace\"|\"packages/stage/source\",to:\"packages/new-stage\",provenance:{kind:\"local\",label}|{kind:\"kernel-source\",moduleId,hash,ref,materialDigest}}. Provenance is caller-declared."
           }
         },
         "required": [
@@ -374,6 +391,28 @@
           },
           "materialDigest": {
             "type": "string"
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "ok": {
+                  "type": "boolean"
+                },
+                "detail": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "ok"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
@@ -382,7 +421,8 @@
           "metadata",
           "files",
           "bytes",
-          "materialDigest"
+          "materialDigest",
+          "checks"
         ],
         "additionalProperties": false
       }
@@ -471,7 +511,7 @@
         "properties": {
           "input": {
             "type": "string",
-            "description": "JSON: {from,to,source:[...],artifacts?:[...],build?:...,overwrite?:boolean}."
+            "description": "JSON {from:\"/absolute/workspace\",to:\"sources/work\",source:[\"module.json\",\"index.ts\"],artifacts:[],build:{commands:[],toolchain:\"host tools\",target:\"host\"},overwrite?:boolean}. Lists and build are required. Artifact: {path,executable?:boolean}. Replacement is opt-in."
           }
         },
         "required": [
@@ -557,7 +597,7 @@
     },
     {
       "name": "validate",
-      "description": "Validate a complete sources/<workspace> before submission: module manifest, entry, tools/pages, dependency lock and bounded safe files. Runs local bun tests by default with a 30s timeout and 8 KiB output. Does not submit or establish product acceptance.",
+      "description": "Check source or staged material locally: entry, essential manifest/tool fields, lockfile presence and bounded files. Runs declared scripts and Bun suites in a disposable snapshot with host runtimes, no installed dependencies, 30s total and 8 KiB output. Skips are explicit. Kernel SDK checks and product acceptance remain separate.",
       "visibility": [
         "owner"
       ],
@@ -567,7 +607,7 @@
         "properties": {
           "input": {
             "type": "string",
-            "description": "JSON {path:\"sources/workspace\",runTests?:boolean}. runTests defaults to true; set false to skip local tests."
+            "description": "JSON {path:\"sources/workspace\"|\"packages/stage/source\",runTests?:boolean}. Defaults true; false checks structure only. Run dependency/SDK tests in the prepared external workspace or kernel harness and retain that evidence."
           }
         },
         "required": [
@@ -612,20 +652,33 @@
                 "type": "boolean"
               },
               "ok": {
-                "type": "boolean"
+                "type": [
+                  "boolean",
+                  "null"
+                ]
               },
               "exitCode": {
-                "type": "integer"
+                "type": [
+                  "integer",
+                  "null"
+                ]
               },
               "output": {
                 "type": "string"
+              },
+              "reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             },
             "required": [
               "ran",
               "ok",
               "exitCode",
-              "output"
+              "output",
+              "reason"
             ],
             "additionalProperties": false
           }
@@ -633,7 +686,8 @@
         "required": [
           "ok",
           "path",
-          "checks"
+          "checks",
+          "tests"
         ],
         "additionalProperties": false
       }

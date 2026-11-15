@@ -337,6 +337,11 @@
                             "type": "string",
                             "pattern": "^[a-z][a-z0-9-]{1,40}$"
                           }
+                        },
+                        "executionRunId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
                         }
                       },
                       "required": [
@@ -589,7 +594,9 @@
                 "unconfigured",
                 "too_large",
                 "timeout",
-                "module_paused"
+                "module_paused",
+                "not_dispatched",
+                "submission_refused"
               ]
             }
           },
@@ -681,6 +688,10 @@
                   "type": "object",
                   "properties": {
                     "moduleId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "hash": {
                       "type": "string",
                       "minLength": 1
                     }
@@ -889,7 +900,9 @@
                     "unconfigured",
                     "too_large",
                     "timeout",
-                    "module_paused"
+                    "module_paused",
+                    "not_dispatched",
+                    "submission_refused"
                   ]
                 },
                 "message": {
