@@ -278,7 +278,8 @@ class PiRun {
     if (this.resumeSessionId !== null && state.sessionId !== this.resumeSessionId) throw new Error("Pi resumed a different session than the requested execution context");
     if (this.input.model) {
       const model = object(state.model);
-      if (`${model.provider}/${model.id}` !== this.input.model) throw new Error("Pi selected a different model than the authorized build");
+      const selected = this.input.model.includes("/") ? `${model.provider}/${model.id}` : model.id;
+      if (selected !== this.input.model) throw new Error("Pi selected a different model than the authorized build");
     }
     if (typeof state.sessionId === "string") this.sessionId = state.sessionId;
     const resources = await this.send("get_commands");

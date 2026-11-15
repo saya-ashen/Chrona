@@ -118,23 +118,23 @@ describe("Pi RPC provider", () => {
     expect(configured).not.toContain("--tools");
     expect(configured).toContain(join(f.cwd, "web.ts"));
   });
-  test("an exact build model overrides defaults without rewriting the selected user profile", async () => {
+  test.each(["openai/gpt-6.1-sol", "gpt-6.1-sol"])("build model %s overrides defaults without rewriting the selected user profile", async model => {
     const f = await fixture();
     await writeFile(join(f.agentDir, "settings.json"), '{"retry":{"enabled":true}}');
     const provider = createPiProvider({ ...f.options, model: "other/default" });
-    expect((await provider.start({ ...f.input, model: "openai/gpt-6.1-sol", sessionId: null }).done).outcome).toBe("finished");
+    expect((await provider.start({ ...f.input, model, sessionId: null }).done).outcome).toBe("finished");
     const launch = JSON.parse(await readFile(join(f.cwd, "launch.json"), "utf8"));
     const args = launch.args;
-    expect(args[args.indexOf("--model") + 1]).toBe("openai/gpt-6.1-sol");
+    expect(args[args.indexOf("--model") + 1]).toBe(model);
     expect(launch.profile).toBe(f.agentDir);
     expect(existsSync(launch.profile)).toBe(true);
     expect(await readFile(join(f.agentDir, "settings.json"), "utf8")).toBe('{"retry":{"enabled":true}}');
     const commands = await f.commands();
     expect(commands.some(c => ["set_auto_retry", "set_auto_compaction"].includes(c.type))).toBe(false);
   });
-  test("a model mismatch fails closed without sending any prompt or falling back", async () => {
+  test.each(["openai/gpt-6.1-sol", "gpt-6.1-sol"])("model mismatch for %s fails without sending any prompt or falling back", async model => {
     const f = await fixture("wrong-model");
-    expect((await f.provider.start({ ...f.input, model: "openai/gpt-6.1-sol" }).done).outcome).toBe("failed");
+    expect((await f.provider.start({ ...f.input, model }).done).outcome).toBe("failed");
     expect((await f.commands()).some(c => c.type === "prompt")).toBe(false);
   });
   test("default and explicit trusted-local run locally; legacy required-isolation is rejected", async () => {
