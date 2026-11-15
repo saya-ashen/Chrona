@@ -1,5 +1,7 @@
 # 内核永久边界收缩实施记录
 
+> 当前状态：Coding 与 coding-web 已退役，包含旧 work-v2；当前 Chat 独立拥有会话与执行记录。本文的 Coding/Editor 接口、源码路径、验收和部署描述仅作历史记录，不是现行接入指引。详见[Coding 退役说明](coding-retirement.md)。
+
 > 2026-11-10：此为前一阶段记录。新版公开 API 正在按[目标规范](kernel-api-design.md)改造，现状与验证见[API 实施记录](kernel-api-implementation.md)。旧接口和旧验收不证明新版能力。
 
 
@@ -51,7 +53,7 @@
 
 ## 当前暂停状态与历史源码保留清单
 
-当前仅 Remind 整应用暂停并保留源码；Mind 正恢复为普通可选应用、不预装，最终验收待完成，见[实施记录](mind-implementation.md)。Coding 和 coding-web 已恢复为普通可选应用，见[实施记录](coding-peer-clients-implementation.md)。Editor 已退役并移除，见[退役记录](editor-retirement.md)。以下表格和 G5 的计数是最初永久收缩验收的历史快照，不表示当前仍保留 Editor 或暂停 Coding。
+当前仅 Remind 整应用暂停并保留源码；Mind 正恢复为普通可选应用、不预装，最终验收待完成，见[实施记录](mind-implementation.md)。Coding 和 coding-web 曾恢复为普通可选应用，现已退役，见[Coding 退役说明](coding-retirement.md)。Editor 已退役并移除，见[退役记录](editor-retirement.md)。以下表格和 G5 的计数是最初永久收缩验收的历史快照，不表示当前仍保留 Editor 或暂停 Coding。
 
 | 应用/功能 | 原收缩验收时源码状态 | 当时恢复前要求 |
 | --- | --- | --- |

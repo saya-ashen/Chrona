@@ -21,8 +21,7 @@ async function fixture() {
   } catch (error) { await f.close(); throw error; }
 }
 
-// Project registration/path policy now belongs to Coding's service tests. The
-// former Agent projects tests' kernel responsibility is actual caller identity.
+// Verify the Agent kernel's caller identity and context ownership boundaries.
 test("Agent authenticates current approved module identities before any Run effect", async () => {
   const f = await fixture();
   try {

@@ -1,6 +1,8 @@
 # 编码工作台参考项目调研
 
-调研日期：2026-11-08。状态：公开资料调研与设计建议，尚未冻结界面，也未开始新版页面开发。顺序见[开发路线](development-roadmap.md)，当前能力见[编码工作台](coding-web-workbench.md)。
+> 当前状态：Coding 与 coding-web 已退役，包含旧 work-v2；当前 Chat 独立拥有会话与执行记录。本文的 Coding/Editor 接口、源码路径、验收和部署描述仅作历史记录，不是现行接入指引。详见[Coding 退役说明](coding-retirement.md)。
+
+调研日期：2026-11-08。状态：公开资料调研与设计建议，尚未冻结界面，也未开始新版页面开发。顺序见[开发路线](development-roadmap.md)，旧 Coding 能力已退役，现状见[Coding 退役说明](coding-retirement.md)。
 
 用户纠正了前一轮的参照假设：Orca 不一定适合 Chrona，而且其界面过于复杂。本轮撤回“Orca 风格”和固定三栏作为设计前提；先比较具体交互，再选择最小页面结构。本文不对外部 Orca 的当前实现作源码评审。
 

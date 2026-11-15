@@ -1,10 +1,12 @@
 # Editor 应用退役记录
 
+> 当前状态：Coding 与 coding-web 已退役，包含旧 work-v2；当前 Chat 独立拥有会话与执行记录。本文的 Coding/Editor 接口、源码路径、验收和部署描述仅作历史记录，不是现行接入指引。详见[Coding 退役说明](coding-retirement.md)。
+
 日期：2026-11-09。用户已明确批准删除被无界面 Coding 取代的旧 Editor 应用及其残留。当前状态：**Editor 已退役并移除；源码、合同、发行包与隔离验收均已完成。** 仅 Mind、Remind 整应用继续暂停，并保留源码与依赖材料；memory-local 仅暂停定时整理。
 
-## 当前接入
+## 当时接入（已被 Coding 退役取代）
 
-无界面的普通可选应用 `coding` 持有共享业务，`coding-web` 为独立普通可选客户端。仓库外编辑器与未来 Electron 消费同一 Coding 应用协议，不要求服务端存在同名 Editor 应用。现行合同与原实施证据分别见[客户端协议](coding-peer-clients-protocol.md)和[实施记录](coding-peer-clients-implementation.md)。旧 `editor` 安装名、`/api/editor/*` 和旧版本协议不再是支持入口，不保留兼容别名。
+无界面的普通可选应用 `coding` 持有共享业务，`coding-web` 为独立普通可选客户端。仓库外编辑器与未来 Electron 消费同一 Coding 应用协议，不要求服务端存在同名 Editor 应用。当时的协议和实施证据已从工作树删除，可从 Git 历史查阅，见[Coding 退役说明](coding-retirement.md)。旧 `editor` 安装名、`/api/editor/*` 和旧版本协议不再是支持入口，不保留兼容别名。
 
 ## 清理范围
 
@@ -21,4 +23,4 @@
 - 重建 Linux x64 发行包成功，官方离线种子共 13 个；最终资源中无 Editor 目录、Git 包或裸仓库，Coding 私有合同无旧 HTTP URL 或旧共享定义名称。二进制 `dist/releases/chrona-linux-x64/chrona` SHA-256：`3401d052ec260369d0f2c62b7840edc2b97058a41515dcd7b8fdc54aedf9c35a`；构建日志 `/tmp/chrona-editor-build-final.log`。
 - 最终发行包隔离验收结果见 `/tmp/chrona-editor-release-smoke-final.log`：受检离线安装、两个应用激活、认证 HTTP、真实 Agent 主机项目登记、HTTP/模块共享会话、回执重放、参数冲突及页面注册；旧 Editor URL 为 404。全程使用临时数据、Provider none，实际模型请求为 0。
 - 文档工作仅调整 `AGENTS.md` 和 `docs/**`；未在此工作中执行构建、测试、网络、模型、外部仓库或部署操作。
-- 现有 `chrona-kernel-preview.service` 的 `127.0.0.1:3112` 部署保持原样。此前 Coding/coding-web 的部署证据继续保留在[原实施记录](coding-peer-clients-implementation.md#本地预览部署)；本轮删除不代表该服务已更新。3111 亦未因本轮文档工作变更。
+- 现有 `chrona-kernel-preview.service` 的 `127.0.0.1:3112` 部署保持原样。此前 Coding/coding-web 的部署证据继续保留在[Coding 退役说明](coding-retirement.md)；本轮删除不代表该服务已更新。3111 亦未因本轮文档工作变更。

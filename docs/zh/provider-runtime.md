@@ -1,5 +1,7 @@
 # Provider 运行：复用 Pi，补齐宿主接线
 
+> 当前状态：Coding 与 coding-web 已退役，包含旧 work-v2；当前 Chat 独立拥有会话与执行记录。本文的 Coding/Editor 接口、源码路径、验收和部署描述仅作历史记录，不是现行接入指引。详见[Coding 退役说明](coding-retirement.md)。
+
 2026-11-08 阅读提示：应用持有会话、消息和业务提示；内核持有执行治理。下文早期“内核管会话/持久消息”及 M1–M3 范围须结合[当前应用编排](agent-module-orchestration.md)阅读。V1 有后续隔离真实模型验收，但不覆盖其后所有修改；状态与后续任务见[统一开发路线](development-roadmap.md)。
 
 Chrona 内核管会话、持久消息、队列/恢复、调度、路由授权与运行预算，内置 `notify` 模块管通知预算与送达，`web` 模块管网页；Pi 管推理、文件/命令/网页工具、技能、扩展、MCP 与原生执行权限。不另建技能/MCP/模型执行器。整体边界见[当前架构](architecture.md)；以下是 Provider 适配与接线参考，不表示已接入或验收任何真实账户。M1 保持现有普通会话与构建语义，已完成开发全组检查；M1 验收记录（已从工作树删除，见 git 历史 docs/zh/chrona-workbench-m1-acceptance.md）已由协调者签署。项目 cwd/日志分离、执行尝试、持久取消、有界详细聊天流、成果捕获及客户端审阅已纳入 M1–M3 集成，当前范围与限制见 M3 验收记录（已从工作树删除，见 git 历史 docs/zh/chrona-workbench-m3-acceptance.md）。真实 SDK/host 与 fake Pi 子进程/Neovim 的闭环证据不代表真实模型或生产部署验收。

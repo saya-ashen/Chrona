@@ -1,5 +1,7 @@
 # 内核 API 实施记录
 
+> 当前状态：Coding 与 coding-web 已退役，包含旧 work-v2；当前 Chat 独立拥有会话与执行记录。本文的 Coding/Editor 接口、源码路径、验收和部署描述仅作历史记录，不是现行接入指引。详见[Coding 退役说明](coding-retirement.md)。
+
 状态：2026-11-11 实现、SDK 和维护中的调用方已提交为 `1aef6824`，完成下述验证，并按用户授权部署独立本地预览实例；**API 未冻结**。依据：[公开 API 规范](kernel-api-design.md)。旧服务及其数据保留，新实例仅使用全新数据。
 
 ## 实现范围

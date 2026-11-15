@@ -26,8 +26,7 @@ async function install(f: Fixture, name: string, source: string, tools = ["relay
 }
 const relaySource = `import {chrona,on} from 'chrona';on('tool',async t=>{try{return {result:await chrona.call('agent.'+t.args.tool,JSON.parse(t.args.args),t.args.tool==='read'?{}:{key:t.args.key})}}catch(e){return {result:{error:e.code,message:e.message}}}});`;
 
-// The former work-* execution/placement/attempt test is Coding-owned. This
-// integration follows only the public kernel Run/context protocol through SDK.
+// Follow the public kernel Run/context protocol through the SDK.
 test("SDK Agent contexts preserve ownership, selected tools, scoped reads, interactions and confirmed stop evidence", async () => {
   const f = await fixture();
   try {

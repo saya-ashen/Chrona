@@ -1,6 +1,6 @@
 # Web 外壳与应用组合组件
 
-> 2026-11-09 当前状态：本文涉及旧 Editor 应用的架构、安装、接口、源码保留和验收结果均属于当时记录，相关运行指引已过时。Editor 已退役并移除；仅 Mind、Remind 整应用暂停并保留源码。现行编码接入见[客户端协议](coding-peer-clients-protocol.md)和[实施记录](coding-peer-clients-implementation.md)，删除范围及待补验证见[Editor 退役记录](editor-retirement.md)。保留本文的其他架构与历史证据；原测试计数、产物散列及部署事实不改写，也不证明本次清理已验证或部署。
+> 当前状态：Coding 与 coding-web 已退役，包含旧 work-v2；当前 Chat 独立拥有会话与执行记录。本文的 Coding/Editor 接口、源码路径、验收和部署描述仅作历史记录，不是现行接入指引。详见[Coding 退役说明](coding-retirement.md)。
 
 > 2026-11-09 补充：本页保留声明式组合的历史设计和验收证据。新增的可信应用浏览器组件登记与执行见 [Web 应用组件登记与执行](web-executable-components.md)；下文“没有脚本加载器”等表述仅描述当时的声明式机制。
 
@@ -10,7 +10,7 @@
 
 Web 拥有登录、导航、路由、主题、字体、控件实现、响应式布局、无障碍和页面校验。今天、对话、应用、活动、设置，以及应用登记的页面共用外壳。内置页的系统操作仍通过 `mountSystem` 的受限适配器处理；普通登记页只能调用登记应用自己的工具。
 
-应用决定业务内容、信息结构、组件组合、状态含义和业务操作。例如 coding 管理项目与会话、回复、问题选项和结果；它登记 `coding:QuestionCard` 与 `coding:ConversationComposer`，以公共组件组合自己的呈现，并提供工具回调。
+应用决定业务内容、信息结构、组件组合、状态含义和业务操作。例如 Chat 管理会话、消息、附件和执行记录，登记自己的页面与组件，并提供工具回调。
 
 页面可以声明 `layout: "document" | "workspace"`，默认 document。document 内容居中，workspace 使用可用的视口区域。Web 根据页面声明设置外壳状态，在导航、错误、登录和退出时更新或清理。页面中的某个子组件不再改变整站导航和主题。
 
@@ -72,7 +72,7 @@ Web 拥有登录、导航、路由、主题、字体、控件实现、响应式�
 
 `Composer.on.submit` 是明确的提交事件。Enter 在非输入法组合、非 Shift 且未禁用时触发它；点击发送按钮由页面绑定相同操作。`Composer.disabled` 控制键盘提交，按钮是否禁用也由页面明确绑定。键盘行为不再寻找某个样式类的按钮。
 
-`WorkspaceHeader.statusTone` 可为 neutral、success、warning、danger，默认 neutral。业务应用提供含义；coding 将确认完成显示为 success、失败显示为 danger、未知或等待停止显示为 warning。状态文本本身不被 Web 猜测为成功。
+`WorkspaceHeader.statusTone` 可为 neutral、success、warning、danger，默认 neutral。业务应用提供含义；应用可将确认完成显示为 success、失败显示为 danger、未知或等待停止显示为 warning。状态文本本身不被 Web 猜测为成功。
 
 ## 验证与证据
 
@@ -84,7 +84,7 @@ Web 拥有登录、导航、路由、主题、字体、控件实现、响应式�
 - 实际 Coding 页面与业务 handler：三种宽度通过目录选择、原生问题、草稿轮询、Enter/Shift+Enter、续接轮次、成果页停止和刷新恢复。审查另外核对三种输入模式的 Enter 与按钮请求一致。
 - 通用浏览器组件另检查输入法组合、焦点/光标、阅读位置和自动跟随。TypeScript、变更文件 ESLint、`git diff --check` 通过。
 
-截图采用受控数据： [桌面今天](../validation/web-components/today-desktop.png)、[手机设置](../validation/web-components/settings-mobile.png)、[应用组合页](../validation/web-components/document-desktop.png)、[Coding 桌面](../validation/web-components/coding-desktop.png)、[Coding 手机](../validation/web-components/coding-mobile.png)。截图证明呈现与布局，不代表真实模型执行。
+截图采用受控数据： [桌面今天](../validation/web-components/today-desktop.png)、[手机设置](../validation/web-components/settings-mobile.png)、[应用组合页](../validation/web-components/document-desktop.png)。旧 Coding 桌面与手机截图已随应用退役删除，可从 Git 历史查阅。截图证明呈现与布局，不代表真实模型执行。
 
 关键源码：`builtin/web/composition.ts`、`pages.ts`、`catalog.ts`、`app.js`、`shell.css`、`src/workspace.tsx`，以及 `external/coding/components.ts`、`page.ts`。Web 的 `build.ts` 将共享组件样式与全站样式写入同源 `style.css`，不放宽 CSP。
 

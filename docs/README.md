@@ -19,7 +19,7 @@
 
 - [中文 README](../README.zh.md) / [English README](../README.md)：安装与运行范围。
 - [运维](zh/operations.md)：启动、数据目录、完整备份、恢复与诊断。
-- [Coding 工作台](zh/coding-web-workbench.md) / [客户端协议](zh/coding-peer-clients-protocol.md)：使用及应用接口。
+- [Coding 退役说明](zh/coding-retirement.md)：旧 Coding/coding-web 已移除，当前 Chat 独立运行。
 - [本地桌面应用](zh/desktop-applications.md) / [桌面会话](zh/desktop-session.md)：窗口与宿主环境。
 
 ## 按任务阅读
@@ -31,7 +31,7 @@
 | Web 与设置 | [外壳与组合](zh/web-components-and-shell.md)、[可执行组件](zh/web-executable-components.md)、[应用设置](zh/application-settings.md) |
 | 通知与自动化 | [有限内核事实](zh/kernel-notification-facts.md)、[Mind](zh/mind-implementation.md)、[应用迁移](zh/application-migration.md) |
 | 源码验收证据 | [内核/Agent 迁移](zh/kernel-agent-migration.md)、[普通应用迁移](zh/application-migration.md)、[边界实施](zh/kernel-permanent-boundary-implementation.md) |
-| Coding 证据 | [实施记录](zh/coding-peer-clients-implementation.md)、工作台验证（已从工作树删除，见 git 历史 docs/zh/coding-workbench-validation.md）、[Editor 退役](zh/editor-retirement.md) |
+| 退役与历史证据 | [Coding 退役](zh/coding-retirement.md)、[Editor 退役](zh/editor-retirement.md)；旧 Coding 协议、实施与工作台验证从 Git 历史查阅 |
 | 可选代理工具 | [context-mode / CodeGraph](agents/tooling.md)：仅在当前会话提供对应工具时按需读取 |
 | 历史背景 | 已归档的早期方案从 Git 历史查阅，不作为当前开发规则 |
 

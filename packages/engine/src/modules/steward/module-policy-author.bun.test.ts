@@ -12,7 +12,7 @@ import { testDb } from "./test-db";
 import { parsePrepare } from "./external/author/contracts";
 import { prepareMaterial } from "./external/author/workflow";
 
-const applications = ["web", "notify", "qq", "author", "mcp", "mind", "files", "events", "memory-local", "coding", "coding-web", "remote-execution", "remind"];
+const applications = ["web", "notify", "qq", "author", "mcp", "mind", "files", "events", "memory-local", "remote-execution", "remind"];
 
 registerSystemModules();
 test.each(applications)("%s author tests preserve application-owned policies", async name => {

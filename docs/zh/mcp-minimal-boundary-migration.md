@@ -1,6 +1,8 @@
 # MCP 迁移到最小内核边界
 
-日期：2026-11-09。范围：恢复普通可选 MCP 应用；不迁移旧数据，不保留旧接口，不新增内核公开工具。该次 MCP 迁移时 Mind、Coding、Editor、Remind 暂停并保留源码。后续 Coding/coding-web 已恢复，见[实施记录](coding-peer-clients-implementation.md)；Editor 已退役并移除，见[退役记录](editor-retirement.md)。当前仅 Mind、Remind 整应用暂停。以下验证计数与部署证据保留为当时记录。
+> 当前状态：Coding 与 coding-web 已退役，包含旧 work-v2；当前 Chat 独立拥有会话与执行记录。本文的 Coding/Editor 接口、源码路径、验收和部署描述仅作历史记录，不是现行接入指引。详见[Coding 退役说明](coding-retirement.md)。
+
+日期：2026-11-09。范围：恢复普通可选 MCP 应用；不迁移旧数据，不保留旧接口，不新增内核公开工具。该次 MCP 迁移时 Mind、Coding、Editor、Remind 暂停并保留源码。Coding/coding-web 后续曾恢复，现已退役，见[Coding 退役说明](coding-retirement.md)；Editor 已退役并移除，见[退役记录](editor-retirement.md)。当前仅 Mind、Remind 整应用暂停。以下验证计数与部署证据保留为当时记录。
 
 ## 使用范围
 

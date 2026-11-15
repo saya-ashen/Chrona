@@ -1,6 +1,6 @@
 # Chrona 最小模块架构与 Agent Workbench：统一开发方案
 
-> 2026-11-09 当前状态：本文涉及旧 Editor 应用的架构、安装、接口、源码保留和验收结果均属于当时记录，相关运行指引已过时。Editor 已退役并移除；仅 Mind、Remind 整应用暂停并保留源码。现行编码接入见[客户端协议](coding-peer-clients-protocol.md)和[实施记录](coding-peer-clients-implementation.md)，删除范围及待补验证见[Editor 退役记录](editor-retirement.md)。保留本文的其他架构与历史证据；原测试计数、产物散列及部署事实不改写，也不证明本次清理已验证或部署。
+> 当前状态：Coding 与 coding-web 已退役，包含旧 work-v2；当前 Chat 独立拥有会话与执行记录。本文的 Coding/Editor 接口、源码路径、验收和部署描述仅作历史记录，不是现行接入指引。详见[Coding 退役说明](coding-retirement.md)。
 
 2026-11-08 生命周期修订：用户已确认 web/mcp/files/notify/events 允许受检定制，Agent 保持不可动态替换；本文关于全部内置不可变的 M1 设计保留为历史。当前开发先做可使用的编码 Web 工作台，之后再按需要推进调用治理，见[统一路线](development-roadmap.md)。
 

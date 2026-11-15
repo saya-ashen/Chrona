@@ -1,5 +1,7 @@
 # 普通应用的新内核适配
 
+> 当前状态：Coding 与 coding-web 已退役，包含旧 work-v2；当前 Chat 独立拥有会话与执行记录。本文的 Coding/Editor 接口、源码路径、验收和部署描述仅作历史记录，不是现行接入指引。详见[Coding 退役说明](coding-retirement.md)。
+
 状态：全部 13 个普通应用源码适配、离线验收、关联全量回归和 Linux 发行材料检查完成。工作分支 `work/kernel-agent-migration`，基于已合入的 `b65e7ece` 与未提交内核迁移。当前记录不代表部署或真实账号验收。
 
 ## 范围与应用清单

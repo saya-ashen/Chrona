@@ -231,9 +231,6 @@ export async function assembleModuleDependencies(moduleDir: string, sourceRoot =
   await writeFile(join(moduleDir, "package.json"), JSON.stringify(packaged, null, 2) + "\n");
 }
 
-// Retained for the existing integration fixture outside the build transition.
-export { assembleModuleDependencies as assembleAgentDependencies };
-
 /** Record explicit build outputs without removing source, types, tests or dependency material. */
 export async function stageModuleMaterial(moduleDir: string, input: { artifacts: string[]; build: ModuleMaterial["build"] }): Promise<ModuleMaterial> {
   if (input.artifacts.some(path => path === MODULE_MATERIAL_FILE || !isModuleMaterialPath(path))) throw new Error("Unsafe generated module artifact path");

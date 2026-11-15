@@ -44,7 +44,8 @@ test("independent unpublished seeds clone offline at their exact commits and unc
       expect(await readFile(join(clone, "index.ts"), "utf8")).toBe(`// ${entry.name}\n`);
       expect(git(clone, ["log", "-1", "--format=%s"])).toBe(`Extract initial module release from Chrona ${base.hostCommit}`);
       expect(await readFile(join(clone, "LICENSE"), "utf8")).toBe(await readFile(join(f.root, "LICENSE"), "utf8"));
-      if (["web", "coding", "coding-web"].includes(entry.name)) expect(await readFile(join(clone, "THIRD-PARTY-NOTICES.txt"), "utf8")).toBe("Fixture third-party notices\n");
+      if (entry.name === "web") expect(await readFile(join(clone, "THIRD-PARTY-NOTICES.txt"), "utf8")).toBe("Fixture third-party notices\n");
+      else expect(await Bun.file(join(clone, "THIRD-PARTY-NOTICES.txt")).exists()).toBe(false);
       expect(git(clone, ["rev-list", "--count", "HEAD"])).toBe("1");
     }
     const same = await prepareModuleGitRelease({ ...f, hostCommit: "b".repeat(40), hostTimestamp: "1735776000" });

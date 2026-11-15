@@ -1,5 +1,7 @@
 # 内核永久边界合同（冻结候选）
 
+> 当前状态：Coding 与 coding-web 已退役，包含旧 work-v2；当前 Chat 独立拥有会话与执行记录。本文的 Coding/Editor 接口、源码路径、验收和部署描述仅作历史记录，不是现行接入指引。详见[Coding 退役说明](coding-retirement.md)。
+
 > 2026-11-10：此为前一阶段记录。新版公开 API 正在按[目标规范](kernel-api-design.md)改造，现状与验证见[API 实施记录](kernel-api-implementation.md)。旧接口和旧验收不证明新版能力。
 
 
@@ -184,7 +186,7 @@ Agent SDK Manifest 使用 kebab-case 参数（如 `request-key`、`context-id`�
 | `agent.locations` | `{after?,limit}` | `{locations,after}`，位置含 `executorId,projectRef,mappingRevision,label,kind,online,baseline,workspaceModes` | 受控 host 配置视图，不授予目录权限 |
 | `agent.cleanup` | `{workId,commandKey,action:"preview"}` 或 `{workId,commandKey,action:"confirm",previewDigest}` | `{workId,workspaceRef,state:retained\|blocked\|removed\|unknown,reason,previewDigest:null\|SHA256}` | receipt 优先，确认删除须精确 preview 和守卫；输入为 `workCleanupInputSchema` |
 
-`executionViewSchema` 为 `{workId,sessionId,runId,attemptId,projectRef,status,cancelRequested,stopConfirmed}`。Coding 的普通应用接入和验收记录见 `coding-peer-clients-implementation.md`。Editor 已退役并移除，见[退役记录](editor-retirement.md)；本轮不包含真实模型或外部设备验收。
+`executionViewSchema` 为 `{workId,sessionId,runId,attemptId,projectRef,status,cancelRequested,stopConfirmed}`。Coding 的旧接入和验收记录已归档至 Git 历史，见[Coding 退役说明](coding-retirement.md)。Editor 已退役并移除，见[退役记录](editor-retirement.md)；本轮不包含真实模型或外部设备验收。
 
 模型政策存于 Agent 私有 data 的 `model-policy.json`，0600 文件及原子替换；tier 映射给出 model/thinking，timeout 取应用偏好与内核事件硬上限的最小值，输出 token 同样受请求及内核硬上限约束。Kernel 硬上限是 `maxCallsPerEvent,maxOutputTokens,eventTimeoutMs`，另有日预算；应用不能自行增加上限。应用通用配置不回流到内核 settings。
 
@@ -230,7 +232,7 @@ Web 当前普通应用工具包含 `today/reply/component-set/component-remove/p
 
 ## 8. 暂停、残留与冻结门禁
 
-`module-availability.ts` 的整应用暂停名单精确为 `remind`，保留源码及依赖材料，拒绝安装和运行接入；路由返回 `unavailable`、reason `module_paused`。初始化对其记录 skipped，不能自动删除或从源码验收推断恢复授权。Mind 已恢复为普通可选应用，部署及自动化限制见[Mind 记录](mind-implementation.md)。Editor 已退役移除，见[退役记录](editor-retirement.md)。Coding 与 coding-web 的普通应用接入见[客户端实施记录](coding-peer-clients-implementation.md)。
+`module-availability.ts` 的整应用暂停名单精确为 `remind`，保留源码及依赖材料，拒绝安装和运行接入；路由返回 `unavailable`、reason `module_paused`。初始化对其记录 skipped，不能自动删除或从源码验收推断恢复授权。Mind 已恢复为普通可选应用，部署及自动化限制见[Mind 记录](mind-implementation.md)。Editor 已退役移除，见[退役记录](editor-retirement.md)。Coding 与 coding-web 已退役移除，见[Coding 退役说明](coding-retirement.md)。
 
 2026-11-09 后续迁移恢复 MCP 为普通可选应用，使用现有内核工具与应用私有配置；没有新增内核 API。安装后提供鉴权的 `/api/mcp`，不恢复旧自动构建、调度或集中应用配置接口。验收见 [MCP 迁移记录](mcp-minimal-boundary-migration.md)。
 

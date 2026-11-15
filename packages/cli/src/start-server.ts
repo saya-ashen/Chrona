@@ -1,7 +1,7 @@
 import { copyFileSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { assertPrivateStorageSupported, ensurePrivateDirectory, secureGeneratedPrivateFile } from "@chrona/db/sqlite-url";
+import { ensurePrivateDirectory, secureGeneratedPrivateFile } from "@chrona/db/sqlite-url";
 
 
 export type ChronaStartOptions = {
@@ -61,7 +61,6 @@ export function getChronaConfigDir(): string {
 }
 
 function ensureDirs() {
-  assertPrivateStorageSupported();
   for (const path of [getChronaDataDir(), getChronaConfigDir()]) {
     // Existing selected paths are audited, never rewritten. Newly-created
     // Chrona roots receive private POSIX modes or a verified Windows ACL.

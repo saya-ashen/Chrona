@@ -255,7 +255,7 @@ export async function assertPiReleaseResources(resourcesRoot: string) {
   await assertExists(join(resourcesRoot, "module-git/pi.bundle"), "Pi module Git bundle");
 }
 
-/** Check Files against packaged Web contracts in a writable SDK, as ordinary builds do. */
+/** Check Notify against packaged Web contracts in a writable SDK, as ordinary builds do. */
 export async function assertModuleTypecheck(resources: string) {
   const temporary = await mkdtemp(join(tmpdir(), "chrona-release-typecheck-")), sdk = join(temporary, "sdk");
   try {

@@ -1,5 +1,7 @@
 # 内核可移植、可信本地运行与远程执行应用化实施方案
 
+> 当前状态：Coding 与 coding-web 已退役，包含旧 work-v2；当前 Chat 独立拥有会话与执行记录。本文的 Coding/Editor 接口、源码路径、验收和部署描述仅作历史记录，不是现行接入指引。详见[Coding 退役说明](coding-retirement.md)。
+
 日期：2026-11-09。状态：**S0–S3 已实施；S4 部分实现，原生平台矩阵未验收；S5 本机实际设备全链路与可靠性修复定向通过，仍为部分完成；S6 未验收**。
 
 主分支 `f964e4dd` 已与实现提交 `442223ee` 完成语义合并；合并后 23 文件 / 278 项定向检查、全部 server/API 19 文件 / 104 项、边界检查及新编译 Linux CLI runtime smoke 通过。详细范围、lint 双父比较与历史失败见[验证记录的合并复核](kernel-portability-verification.md#合并复核2026-11-09-1918-0800)。以下实施快照核对至当日 **18:36（+08:00）**。物理存储改动后 root tsc final9、root lint final6 PASS（440 files、0 errors、1 个既有 doctor warning）、边界 final3 PASS（0 errors / 35 warnings、798 modules / 4175 dependencies）；schema `--check`、原始 hash 基线 9 pass / 147 断言、schema 生成测试 7 pass / 43 断言通过。新增有限物理存储、私有 journal 和设备回归 **7 文件 / 50 pass / 441 断言，无失败、无跳过**，包含真实 Pi 1.5.0、生产 HTTP、内核模型预留、签名停止及 cleanup。普通应用和设备均使用有限 SQLite 页数、实际证据预留与有界 DELETE 回滚日志；达到高水位后拒绝普通准入，保留终止/控制回执写入空间。安全归档与超过 100 项设备 journal 的持续恢复尚未完成。
@@ -342,6 +344,6 @@ flowchart LR
 - [可移植性验证记录](kernel-portability-verification.md)：本轮实际证据、平台矩阵、复现命令与未完成验收。
 - [内核永久边界合同](kernel-permanent-boundary-contract.md)、[实施记录](kernel-permanent-boundary-implementation.md)：当前内核职责与应用生命周期的基线。
 - [当前架构](architecture.md)、[模块依赖方向](module-dependency-direction.md)：依赖与所有权规则。
-- [Coding 客户端协议](coding-peer-clients-protocol.md)：业务调用面；不借远程拆分重建 Coding 协议。
+- [Coding 退役说明](coding-retirement.md)：业务调用面；不借远程拆分重建 Coding 协议。
 - [统一模块协议与本地／远端宿主](unified-module-runtime-plan.md)：历史与阶段背景；本文不重启已推迟的通用远程宿主工作。
 - 合并前的《可信本地跨平台运行与远程执行应用化方案》：`git show fbc4464a:docs/zh/history/cross-platform-runtime-and-remote-execution-plan.md`。

@@ -8,7 +8,12 @@ type Command = { description: string; steps: string[][] };
 const command = (description: string, ...steps: string[][]): Command => ({ description, steps });
 const binary = (target?: string) => command("Build steward binary", ["scripts/build-binaries.ts", ...(target ? ["--target", target] : [])]);
 const types = [["x", "tsc", "--noEmit", "--pretty", "false"]];
-const boundaries = ["x", "dependency-cruiser", "apps", "packages/contracts", "packages/db", "packages/domain", "packages/engine", "packages/integrations", "packages/cli", "packages/i18n", "packages/shared", "packages/logging", "packages/pi", "packages/process"];
+const boundaries = [
+  "x", "dependency-cruiser", "apps", "packages/contracts", "packages/db", "packages/domain",
+  "packages/engine", "packages/integrations", "packages/cli", "packages/i18n", "packages/shared",
+  "packages/logging", "packages/pi", "packages/process", "packages/workspaces",
+  "packages/remote-device", "packages/remote-model",
+];
 export const TEST_COMMANDS: Record<string, Command> = {
   bun: command("Bun tests", ["scripts/run-bun-tests.ts"]),
   api: command("API tests", ["scripts/run-api-tests.ts"]),
@@ -25,9 +30,11 @@ export const COMMANDS: Record<string, Partial<Record<string, Command>>> = {
     ...Object.fromEntries(Object.keys(buildTargets).map(t => [t, binary(t)])),
   },
   check: {
-    all: command("Types, lint and boundaries", ...types, ["scripts/lint-ratchet.ts"], boundaries),
+    all: command("Types, lint, guardrails and boundaries", ...types, ["scripts/lint-ratchet.ts"], ["scripts/check-guardrails.ts"], boundaries),
     types: command("Types", ...types),
     lint: command("Lint ratchet", ["scripts/lint-ratchet.ts"]),
+    guardrails: command("Sync, hygiene and closure guardrails", ["scripts/check-guardrails.ts"]),
+    slice: command("Verify workspace or target slice", ["scripts/verify-slice.ts"]),
     boundaries: command("Package boundaries", boundaries),
     deadcode: command("Dead code (advisory)", ["x", "knip", "--no-progress"]),
   },

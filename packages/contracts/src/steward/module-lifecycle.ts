@@ -8,7 +8,7 @@ export const LOCAL_CAPABILITY_NAMES = ["runtime-callback", "workspace-local"] as
 export const BUILTIN_MODULE_NAMES = [] as const;
 export const PREINSTALLED_MODULE_NAMES = ["pi", "web", "notify", "author", "mind", "chat"] as const;
 /** QQ ships as an optional app; retained catalog entries are unavailable without release resources. */
-export const OPTIONAL_EXTERNAL_MODULE_NAMES = ["qq", "memory-local", "coding", "coding-web", "mcp", "files", "events", "remind", "remote-execution"] as const;
+export const OPTIONAL_EXTERNAL_MODULE_NAMES = ["qq", "memory-local", "mcp", "files", "events", "remind", "remote-execution"] as const;
 export const OFFICIAL_EXTERNAL_MODULE_NAMES = [...PREINSTALLED_MODULE_NAMES, ...OPTIONAL_EXTERNAL_MODULE_NAMES] as const;
 export const moduleVersionHashSchema = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/);
 export const moduleOriginSchema = z.enum(["kernel", "builtin", "external"]);

@@ -4,6 +4,8 @@
 
 本地优先的个人管家：通过网页或 QQ 私聊交代事情，在持久的会话和应用中一起推进。
 
+Coding 与 coding-web（含 work-v2）已退役移除；当前 Chat 独立拥有会话与执行记录，见[退役说明](docs/zh/coding-retirement.md)。
+
 ## 如何工作
 
 **会话目录**位于 `<dataDir>/sessions/<id>/`。应用（模块）的文件保存在 `<dataDir>/platform/data`（代码在 `<dataDir>/platform/store`），对外只开放工具；对话附件保存在 `<dataDir>/platform/data/chat`。Provider（目前为 Pi）通过应用工具工作、研究并使用自己的工具。Chrona 提供持久调度、前后台排队、凭据、审批和送达。模型文字不直接创建调度或发送消息，这些动作必须调用 Chrona 工具。

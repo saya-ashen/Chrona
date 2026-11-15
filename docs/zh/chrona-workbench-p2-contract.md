@@ -1,6 +1,6 @@
 # P2：固定设备、有界并发与工作协议
 
-> 2026-11-09 当前状态：本文涉及旧 Editor 应用的架构、安装、接口、源码保留和验收结果均属于当时记录，相关运行指引已过时。Editor 已退役并移除；仅 Mind、Remind 整应用暂停并保留源码。现行编码接入见[客户端协议](coding-peer-clients-protocol.md)和[实施记录](coding-peer-clients-implementation.md)，删除范围及待补验证见[Editor 退役记录](editor-retirement.md)。保留本文的其他架构与历史证据；原测试计数、产物散列及部署事实不改写，也不证明本次清理已验证或部署。
+> 当前状态：Coding 与 coding-web 已退役，包含旧 work-v2；当前 Chat 独立拥有会话与执行记录。本文的 Coding/Editor 接口、源码路径、验收和部署描述仅作历史记录，不是现行接入指引。详见[Coding 退役说明](coding-retirement.md)。
 
 状态：**协调者于 2026-11-06 冻结 `P2-20261106`；R/Q/U 实现与 M3 开发集成验收已完成**。实现、19 项矩阵、实际 compiled CLI 与真实 host 闭环、独立复核及环境限制见 M3 验收记录（已从工作树删除，见 git 历史 docs/zh/chrona-workbench-m3-acceptance.md）与[统一方案](chrona-workbench-unified-development-plan.md)。本文保留冻结时的职责和契约说明；冻结本身不是验收证据，不代表生产部署、真实模型或其他平台原生执行已验证。
 

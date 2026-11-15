@@ -17,7 +17,7 @@ test.each([...PAUSED_MODULE_NAMES])("%s is explicitly unavailable even without c
   }
 });
 
-test.each(["mind", "coding", "coding-web", "web", "qq", "notify", "agent", "author", "events", "files", "memory-local", "mcp"])("%s remains admitted by the temporary policy", name => {
+test.each(["mind", "web", "qq", "notify", "agent", "author", "events", "files", "memory-local", "mcp"])("%s remains admitted by the temporary policy", name => {
   expect(isModulePaused(name)).toBe(false);
   expect(() => assertModuleAvailable(name)).not.toThrow();
 });

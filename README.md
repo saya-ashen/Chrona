@@ -4,6 +4,8 @@ English | [中文](README.zh.md)
 
 A local-first personal steward: talk in the web composer or QQ private chat, and work together in persistent sessions and apps.
 
+Coding and coding-web, including work-v2, are retired. The current Chat application owns its conversations and execution records independently; see the [retirement note](docs/zh/coding-retirement.md).
+
 ## How it works
 
 **Sessions** have directories under `<dataDir>/sessions/<id>/`. Apps (modules) keep their own files under `<dataDir>/platform/data` (code under `<dataDir>/platform/store`) and offer tools; conversation attachments are kept under `<dataDir>/platform/data/chat`. The Provider (currently Pi) works through app tools, researches and uses its own tools. Chrona supplies persistent schedules, foreground/background queues, credentials, approvals and delivery. Model prose alone does not schedule work or send messages: those actions use Chrona tools.

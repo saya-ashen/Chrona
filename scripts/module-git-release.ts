@@ -114,7 +114,7 @@ async function readLock(seedDir: string, preparing = false): Promise<ReleaseLock
 export async function stageModuleGitLicense(resourcesRoot: string, licensePath: string, noticesPath: string) {
   for (const module of buildArtifacts.moduleGit.modules) {
     await cp(licensePath, join(resourcesRoot, module.source, "LICENSE"));
-    if (["web", "coding", "coding-web"].includes(module.name)) await cp(noticesPath, join(resourcesRoot, module.source, "THIRD-PARTY-NOTICES.txt"));
+    if (module.name === "web") await cp(noticesPath, join(resourcesRoot, module.source, "THIRD-PARTY-NOTICES.txt"));
   }
 }
 

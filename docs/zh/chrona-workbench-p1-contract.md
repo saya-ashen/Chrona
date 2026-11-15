@@ -1,6 +1,6 @@
 # Chrona / Workbench P1 执行与客户端接线合同
 
-> 2026-11-09 当前状态：本文涉及旧 Editor 应用的架构、安装、接口、源码保留和验收结果均属于当时记录，相关运行指引已过时。Editor 已退役并移除；仅 Mind、Remind 整应用暂停并保留源码。现行编码接入见[客户端协议](coding-peer-clients-protocol.md)和[实施记录](coding-peer-clients-implementation.md)，删除范围及待补验证见[Editor 退役记录](editor-retirement.md)。保留本文的其他架构与历史证据；原测试计数、产物散列及部署事实不改写，也不证明本次清理已验证或部署。
+> 当前状态：Coding 与 coding-web 已退役，包含旧 work-v2；当前 Chat 独立拥有会话与执行记录。本文的 Coding/Editor 接口、源码路径、验收和部署描述仅作历史记录，不是现行接入指引。详见[Coding 退役说明](coding-retirement.md)。
 
 状态：协调者于 2026-11-05 完成八项审核并冻结 P1 公共契约，M2 开发已授权；M1 与 minimality 已验收。产品 executions/coding/editor 服务、持久事件存储及 Workbench backend 尚未实现。主协议仍为 `chrona.execution.v1`，共享 cases.json 字节不变。
 

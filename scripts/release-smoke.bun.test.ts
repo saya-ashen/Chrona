@@ -39,7 +39,7 @@ test("packaged checker uses Web's actual contracts without changing the shipped 
     }
     await mkdir(join(resources, "external/web"), { recursive: true });
     await cp(join(repository, "packages/engine/src/modules/steward/external/web/module.json"), join(resources, "external/web/module.json"));
-    await cp(join(repository, "packages/engine/src/modules/steward/external/files"), join(resources, "external/files"), { recursive: true });
+    await cp(join(repository, "packages/engine/src/modules/steward/external/notify"), join(resources, "external/notify"), { recursive: true });
     const original = await readFile(join(sdk, "calls.d.ts"), "utf8");
     await chmod(join(sdk, "calls.d.ts"), 0o444);
     await assertModuleTypecheck(resources);
