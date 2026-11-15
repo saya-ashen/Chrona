@@ -3,15 +3,14 @@ import { inDatabaseTransaction, transactionAwareClient } from "./transaction-con
 import { guardSqliteAdapter } from "./sqlite-adapter-guards";
 export { afterDatabaseCommit } from "./transaction-context";
 import { applyChronaRuntimeConfigToEnv } from "@chrona/shared/runtime-config";
-import { resolve } from "node:path";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 import { ensureSqliteDatabase } from "./sqlite-migrations";
 import { resolveRuntimeDatabaseUrl, resolveSqliteAdapterUrl } from "./sqlite-url";
 
 applyChronaRuntimeConfigToEnv(process.env);
-
-const DATABASE_URL = resolveRuntimeDatabaseUrl(process.env);
-const MIGRATIONS_DIR = process.env.CHRONA_MIGRATIONS_DIR ?? resolve("prisma", "migrations");
 
 if (typeof globalThis.Bun === "undefined") {
   throw new Error(
@@ -20,9 +19,29 @@ if (typeof globalThis.Bun === "undefined") {
   );
 }
 
-function createAdapter() {
+let ephemeralTestRoot: string | undefined;
+
+function resolveEffectiveDatabaseUrl(): string {
+  if (
+    process.env.NODE_ENV === "test" &&
+    !process.env.DATABASE_URL?.trim() &&
+    !process.env.CHRONA_DATA_DIR?.trim()
+  ) {
+    if (!ephemeralTestRoot) {
+      ephemeralTestRoot = mkdtempSync(join(tmpdir(), "chrona-ephemeral-test-db-"));
+      const dirToClean = ephemeralTestRoot;
+      process.once("exit", () => {
+        rmSync(dirToClean, { recursive: true, force: true });
+      });
+    }
+    return `file:${join(ephemeralTestRoot, "test.db")}`;
+  }
+  return resolveRuntimeDatabaseUrl(process.env);
+}
+
+function createAdapter(databaseUrl: string) {
   return guardSqliteAdapter(new PrismaBunSqlite({
-    url: resolveSqliteAdapterUrl(DATABASE_URL),
+    url: resolveSqliteAdapterUrl(databaseUrl),
     // Keep committed receipts durable while avoiding rollback-journal fsyncs on
     // every routed call. Configure every adapter connection, including reopen.
     wal: { enabled: true, synchronous: "FULL", busyTimeout: 5000 },
@@ -30,14 +49,16 @@ function createAdapter() {
 }
 
 function createDbClient() {
+  const databaseUrl = resolveEffectiveDatabaseUrl();
+  const migrationsDir = process.env.CHRONA_MIGRATIONS_DIR ?? resolve(import.meta.dirname, "../../../prisma/migrations");
   if (process.env.NODE_ENV === "test") {
     ensureSqliteDatabase({
-      databaseUrl: DATABASE_URL,
-      migrationsDir: MIGRATIONS_DIR,
+      databaseUrl,
+      migrationsDir,
     });
   }
 
-  const adapter = createAdapter();
+  const adapter = createAdapter(databaseUrl);
 
   const client = new PrismaClient({
     adapter,
@@ -45,7 +66,13 @@ function createDbClient() {
   });
 
   // Prisma adapter connections inherit this for subsequent operations in Bun SQLite.
-  client.$executeRawUnsafe("PRAGMA foreign_keys = ON").catch(() => undefined);
+  client.$executeRawUnsafe("PRAGMA foreign_keys = ON").catch((error: unknown) => {
+    console.error(JSON.stringify({
+      component: "db",
+      event: "foreign_keys_pragma_failed",
+      error: error instanceof Error ? error.message : String(error),
+    }));
+  });
 
   return client;
 }
@@ -76,12 +103,56 @@ const globalForPrisma = globalThis as typeof globalThis & {
   prisma?: PrismaClient;
 };
 
-const rootDb = resolveCachedClient(globalForPrisma) ?? createDbClient();
-export const db = transactionAwareClient(rootDb);
-export function withDatabaseTransaction<T>(work: () => Promise<T>): Promise<T> {
-  return inDatabaseTransaction(rootDb, work);
+let initializedRootDb: PrismaClient | undefined;
+let initializedAwareDb: PrismaClient | undefined;
+const boundAwareMethods = new Map<PropertyKey, unknown>();
+
+function getRootDb(): PrismaClient {
+  if (!initializedRootDb) {
+    initializedRootDb = resolveCachedClient(globalForPrisma) ?? createDbClient();
+    if (process.env.NODE_ENV !== "production") {
+      globalForPrisma.prisma = initializedRootDb;
+    }
+  }
+  return initializedRootDb;
 }
 
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = rootDb;
+function getAwareDb(): PrismaClient {
+  if (!initializedAwareDb) {
+    initializedAwareDb = transactionAwareClient(getRootDb());
+  }
+  return initializedAwareDb;
+}
+
+export const db: PrismaClient = new Proxy({} as PrismaClient, {
+  get(_target, property) {
+    const client = getAwareDb();
+    const value = Reflect.get(client, property);
+    if (typeof value !== "function") return value;
+    if (property === "$transaction") return value;
+    let bound = boundAwareMethods.get(property);
+    if (!bound) {
+      bound = value.bind(client);
+      boundAwareMethods.set(property, bound);
+    }
+    return bound;
+  },
+  set(_target, property, value) {
+    boundAwareMethods.delete(property);
+    return Reflect.set(getAwareDb(), property, value);
+  },
+  has(_target, property) {
+    return Reflect.has(getAwareDb(), property);
+  },
+  ownKeys() {
+    return Reflect.ownKeys(getAwareDb());
+  },
+  getOwnPropertyDescriptor(_target, property) {
+    const descriptor = Reflect.getOwnPropertyDescriptor(getAwareDb(), property);
+    return descriptor ? { ...descriptor, configurable: true } : undefined;
+  },
+});
+
+export function withDatabaseTransaction<T>(work: () => Promise<T>): Promise<T> {
+  return inDatabaseTransaction(getRootDb(), work);
 }

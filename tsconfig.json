@@ -97,6 +97,7 @@
     "result",
     "dist",
     "artifacts",
+    "plans",
     "packages/pi/resources"
   ]
 }

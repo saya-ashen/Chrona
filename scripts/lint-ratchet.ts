@@ -48,15 +48,27 @@ function refExists(ref: string): boolean {
 	return git(["rev-parse", "--verify", "--quiet", `${ref}^{commit}`]) !== null;
 }
 
-function resolveBaseRef(): string {
-	const requestedBase = process.env.LINT_RATCHET_BASE;
-	if (requestedBase && refExists(requestedBase)) return requestedBase;
-
+function candidateBaseRefs(stagedOnly: boolean): string[] {
+	const upstream = git([
+		"rev-parse",
+		"--abbrev-ref",
+		"--symbolic-full-name",
+		"@{u}",
+	])?.trim();
 	const githubBase = process.env.GITHUB_BASE_REF;
-	if (githubBase && refExists(`origin/${githubBase}`))
-		return `origin/${githubBase}`;
-	if (refExists("origin/main")) return "origin/main";
-	return refExists("HEAD^") ? "HEAD^" : "HEAD";
+	return [
+		process.env.LINT_RATCHET_BASE ?? "",
+		stagedOnly ? "HEAD" : "",
+		githubBase ? `origin/${githubBase}` : "",
+		upstream ?? "",
+		"origin/platform-v2",
+		"origin/main",
+		"HEAD^",
+	].filter(Boolean);
+}
+
+function resolveBaseRef(stagedOnly: boolean): string {
+	return candidateBaseRefs(stagedOnly).find(refExists) ?? "HEAD";
 }
 
 function pathsFromGit(args: string[]): string[] {
@@ -70,12 +82,18 @@ function isLintablePath(path: string): boolean {
 	);
 }
 
-function changedLintableFiles(baseRef: string): string[] {
+function changedLintableFiles(baseRef: string, stagedOnly: boolean): string[] {
+	if (stagedOnly) {
+		return pathsFromGit(["diff", "--cached", "--name-only", "-z", "--diff-filter=ACMR"])
+			.filter(isLintablePath)
+			.sort((left, right) => left.localeCompare(right));
+	}
 	const files = new Set<string>();
 	for (const args of [
 		["diff", "--name-only", "-z", "--diff-filter=ACMR", `${baseRef}...HEAD`],
 		["diff", "--name-only", "-z", "--diff-filter=ACMR"],
 		["diff", "--cached", "--name-only", "-z", "--diff-filter=ACMR"],
+		["ls-files", "--others", "--exclude-standard", "-z"],
 	]) {
 		for (const path of pathsFromGit(args))
 			if (isLintablePath(path)) files.add(path);
@@ -91,10 +109,17 @@ function formatDebt(path: string, baseline: Debt, current: Debt): string {
 	return `${path}: warnings ${baseline.warnings} → ${current.warnings}, errors ${baseline.errors} → ${current.errors}`;
 }
 
-const baseRef = resolveBaseRef();
+const args = process.argv.slice(2);
+const stagedOnly = args.includes("--staged");
+const explicitFiles = args.filter((arg) => !arg.startsWith("-"));
+const baseRef = resolveBaseRef(stagedOnly);
 const eslint = new ESLint({ cwd: ROOT });
+const candidates =
+	explicitFiles.length > 0
+		? explicitFiles.filter(isLintablePath)
+		: changedLintableFiles(baseRef, stagedOnly);
 const files: string[] = [];
-for (const path of changedLintableFiles(baseRef)) {
+for (const path of candidates) {
 	if (!await eslint.isPathIgnored(resolve(ROOT, path))) files.push(path);
 }
 if (files.length === 0) {
@@ -104,7 +129,18 @@ if (files.length === 0) {
 	process.exit(0);
 }
 
-const currentResults = await eslint.lintFiles(files);
+async function collectCurrentResults(eslintInstance: ESLint, targetPaths: string[], useStagedIndex: boolean) {
+	if (!useStagedIndex) return eslintInstance.lintFiles(targetPaths);
+	const results = [];
+	for (const path of targetPaths) {
+		const stagedText = git(["show", `:${path}`]);
+		if (stagedText === null) continue;
+		results.push(...await eslintInstance.lintText(stagedText, { filePath: resolve(ROOT, path) }));
+	}
+	return results;
+}
+
+const currentResults = await collectCurrentResults(eslint, files, stagedOnly && explicitFiles.length === 0);
 const currentByPath = new Map(
 	currentResults.map((result) => [
 		resolve(ROOT, result.filePath),

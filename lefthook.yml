@@ -1,4 +1,15 @@
+pre-commit:
+  parallel: true
+  commands:
+    lint:
+      run: bun run scripts/lint-ratchet.ts --staged
+    guardrails:
+      run: bun run scripts/check-guardrails.ts --staged
+
 pre-push:
+  parallel: true
   commands:
     types:
-      run: systemd-run --user --scope --quiet -p MemoryMax=10G -E NODE_OPTIONS=--max-old-space-size=6144 bun run typecheck
+      run: NODE_OPTIONS=--max-old-space-size=4096 bun run typecheck
+    guardrails:
+      run: bun run scripts/check-guardrails.ts --with-boundaries

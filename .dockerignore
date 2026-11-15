@@ -11,6 +11,9 @@
 .tmp/
 data/
 .git/
+.serena/
+HANDOFF.md
+plans/
 .worktrees/
 .direnv/
 .github/
@@ -24,8 +27,9 @@ dist/
 build/*
 !build/manifest.ts
 !build/portable-elf.ts
-!build/execution-contracts.ts
-!build/execution-contract-types.ts
+!build/agent-declaration-bundle.ts
+!build/agent-dependencies.ts
+!build/entry-conversations.ts
 *.tsbuildinfo
 .env*
 !.env.example

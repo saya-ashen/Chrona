@@ -60,11 +60,13 @@ async function smokeEntrypoint(
 	// Exercise the documented root command without a smoke-only migration path.
 	// This catches cwd regressions in `bun run server:start`.
 	delete childEnv.CHRONA_MIGRATIONS_DIR;
+	delete childEnv.CHRONA_CONFIG_DIR;
 	const child = Bun.spawn({
 		cmd: entrypoint.command,
 		cwd: ROOT,
 		env: {
 			...childEnv,
+			CHRONA_DATA_DIR: join(tempDir, `${entrypoint.name}-data`),
 			DATABASE_URL: `file:${join(tempDir, `${entrypoint.name}.db`)}`,
 			HOME: tempDir,
 			HOST: "127.0.0.1",

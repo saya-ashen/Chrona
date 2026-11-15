@@ -7,12 +7,15 @@
 
 export {};
 
-import { existsSync, mkdirSync, rmSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { join, resolve } from "node:path";
 
-const glob = new Bun.Glob("*.bun.test.ts");
+const glob = new Bun.Glob("*.bun.test.{ts,tsx}");
 const rootDir = process.cwd();
-const tempDir = resolve(rootDir, ".tmp", "api-tests");
+const tempParent = resolve(rootDir, ".tmp");
+mkdirSync(tempParent, { recursive: true });
+const tempDir = mkdtempSync(join(tempParent, "api-tests-"));
+const requestedFiles = process.argv.slice(2).map((p) => p.replace(/^\.\//u, ""));
 const concurrency = Math.max(
 	1,
 	Number(process.env.CHRONA_TEST_CONCURRENCY ?? "4"),
@@ -23,8 +26,6 @@ const serialFiles = new Set<string>();
 
 let exitCode = 0;
 const failedFiles: Array<{ file: string; code: number }> = [];
-
-mkdirSync(tempDir, { recursive: true });
 
 async function runFile(
 	path: string,
@@ -67,20 +68,32 @@ async function runFile(
 	return await proc.exited;
 }
 
-const files: Array<{ file: string; dbPath: string; dataDir: string }> = [];
-for (const dir of dirs) {
-	const entries = (await Array.fromAsync(glob.scan(dir))).sort((a, b) =>
-		a.localeCompare(b),
-	);
-	for (const file of entries) {
-		const fullPath = `${dir}/${file}`;
-		files.push({
-			file: fullPath,
-			dbPath: resolve(tempDir, `${dir.replaceAll("/", "-")}-${file}.db`),
-			dataDir: resolve(tempDir, `${dir.replaceAll("/", "-")}-${file}-data`),
-		});
+const discoveredFiles: string[] = [];
+if (requestedFiles.length > 0) {
+	for (const candidate of requestedFiles) {
+		if (!candidate.startsWith("apps/server/") || !existsSync(candidate)) {
+			console.error(`Invalid API test file: ${candidate}`);
+			process.exit(1);
+		}
+		discoveredFiles.push(candidate);
+	}
+} else {
+	for (const dir of dirs) {
+		const entries = (await Array.fromAsync(glob.scan(dir))).sort((a, b) =>
+			a.localeCompare(b),
+		);
+		for (const file of entries) {
+			discoveredFiles.push(`${dir}/${file}`);
+		}
 	}
 }
+
+const files: Array<{ file: string; dbPath: string; dataDir: string }> =
+	discoveredFiles.map((fullPath, idx) => ({
+		file: fullPath,
+		dbPath: resolve(tempDir, `${idx}-${fullPath.replaceAll("/", "-")}.db`),
+		dataDir: resolve(tempDir, `${idx}-${fullPath.replaceAll("/", "-")}-data`),
+	}));
 
 const serial = files.filter(({ file }) => serialFiles.has(file));
 const parallel = files.filter(({ file }) => !serialFiles.has(file));

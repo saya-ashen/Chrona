@@ -2,18 +2,24 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { buildProcessHelper } from "../packages/process/scripts/build-helper";
 
-const include = new Bun.Glob("**/*.bun.test.ts");
+const include = new Bun.Glob("**/*.bun.test.{ts,tsx}");
 const ignoredSegments = new Set([
 	"node_modules",
 	".direnv",
 	".git",
 	".worktrees",
+	".tmp",
+	".serena",
+	"agent-test-runs",
+	"playwright-report",
+	"plans",
 	"dist",
 	"build",
 	"coverage",
 ]);
 const rootDir = process.cwd();
-const requestedFiles = process.argv.slice(2);
+const requestedFiles = process.argv.slice(2).map((p) => p.replace(/^\.\//u, ""));
+const retryFlaky = process.env.CHRONA_TEST_RETRY_FLAKY === "1";
 const concurrency = Math.max(
 	1,
 	Number(process.env.CHRONA_TEST_CONCURRENCY ?? "2"),
@@ -22,24 +28,24 @@ const concurrency = Math.max(
 // Retained applications run offline checks without changing their installation/pause policy.
 function shouldInclude(path: string) {
 	const retained = [
-		"scripts/agent-integration/",
+		"scripts/",
+		"packages/cli/",
 		"packages/engine/src/modules/steward/", "packages/domain/src/steward/",
 		"packages/integrations/src/steward/", "packages/contracts/src/steward/", "packages/pi/", "packages/process/", "packages/workspaces/", "packages/remote-device/", "packages/remote-model/",
 		"packages/db/", "packages/shared/", "packages/logging/", "packages/i18n/",
 	];
-	const standalone = new Set([
-		"packages/cli/src/doctor.bun.test.ts", "packages/cli/src/start-server.bun.test.ts",
-		"scripts/portable-elf.bun.test.ts",
-		"scripts/module-git-release.bun.test.ts", "scripts/build-binaries.bun.test.ts",
-	]);
-	return (standalone.has(path) || retained.some(prefix => path.startsWith(prefix)))
+	return retained.some(prefix => path.startsWith(prefix))
 		&& !path.split("/").some((segment) => ignoredSegments.has(segment));
+}
+
+function isBunTestFile(path: string) {
+	return path.endsWith(".bun.test.ts") || path.endsWith(".bun.test.tsx");
 }
 
 function resolveRequestedFiles(paths: string[]) {
 	const invalid = paths.filter(
 		(path) =>
-			!path.endsWith(".bun.test.ts") ||
+			!isBunTestFile(path) ||
 			!shouldInclude(path) ||
 			!existsSync(path),
 	);
@@ -160,7 +166,7 @@ async function main(): Promise<number> {
 		const launch = (item: TestFileEnvironment) => {
 			const job = (async () => {
 				let code = await runWithFreshDatabase(item);
-				if (code !== 0) {
+				if (code !== 0 && retryFlaky) {
 					console.error(
 						`Retrying isolated Bun test file after exit ${code}: ${item.file}`,
 					);

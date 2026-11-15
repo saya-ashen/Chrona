@@ -31,9 +31,6 @@ node_modules/
 !/build/entry-conversations.ts
 !/build/manifest.ts
 !/build/manifest.bun.test.ts
-!/build/execution-contracts.ts
-!/build/execution-contract-types.ts
-!/build/execution-contracts.bun.test.ts
 !/build/release-smoke.ts
 !/build/release-smoke.bun.test.ts
 # misc
@@ -160,3 +157,8 @@ prisma/*.sync-conflict-*.db*
 # Local agent working notes, deployment receipts and screenshots
 .agent-artifacts/
 .claude/
+
+# Local agent state and historical execution snapshots; keep them outside releases.
+/.serena/
+/HANDOFF.md
+/plans/

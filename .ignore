@@ -1,0 +1,8 @@
+# Keep default code search (rg / fd) focused on live source rather than
+# historical acceptance snapshots, release tarballs, or archived trees under plans/.
+# Pass `rg -u` or `rg <pattern> plans/` when intentionally searching historical plans.
+/plans/
+/.serena/
+/.understand-anything/
+/agent-test-runs/
+/playwright-report/
