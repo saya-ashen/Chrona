@@ -78,7 +78,7 @@ class Fixture {
   this.store=new CoreMindStore(this.directory);this.service=new CoreMindService(this.store,{now:()=>this.now});this.application=new CoreApplication(this.directory,this.service,this.gateway.call,identity.moduleId);this.actions=new CoreActions(this.directory,this.service,()=>this.application);
   this.runtime=new CoreRuntime(this.store,this.service,this.gateway.call,()=>identity,this.actions,()=>this.now,deliveryRuntimeHooks(()=>this.delivery,()=>this.proof));
   this.proof=new CoreDeliveryAdmission(this.directory,this.runtime.journal);
-  this.delivery=new CoreDelivery(this.directory,this.service,this.gateway.call,{worker:runRef=>this.runtime.journal.all().find(e=>e.runId===runRef),verifyAdmission:async r=>this.proof.verify(r)});
+  this.delivery=new CoreDelivery(this.directory,this.service,this.gateway.call,{worker:runRef=>this.runtime.journal.all().find(e=>e.runId===runRef),verifyAdmission:async r=>this.proof.verify(r),assertMaySubmit:id=>{if(this.runtime.pendingControl(id))throw Error('Pending control holds delivery');}});
  }
  closeStores(){this.delivery.close();this.proof.close();this.runtime.close();this.actions.close();this.application.close();this.store.close();}
  restart(){this.closeStores();this.open();}
@@ -95,6 +95,93 @@ class Fixture {
  }
  exhaustObservations(){while(this.runtime.observationBudget.view().remaining>3)this.runtime.observationBudget.consume('ordinary');}
 }
+
+function autoSubmit(f:Fixture,enabled=true){
+ const s=f.store.read();
+ f.service.settings({patch:{autoSubmit:enabled},expectedRevision:s.settings.revision,expectedVisibilityRevision:s.visibilityRevision,actionKey:`auto-submit:${enabled}:${s.settings.revision}`},owner);
+}
+async function ready(f:Fixture){f.goal();await f.runtime.tick();const r=await f.prepare();f.gateway.finish(r.run.runId);await f.runtime.tick();return r;}
+function hold(f:Fixture){
+ const s=f.store.read(),p=f.pursuit;
+ f.runtime.admission.enqueue('control',{actionKey:'hold-delivery',kind:'pursuit',id:p.id,expectedRevision:p.revision,expectedVisibilityRevision:s.visibilityRevision,operation:'pause',evidenceRefs:p.evidenceRefs},{subject:'chat:agent',role:'application',scopes:[{}]});
+ expect(f.runtime.pendingControl(p.id)).toBe(true);
+}
+test('autoSubmit defaults off; enabling submits once with the prepared key, even across restart',async()=>{
+ const f=new Fixture();try{
+  const r=await ready(f);expect(f.store.read().settings.autoSubmit).toBe(false);
+  expect(f.runtime.view().autonomousPublishing.enabled).toBe(false);expect(f.gateway.commands('submit')).toHaveLength(0);
+  autoSubmit(f);expect(f.runtime.view().autonomousPublishing.enabled).toBe(true);
+  await f.runtime.tick(false,false);expect(f.gateway.commands('submit')).toHaveLength(1);
+  expect(JSON.parse(String(f.gateway.commands('submit')[0].args.input)).requestKey).toBe(r.input.requestKey);
+  await f.runtime.tick(false,false);f.restart();await f.runtime.reconcileOriginals();await f.runtime.tick(false,false);
+  expect(f.gateway.commands('submit')).toHaveLength(1);expect(f.gateway.commands('modules.receipt').length).toBeGreaterThan(0);
+ }finally{f.close();}
+});
+test('enabled runtime submits immediately after authenticated worker settlement',async()=>{
+ const f=new Fixture();try{
+  autoSubmit(f);f.goal();await f.runtime.tick();const r=await f.prepare();
+  expect(f.gateway.commands('submit')).toHaveLength(0);expect(f.delivery.detail(r.id,owner).status).toBe('awaiting-worker-proof');
+  f.gateway.finish(r.run.runId);await f.runtime.tick();
+  expect(f.gateway.commands('submit')).toHaveLength(1);expect(f.delivery.detail(r.id,owner).status).toBe('submitted');
+  expect(f.pursuit.status).not.toBe('done');
+ }finally{f.close();}
+});
+test('autoSubmit resumes ready deliveries after restart and reconciles a lost submit reply without resubmission',async()=>{
+ const f=new Fixture();try{
+  const r=await ready(f);autoSubmit(f);f.gateway.lostSubmit=true;f.restart();
+  await f.runtime.reconcileOriginals();expect(f.gateway.commands('submit')).toHaveLength(0);
+  await f.runtime.tick(false,false);expect(f.delivery.detail(r.id,owner).status).toBe('submit-unknown');
+  expect(f.gateway.commands('submit')).toHaveLength(1);f.restart();await f.runtime.reconcileOriginals();
+  expect(f.gateway.commands('modules.receipt').at(-1)?.args).toEqual({admissionId:r.input.admissionId,key:r.input.requestKey});
+  await f.runtime.tick(false,false);expect(f.gateway.commands('submit')).toHaveLength(1);
+ }finally{f.close();}
+});
+test('autoSubmit holds pending controls across restart and skips withdrawn or forgotten deliveries',async()=>{
+ for(const mode of ['control','withdraw','forget','disabled'] as const){
+  const f=new Fixture();try{
+   const r=await ready(f);autoSubmit(f);
+   if(mode==='control')hold(f);
+   if(mode==='withdraw')f.delivery.withdraw(r.id,owner);
+   if(mode==='forget')f.service.forget({actionKey:'forget-before-auto-submit',expectedVisibilityRevision:f.store.read().visibilityRevision,target:{kind:'evidence',id:f.pursuit.evidenceRefs[0]}},owner);
+   if(mode==='disabled')autoSubmit(f,false);
+   f.restart();await f.runtime.tick(false,false);expect(f.gateway.commands('submit')).toHaveLength(0);
+  }finally{f.close();}
+ }
+});
+test('slow delivery receipts do not hold execution recovery or duplicate reconciliation',async()=>{
+ const f=new Fixture();let release:()=>void=()=>{};let pending:Promise<unknown>|undefined;
+ try{
+  await ready(f);autoSubmit(f);await f.runtime.tick(false,false);
+  f.goal('other-goal');await f.runtime.tick();const worker=f.runtime.journal.outstanding()!;expect(worker.runId).toBeTruthy();
+  let entered=false;const original=f.gateway.call;
+  const call:CoreCall=async(target,args,options)=>{if(target==='modules.receipt'){entered=true;await new Promise<void>(resolve=>{release=resolve;});}return original(target,args,options);};
+  f.delivery.close();f.delivery=new CoreDelivery(f.directory,f.service,call,{worker:runRef=>f.runtime.journal.all().find(e=>e.runId===runRef),verifyAdmission:async d=>f.proof.verify(d)});
+  pending=f.runtime.tick(false,false);
+  for(let i=0;i<100&&!entered;i++)await Bun.sleep(1);
+  expect(entered).toBe(true);const reads=f.gateway.readCalls;
+  await f.runtime.tick(false,false);expect(f.gateway.readCalls).toBeGreaterThan(reads);
+ }finally{release();await pending;f.close();}
+});
+
+test('autoSubmit stops polling settled receipts',async()=>{
+ const f=new Fixture();try{
+  await ready(f);autoSubmit(f);f.gateway.receipt={...f.gateway.receipt,state:'rejected'};
+  await f.runtime.tick(false,false);const polls=f.gateway.commands('modules.receipt').length;
+  await f.runtime.tick(false,false);await f.runtime.tick(false,false);
+  expect(f.gateway.commands('modules.receipt')).toHaveLength(polls);
+ }finally{f.close();}
+});
+
+test('autoSubmit rechecks controls and settings after asynchronous validation, before dispatch',async()=>{
+ for(const mode of ['control','disabled'] as const){
+  const f=new Fixture();try{
+   const r=await ready(f);autoSubmit(f);const original=f.gateway.call;
+   const call:CoreCall=async(target,args,options)=>{const result=await original(target,args,options);if(target==='modules.list'){if(mode==='control')hold(f);else autoSubmit(f,false);}return result;};
+   f.delivery.close();f.delivery=new CoreDelivery(f.directory,f.service,call,{worker:runRef=>f.runtime.journal.all().find(e=>e.runId===runRef),verifyAdmission:async d=>f.proof.verify(d),assertMaySubmit:id=>{if(f.runtime.pendingControl(id))throw Error('Pending control holds delivery');}});
+   await f.runtime.tick(false,false);expect(f.gateway.commands('submit')).toHaveLength(0);expect(f.delivery.detail(r.id,owner).status).toBe('coordinator-ready');
+  }finally{f.close();}
+ }
+});
 
 test('actual terminal runtime captures admission and stage before release/scrub; explicit owner handoff survives restart, then original goal resumes through reviewed actions',async()=>{
  const f=new Fixture();try{

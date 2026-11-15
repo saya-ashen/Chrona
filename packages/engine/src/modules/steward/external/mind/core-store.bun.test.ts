@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CoreMindStore, coreDigest, evidenceId } from "./core-store";
 import { CoreMindService } from "./core-service";
-import type { CoreAccess, Evidence, IngestBatch, Mutation, Pursuit, Receipt, Scope } from "./core-types";
+import type { CoreAccess, Evidence, IngestBatch, Mutation, Pursuit, Receipt, Scope, CoreSettings } from "./core-types";
 
 const owner: CoreAccess = { subject: "owner", role: "owner", scopes: [{}] };
 const runtime: CoreAccess = { subject: "mind-adapter", role: "runtime", scopes: [{}] };
@@ -42,6 +42,29 @@ function claim(service: CoreMindService, p: Pursuit) {
 }
 
 describe("Mind private core", () => {
+  test("autoSubmit defaults off, accepts both booleans, and persists across reopening", () => {
+    const { service, directory } = setup();
+    expect((service.settings(undefined, owner) as CoreSettings).autoSubmit).toBe(false);
+    const enabled = value(service.settings({ actionKey: "enable-auto-submit", expectedVisibilityRevision: 0,
+      expectedRevision: 0, patch: { autoSubmit: true } }, owner) as Receipt<CoreSettings>);
+    expect(enabled.autoSubmit).toBe(true);
+    expect(enabled.revision).toBe(1);
+    const reopened = new CoreMindStore(directory);
+    try { expect((new CoreMindService(reopened).settings(undefined, owner) as CoreSettings).autoSubmit).toBe(true); } finally { reopened.close(); }
+    const disabled = value(service.settings({ actionKey: "disable-auto-submit", expectedVisibilityRevision: 0,
+      expectedRevision: 1, patch: { autoSubmit: false } }, owner) as Receipt<CoreSettings>);
+    expect(disabled.autoSubmit).toBe(false);
+    expect(disabled.revision).toBe(2);
+  });
+
+  test.each(["true", "false", 1, 0, null, [], {}].map(invalid => ({ invalid })))("autoSubmit rejects non-boolean input %j without changing settings", ({ invalid }) => {
+    const { service } = setup();
+    const before = service.settings(undefined, owner);
+    expect(() => service.settings({ actionKey: "invalid-auto-submit", expectedVisibilityRevision: 0,
+      expectedRevision: 0, patch: { autoSubmit: invalid as unknown as boolean } }, owner)).toThrow("Invalid boolean setting");
+    expect(service.settings(undefined, owner)).toEqual(before);
+  });
+
   test("fresh browsing and source ingestion never invent understandings or pursuits; private durable SQLite and rollback", () => {
     const { service, store, directory } = setup();
     expect(service.overview({}, owner).items).toEqual([]);

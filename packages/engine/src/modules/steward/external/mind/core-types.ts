@@ -64,7 +64,7 @@ export interface UserFeedback extends Versioned {
   evidenceRefs: string[]; suppressedUntil?: string;
 }
 export interface CoreSettings {
-  revision: number; enabled: boolean; learningEnabled: boolean; notifyEnabled: boolean;
+  revision: number; enabled: boolean; learningEnabled: boolean; notifyEnabled: boolean; autoSubmit: boolean;
   timezone: string; quietStart: string; quietEnd: string;
   eventRetentionDays: number; diagnosticRetentionDays: number;
   maxDatabaseBytes: number; restoreBlocked: boolean;

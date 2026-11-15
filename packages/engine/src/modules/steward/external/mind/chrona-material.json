@@ -64,7 +64,7 @@
   "artifacts": [
     {
       "path": "dist/workspace.js",
-      "sha256": "9ccf5a0d40b6098becebd783078596f41ce85ef614c3c6ad84d2cf173aaabb0e"
+      "sha256": "4194e3beaa5f69e25b47eb8be125aeafe1a910795f62da1859b87c60cf7a8c5f"
     }
   ],
   "build": {

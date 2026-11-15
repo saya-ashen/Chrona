@@ -10,7 +10,7 @@ let container: HTMLElement;
 const logs: string[] = [];
 const originalError = console.error;
 const envelope = (value: unknown) => ({ json: JSON.stringify(value) });
-const settings = { revision: 3, enabled: true, learningEnabled: true, notifyEnabled: false, timezone: 'UTC', quietStart: '22:00', quietEnd: '08:00', restoreBlocked: false };
+const settings = { revision: 3, enabled: true, learningEnabled: true, notifyEnabled: false, autoSubmit: false, timezone: 'UTC', quietStart: '22:00', quietEnd: '08:00', restoreBlocked: false };
 const pursuit = { id: 'p-1', revision: 4, goal: '整理研究资料', status: 'active', paused: false, scope: { projectId: 'research' }, evidenceRefs: [], artifactRefs: [], nextStep: '核对来源' };
 const overview = (items: unknown[] = []) => ({ visibilityRevision: 7, items, settings });
 async function wait(condition: () => boolean, reason = 'DOM condition') {
@@ -154,11 +154,22 @@ test('settings save only edited supported fields and re-read the new revision', 
   }, { view: 'settings' });
   await wait(() => buttons().some(b => b.textContent === '保存设置' && !b.disabled));
   expect(visible()).toContain('服务尚未提供可修改的预算');
-  const checkbox = container.querySelectorAll<HTMLInputElement>('input[type=checkbox]')[0]!; checkbox.click(); await click('保存设置');
+  const toggle = (name: string) => Array.from(container.querySelectorAll('label')).find(label => label.textContent === name)!.querySelector<HTMLInputElement>('input')!;
+  const autoSubmit = () => toggle('自动安装通过检查的改进');
+  expect(autoSubmit().checked).toBe(false);
+  expect(window.document.getElementById(autoSubmit().getAttribute('aria-describedby')!)?.textContent).toBe('开启后，检查通过的改进会自动安装，可随时回滚');
+  toggle('从获准的已发送内容学习').click(); await click('保存设置');
   await wait(() => saves.length === 1 && !button('保存设置').disabled);
   expect(saves[0]).toEqual({ patch: JSON.stringify({ learningEnabled: false }), revision: 3 });
-  container.querySelectorAll<HTMLInputElement>('input[type=checkbox]')[2]!.click(); await click('保存设置'); await wait(() => saves.length === 2);
+  toggle('启用外部通知').click(); await click('保存设置'); await wait(() => saves.length === 2 && !button('保存设置').disabled);
   expect(saves[1].revision).toBe(4); expect(JSON.parse(saves[1].patch)).toEqual({ notifyEnabled: true });
+  autoSubmit().click(); await click('保存设置'); await wait(() => saves.length === 3 && !button('保存设置').disabled);
+  expect(saves[2]).toEqual({ patch: JSON.stringify({ autoSubmit: true }), revision: 5 });
+  autoSubmit().click(); await wait(() => !autoSubmit().checked);
+  await click('重新读取'); await wait(() => autoSubmit().checked);
+  autoSubmit().click(); await click('保存设置'); await wait(() => saves.length === 4 && !button('保存设置').disabled);
+  expect(saves[3]).toEqual({ patch: JSON.stringify({ autoSubmit: false }), revision: 6 });
+  expect(autoSubmit().checked).toBe(false);
 });
 
 test('understanding errors stop loading, can retry, and referenced evidence is fetched on demand', async () => {

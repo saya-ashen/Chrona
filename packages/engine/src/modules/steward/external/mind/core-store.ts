@@ -20,7 +20,7 @@ export const objectRetractionId = (sourceIdentity: string, kind: string, id: str
 export const sessionRetractionId = (id: string): string => coreDigest(["session", id]);
 
 export const defaultCoreSettings = (): CoreSettings => ({
-  revision: 0, enabled: true, learningEnabled: true, notifyEnabled: false,
+  revision: 0, enabled: true, learningEnabled: true, notifyEnabled: false, autoSubmit: false,
   timezone: "UTC", quietStart: "23:00", quietEnd: "08:00",
   eventRetentionDays: 30, diagnosticRetentionDays: 7,
   maxDatabaseBytes: 256 * 1024 * 1024, restoreBlocked: false,
@@ -318,10 +318,10 @@ export class CoreTransaction {
     if (!Number.isSafeInteger(expectedRevision) || settings.revision !== expectedRevision) {
       throw new CoreError("CONFLICT", `Version mismatch: expected ${expectedRevision}, current ${settings.revision}`);
     }
-    const permitted = ["enabled", "learningEnabled", "notifyEnabled", "timezone", "quietStart", "quietEnd", "eventRetentionDays", "diagnosticRetentionDays", "maxDatabaseBytes"];
+    const permitted = ["enabled", "learningEnabled", "notifyEnabled", "autoSubmit", "timezone", "quietStart", "quietEnd", "eventRetentionDays", "diagnosticRetentionDays", "maxDatabaseBytes"];
     if (Object.keys(patch).some(k => !permitted.includes(k))) invalidInput("Unknown or privileged setting");
     const next = { ...settings, ...patch, revision: settings.revision + 1 };
-    for (const key of ["enabled", "learningEnabled", "notifyEnabled"] as const) if (typeof next[key] !== "boolean") invalidInput("Invalid boolean setting");
+    for (const key of ["enabled", "learningEnabled", "notifyEnabled", "autoSubmit"] as const) if (typeof next[key] !== "boolean") invalidInput("Invalid boolean setting");
     for (const key of ["eventRetentionDays", "diagnosticRetentionDays"] as const) if (!Number.isSafeInteger(next[key]) || next[key] < 1 || next[key] > 3650) invalidInput("Retention must be 1..3650 days");
     if (!Number.isSafeInteger(next.maxDatabaseBytes) || next.maxDatabaseBytes < 65536) invalidInput("Invalid storage high-water mark");
     try { new Intl.DateTimeFormat("en", { timeZone: next.timezone }); } catch (error) { throw new CoreError("INVALID_INPUT", `Invalid timezone: ${String(error)}`); }

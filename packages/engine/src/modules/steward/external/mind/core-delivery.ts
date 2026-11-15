@@ -47,7 +47,7 @@ const same = (a: unknown, b: unknown) => canonical(a) === canonical(b);
 const pursuitBasis = ({revision,updatedAt,currentActor,...basis}:Pursuit, understandings:Understanding[]) => coreDigest(understandings.length ? {pursuit:basis,understandings} : basis);
 const immutableReceipt = (r: Receipt) => ({ receiptId:r.receiptId, admissionId:r.admissionId, requestKey:r.requestKey, submitter:r.submitter, members:r.members.map(({status,selected,...m})=>m).sort((a,b)=>a.name.localeCompare(b.name)) });
 
-/** Private handoff ledger, not another executor or lifecycle queue. No automatic submission. */
+/** Private handoff ledger, not another executor or lifecycle queue. Submission is shared by owner review and the trusted runtime coordinator. */
 export class CoreDelivery {
  private db: Database;
  private inflight = new Set<string>();
@@ -144,7 +144,7 @@ export class CoreDelivery {
   r.receipt=receipt;r.status='submitted';r.observation=receipt.state==='pending_approval'?'pending approval':receipt.state==='rejected'?'candidate rejected':receipt.members.some(m=>['building','testing'].includes(m.status))?'pending checks':'waiting for activation or owner proof';this.save(r);
   }).immediate();
  }
- async submit(idValue:string,access:CoreAccess){
+ async submit(idValue:string,access:CoreAccess,mayDispatch?:()=>boolean){
   owner(access);let r=this.get(idValue);if(r.status==='submit-unknown'||r.receipt)return this.reconcile(idValue,access);
   if(r.withdrawn||r.status!=='coordinator-ready'||!r.payload||r.proof.length!==r.materials.length)throw Error('Actual worker stage proof required');
   if(this.inflight.has(r.id))throw Error('Delivery call already in flight');this.inflight.add(r.id);
@@ -158,6 +158,7 @@ export class CoreDelivery {
     if(r.materials.some(i=>finalModules.some(m=>m.name===i.name)))throw Error('Target is no longer NEW');
     if(r.withdrawn||r.status!=='coordinator-ready'||!r.payload)throw Error('Delivery withdrawn or changed');
     this.options.assertMaySubmit?.(r.pursuitId);
+    if(mayDispatch&&!mayDispatch())throw Error('Automatic submission held by current settings or user control');
     const original=command(r.payload);if(coreDigest(original)!==r.commandDigest)throw Error('Original command changed');
     r.status='submit-unknown';r.observation='original submit outcome unknown; exact receipt query required';this.save(r);return original;
    }).immediate();
