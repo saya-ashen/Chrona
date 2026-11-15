@@ -5,7 +5,7 @@ import { StewardError } from "./errors";
 import { ensureModuleGit, getModuleLocalHead, moduleGitCommand as git, moduleGitRevision as revision, pinModuleGitRef as pin, readModuleSource, type ModuleGitFile, type ModuleGitRevision } from "./module-git";
 
 type Repository = { platform: string; moduleId: string };
-type Bundle = { bundlePath: string; commit: string; branch: string; repository: string | null };
+type Bundle = { bundlePath: string; commit: string; branch: string; repository: string | null; defaultRepository?: string };
 type SourceRevision = ModuleGitRevision & { files: ModuleGitFile[] };
 const zero = "0".repeat(40);
 function publicRepository(repository: string) {
@@ -25,7 +25,8 @@ async function configureUpstream(repo: string, repository: string, branch: strin
 }
 export async function importModuleGitBundle(input: Repository & Bundle): Promise<ModuleGitRevision> {
   if (!/^[a-f0-9]{40}$/.test(input.commit)) throw new StewardError("invalid", "Invalid module release commit");
-  if (input.repository !== null) publicRepository(input.repository);
+  const repository = input.repository ?? input.defaultRepository;
+  if (repository !== undefined) publicRepository(repository);
   const bundle = resolve(input.bundlePath), stat = await lstat(bundle);
   if (!stat.isFile() || stat.isSymbolicLink() || await realpath(bundle) !== bundle) throw new StewardError("forbidden", "Unsafe module Git bundle");
   const repo = await ensureModuleGit(input.platform, input.moduleId), source = await branchRef(repo, input.branch);
@@ -37,8 +38,8 @@ export async function importModuleGitBundle(input: Repository & Bundle): Promise
   const result = await revision(repo, input.commit);
   await readModuleSource({ ...input, commit: result.commit });
   await pin(repo, `refs/chrona/releases/${result.commit}`, result.commit);
+  if (repository !== undefined) await configureUpstream(repo, repository, input.branch);
   if (input.repository !== null) {
-    await configureUpstream(repo, input.repository, input.branch);
     const remoteRef = `refs/remotes/upstream/${input.branch}`;
     const existing = (await git(repo, ["for-each-ref", "--format=%(objectname)", remoteRef])).toString().trim();
     if (!existing) await git(repo, ["update-ref", remoteRef, result.commit, zero]);

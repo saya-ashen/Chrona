@@ -56,6 +56,9 @@ export function createExternalModuleInstaller(ports: StewardPorts): ExternalModu
     // Re-resolve immediately before copying; never trust an adapter argument as a host path.
     const trusted = await revalidateInstallationRelease(ports, request.package, release);
     if (!trusted.git) throw new StewardError("invalid", "Official installation requires a pinned Git release");
+    // The update destination is independent of whether this exact offline commit has been published.
+    const shipped = PREINSTALLED_MODULE_NAMES.some(name => name === request.package) || request.package === "qq";
+    const git = { ...trusted.git, ...(shipped ? { defaultRepository: `https://github.com/chrona-core/chrona-module-${request.package}` } : {}) };
     const { id, marker, submission } = await prepareSubmission(ports, workspaceId, request, release.hash);
     const root = await realpath(await mkdtemp(join(tmpdir(), "chrona-install-")));
     try {
@@ -69,13 +72,15 @@ export function createExternalModuleInstaller(ports: StewardPorts): ExternalModu
       };
       let proposal;
       if (request.mode === "update" && submission.moduleId) {
-        proposal = await submitMergedCommit(context, { moduleId: submission.moduleId, commit: trusted.git.commit, bundle: trusted.git, intent, onPrepared: prepared });
+        proposal = await submitMergedCommit(context, { moduleId: submission.moduleId, commit: git.commit, bundle: git, intent, onPrepared: prepared });
       } else {
         await prepared(trusted.git.commit);
-        proposal = await propose(context, { root, dir: request.package, intent, allowed: [request.package], sourceCommit: trusted.git.commit, gitBundle: trusted.git, expectedModuleId: null }, "user");
+        proposal = await propose(context, { root, dir: request.package, intent, allowed: [request.package], sourceCommit: git.commit, gitBundle: git, expectedModuleId: null }, "user");
         if (proposal.hash !== trusted.git.commit) throw new StewardError("conflict", "Proposal commit differs from the selected release");
       }
-      if (proposal.moduleId) await recordModuleUpstream(ports, workspaceId, proposal.moduleId, trusted.git);
+      if (proposal.moduleId) {
+        await recordModuleUpstream(ports, workspaceId, proposal.moduleId, { ...git, repository: git.repository ?? git.defaultRepository ?? null });
+      }
       submission.moduleId = proposal.moduleId ?? submission.moduleId;
       submission.phase = "submitted";
       await ports.db.moduleInstallationSubmission.update({ where: { id }, data: submission });

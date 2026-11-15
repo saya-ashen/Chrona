@@ -33,7 +33,7 @@ export async function submitMergedCommit(context: ModuleContext, input: { module
   if (!expectedLocal) throw new StewardError("conflict", "Module has no local Git source; inspect its source before updating");
   if (input.bundle) {
     const associated = await context.db.moduleUpstream.findUnique({ where: { moduleId: module.id } });
-    await importModuleGitBundle({ ...location, ...input.bundle, ...(associated?.repository ? { repository: null } : {}) });
+    await importModuleGitBundle({ ...location, ...input.bundle, ...(associated?.repository ? { repository: null, defaultRepository: undefined } : {}) });
   }
   const merged = await mergeModuleUpstream({ ...location, versionId: randomUUID(), upstreamCommit: input.commit });
   const root = await mkdtemp(join(tmpdir(), "chrona-module-merge-"));

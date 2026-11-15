@@ -14,6 +14,8 @@ import { resolveExternalRelease } from "./module-release";
 import { moduleContext } from "./module-context";
 import { buildPending } from "./module-build";
 import { propose } from "./module-proposal";
+import { moduleGitCommand, moduleGitPath } from "./module-git";
+import { moduleUpstream } from "./module-upstream";
 import { createApprovals } from "./approvals";
 import { onApproved } from "./module-activation";
 import { testModuleSandbox } from "./module-test-process";
@@ -43,9 +45,21 @@ async function fixture() {
 test("catalog reports missing releases and paused products unavailable with exactly six current preinstalls", async () => {
   const f = await fixture();
   const catalog = await externalPackageCatalog(f.ports, f.workspaceId);
-  for (const name of ["coding", "mind", "remind"]) expect(catalog.find(item => item.name === name)).toMatchObject({ available: false, releaseHash: null, moduleId: null });
+  for (const name of ["mind", "remind"]) expect(catalog.find(item => item.name === name)).toMatchObject({ available: false, releaseHash: null, moduleId: null });
   expect(new Set(PREINSTALLED_MODULE_NAMES.filter(name => !isModulePaused(name)))).toEqual(new Set(["pi", "web", "notify", "author", "mind", "chat"]));
   expect(await f.db.module.count()).toBe(0);
+});
+
+test.each([...PREINSTALLED_MODULE_NAMES, "qq"])("offline %s installation associates its official upstream without fetching or claiming publication", async name => {
+  const f = await fixture(); await f.resource(name);
+  const result = await installExternal(f.ports, f.workspaceId, { package: name, mode: "install", requestKey: "official-upstream" });
+  expect(result.status).toBe("building");
+  const repository = `https://github.com/chrona-core/chrona-module-${name}`;
+  expect(await moduleUpstream(f.ports, f.workspaceId, { action: "status", moduleId: result.moduleId! })).toMatchObject({ repository, localCommit: result.hash, fetchedCommit: null });
+  const repo = moduleGitPath(moduleContext(f.ports, f.workspaceId).platform, result.moduleId!);
+  expect((await moduleGitCommand(repo, ["config", "--get", "remote.upstream.url"])).toString().trim()).toBe(repository);
+  expect((await resolveExternalRelease(f.ports, name)).git?.repository).toBeNull();
+  expect(f.executions()).toBe(0);
 });
 
 test.each(["qq", "files", "events", "remote-execution"] as const)("optional %s installs, stays removed on restart and explicitly reinstalls through checks", async name => {
@@ -385,15 +399,19 @@ test("ordinary local source uses its own real Git commit rather than impersonati
   expect(result.hash).not.toBe(release.hash);
 });
 
-test("offline official update preserves a local fork and queues the merged commit", async () => {
-  const f = await fixture(), first = await installExternal(f.ports, f.workspaceId, { package: "files", mode: "install", requestKey: "fork-initial" });
-  const context = moduleContext(f.ports, f.workspaceId), dir = join(f.ports.moduleExternalResources!, "files");
+test("offline official update preserves a local fork and the owner's remote", async () => {
+  const f = await fixture(); await f.resource("pi");
+  const first = await installExternal(f.ports, f.workspaceId, { package: "pi", mode: "install", requestKey: "fork-initial" });
+  const context = moduleContext(f.ports, f.workspaceId), dir = join(f.ports.moduleExternalResources!, "pi");
+  const repository = "https://github.com/owner/custom-pi", repo = moduleGitPath(context.platform, first.moduleId!);
+  await f.db.moduleUpstream.update({ where: { moduleId: first.moduleId! }, data: { repository } });
+  await moduleGitCommand(repo, ["config", "remote.upstream.url", repository]);
   await writeFile(join(dir, "local.txt"), "owner customization\n");
-  await propose(context, { root: f.ports.moduleExternalResources!, dir: "files", intent: { changes: ["Owner customization"] } }, "user");
+  await propose(context, { root: f.ports.moduleExternalResources!, dir: "pi", intent: { changes: ["Owner customization"] } }, "user");
   await rm(join(dir, "local.txt"));
-  await f.resource("files", { description: "New upstream release" });
-  const release = await resolveExternalRelease(f.ports, "files");
-  const request = { package: "files" as const, mode: "update" as const, requestKey: "fork-update" };
+  await f.resource("pi", { description: "New upstream release" });
+  const release = await resolveExternalRelease(f.ports, "pi");
+  const request = { package: "pi" as const, mode: "update" as const, requestKey: "fork-update" };
   const result = await installExternal(f.ports, f.workspaceId, request);
   expect(result).toMatchObject({ status: "building", moduleId: first.moduleId, error: null });
   expect(result.hash).not.toBe(release.hash);
@@ -403,6 +421,8 @@ test("offline official update preserves a local fork and queues the merged commi
   expect(JSON.parse(Buffer.from(files.find(file => file.path === "module.json")!.bytes).toString()).description).toBe("New upstream release");
   expect((await f.db.module.findUniqueOrThrow({ where: { id: first.moduleId! } })).activeHash).toBeNull();
   expect(await installExternal(f.ports, f.workspaceId, request)).toEqual(result);
+  expect(await moduleUpstream(f.ports, f.workspaceId, { action: "status", moduleId: first.moduleId! })).toMatchObject({ repository, fetchedCommit: null });
+  expect((await moduleGitCommand(repo, ["config", "--get", "remote.upstream.url"])).toString().trim()).toBe(repository);
 });
 
 test.each(["pi", "web", "notify", "author", "chat"] as const)("preinstalled %s uses checks, stays removed after restart and explicitly reinstalls with a new identity", async name => {
