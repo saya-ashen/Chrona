@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "source": [
+    "LICENSE",
+    "activity.bun.test.ts",
+    "activity.ts",
+    "approval.ts",
+    "budget.ts",
+    "continuity.bun.test.ts",
+    "facts.ts",
+    "format-test.ts",
+    "index.ts",
+    "kernel-client.ts",
+    "lifecycle.bun.test.ts",
+    "lifecycle.ts",
+    "migrate.ts",
+    "module.json",
+    "nonconsumer.bun.test.ts",
+    "notify.ts",
+    "registry.bun.test.ts",
+    "registry.ts",
+    "runtime.bun.test.ts",
+    "settings-page.bun.test.ts",
+    "settings-page.ts",
+    "store.ts",
+    "test-directory.ts",
+    "test-storage.ts",
+    "test.ts"
+  ],
+  "artifacts": [],
+  "build": {
+    "commands": [],
+    "toolchain": "Bun with the Chrona SDK supplied by the host; source-only application",
+    "target": "trusted-local host"
+  }
+}

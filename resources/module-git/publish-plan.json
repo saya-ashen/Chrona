@@ -4,51 +4,51 @@
     {
       "name": "web",
       "proposedRepository": "chrona-core/chrona-module-web",
-      "localRepository": "/tmp/claude-1000/-home-saya-workspace-Chrona/32ee6f1a-71a9-4122-a2cf-026e97172cd3/scratchpad/build/resources/module-git/repos/web.git",
+      "localRepository": "repos/web.git",
       "branch": "main",
-      "commit": "5144d7a92fa781a1d77e9e77ff91edeee0569667"
+      "commit": "6e2ad9f52b65314517293ee6fca7a32cc5220fd8"
     },
     {
       "name": "notify",
       "proposedRepository": "chrona-core/chrona-module-notify",
-      "localRepository": "/tmp/claude-1000/-home-saya-workspace-Chrona/32ee6f1a-71a9-4122-a2cf-026e97172cd3/scratchpad/build/resources/module-git/repos/notify.git",
+      "localRepository": "repos/notify.git",
       "branch": "main",
-      "commit": "c4f00470de6d8bd25affb38c10584214c9c4faa0"
+      "commit": "ef69a82e6627ca9e0b6d5e508dd84c16ad201c15"
     },
     {
       "name": "pi",
       "proposedRepository": "chrona-core/chrona-module-pi",
-      "localRepository": "/tmp/claude-1000/-home-saya-workspace-Chrona/32ee6f1a-71a9-4122-a2cf-026e97172cd3/scratchpad/build/resources/module-git/repos/pi.git",
+      "localRepository": "repos/pi.git",
       "branch": "main",
-      "commit": "365909c4df085885bb8ab4ed953df4a2951d459f"
+      "commit": "bca670af2a041b7e86285d2fe820f5b02fa3b0a8"
     },
     {
       "name": "qq",
       "proposedRepository": "chrona-core/chrona-module-qq",
-      "localRepository": "/tmp/claude-1000/-home-saya-workspace-Chrona/32ee6f1a-71a9-4122-a2cf-026e97172cd3/scratchpad/build/resources/module-git/repos/qq.git",
+      "localRepository": "repos/qq.git",
       "branch": "main",
-      "commit": "9adea757a3c6d3830783f46fcdd0e8a37062080b"
+      "commit": "35b58beb86e78f4aff9a7f01f0a817c86152d90d"
     },
     {
       "name": "author",
       "proposedRepository": "chrona-core/chrona-module-author",
-      "localRepository": "/tmp/claude-1000/-home-saya-workspace-Chrona/32ee6f1a-71a9-4122-a2cf-026e97172cd3/scratchpad/build/resources/module-git/repos/author.git",
+      "localRepository": "repos/author.git",
       "branch": "main",
-      "commit": "239b232968e45c9880e534dfbda926124b0f1c8a"
+      "commit": "201ad16c8bce6fddcf57729dd0e98c2cc665ef98"
     },
     {
       "name": "mind",
       "proposedRepository": "chrona-core/chrona-module-mind",
-      "localRepository": "/tmp/claude-1000/-home-saya-workspace-Chrona/32ee6f1a-71a9-4122-a2cf-026e97172cd3/scratchpad/build/resources/module-git/repos/mind.git",
+      "localRepository": "repos/mind.git",
       "branch": "main",
-      "commit": "763a65119030c44e199ad8052fa8408dae28cda4"
+      "commit": "97ebf2478de1010d5cae284f9cfdebac2d6826ce"
     },
     {
       "name": "chat",
       "proposedRepository": "chrona-core/chrona-module-chat",
-      "localRepository": "/tmp/claude-1000/-home-saya-workspace-Chrona/32ee6f1a-71a9-4122-a2cf-026e97172cd3/scratchpad/build/resources/module-git/repos/chat.git",
+      "localRepository": "repos/chat.git",
       "branch": "main",
-      "commit": "491a752fc37ab5daafd4dc7c66fc07523f7985eb"
+      "commit": "60fc2475f2947d1316647a271728b33a1dbf8498"
     }
   ]
 }

@@ -2,7 +2,7 @@
 
 import { $ } from "bun";
 import { chmod, cp, mkdir, rm, stat } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import { buildArtifacts, buildTargets, currentBuildTarget, omitPausedRuntimeModules, parseBuildTarget, type BuildTargetName, type ReleaseResource } from "../build/manifest";
 import { normalizeElfInterpreterFile, removeElfLibraryPathsFile } from "../build/portable-elf";
@@ -26,7 +26,7 @@ async function exists(path: string) {
   }
 }
 
-async function copyResource(resource: ReleaseResource, releaseDir: string) {
+export async function copyResource(resource: ReleaseResource, releaseDir: string) {
   const src = resolve(ROOT, resource.from);
   const dst = resolve(releaseDir, resource.to);
   if (!(await exists(src))) {
@@ -39,7 +39,13 @@ async function copyResource(resource: ReleaseResource, releaseDir: string) {
 
   await mkdir(dirname(dst), { recursive: true });
   await rm(dst, { recursive: true, force: true });
-  await cp(src, dst, { recursive: true, filter: path => resource.to !== "resources/external" || !path.slice(src.length).split(/[\\/]/).some(part => ["node_modules", ".git", ".venv", ".chrona"].includes(part)) });
+  await cp(src, dst, {
+    recursive: true,
+    filter: path => resource.to !== "resources/external" || (
+      !path.slice(src.length).split(/[\\/]/).some(part => ["node_modules", ".git", ".venv", ".chrona"].includes(part)) &&
+      path !== join(src, "chat", "browser-fixture.html")
+    ),
+  });
   log("copy", `${resource.from} → ${resource.to}`);
 }
 

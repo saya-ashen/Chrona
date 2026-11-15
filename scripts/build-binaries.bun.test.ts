@@ -1,11 +1,27 @@
 import { expect, test } from "bun:test";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { buildBinary, compileArgs, prepareReleaseProcessHelper } from "./build-binaries";
+import { buildBinary, compileArgs, copyResource, prepareReleaseProcessHelper } from "./build-binaries";
 import { buildArtifacts, buildTargets, currentBuildTarget, omitPausedRuntimeModules, type BuildTargetName } from "../build/manifest";
 import { readElfInterpreter, readElfLibraryPathTags } from "../build/portable-elf";
 import { processCapability, spawnSupervised } from "../packages/process/src/index";
+
+test("release resource copy keeps the generated Chat preview local", async () => {
+  const root = mkdtempSync(join(tmpdir(), "chrona-resource-copy-"));
+  try {
+    const source = join(root, "external"), release = join(root, "release");
+    for (const name of ["chat", "other"]) {
+      mkdirSync(join(source, name), { recursive: true });
+      writeFileSync(join(source, name, "index.ts"), "// application source\n");
+      writeFileSync(join(source, name, "browser-fixture.html"), "preview\n");
+    }
+    await copyResource({ from: source, to: "resources/external", required: true }, release);
+    expect(readFileSync(join(release, "resources/external/chat/index.ts"), "utf8")).toBe("// application source\n");
+    expect(existsSync(join(release, "resources/external/chat/browser-fixture.html"))).toBe(false);
+    expect(existsSync(join(release, "resources/external/other/browser-fixture.html"))).toBe(true);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 
 test("every release target pins production compilation independently of parent test environment", () => {
   const previous = process.env.NODE_ENV;
