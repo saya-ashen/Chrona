@@ -1,11 +1,6 @@
 {
   "schema": 1,
   "source": [
-    "DESIGN.md",
-    "LICENSE",
-    "MATERIAL-ADMISSION.md",
-    "THIRD-PARTY-NOTICES.txt",
-    "UI-DEVELOPMENT.md",
     "agent-conversations.bun.test.ts",
     "agent-conversations.ts",
     "app-overview.bun.test.ts",
@@ -18,19 +13,22 @@
     "catalog.ts",
     "chat-api.bun.test.ts",
     "chat-browser.bun.test.ts",
-    "coding-web-components.bun.test.ts",
     "composition.bun.test.ts",
     "composition.ts",
     "delivery.ts",
+    "DESIGN.md",
     "executable-components.bun.test.ts",
     "executable-components.ts",
+    "feedback-link.bun.test.ts",
     "image.bun.test.ts",
     "index.html",
     "index.ts",
     "inline-settings.bun.test.ts",
     "kernel-client.ts",
+    "LICENSE",
     "lifecycle.bun.test.ts",
     "material-admission.bun.test.ts",
+    "MATERIAL-ADMISSION.md",
     "material-admission.ts",
     "memory.ts",
     "module.json",
@@ -53,7 +51,6 @@
     "shell.css",
     "src/base.css",
     "src/chat.browser-test.tsx",
-    "src/coding-page.bun.test.tsx",
     "src/display.tsx",
     "src/executable-components.browser-test.tsx",
     "src/executable-components.bun.test.tsx",
@@ -106,30 +103,31 @@
     "test-settings-page.ts",
     "test-system-pages.ts",
     "test.ts",
+    "THIRD-PARTY-NOTICES.txt",
     "today-health.bun.test.ts",
     "today.bun.test.ts",
     "today.ts",
     "tsconfig.json",
+    "UI-DEVELOPMENT.md",
     "workspace-catalog.bun.test.ts"
   ],
   "artifacts": [
     {
       "path": "pages.js",
-      "executable": false,
-      "sha256": "b934f37bf16ccc0c341513062feffcac682e4629d6095840887382e9cc8b0342"
+      "sha256": "b934f37bf16ccc0c341513062feffcac682e4629d6095840887382e9cc8b0342",
+      "executable": false
     },
     {
       "path": "style.css",
-      "executable": false,
-      "sha256": "b8a0557ca4d0342dfab82f167c939aaaa02542dd1e42af32307a5a3c305cae31"
+      "sha256": "b8a0557ca4d0342dfab82f167c939aaaa02542dd1e42af32307a5a3c305cae31",
+      "executable": false
     }
   ],
   "build": {
     "commands": [
-      "bun install --frozen-lockfile --ignore-scripts --no-progress",
-      "bun run build"
+      "bun run build.ts"
     ],
-    "toolchain": "Bun 1.4.2; scoped material-admission tests 4 pass/17 assertions; full directory tests not all portable (documented)",
-    "target": "Authenticated Web owner exact material admission endpoint; no approval or submission"
+    "toolchain": "Bun 1.4.2",
+    "target": "browser"
   }
 }

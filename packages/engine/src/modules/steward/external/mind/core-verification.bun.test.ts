@@ -109,8 +109,8 @@ test('forged adapter identity and mismatched candidate/digests cannot mint a ver
   } finally { f.cleanup(); }
 });
 
-test.each(['plaintext', 'invented-receipt', 'wrong-run', 'wrong-module', 'wrong-version', 'filtered', 'failed', 'unselected', 'no-artifact-read', 'partial-document', 'malformed-json'])
-('untrusted verifier result %s never completes', async mode => {
+test.each(['plaintext', 'invented-receipt', 'wrong-run', 'wrong-module', 'wrong-version', 'filtered', 'failed', 'unselected', 'no-artifact-read', 'partial-document', 'malformed-json'])(
+'untrusted verifier result %s never completes', async mode => {
     const f = fixture(); try {
       await f.start(); const receipt = f.verification.verdict(f.input, binding);
       const value = fact('verdict', receipt);
@@ -161,8 +161,8 @@ test('stalled active verifier and unknown effects retain responsibility and dura
   } finally { g.cleanup(); }
 });
 
-test.each(['artifact', 'candidate', 'goal', 'revision', 'evidence', 'visibility', 'withdrawal', 'actor', 'criteria', 'source-scope'])
-('exact material change %s invalidates even accepted receipts', async mode => {
+test.each(['artifact', 'candidate', 'goal', 'revision', 'evidence', 'visibility', 'withdrawal', 'actor', 'criteria', 'source-scope'])(
+'exact material change %s invalidates even accepted receipts', async mode => {
     const f = fixture(); try {
       await f.start(); const receipt = f.verification.verdict(f.input, binding); f.finish(receipt); await f.verification.reconcile(now);
       expect(f.verification.assess(f.request.id).status).toBe('accepted');

@@ -2,6 +2,8 @@
   "schema": 1,
   "source": [
     ".gitignore",
+    "LICENSE",
+    "README.md",
     "browser-check.js",
     "browser-fixture.ts",
     "build.ts",
@@ -16,7 +18,7 @@
     "frontend-context.ts",
     "host-agent.integration.test.ts",
     "index.ts",
-    "LICENSE",
+    "mind-tasks.ts",
     "mind-updates.bun.test.ts",
     "mind-updates.ts",
     "module.json",
@@ -26,7 +28,6 @@
     "playwright.config.json",
     "race-checks.ts",
     "race.bun.test.ts",
-    "README.md",
     "reconcile.bun.test.ts",
     "registration-checks.ts",
     "selection-checks.ts",
@@ -34,6 +35,8 @@
     "state-checks.ts",
     "state.test.ts",
     "state.ts",
+    "tasks-ui.ts",
+    "tasks.bun.test.ts",
     "test-support/host-style.css",
     "test-support/registration-test.mjs",
     "test.ts",
@@ -41,12 +44,13 @@
     "ui-mind.bun.test.ts",
     "ui.css",
     "ui.ts",
+    "view-types.ts",
     "web-registration.bun.test.ts"
   ],
   "artifacts": [
     {
       "path": "dist/ui.js",
-      "sha256": "7d339243190e785018bc43909c5f22756075e62e80744171f9ae91bfbd501875"
+      "sha256": "5dbf477ec2a5aa07a9b15992b045455e4315670b0d7604f4d8f4b1d14daa4cd9"
     }
   ],
   "build": {

@@ -184,6 +184,24 @@ describe("Mind private core", () => {
     expect(result.pursuit.currentActor).toBeDefined();
   });
 
+  test("user reports an unresolved completed improvement: reopen the same goal with fresh evidence", () => {
+    const {service,store}=setup(),p=createPursuit(service);
+    store.update(tx=>{const current=tx.get("pursuit",p.id)!;current.status="done";current.verification={at:now,method:"old result",runRef:"old",originalReceiptRef:"old"};tx.put("pursuit",current);});
+    service.feedback({actionKey:"still-broken",expectedVisibilityRevision:0,targetKind:"pursuit",targetId:p.id,expectedRevision:p.revision,scope:p.scope,value:"restart"},owner);
+    const reopened=service.detail({kind:"pursuit",id:p.id},owner);
+    expect(reopened.status).toBe("waiting");expect(reopened.paused).toBe(false);expect(reopened.verification).toBeUndefined();expect(reopened.evidenceRefs.length).toBeGreaterThan(p.evidenceRefs.length);expect(store.read().pursuits).toHaveLength(1);
+  });
+
+  test("waiting for a user decision stays explicit through verified progress and clears on resume", () => {
+    const {service}=setup(),p=claim(service,createPursuit(service));
+    const candidate=value(service.progress({actionKey:"wait-user",expectedVisibilityRevision:0,pursuitId:p.id,expectedRevision:p.revision,summary:"请选展示方式",artifactRefs:[],originalReceiptRef:"question",evidenceRefs:p.evidenceRefs,desiredStatus:"waiting",waitFor:"user",waitReason:"选择周视图或月视图"},execution));
+    const applied=value(service.applyProgress({actionKey:"apply-wait",expectedVisibilityRevision:0,expectedRevision:p.revision,candidateId:candidate.id,verified:{candidateReceipt:candidate.receipt,runRef:candidate.runRef,originalReceiptRef: candidate.originalReceiptRef,artifactRefs:[],method:"persisted question result",criteriaSatisfied:false,executionTerminal:true}},runtime));
+    expect(applied.pursuit.waitFor).toBe("user");
+    const released=value(service.release({actionKey:"release-wait",expectedVisibilityRevision:0,pursuitId:p.id,expectedRevision:applied.pursuit.revision,runRef:candidate.runRef,executionStopped:true,effectsReconciled:true},runtime));
+    const resumed=value(service.control({actionKey:"resume-wait",expectedVisibilityRevision:0,id:p.id,kind:"pursuit",expectedRevision:released.revision,operation:"resume"},owner));
+    expect("waitFor" in resumed ? resumed.waitFor : undefined).toBeUndefined();
+  });
+
   test("progress candidate needs trusted verifier with receipt and real completion checks, finished alone is insufficient", () => {
     const { service } = setup(), p = claim(service, createPursuit(service));
     const c = value(service.progress({ actionKey: "candidate", expectedVisibilityRevision: 0, pursuitId: p.id, expectedRevision: p.revision,

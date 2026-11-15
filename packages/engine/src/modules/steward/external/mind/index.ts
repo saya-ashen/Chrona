@@ -5,10 +5,12 @@ import {CoreMindStore,coreDigest} from './core-store';
 import {CoreMindService} from './core-service';
 import {CoreRuntime,deliveryRuntimeHooks} from './core-runtime';
 import {CoreActions} from './core-actions';
+import {CoreTaskView,taskOwnerAccess} from './core-task-view';
+import {artifactToolResult} from './core-artifact';
 import {CoreApplication} from './core-application';
 import {CoreDelivery} from './core-delivery';
 import {CoreDeliveryAdmission} from './core-delivery-admission';
-import {CoreSources} from './core-sources';
+import {CoreSources,ingestApplicationOperation} from './core-sources';
 import {CoreObservationCoordinator} from './core-observation';
 import {CoreNotifications} from './core-notifications';
 import {CoreRecovery} from './core-recovery';
@@ -36,7 +38,8 @@ const delivery:CoreDelivery=new CoreDelivery(chrona.paths.data,service,rawCall,{
 const observe:CoreCall=(target,args,options)=>runtime.observe(target,args,options,typeof target==='object'&&target.tool==='observation-scope'?'source-control':'source-data');
 const sources=new CoreSources(store,service,observe,async()=>{const id=chrona.dependencies['chat'];if(!id)return undefined;const rows=await directoryRows((target,args)=>runtime.observe(target,args,undefined,'source-control'));const row=rows.find(m=>m.id===id);return row?.activeHash?{moduleId:id,hash:row.activeHash}:undefined;});
 const TOOLS=['overview','detail','settings','context','remember','pursue','control','feedback','forget','applications','delivery','artifact','check','recovery'];
-const tools=new Set([...TOOLS,'updates','progress','action','verdict','admission-verdict']);let pagesReady=false,maintaining=false,closed=false;
+const taskView=new CoreTaskView(store,service,actions,()=>runtime.journal.all(),{chatIdentity:()=>chrona.dependencies['chat'],deliveries:delivery});
+const tools=new Set([...TOOLS,'updates','progress','action','organized','observe','verdict','admission-verdict','task-view','task-control']);let pagesReady=false,maintaining=false,closed=false;
 const log=(event:string,error:unknown)=>console.error(JSON.stringify({component:'mind',event,error:error instanceof Error?error.message.slice(0,500):String(error).slice(0,500)}));
 async function directoryRows(call:CoreCall){
  const rows:{id:string;name:string;activeHash:string}[]=[],seen=new Set<string>();let cursor:string|undefined;
@@ -56,7 +59,7 @@ async function verifyIdentity(){
 function access(caller:Caller|undefined,tool:string,executionRunId?:string):CoreAccess{
  if(caller?.kind==='owner')return {subject:`owner:${caller.via??'local'}`,role:'owner',scopes:[{}]};
  if(caller?.kind==='module'){
-  if(caller.moduleId===self().moduleId&&caller.hash===self().hash){const bound=runtime.accessForCaller(`module:${caller.moduleId}:${caller.hash}`,true,executionRunId);if(['remember','pursue','control','feedback','progress','action','delivery'].includes(tool)&&!bound.execution)throw new ModelError('forbidden','Only the current kernel-bound Mind execution may mutate understanding or work');return bound;}
+  if(caller.moduleId===self().moduleId&&caller.hash===self().hash){const bound=runtime.accessForCaller(`module:${caller.moduleId}:${caller.hash}`,true,executionRunId);if(['remember','pursue','control','feedback','progress','action','delivery','organized'].includes(tool)&&!bound.execution)throw new ModelError('forbidden','Only the current kernel-bound Mind execution may mutate understanding or work');return bound;}
   // Web is the explicitly approved owner UI host; only its real kernel principal is accepted, never a JSON owner flag.
   if(caller.moduleId===chrona.dependencies['web']&&['overview','detail','settings','context','control','feedback','forget','remember','pursue','artifact','applications','delivery','check','recovery'].includes(tool))return {subject:`web:${caller.moduleId}:${caller.hash}`,role:'owner',scopes:[{}]};
   return {subject:`module:${caller.moduleId}:${caller.hash}`,role:'application',scopes:[{}]};
@@ -73,7 +76,7 @@ async function register(){
  if(maintaining)return;maintaining=true;
  try{
   await verifyIdentity();if(!pagesReady&&chrona.dependencies['web']){
-   const component=await chrona.call<{type:string}>({moduleId:chrona.dependencies['web'],tool:'component-set'},{name:'MindWorkspace',javascript:readFileSync(join(chrona.paths.module,'dist/workspace.js'),'utf8'),css:readFileSync(join(chrona.paths.module,'workspace.css'),'utf8'),props:{type:'object',properties:{view:{type:'string',enum:['overview','understanding','connections','settings']}},additionalProperties:false},tools:TOOLS});
+   const component=await chrona.call<{type:string}>({moduleId:chrona.dependencies['web'],tool:'component-set'},{name:'MindWorkspace',javascript:readFileSync(join(chrona.paths.module,'dist/workspace.js'),'utf8'),css:readFileSync(join(chrona.paths.module,'dist/workspace.css'),'utf8'),props:{type:'object',properties:{view:{type:'string',enum:['overview','improvements','understanding','settings']}},additionalProperties:false},tools:TOOLS});
    for(const page of [{id:'main',title:'Mind',view:'overview'},{id:'settings',title:'Mind 设置',view:'settings'}])await chrona.call({moduleId:chrona.dependencies['web'],tool:'page-set'},{id:page.id,title:page.title,...(page.id==='settings'?{purpose:'settings'}:{}),layout:'workspace',spec:{root:'mind',elements:{mind:{type:component.type,props:{view:page.view},children:[]}}}});
    pagesReady=true;
   }
@@ -105,22 +108,30 @@ async function background(manual=false){
 on('tool',async event=>{
  try{
   if(!tools.has(event.id))throw new ModelError('invalid','Unknown Mind tool');if(!identity)await verifyIdentity();
-  recovery.guard();const a=event.args,who=access(event.caller,event.id,event.call?.executionRunId);let result:unknown;
+  recovery.guard();const a=event.args,who=['task-view','task-control'].includes(event.id)?taskOwnerAccess(event.caller,event.call?.chain,chrona.dependencies):access(event.caller,event.id,event.call?.executionRunId);let result:unknown;
   if(store.inspect(tx=>tx.settings().restoreBlocked)&&who.role!=='owner'&&['context','updates','detail','artifact','overview'].includes(event.id))throw new CoreError('RESTORE_BLOCKED','Restored memory is unavailable until owner review');
   switch(event.id){
    case 'context':result=service.context(contextInput(a),who);break;
+   case 'task-view':result=taskView.view(a as {id?:string;artifactRef?:string},who);break;
+   case 'task-control':result=taskView.control(input(a) as never,who);await runtime.executor.reconcile();break;
    case 'updates':{
     if(event.caller?.kind!=='module'||event.caller.moduleId!==chrona.dependencies['chat'])throw new ModelError('forbidden','Only the bound Chat application may read its conversation updates');
     result=service.conversationUpdates(event.caller.moduleId,String(a.conversationId??''),who,{epoch:a.epoch,scopeRevision:a.scopeRevision});break;
    }
    case 'overview':{
     const overview=service.overview({limit:typeof a.limit==='number'?a.limit:50,...(typeof a.after==='string'?{after:a.after}:{})},who);
-    result={...overview,health:runtime.view(),notifications:notifications.view(),budget:runtime.view().budget,sources:store.read().checkpoints,autonomousPublishing:runtime.view().autonomousPublishing,recovery:recovery.status()};break;
+    result={...overview,health:runtime.view(),notifications:notifications.view(),budget:runtime.view().budget,sources:store.read().checkpoints,deliveries:who.role==='owner'?delivery.list({limit:50},who).items:[],applications:runtime.capabilities?.modules.map(m=>({id:m.id,name:m.name,activeHash:m.activeHash??null}))??[],autonomousPublishing:runtime.view().autonomousPublishing,recovery:recovery.status()};break;
    }
    case 'detail':{
-    const id=String(a.id??''),state=store.read();const kind=state.pursuits.some(p=>p.id===id)?'pursuit':state.understandings.some(u=>u.id===id)?'understanding':'evidence';
-    const detail=service.detail({kind,id},who),refs='evidenceRefs'in detail?detail.evidenceRefs:'supportingRefs'in detail?[...detail.supportingRefs,...detail.opposingRefs]:[];
-    result={...detail,evidence:refs.map(id=>service.detail({kind:'evidence',id},who)).filter(e=>!e.retractedAt),artifacts:kind==='pursuit'?actions.list(id,who).map(d=>actions.read(d.ref,who)):[]};break;
+    const id=String(a.id??''),state=store.read();
+    const kind=state.pursuits.some(p=>p.id===id)?'pursuit':state.understandings.some(u=>u.id===id)?'understanding':'evidence';
+    const detail=service.detail({kind,id},who);
+    const refs='evidenceRefs'in detail?detail.evidenceRefs:'supportingRefs'in detail?[...detail.supportingRefs,...detail.opposingRefs]:[];
+    const artifacts=kind==='pursuit'?actions.list(id,who):[];
+    // Agent tool results have a bounded journal; read document bodies through artifact.
+    result={...detail,evidence:refs.map(id=>service.detail({kind:'evidence',id},who)).filter(e=>!e.retractedAt),
+     artifacts:who.role==='owner'?artifacts.map(d=>actions.read(d.ref,who)):artifacts};
+    break;
    }
    case 'recovery':{result=a.input===undefined?recovery.status():recovery.review(input(a) as never,who);break;}
    case 'settings':{
@@ -139,6 +150,8 @@ on('tool',async event=>{
    }
    case 'admission-verdict':{if(event.caller?.kind!=='module'||event.caller.moduleId!==self().moduleId||event.caller.hash!==self().hash||!event.call?.executionRunId)throw new ModelError('forbidden','Kernel-bound independent semantic verifier required');result=runtime.admission.verdict(input(a) as never,{...event.caller,runId:event.call.executionRunId});break;}
    case 'verdict':{if(event.caller?.kind!=='module'||event.caller.moduleId!==self().moduleId||event.caller.hash!==self().hash)throw new ModelError('forbidden','Independent verifier identity required');if(!event.call?.executionRunId)throw new ModelError('forbidden','Kernel-bound verifier run required');result=runtime.verdict(input(a) as never,{...event.caller,runId:event.call.executionRunId});break;}
+   case 'observe':{if(event.caller?.kind!=='module'||event.caller.moduleId===self().moduleId)throw new ModelError('forbidden','A source application caller is required');result=ingestApplicationOperation(store,service,event.caller,input(a));break;}
+   case 'organized':{if(!who.execution||event.caller?.kind!=='module'||!event.call?.executionRunId)throw new ModelError('forbidden','Bound organizer required');result=runtime.organizer.result(input(a),event.call.executionRunId);break;}
    case 'progress':await runtime.bindResponsibility();result=service.progress(input(a) as never,access(event.caller,event.id,event.call?.executionRunId));break;
    case 'applications':{
     const mutation=a.input===undefined?{operation:'list'}:input(a);
@@ -174,9 +187,19 @@ on('tool',async event=>{
      else throw new ModelError('invalid','Expected delivery operation prepare, list, detail, submit, reconcile, withdraw or forget');
     }break;
    }
-   case 'action':{const mutation=input(a);if(typeof mutation.pursuitId==='string'&&runtime.pendingControl(mutation.pursuitId))throw new ModelError('conflict','A pending user control is being checked; guarded effects are held');await runtime.bindResponsibility();const bound=access(event.caller,event.id,event.call?.executionRunId);result=mutation.target==='application-read'?await actions.applicationRead(mutation as never,bound):actions.create(mutation as never,bound);break;}
+   case 'action':{
+    const mutation=input(a);
+    if(typeof mutation.pursuitId==='string'&&runtime.pendingControl(mutation.pursuitId))throw new ModelError('conflict','A pending user control is being checked; guarded effects are held');
+    await runtime.bindResponsibility();
+    const bound=access(event.caller,event.id,event.call?.executionRunId);
+    const outcome=mutation.target==='application-read'?await actions.applicationRead(mutation as never,bound):actions.create(mutation as never,bound);
+    result='body' in outcome?artifactToolResult(outcome):outcome;
+    break;
+   }
    case 'artifact':{
-    const document=actions.read(String(a.ref),who);service.detail({kind:'pursuit',id:document.pursuitId},who);result=document;break;
+    const document=actions.read(String(a.ref),who,{full:a.full===true});
+    result=who.role==='owner'&&a.offset===undefined?document:artifactToolResult(document,a.offset as number|undefined);
+    break;
    }
    case 'check':if(who.role!=='owner')throw new ModelError('forbidden','Only the owner can manually check');result=await background(true);break;
   }

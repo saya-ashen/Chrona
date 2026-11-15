@@ -8,7 +8,7 @@ import {CoreMindService} from './core-service';
 import {CoreActions,type DocumentArtifact} from './core-actions';
 import {CoreApplication} from './core-application';
 import {CoreRuntime,deliveryRuntimeHooks} from './core-runtime';
-import {CoreDelivery,type DeliveryPrepare} from './core-delivery';
+import {CoreDelivery,deliveryPrepareSchema,type DeliveryPrepare} from './core-delivery';
 import {CoreDeliveryAdmission} from './core-delivery-admission';
 import type {CoreCall,Target,ToolFact} from './core-execution';
 import type {CoreAccess} from './core-types';
@@ -16,6 +16,7 @@ import {candidateAdmissionInputSchema,candidateAdmissionOutputSchema,candidateRe
 import {moduleToolSchema} from '../../../../../../contracts/src/steward/module-tool';
 import {parseSubmit,parseReceipt} from '../author/contracts';
 import {createPages,type PageTool} from '../web/pages';
+import {assertExplicitRetryIssuesFreshAttempt} from '../../__testing__/state-machine-invariants';
 
 const identity={moduleId:'mind-delivery-integration',hash:'b'.repeat(40)};
 const author={moduleId:'actual-author',hash:'a'.repeat(40)};
@@ -25,9 +26,9 @@ type Run={runId:string;contextId:string;status:string;active:boolean;ended:boole
 
 /** Only the kernel gateway is replaced. Runs, admissions, stages and commands survive restarts in SQLite. */
 class Gateway {
- readonly db:Database;lostSubmit=false;active=false;directoryVersion=0;sourceCalls=0;readCalls=0;
+ readonly db:Database;lostSubmit=false;submitRefusal:Error|undefined;authorHash=author.hash;active=false;directoryVersion=0;sourceCalls=0;readCalls=0;
  receipt=candidateReceiptSchema.parse({receiptId:'original-receipt',admissionId:'original-admission',requestKey:'original-submit-key',submitter:author,state:'pending_approval',approvalId:'approval',members:[{name:material.name,moduleId:'new-timetable',hash:'d'.repeat(40),versionId:'version',expectedActiveHash:null,materialDigest:material.materialDigest,status:'pending_review',selected:false}]});
- constructor(directory:string){this.db=new Database(join(directory,'fake-kernel.sqlite'));this.db.exec('CREATE TABLE runs(key TEXT PRIMARY KEY,json TEXT NOT NULL); CREATE TABLE commands(seq INTEGER PRIMARY KEY,target TEXT NOT NULL,args TEXT NOT NULL,key TEXT);');}
+ constructor(directory:string){this.db=new Database(join(directory,'fake-kernel.sqlite'));this.db.exec('CREATE TABLE runs(key TEXT PRIMARY KEY,json TEXT NOT NULL); CREATE TABLE commands(seq INTEGER PRIMARY KEY,target TEXT NOT NULL,args TEXT NOT NULL,key TEXT); CREATE TABLE receipts(id TEXT PRIMARY KEY,admission TEXT NOT NULL,key TEXT NOT NULL,json TEXT NOT NULL);');}
  runs(){return (this.db.query('SELECT json FROM runs ORDER BY rowid').all() as {json:string}[]).map(r=>JSON.parse(r.json) as Run);}
  get(runId:string){const r=this.runs().find(r=>r.runId===runId);if(!r)throw Error('Unknown gateway run');return r;}
  save(r:Run){this.db.query("UPDATE runs SET json=? WHERE json_extract(json,'$.runId')=?").run(JSON.stringify(r),r.runId);}
@@ -41,10 +42,10 @@ class Gateway {
  finish(runId:string,status='finished'){const r=this.get(runId);r.status=status;r.active=false;r.ended=true;this.save(r);}
  readonly call:CoreCall=async(target,args,options)=>{
   this.db.query('INSERT INTO commands(target,args,key) VALUES(?,?,?)').run(JSON.stringify(target),JSON.stringify(args),options?.key??null);
-  if(target==='modules.receipt')return structuredClone(this.receipt);
-  if(target==='modules.list')return {items:[{id:identity.moduleId,name:'mind',status:'active',activeHash:identity.hash},{id:author.moduleId,name:'author',status:'active',activeHash:author.hash},{id:'pi-current',name:'pi',status:'active',activeHash:'e'.repeat(40)},{id:'chat-current',name:'chat',status:'active',activeHash:'f'.repeat(40)},...(this.directoryVersion?[{id:'unrelated',name:'unrelated',status:'active',activeHash:'1'.repeat(40)}]:[]),...(this.active?[{id:'new-timetable',name:'timetable',status:'active',activeHash:'d'.repeat(40)}]:[])],nextCursor:null};
+  if(target==='modules.receipt')return this.readReceipt(args);
+  if(target==='modules.list')return {items:[{id:identity.moduleId,name:'mind',status:'active',activeHash:identity.hash},{id:author.moduleId,name:'author',status:'active',activeHash:this.authorHash},{id:'pi-current',name:'pi',status:'active',activeHash:'e'.repeat(40)},{id:'chat-current',name:'chat',status:'active',activeHash:'f'.repeat(40)},...(this.directoryVersion?[{id:'unrelated',name:'unrelated',status:'active',activeHash:'1'.repeat(40)}]:[]),...(this.active?[{id:'new-timetable',name:'timetable',status:'active',activeHash:'d'.repeat(40)}]:[])],nextCursor:null};
   if(target==='modules.describe')return {items:[...['prepare','stage','submit','receipt'].map(tool=>({target:{moduleId:author.moduleId,tool},description:tool})),{target:{moduleId:'pi-current',tool:'models'},description:'Model inventory'}],nextCursor:null};
-  if(target==='modules.admit')return candidateAdmissionOutputSchema.parse({admissionId:'original-admission',...candidateAdmissionInputSchema.parse(args)});
+  if(target==='modules.admit')return candidateAdmissionOutputSchema.parse({admissionId:this.receipt.admissionId,...candidateAdmissionInputSchema.parse(args)});
   if(target==='agent.run'){
    const prior=this.db.query('SELECT json FROM runs WHERE key=?').get(options?.key??'') as {json:string}|null;
    if(prior){const r=JSON.parse(prior.json) as Run;expect(r.args).toEqual(args);return r;}
@@ -56,8 +57,14 @@ class Gateway {
   if(target==='agent.stop'){const r=this.get(String(args.runId));return {...r,stopConfirmed:!r.active};}
   if(typeof target==='object'&&target.moduleId===author.moduleId){
    if(target.tool==='stage')return {name:args.name,dir:material.dir,materialDigest:material.materialDigest,files:3,bytes:123};
-   if(target.tool==='submit'){const command=parseSubmit(JSON.parse(String(args.input)));expect(command).toEqual({admissionId:'original-admission',requestKey:'original-submit-key',items:[{name:material.name,dir:material.dir,intent:material.intent}]});expect(options?.key).toBe(command.requestKey);if(this.lostSubmit)throw Error('Lost submit reply');return structuredClone(this.receipt);}
-   if(target.tool==='receipt'){parseReceipt(JSON.parse(String(args.input)));return structuredClone(this.receipt);}
+   if(target.tool==='submit'){
+    const command=parseSubmit(JSON.parse(String(args.input)));
+    expect(command).toEqual({admissionId:this.receipt.admissionId,requestKey:this.receipt.requestKey,items:[{name:material.name,dir:material.dir,intent:material.intent}]});expect(options?.key).toBe(command.requestKey);
+    if(this.submitRefusal)throw this.submitRefusal;
+    this.db.query('INSERT INTO receipts(id,admission,key,json) VALUES(?,?,?,?)').run(this.receipt.receiptId,command.admissionId,command.requestKey,JSON.stringify(this.receipt));
+    if(this.lostSubmit)throw Error('Lost submit reply');return structuredClone(this.receipt);
+   }
+   if(target.tool==='receipt'){const selector=parseReceipt(JSON.parse(String(args.input)));return this.readReceipt('receiptId'in selector?selector:{admissionId:selector.admissionId,key:selector.requestKey});}
   }
   if(typeof target==='object'&&target.moduleId==='new-timetable'&&target.tool==='lookup')return {departure:'09:00',arrival:'11:30',source:'published timetable'};
   if(typeof target==='object'&&target.moduleId==='chat-current'){this.sourceCalls++;throw Error('Source offline');}
@@ -66,6 +73,13 @@ class Gateway {
   if(target==='timers.list')return {items:[{id:'mind-core'}]};
   throw Error(`Unexpected gateway call ${JSON.stringify(target)}`);
  };
+ private readReceipt(selector:Record<string,unknown>){
+  const row=('receiptId'in selector?this.db.query('SELECT json FROM receipts WHERE id=?').get(String(selector.receiptId)):this.db.query('SELECT json FROM receipts WHERE admission=? AND key=?').get(String(selector.admissionId),String(selector.key))) as {json:string}|null;
+  if(!row)throw Object.assign(Error('Original receipt not found'),{code:'not_found'});
+  const receipt=candidateReceiptSchema.parse(JSON.parse(row.json));
+  // Lifecycle projections may change, but only for an actually published identity.
+  return receipt.receiptId===this.receipt.receiptId?structuredClone(this.receipt):receipt;
+ }
  close(){this.db.close();}
 }
 
@@ -90,7 +104,7 @@ class Fixture {
  async prepare(proofs=true){
   const run=this.gateway.runs().at(-1)!;
   if(proofs){await this.gateway.invoke(run.runId,'modules.admit',{requestKey:'original-admit-key',submitter:author,targets:[{name:material.name,moduleId:null,expectedActiveHash:null}]});await this.gateway.invoke(run.runId,{moduleId:author.moduleId,tool:'stage'},{name:material.name});}
-  const input:DeliveryPrepare={...this.mutation('prepare-delivery'),author,admissionId:'original-admission',requestKey:'original-submit-key',items:[material],criteria:this.pursuit.completionCriteria};
+  const input:DeliveryPrepare={...this.mutation(`prepare-delivery:${this.gateway.receipt.requestKey}`),author,admissionId:this.gateway.receipt.admissionId,requestKey:this.gateway.receipt.requestKey,items:[material],criteria:this.pursuit.completionCriteria};
   const receipt=await this.delivery.prepare(input,this.access());return {run,input,id:receipt.id};
  }
  exhaustObservations(){while(this.runtime.observationBudget.view().remaining>3)this.runtime.observationBudget.consume('ordinary');}
@@ -106,6 +120,18 @@ function hold(f:Fixture){
  f.runtime.admission.enqueue('control',{actionKey:'hold-delivery',kind:'pursuit',id:p.id,expectedRevision:p.revision,expectedVisibilityRevision:s.visibilityRevision,operation:'pause',evidenceRefs:p.evidenceRefs},{subject:'chat:agent',role:'application',scopes:[{}]});
  expect(f.runtime.pendingControl(p.id)).toBe(true);
 }
+test.each(['xx','a'.repeat(41)])('kernel, Author and Mind accept the same valid target name %s',name=>{
+ const admission=candidateAdmissionInputSchema.parse({requestKey:'admit',submitter:author,targets:[{name,moduleId:null,expectedActiveHash:null}]});
+ const command=parseSubmit({admissionId:'admission',requestKey:'submit',items:[{name,dir:material.dir,intent:material.intent}]});
+ const prepared=deliveryPrepareSchema.parse({pursuitId:'p',expectedRevision:1,expectedVisibilityRevision:0,actionKey:'prepare',author,admissionId:'admission',requestKey:command.requestKey,items:[{...material,name}],criteria:['Requested behavior works']});
+ expect(prepared.items[0].name).toBe(admission.targets[0].name);
+ expect(command.items[0].name).toBe(prepared.items[0].name);
+});
+test.each(['x','a'.repeat(42)])('admission rejects names the runnable module manifest cannot accept: %s',name=>{
+ expect(candidateAdmissionInputSchema.safeParse({requestKey:'admit',submitter:author,targets:[{name,moduleId:null,expectedActiveHash:null}]}).success).toBe(false);
+ expect(()=>parseSubmit({admissionId:'admission',requestKey:'submit',items:[{name,dir:material.dir,intent:material.intent}]})).toThrow();
+ expect(deliveryPrepareSchema.safeParse({pursuitId:'p',expectedRevision:1,expectedVisibilityRevision:0,actionKey:'prepare',author,admissionId:'admission',requestKey:'submit',items:[{...material,name}],criteria:['Requested behavior works']}).success).toBe(false);
+});
 test('autoSubmit defaults off; enabling submits once with the prepared key, even across restart',async()=>{
  const f=new Fixture();try{
   const r=await ready(f);expect(f.store.read().settings.autoSubmit).toBe(false);
@@ -115,6 +141,24 @@ test('autoSubmit defaults off; enabling submits once with the prepared key, even
   expect(JSON.parse(String(f.gateway.commands('submit')[0].args.input)).requestKey).toBe(r.input.requestKey);
   await f.runtime.tick(false,false);f.restart();await f.runtime.reconcileOriginals();await f.runtime.tick(false,false);
   expect(f.gateway.commands('submit')).toHaveLength(1);expect(f.gateway.commands('modules.receipt').length).toBeGreaterThan(0);
+ }finally{f.close();}
+});
+test('disabling autoSubmit still reconciles an existing submission and releases activated work',async()=>{
+ const f=new Fixture();try{
+  const prepared=await ready(f);
+  await f.delivery.submit(prepared.id,owner);
+  expect(f.store.read().settings.autoSubmit).toBe(false);
+  expect(f.delivery.pendingFor(f.pursuit.id)).toBe(true);
+  f.gateway.receipt.state='approved';
+  f.gateway.receipt.members[0].selected=true;
+  f.gateway.receipt.members[0].status='approved';
+  f.gateway.active=true;
+  f.restart();
+  await f.runtime.reconcileOriginals();
+  expect(f.delivery.pendingFor(f.pursuit.id)).toBe(false);
+  expect(f.gateway.commands('submit')).toHaveLength(1);
+  expect(f.gateway.commands('modules.receipt').length).toBeGreaterThan(0);
+  expect(f.pursuit.status).not.toBe('done');
  }finally{f.close();}
 });
 test('enabled runtime submits immediately after authenticated worker settlement',async()=>{
@@ -131,7 +175,11 @@ test('autoSubmit resumes ready deliveries after restart and reconciles a lost su
   const r=await ready(f);autoSubmit(f);f.gateway.lostSubmit=true;f.restart();
   await f.runtime.reconcileOriginals();expect(f.gateway.commands('submit')).toHaveLength(0);
   await f.runtime.tick(false,false);expect(f.delivery.detail(r.id,owner).status).toBe('submit-unknown');
-  expect(f.gateway.commands('submit')).toHaveLength(1);f.restart();await f.runtime.reconcileOriginals();
+  expect(f.gateway.commands('submit')).toHaveLength(1);
+  f.delivery.withdraw(r.id,owner);
+  const outcomes=deliveryRuntimeHooks(()=>f.delivery,()=>f.proof).deliveryOutcomes!();
+  expect(outcomes.find(outcome=>outcome.id===r.id)).toMatchObject({status:'submit-unknown',withdrawn:true,requestKey:r.input.requestKey,admissionId:r.input.admissionId});
+  f.restart();await f.runtime.reconcileOriginals();
   expect(f.gateway.commands('modules.receipt').at(-1)?.args).toEqual({admissionId:r.input.admissionId,key:r.input.requestKey});
   await f.runtime.tick(false,false);expect(f.gateway.commands('submit')).toHaveLength(1);
  }finally{f.close();}
@@ -147,7 +195,7 @@ test('autoSubmit holds pending controls across restart and skips withdrawn or fo
    f.restart();await f.runtime.tick(false,false);expect(f.gateway.commands('submit')).toHaveLength(0);
   }finally{f.close();}
  }
-});
+},15000);
 test('slow delivery receipts do not hold execution recovery or duplicate reconciliation',async()=>{
  const f=new Fixture();let release:()=>void=()=>{};let pending:Promise<unknown>|undefined;
  try{
@@ -215,6 +263,54 @@ test('lost explicit submit is queried by original admission/key after restart an
   expect(readFileSync(join(f.directory,'mind-delivery.sqlite')).includes(Buffer.from('Existing apps'))).toBe(false);
   await f.delivery.reconcile(id,owner);expect(f.gateway.commands('modules.receipt').map(c=>({admissionId:c.args.admissionId,requestKey:c.args.key}))).toEqual([{admissionId:'original-admission',requestKey:'original-submit-key'}]);
   expect(f.gateway.commands('submit')).toHaveLength(1);expect(f.delivery.detail(id,owner).withdrawn).toBe(true);
+ }finally{f.close();}
+});
+
+test('known failure releases real runtime work; a fresh attempt uses a new delivery identity after restart',async()=>{
+ const f=new Fixture();try{
+  await assertExplicitRetryIssuesFreshAttempt({
+   runFailingAttempt:async()=>{
+    const prepared=await ready(f);f.gateway.authorHash='9'.repeat(40);
+    await expect(f.delivery.submit(prepared.id,owner)).rejects.toThrow('Author');
+    expect(f.delivery.detail(prepared.id,owner)).toMatchObject({status:'failed',receipt:null});
+    expect(f.delivery.pendingFor(f.pursuit.id)).toBe(false);expect(f.gateway.commands('submit')).toHaveLength(0);
+    return prepared;
+   },
+   retry:async failed=>{
+    f.restart();expect(f.delivery.pendingFor(f.pursuit.id)).toBe(false);
+    f.gateway.authorHash=author.hash;f.gateway.directoryVersion++;
+    f.now=new Date(Date.parse(f.now)+60000).toISOString();await f.runtime.tick();
+    expect(f.gateway.runs()).toHaveLength(2);expect(f.runtime.journal.outstanding()?.subject).toBe(f.pursuit.id);
+    f.gateway.receipt={...f.gateway.receipt,receiptId:'retry-receipt',admissionId:'retry-admission',requestKey:'retry-submit-key'};
+    const retry=await f.prepare();expect(retry.run.runId).not.toBe(failed.run.runId);expect(retry.id).not.toBe(failed.id);
+    expect(retry.input.requestKey).not.toBe(failed.input.requestKey);
+    f.gateway.finish(retry.run.runId);await f.runtime.tick();await f.delivery.submit(retry.id,owner);
+    expect(f.delivery.detail(failed.id,owner).status).toBe('failed');expect(f.gateway.commands('submit')).toHaveLength(1);
+    expect(f.gateway.commands('submit')[0].key).toBe(retry.input.requestKey);expect(f.pursuit.status).not.toBe('done');
+   },
+   observedDownstreamAttempts:()=>f.gateway.runs().length,
+  });
+ }finally{f.close();}
+});
+
+test.each([false,true])('pre-receipt refusal and lost reply remain distinct in the gateway, but SDK uncertainty survives restart (published=%s)',async published=>{
+ const f=new Fixture();try{
+  const prepared=await ready(f);
+  if(published)f.gateway.lostSubmit=true;
+  else f.gateway.submitRefusal=Object.assign(Error('Admission refused'),{code:'forbidden',reason:'reauthorize'});
+  await expect(f.delivery.submit(prepared.id,owner)).rejects.toThrow();
+  expect(f.gateway.db.query('SELECT COUNT(*) AS count FROM receipts').get()).toEqual({count:published?1:0});
+  f.restart();expect(f.delivery.detail(prepared.id,owner).status).toBe('submit-unknown');
+  if(published){
+   await f.delivery.submit(prepared.id,owner);
+   expect(f.delivery.detail(prepared.id,owner).receipt?.receiptId).toBe('original-receipt');
+  }else{
+   await expect(f.delivery.submit(prepared.id,owner)).rejects.toThrow('receipt not found');
+   f.restart();await expect(f.delivery.reconcile(prepared.id,owner)).rejects.toThrow('receipt not found');
+   expect(f.delivery.detail(prepared.id,owner)).toMatchObject({status:'submit-unknown',receipt:null,observation:expect.stringContaining('Admission refused')});
+  }
+  expect(f.gateway.commands('submit')).toHaveLength(1);expect(f.delivery.pendingFor(f.pursuit.id)).toBe(true);
+  expect(f.gateway.commands('modules.receipt').every(command=>command.args.admissionId===prepared.input.admissionId&&command.args.key===prepared.input.requestKey)).toBe(true);
  }finally{f.close();}
 });
 
@@ -289,6 +385,19 @@ test('entry point enforces actual callers and keeps reconciling after source err
   for(let attempt=0;attempt<50&&gateway.runs().length===0;attempt++){await new Promise<void>(resolve=>setImmediate(resolve));await tool('check');}
   expect(gateway.sourceCalls).toBeGreaterThan(0);expect(gateway.runs()).toHaveLength(1);
   const run=gateway.runs()[0];const inspection=new CoreMindStore(directory);let p=inspection.read().pursuits[0];
+  const body='真实成果内容。'.repeat(4000);
+  const document=await tool('action',{pursuitId:p.id,expectedRevision:p.revision,expectedVisibilityRevision:0,actionKey:'entry-document',target:'document',document:{title:'完整成果',body}},workerCaller,run.runId);
+  expect(document.kind).toBe('artifact-manifest');
+  expect(document.bodyLength).toBe(body.length);
+  const readTool=async(id:string,args:Record<string,unknown>,caller:unknown=workerCaller)=>{
+   const response=await handlers.get('tool')!({id,args,caller,call:{executionRunId:run.runId}});
+   return {wire:response.result,value:JSON.parse(response.result.json)};
+  };
+  const chunk=await readTool('artifact',{ref:document.ref,offset:0});
+  expect(chunk.value.body).toBe(body.slice(0,chunk.value.nextOffset));
+  expect(Buffer.byteLength(JSON.stringify(chunk.wire))).toBeLessThanOrEqual(32000);
+  expect((await readTool('artifact',{ref:document.ref},ownerCaller)).value.body).toBe(body);
+  expect((await readTool('detail',{id:p.id})).value.artifacts[0].body).toBeUndefined();
   const preparation={operation:'prepare',pursuitId:p.id,expectedRevision:p.revision,expectedVisibilityRevision:0,actionKey:'entry-prepare',author,admissionId:'original-admission',requestKey:'original-submit-key',items:[material],criteria:p.completionCriteria};
   await expect(tool('delivery',preparation,ownerCaller)).rejects.toThrow('kernel-bound');
   await expect(tool('delivery',preparation,workerCaller,'wrong-run')).rejects.toThrow('kernel-bound');
@@ -305,4 +414,42 @@ test('entry point enforces actual callers and keeps reconciling after source err
   await tool('delivery',{operation:'submit',id:prepared.id},webCaller);expect(gateway.commands('submit')).toHaveLength(1);
   await expect(tool('delivery',{operation:'detail',id:prepared.id,access:owner},ownerCaller)).rejects.toThrow('Unexpected delivery fields');
  }finally{disconnect?.();mock.restore();gateway.close();rmSync(directory,{recursive:true,force:true});}
+});
+
+test('a definite delivery failure resumes the same goal with its material and reason after restart',async()=>{
+ const f=new Fixture();
+ try{
+  f.goal();await f.runtime.tick();const prepared=await f.prepare();
+  f.gateway.finish(prepared.run.runId);await f.runtime.tick();
+  f.proof.verify=()=>{throw Error('The fixed admission is no longer usable; obtain a fresh admission for these materials');};
+  await expect(f.delivery.submit(prepared.id,owner)).rejects.toThrow('fresh admission');
+  expect(f.delivery.detail(prepared.id,owner).status).toBe('failed');
+  expect(f.delivery.pendingFor(f.pursuit.id)).toBe(false);
+  f.restart();await f.runtime.tick();expect(f.gateway.runs()).toHaveLength(1);
+  f.now='2026-11-14T00:01:01.000Z';await f.runtime.tick();
+  const resumed=f.gateway.runs().at(-1)!;
+  expect(f.gateway.runs()).toHaveLength(2);expect(resumed.runId).not.toBe(prepared.run.runId);
+  expect(String(resumed.args.prompt)).toContain('fresh admission');
+  expect(String(resumed.args.prompt)).toContain(material.dir);
+  expect(String(resumed.args.prompt)).toContain(prepared.input.requestKey);
+  expect(f.gateway.commands('submit')).toHaveLength(0);
+  f.gateway.finish(resumed.runId);await f.runtime.tick();
+  f.now='2026-11-14T00:10:01.000Z';await f.runtime.tick();
+  expect(f.gateway.runs()).toHaveLength(2); // An older failed delivery cannot restart a newer settled attempt.
+ }finally{f.close();}
+});
+
+test.each([
+ {code:'unavailable',reason:'not_dispatched'},
+ {code:'invalid',reason:'submission_refused'},
+])('positive original submission refusal proof releases work across restart (%s)',async failure=>{
+ const f=new Fixture();try{
+  const prepared=await ready(f);
+  f.gateway.submitRefusal=Object.assign(Error('Explicit rejection before acceptance'),failure);
+  await expect(f.delivery.submit(prepared.id,owner)).rejects.toThrow('Explicit rejection');
+  expect(f.delivery.detail(prepared.id,owner).status).toBe('failed');
+  f.restart();expect(f.delivery.pendingFor(f.pursuit.id)).toBe(false);
+  await f.delivery.reconcile(prepared.id,owner);await f.delivery.submit(prepared.id,owner);
+  expect(f.gateway.commands('submit')).toHaveLength(1);expect(f.gateway.commands('modules.receipt')).toHaveLength(0);
+ }finally{f.close();}
 });

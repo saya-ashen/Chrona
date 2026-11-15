@@ -3,11 +3,16 @@ import { mkdirSync, chmodSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
+export function mainModelSelection(settings:{mainProviderId?:string;
+ mainModel?:string}) { return {providerId:settings.mainProviderId,model:settings.mainModel}; }
+
 export type Target = string | { moduleId: string; tool: string };
-export type CoreCall = (target: Target, args: Record<string, unknown>, options?: { key?: string; expectedTarget?: { moduleId: string; hash?: string } }) => Promise<unknown>;
-export type ToolFact = { runId: string; callId: string; target: Target; moduleId: string; hash: string; status: string; outputState: string; output?: unknown };
+export type CoreCall = (target: Target, args: Record<string, unknown>, options?: { key?: string;
+  expectedTarget?: { moduleId: string; hash?: string } }) => Promise<unknown>;
+export type ToolFact = { runId: string; callId: string; target: Target; moduleId: string; hash: string;
+ status: string; outputState: string; at?: string; output?: unknown };
 export type Execution = {
- id: string; purpose: 'understand'|'pursuit'|'opportunity'; subject: string; basis?: string; evidenceRefs?: string[]; revision: number; visibilityRevision: number;
+ id: string; purpose: 'understand'|'organize'|'pursuit'|'opportunity'; subject: string; basis?: string; evidenceRefs?: string[]; revision: number; visibilityRevision: number;
  principal?: {moduleId:string;hash:string}; key: string; args: Record<string, unknown>; tools: Target[]; createdAt: string; activityStartedAt: string|null;
  contextId: string|null; runId: string|null; cursor: string|null; status: 'prepared'|'running'|'waiting'|'unknown'|'settling'|'finished'|'failed';
  ended: boolean; active: boolean; terminalStatus?: string; stopRequested: boolean; stopConfirmed: boolean; stopKey: string;
@@ -20,6 +25,8 @@ export type ExecutionHooks = {
  settle: (execution: Execution) => Promise<void>;
  admitted?: (execution: Execution) => Promise<void>;
 };
+/** Persisted agent.read terminal evidence; kernel exposes uncertain stops as active/unknown. */
+export function hasTerminalObservation(e:Execution){return !!e.runId&&e.ended&&!e.active&&!e.cursor&&['finished','failed','cancelled'].includes(e.terminalStatus??'');}
 const targetKey = (t: Target) => typeof t === 'string' ? t : `${t.moduleId}:${t.tool}`;
 const errorText = (e: unknown) => e instanceof Error ? e.message.slice(0, 500) : String(e).slice(0, 500);
 const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -30,7 +37,7 @@ function runView(raw: unknown) {
 /** This journal stores command identities and observations; all execution remains in kernel's unique queue. */
 export class CoreExecutionJournal {
  readonly db: Database;
- constructor(directory: string) {
+ constructor(directory: string, private readonly modelSelection?: () => {providerId?: string; model?: string}) {
   mkdirSync(directory, {recursive:true,mode:0o700}); const path=join(directory,'mind-execution.sqlite');
   this.db=new Database(path,{create:true}); chmodSync(path,0o600);
   this.db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA secure_delete=ON; CREATE TABLE IF NOT EXISTS executions(id TEXT PRIMARY KEY, created_at TEXT NOT NULL, json TEXT NOT NULL);');
@@ -39,16 +46,16 @@ export class CoreExecutionJournal {
  save(e:Execution) { this.db.query('INSERT INTO executions(id,created_at,json) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET json=excluded.json').run(e.id,e.createdAt,JSON.stringify(e)); return structuredClone(e); }
  get(id:string):Execution { const row=this.db.query('SELECT json FROM executions WHERE id=?').get(id) as {json:string}|null; if(!row)throw Error('Execution not found'); return JSON.parse(row.json) as Execution; }
  outstanding() { return this.all().find(e=>!e.settled); }
- prepare(input:{purpose:Execution['purpose'];subject:string;basis?:string;evidenceRefs?:string[];revision:number;visibilityRevision:number;prompt:string;tools:Target[];principal?:{moduleId:string;hash:string}}, now:string, budget=24, opportunityBudget=8) {
+ prepare(input:{purpose:Execution['purpose'];subject:string;basis?:string;evidenceRefs?:string[];revision:number;visibilityRevision:number;prompt:string;tools:Target[];selection?:{providerId?:string;model?:string};principal?:{moduleId:string;hash:string}}, now:string, budget=24, opportunityBudget=8) {
   return this.db.transaction(()=>{
    if(this.outstanding())throw Error('Previous execution or effect still requires reconciliation');
    const today=this.all().filter(e=>e.createdAt.slice(0,10)===now.slice(0,10));
    if(today.length>=budget || input.purpose==='opportunity'&&today.filter(e=>e.purpose==='opportunity').length>=opportunityBudget)throw Error('Background start budget exhausted');
    if(input.tools.length>100 || new Set(input.tools.map(targetKey)).size!==input.tools.length)throw Error('Invalid selected tools');
    if(input.tools.some(t=>typeof t==='string' && (/^(approvals\.(resolve|request)|secrets\.|settings\.|agent\.(run|native)|modules\.(install|remove|rollback|promote))/.test(t)))) throw Error('Autonomous tool selection includes unrestricted administration');
-   const id=randomUUID();
+   const id=randomUUID(),selection=input.selection??this.modelSelection?.();
    return this.save({id,purpose:input.purpose,subject:input.subject,basis:input.basis,...(input.evidenceRefs?{evidenceRefs:[...input.evidenceRefs]}:{}),revision:input.revision,visibilityRevision:input.visibilityRevision,principal:input.principal,key:`mind:${id}:run`,
-    args:{prompt:input.prompt,content:[],lane:'background',tools:input.tools,kind:'conversation'},tools:structuredClone(input.tools),createdAt:now,activityStartedAt:null,contextId:null,runId:null,cursor:null,status:'prepared',ended:false,active:false,stopRequested:false,stopConfirmed:false,stopKey:`mind:${id}:stop`,error:null,interactions:[],facts:[],summary:'',settled:false});
+    args:{prompt:input.prompt,content:[],lane:'background',tools:input.tools,kind:'conversation',...(selection?.providerId?{providerId:selection.providerId}:{}),...(selection?.model?{providerOptions:{model:selection.model}}:{})},tools:structuredClone(input.tools),createdAt:now,activityStartedAt:null,contextId:null,runId:null,cursor:null,status:'prepared',ended:false,active:false,stopRequested:false,stopConfirmed:false,stopKey:`mind:${id}:stop`,error:null,interactions:[],facts:[],summary:'',settled:false});
   }).immediate();
  }
  scrubInvalid(keep:(e:Execution)=>boolean){let deferred=0;for(const e of this.all()){
@@ -75,9 +82,10 @@ export class CoreExecutor {
   if(this.busy)return; this.busy=true;
   try {
    let e=this.journal.outstanding(); if(!e)return; e=this.refresh(e.id);
+   if(hasTerminalObservation(e)&&e.facts.every(f=>f.status!=='unknown')){e.stopConfirmed=true;this.journal.save(e);await this.settle(e);return;}
    if(e.status==='settling'){await this.settle(e);return;}
    const current=this.hooks.current(e);
-   if(!current || e.activityStartedAt && Date.parse(now)-Date.parse(e.activityStartedAt)>(e.purpose==='opportunity'?180000:600000))e.stopRequested=true;
+   if(!current || e.activityStartedAt && Date.parse(now)-Date.parse(e.activityStartedAt)>(e.purpose==='organize'?180000:600000))e.stopRequested=true;
    if(!e.runId){
     // Even when withdrawn, prepared/unknown requests must query the *original* command identity.
     // Pure prepared commands have no dispatch intent yet and may be cancelled without dispatch.
@@ -104,8 +112,10 @@ export class CoreExecutor {
     if(run.active&&!e.activityStartedAt&&run.status!=='queued')e.activityStartedAt=now;
     for(const item of page.items)this.capture(e,item);
     const next=page.nextCursor as string|null;if(next&&next===e.cursor&&page.items.length)throw Error('Agent observation cursor did not advance');
-    e.cursor=next;e.ended=page.ended;e.active=run.active;if(!run.active)e.terminalStatus=run.status;e.interactions=this.contentCurrent(e)&&Array.isArray(page.interactions)?page.interactions:[];
+    e.cursor=next;
+ e.ended=page.ended;e.active=run.active;if(!run.active)e.terminalStatus=run.status;e.interactions=this.contentCurrent(e)&&Array.isArray(page.interactions)?page.interactions:[];
     e.status=run.status==='unknown'?'unknown':run.active?(e.interactions.length?'waiting':'running'):run.status==='finished'?'finished':'failed';e.error=null;
+    if(hasTerminalObservation(e))e.stopConfirmed=true;
     this.journal.save(e);
     if(page.ended&&!next&&!run.active&&(!e.stopRequested||e.stopConfirmed)){await this.settle(e);return;}
     if(!next)break;
@@ -133,11 +143,14 @@ export class CoreExecutor {
   if(typeof t==='string'&&v.moduleId.startsWith('system:')&&v.moduleId!==`system:${t.split('.')[0]}`)return;
   if(e.principal&&v.moduleId===e.principal.moduleId&&v.hash!==e.principal.hash)return;
   if(!e.tools.some(selected=>targetKey(selected)===targetKey(t as Target)))return;
-  const fact={runId:e.runId!,callId:v.callId,target:t as Target,moduleId:v.moduleId,hash:v.hash,status:v.status,outputState:v.outputState,...(v.outputState==='complete'&&this.contentCurrent(e)?{output:v.output}:{})};
+  const fact={runId:e.runId!,callId:v.callId,target:t as Target,moduleId:v.moduleId,hash:v.hash,status:v.status,outputState:v.outputState,...(typeof raw.at==='string'?{at:raw.at}:{}),...(v.outputState==='complete'&&this.contentCurrent(e)?{output:v.output}:{})};
   const at=e.facts.findIndex(f=>f.callId===fact.callId);if(at<0)e.facts.push(fact);else e.facts[at]=fact;
  }
  private async settle(e:Execution){
   e=this.refresh(e.id);
+  if(hasTerminalObservation(e))e.stopConfirmed=true;
+  // A changed visibility alone is not evidence of a stopped execution.
+  if(e.runId&&e.stopRequested&&!e.stopConfirmed){e.status='unknown';this.journal.save(e);return;}
   if(e.facts.some(f=>f.status==='unknown')){e.status='unknown';e.error=this.contentCurrent(e)?'Original tool effect remains unknown; no new execution will start':null;this.journal.save(e);return;}
   e.status='settling';this.journal.save(e);
   await this.hooks.settle(e);e=this.journal.get(e.id);e.settled=true;e.status=e.terminalStatus==='finished'&&!e.stopRequested?'finished':'failed';e.args={};delete e.evidenceRefs;e.interactions=[];e.facts=e.facts.map(({output:_output,...f})=>f);this.journal.save(e);

@@ -7,7 +7,6 @@ import { scopeCovers, type CoreMindService } from './core-service';
 import type { CoreCall } from './core-execution';
 import type { CoreAccess, CoreState, GuardActionInput, Scope } from './core-types';
 
-const MAX_RESULT_BYTES = 32 * 1024;
 const MAX_PARAMS_BYTES = 8 * 1024;
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const credentialKey = /^(?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?(?:secret|token|key)|token|password|passphrase|secret|authorization|cookie|set-cookie|private[_-]?key)$/i;
@@ -32,13 +31,17 @@ export interface ApplicationGrantInput {
 export interface ApplicationAdapter extends ApplicationGrantInput {
   id: string; source: 'owner' | 'builtin'; grantedBy: string; grantedAt: string; revokedAt?: string;
 }
+export interface ApplicationFocus { moduleId?: string; name?: string }
 export interface ApplicationInvokeInput {
   actionKey: string; pursuitId: string; expectedRevision: number; expectedVisibilityRevision: number;
   adapterId: string; params: Record<string, unknown>;
+  /** Local projection of the reviewed apps overview; never forwarded as application params. */
+  focus?: ApplicationFocus;
 }
 export interface ApplicationReceipt {
   ref: string; actionKey: string; intentDigest: string; adapterId: string;
   moduleId: string; activeHash: string; tool: string; effect: 'read'; argsDigest: string;
+  applicationName?: string; focus?: ApplicationFocus;
   pursuitId: string; pursuitRevision: number; visibilityRevision: number;
   actor: string; runRef: string; createdAt: string; completedAt?: string;
   status: 'unknown' | 'succeeded' | 'failed' | 'withheld';
@@ -169,13 +172,13 @@ export class CoreApplication {
     if (!adapter.revokedAt) { adapter.revokedAt = new Date().toISOString(); this.db.query('UPDATE adapters SET json=? WHERE id=?').run(JSON.stringify(adapter), id); }
     return adapter;
   }
-  private async resolve(id: string): Promise<ApplicationAdapter> {
+  private async resolve(id: string): Promise<ApplicationAdapter & { applicationName: string }> {
     const rows = await this.directory(), builtins = this.builtin(rows);
     const adapter = builtins.find(a => a.id === id) ?? this.adapters().find(a => a.id === id && !a.revokedAt);
     if (!adapter) throw Error('Adapter authorization missing or revoked');
     const row = rows.find(r => r.id === adapter.moduleId);
     if (!row || row.activeHash !== adapter.activeHash) throw Error('Application active version changed');
-    this.validate(adapter); this.safeTarget(row, adapter.tool); return adapter;
+    this.validate(adapter); this.safeTarget(row, adapter.tool); return { ...adapter, applicationName: row.name };
   }
   private stored(ref: string): StoredInvocation {
     const row = this.db.query('SELECT json FROM invocations WHERE ref=?').get(ref) as { json: string } | null;
@@ -200,7 +203,7 @@ export class CoreApplication {
   }
   private withdrawn(stored: StoredInvocation, state: CoreState): boolean {
     const r = stored.receipt, p = state.pursuits.find(p => p.id === r.pursuitId);
-    if (r.contentWithdrawn || state.settings.restoreBlocked || state.visibilityRevision !== r.visibilityRevision || !p || !p.goal) return true;
+    if (r.contentWithdrawn || state.settings.restoreBlocked || !p || !p.goal) return true;
     const basis = stored.basis ?? this.basis(p.id, state);
     const evidenceRefs = new Set([...basis.evidenceRefs, ...p.evidenceRefs]);
     for (const id of new Set([...basis.understandingRefs, ...p.understandingRefs])) {
@@ -277,10 +280,18 @@ export class CoreApplication {
     try {
       const adapter = await this.resolve(input.adapterId);
       if (canonical(input.params) !== canonical(adapter.params)) throw Error('Params differ from exact owner authorization');
+      if (input.focus !== undefined) {
+        // Projection is defined only for this reviewed response shape, never arbitrary owner tool replies.
+        if (adapter.source !== 'builtin' || adapter.applicationName !== 'apps' || adapter.tool !== 'overview') throw Error('Application focus requires the reviewed apps overview');
+        if (!isObject(input.focus) || (!input.focus.moduleId && !input.focus.name)) throw Error('Application focus requires moduleId or name');
+        if (input.focus.moduleId !== undefined) text(input.focus.moduleId, 'focus module ID');
+        if (input.focus.name !== undefined) text(input.focus.name, 'focus application name');
+        input.focus = { ...(input.focus.moduleId ? { moduleId: input.focus.moduleId } : {}), ...(input.focus.name ? { name: input.focus.name } : {}) };
+      }
       const guard: GuardActionInput = { actionKey: input.actionKey, pursuitId: input.pursuitId,
         expectedRevision: input.expectedRevision, expectedVisibilityRevision: input.expectedVisibilityRevision,
         target: 'application-read', arguments: { adapterId: adapter.id, moduleId: adapter.moduleId, activeHash: adapter.activeHash,
-          tool: adapter.tool, effect: 'read', params: adapter.params } };
+          tool: adapter.tool, effect: 'read', params: adapter.params, ...(input.focus ? { focus: input.focus } : {}) } };
       this.service.guardAction(guard, access);
       const ref = `mind-application:${coreDigest(input.actionKey)}`;
       const intentDigest = coreDigest({ guard, subject: access.subject, role: access.role, execution: access.execution });
@@ -293,6 +304,7 @@ export class CoreApplication {
         }
         const receipt: ApplicationReceipt = { ref, actionKey: input.actionKey, intentDigest, adapterId: adapter.id,
           moduleId: adapter.moduleId, activeHash: adapter.activeHash, tool: adapter.tool, effect: 'read', argsDigest: coreDigest(adapter.params),
+          applicationName: clean(adapter.applicationName) as string, ...(input.focus ? { focus: input.focus } : {}),
           pursuitId: input.pursuitId, pursuitRevision: input.expectedRevision, visibilityRevision: input.expectedVisibilityRevision,
           actor: access.execution!.actor, runRef: access.execution!.runRef, createdAt: new Date().toISOString(), status: 'unknown' };
         const prepared: StoredInvocation = { receipt, guard, access, basis: this.basis(input.pursuitId, this.service.store.read()) };
@@ -328,12 +340,11 @@ export class CoreApplication {
       }
       let body: unknown;
       try {
-        if (Buffer.byteLength(canonical(raw)) > MAX_RESULT_BYTES) throw Error('result-too-large');
+        canonical(raw);
         body = clean(raw);
-        if (Buffer.byteLength(canonical(body)) > MAX_RESULT_BYTES) throw Error('result-too-large');
       } catch (error) {
-        r.status = 'failed'; r.reason = error instanceof Error && error.message === 'result-too-large' ? 'result-too-large' : 'invalid-result';
-        console.error(JSON.stringify({ component: 'mind', event: 'application_result_rejected', reason: r.reason }));
+        r.status = 'failed'; r.reason = 'invalid-result';
+        console.error(JSON.stringify({ component: 'mind', event: 'application_result_rejected', reason: r.reason, error: error instanceof Error ? error.message : String(error) }));
         r.completedAt = new Date().toISOString(); this.save(stored); this.record(stored); return this.readReceipt(ref, access);
       }
       if (isObject(raw) && (raw.status === 'unknown' || raw.outputState === 'unknown' || raw.approvalRequired === true || raw.status === 'pending')) {

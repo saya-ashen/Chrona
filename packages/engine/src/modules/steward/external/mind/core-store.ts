@@ -21,6 +21,7 @@ export const sessionRetractionId = (id: string): string => coreDigest(["session"
 
 export const defaultCoreSettings = (): CoreSettings => ({
   revision: 0, enabled: true, learningEnabled: true, notifyEnabled: false, autoSubmit: false,
+  organizerProviderId: "", organizerModel: "", mainProviderId: "", mainModel: "",
   timezone: "UTC", quietStart: "23:00", quietEnd: "08:00",
   eventRetentionDays: 30, diagnosticRetentionDays: 7,
   maxDatabaseBytes: 256 * 1024 * 1024, restoreBlocked: false,
@@ -318,7 +319,7 @@ export class CoreTransaction {
     if (!Number.isSafeInteger(expectedRevision) || settings.revision !== expectedRevision) {
       throw new CoreError("CONFLICT", `Version mismatch: expected ${expectedRevision}, current ${settings.revision}`);
     }
-    const permitted = ["enabled", "learningEnabled", "notifyEnabled", "autoSubmit", "timezone", "quietStart", "quietEnd", "eventRetentionDays", "diagnosticRetentionDays", "maxDatabaseBytes"];
+    const permitted = ["organizerProviderId", "organizerModel", "mainProviderId", "mainModel", "enabled", "learningEnabled", "notifyEnabled", "autoSubmit", "timezone", "quietStart", "quietEnd", "eventRetentionDays", "diagnosticRetentionDays", "maxDatabaseBytes"];
     if (Object.keys(patch).some(k => !permitted.includes(k))) invalidInput("Unknown or privileged setting");
     const next = { ...settings, ...patch, revision: settings.revision + 1 };
     for (const key of ["enabled", "learningEnabled", "notifyEnabled", "autoSubmit"] as const) if (typeof next[key] !== "boolean") invalidInput("Invalid boolean setting");
@@ -326,6 +327,10 @@ export class CoreTransaction {
     if (!Number.isSafeInteger(next.maxDatabaseBytes) || next.maxDatabaseBytes < 65536) invalidInput("Invalid storage high-water mark");
     try { new Intl.DateTimeFormat("en", { timeZone: next.timezone }); } catch (error) { throw new CoreError("INVALID_INPUT", `Invalid timezone: ${String(error)}`); }
     for (const v of [next.quietStart, next.quietEnd]) if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(v)) invalidInput("Invalid quiet hours");
+    for (const key of ["organizerProviderId", "organizerModel", "mainProviderId", "mainModel"] as const) {
+      const value = next[key];
+      if (value !== undefined && (typeof value !== "string" || value.length > (key.endsWith("ProviderId") ? 64 : 500) || Array.from(value).some(char => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127))) invalidInput("Invalid model selection");
+    }
     this.setSettings(next);
     if (!next.enabled && settings.enabled) for (const p of this.list("pursuit")) if (p.currentActor) { p.currentActor.stopRequested = true; p.revision++; this.put("pursuit", p); }
     return next;

@@ -7,7 +7,7 @@ const main = document.getElementById("main");
 const header = document.querySelector("body > header");
 const nav = header.querySelector("nav");
 let authenticated = false, navigation = 0, session = 0, linksRequest = 0;
-let stream = null;
+let stream = null, mindPage = null, feedbackSource = null;
 
 function shellState(layout = "document") {
   document.body.classList.toggle("web-shell-app", authenticated);
@@ -18,7 +18,21 @@ function shellState(layout = "document") {
   if (!authenticated) nav.querySelectorAll("a[data-page]").forEach(link => link.remove());
   activeNavigation();
 }
+function updateFeedbackLink() {
+  let link = nav.querySelector('[data-feedback]');
+  if (!link) { link = document.createElement('a'); link.dataset.feedback = ''; link.textContent = '反馈此页'; nav.append(link); }
+  link.hidden = !authenticated || !mindPage || location.pathname.startsWith('/p/mind/');
+  if (!link.hidden) link.href = feedbackHref(mindPage, feedbackSource, location.pathname);
+}
+// Page identity is context for a user-confirmed report, never permission to change an app.
+function feedbackHref(mind, source, path) {
+  const params = new URLSearchParams({ feedbackPage: path });
+  if (source?.moduleId) params.set('feedbackApp', source.moduleId);
+  if (source?.hash) params.set('feedbackVersion', source.hash);
+  return `${pageHref(mind)}?${params}`;
+}
 function activeNavigation() {
+  updateFeedbackLink();
   const path = location.pathname;
   for (const link of nav.querySelectorAll("a")) {
     const href = link.getAttribute("href");
@@ -39,7 +53,7 @@ async function request(url, { method = "GET", body, raw = false } = {}) {
   }
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || error.code || `请求失败（${response.status}）`);
+    throw Object.assign(new Error(error.message || error.code || `请求失败（${response.status}）`), { code: error.code });
   }
   return raw ? response.blob() : response.json();
 }
@@ -107,6 +121,7 @@ async function registeredPage(module, id, version) {
     import("/pages.js"),
   ]);
   if (version !== navigation || !authenticated) return;
+  feedbackSource = page;
   shellState(page.layout);
   main.replaceChildren();
   unmountPage = mount(main, page, registeredDeps(page, web, (path, replace) => go(path, replace)));
@@ -152,6 +167,7 @@ async function readPageLinks(requestId) {
     link.title = page.title;
     apps.before(link);
   }
+  mindPage = pages.find(page => page.module === "mind" && page.id === "main" && page.purpose !== "settings") ?? null;
   activeNavigation();
 }
 
@@ -166,7 +182,7 @@ async function route() {
     history.replaceState(null, "", url);
   }
   const parts = url.pathname.split("/").filter(Boolean);
-  let chatPage = false;
+  let chatPage = false; feedbackSource = null;
   unmountPage?.(); unmountPage = null;
   shellState();
   main.replaceChildren();

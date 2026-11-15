@@ -1,6 +1,8 @@
 {
   "schema": 1,
   "source": [
+    "LICENSE",
+    "README.md",
     "build.ts",
     "bun.lock",
     "core-actions.ts",
@@ -10,8 +12,11 @@
     "core-admission.ts",
     "core-application-cleanup.bun.test.ts",
     "core-application-integration.bun.test.ts",
+    "core-application-projection.ts",
     "core-application.bun.test.ts",
     "core-application.ts",
+    "core-artifact.ts",
+    "core-capabilities.bun.test.ts",
     "core-capabilities.ts",
     "core-chat-responsibility.bun.test.ts",
     "core-context.bun.test.ts",
@@ -23,6 +28,8 @@
     "core-delivery-understanding.bun.test.ts",
     "core-delivery.bun.test.ts",
     "core-delivery.ts",
+    "core-display.bun.test.ts",
+    "core-display.ts",
     "core-execution-privacy-race.bun.test.ts",
     "core-execution.bun.test.ts",
     "core-execution.ts",
@@ -31,6 +38,9 @@
     "core-notifications.ts",
     "core-observation.bun.test.ts",
     "core-observation.ts",
+    "core-organizer.bun.test.ts",
+    "core-organizer.ts",
+    "core-prompt.ts",
     "core-reauthorization.bun.test.ts",
     "core-recovery.bun.test.ts",
     "core-recovery.ts",
@@ -44,16 +54,17 @@
     "core-sources.ts",
     "core-store.bun.test.ts",
     "core-store.ts",
+    "core-task-view.bun.test.ts",
+    "core-task-view.ts",
     "core-types.ts",
+    "core-verification-artifact.bun.test.ts",
     "core-verification-understanding.bun.test.ts",
     "core-verification.bun.test.ts",
     "core-verification.ts",
     "index.ts",
-    "LICENSE",
     "module.json",
     "offline-entry.ts",
     "package.json",
-    "README.md",
     "test.ts",
     "workspace-applications.bun.test.tsx",
     "workspace-delivery.bun.test.tsx",
@@ -64,7 +75,11 @@
   "artifacts": [
     {
       "path": "dist/workspace.js",
-      "sha256": "4194e3beaa5f69e25b47eb8be125aeafe1a910795f62da1859b87c60cf7a8c5f"
+      "sha256": "425b2695b72ffc5703bf71e0748e2b96a75eaa93f6fb2fd181d6b8c8de007420"
+    },
+    {
+      "path": "dist/workspace.css",
+      "sha256": "b06aa1bc414eef38602957fe1a71f741efa86b0295183a7caeebde91097467ad"
     }
   ],
   "build": {

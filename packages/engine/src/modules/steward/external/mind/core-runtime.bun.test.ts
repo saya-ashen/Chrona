@@ -10,6 +10,7 @@ import { CoreRuntime, RUNTIME_ACCESS } from './core-runtime';
 import type { CoreCall, Target, ToolFact } from './core-execution';
 import type { CoreAccess, ProgressCandidate } from './core-types';
 import type { VerdictInput } from './core-verification';
+import { assertInterleavedSettlementConverges } from '../../__testing__/state-machine-invariants';
 
 const identity = { moduleId: 'mind-integration', hash: 'mind-current-version' };
 const owner: CoreAccess = { subject: 'owner', role: 'owner', scopes: [{}] };
@@ -72,16 +73,18 @@ class Harness {
   service!: CoreMindService;
   actions!: CoreActions;
   runtime!: CoreRuntime;
+  now = new Date().toISOString();
+  advance(ms: number) { this.now = new Date(Date.parse(this.now) + ms).toISOString(); }
   constructor() { this.open(); }
   private open() {
-    this.store = new CoreMindStore(this.directory); this.service = new CoreMindService(this.store);
+    this.store = new CoreMindStore(this.directory); this.service = new CoreMindService(this.store, { now: () => this.now });
     this.actions = new CoreActions(this.directory, this.service);
-    this.runtime = new CoreRuntime(this.store, this.service, this.gateway.call, () => identity, this.actions);
+    this.runtime = new CoreRuntime(this.store, this.service, this.gateway.call, () => identity, this.actions, () => this.now);
   }
   restart() { this.runtime.close(); this.actions.close(); this.store.close(); this.open(); }
   cleanup() { this.runtime.close(); this.actions.close(); this.store.close(); this.gateway.close(); rmSync(this.directory, { recursive: true, force: true }); }
   ingest(text: string, complete = true) {
-    const state = this.store.read(), checkpoint = state.checkpoints[0], now = new Date().toISOString();
+    const state = this.store.read(), checkpoint = state.checkpoints[0], now = this.now;
     this.service.ingest({ sourceIdentity: 'chat-source', epoch: 'epoch-1', expectedCheckpointRevision: checkpoint?.revision ?? 0,
       nextCursor: '2', scopeRevision: 1, capturedAt: now, coverage: { complete, ...(complete ? {} : { gap: 'snapshot page still missing' }) },
       events: checkpoint ? [] : [{ id: 'request', eventId: 'request', cursor: '1', object: { kind: 'message', id: 'request', revision: 1 },
@@ -158,11 +161,11 @@ class Harness {
       document: { title: 'Original discovery run', body } }, access)).toThrow('responsibility');
     return { evidence, worker };
   }
-  produce(worker: Run): { document: DocumentArtifact; candidate: ProgressCandidate } {
-    const document = this.actions.create({ ...this.mutation('itinerary:document'), target: 'document', arguments: {}, document: { title: 'Train itinerary', body } }, this.workerAccess());
-    this.gateway.result(worker.runId, 'action', document, 'create-itinerary');
-    const progress = this.service.progress({ ...this.mutation('itinerary:progress'), summary: 'Itinerary ready for independent review',
-      artifactRefs: [document.ref], originalReceiptRef: 'create-itinerary', evidenceRefs: this.pursuit.evidenceRefs, desiredStatus: 'done' }, this.workerAccess());
+  produce(worker: Run, key = 'itinerary', documentBody = body): { document: DocumentArtifact; candidate: ProgressCandidate } {
+    const document = this.actions.create({ ...this.mutation(`${key}:document`), target: 'document', arguments: {}, document: { title: 'Train itinerary', body: documentBody } }, this.workerAccess());
+    this.gateway.result(worker.runId, 'action', document, `create-${key}`);
+    const progress = this.service.progress({ ...this.mutation(`${key}:progress`), summary: 'Itinerary ready for independent review',
+      artifactRefs: [document.ref], originalReceiptRef: `create-${key}`, evidenceRefs: this.pursuit.evidenceRefs, desiredStatus: 'done' }, this.workerAccess());
     this.gateway.result(worker.runId, 'progress', progress);
     return { document, candidate: progress.value! };
   }
@@ -297,7 +300,7 @@ test('incomplete source coverage blocks both understanding and pursuit dispatch 
   } finally { f.cleanup(); }
 });
 
-for (const decision of ['needs-work', 'rejected'] as const) test(`independent ${decision} never completes and releases the terminal worker without wedging subsequent ticks`, async () => {
+for (const decision of ['needs-work', 'rejected'] as const) test(`independent ${decision} resumes the same goal with concrete repair context and completes only after a new accepted result`, async () => {
   const f = new Harness(); try {
     const { worker } = await f.discover(); const { document, candidate } = f.produce(worker);
     f.gateway.finish(worker.runId); await f.runtime.tick(true);
@@ -306,7 +309,23 @@ for (const decision of ['needs-work', 'rejected'] as const) test(`independent ${
     f.gateway.result(verifier.runId!, 'verdict', f.verdict(document, candidate, decision));
     f.gateway.finish(verifier.runId!); await f.runtime.tick(true);
     expect(f.pursuit.status).not.toBe('done'); expect(f.runtime.lastError).toBeNull(); expect(f.pursuit.currentActor).toBeUndefined();
-    f.restart(); await f.runtime.tick(true); expect(f.runtime.lastError).toBeNull(); expect(f.gateway.runs()).toHaveLength(5);
+    const originalGoal = f.pursuit.goal, originalId = f.pursuit.id;
+    f.restart(); f.advance(59999); await f.runtime.tick(true); expect(f.runtime.lastError).toBeNull(); expect(f.gateway.runs()).toHaveLength(5);
+    f.advance(1); await f.runtime.tick(true); expect(f.gateway.runs()).toHaveLength(6);
+    const repair = f.gateway.runs()[5], prompt = String(repair.args.prompt);
+    expect(repair.contextId).not.toBe(worker.contextId); expect(f.pursuit.id).toBe(originalId); expect(f.pursuit.goal).toBe(originalGoal);
+    expect(prompt).toContain(`Independent verification ${decision}`); expect(prompt).toContain('needs another check against the current timetable');
+    expect(prompt).toContain(document.ref); expect(prompt).toContain(body); expect(prompt).toContain('Itinerary ready for independent review');
+    expect(f.pursuit.status).not.toBe('done');
+    const repaired = f.produce(repair, 'repaired-itinerary', `${body}\nRechecked against the original timetable: 09:00 departure and 11:30 arrival.`);
+    expect(repaired.document.digest).not.toBe(document.digest); f.gateway.finish(repair.runId); await f.runtime.tick(true);
+    const secondVerifier = f.runtime.verification.outstanding()!;
+    expect(secondVerifier.runId).not.toBe(verifier.runId); expect(secondVerifier.runId).not.toBe(repair.runId);
+    f.gateway.result(secondVerifier.runId!, 'artifact', f.actions.read(repaired.document.ref));
+    f.gateway.result(secondVerifier.runId!, 'verdict', f.verdict(repaired.document, repaired.candidate));
+    f.gateway.finish(secondVerifier.runId!); await f.runtime.tick(true);
+    expect(f.pursuit.status).toBe('done'); expect(f.pursuit.artifactRefs).toEqual([repaired.document.ref]); expect(f.pursuit.currentActor).toBeUndefined();
+    f.restart(); f.advance(86400000); await f.runtime.tick(true); expect(f.gateway.runs()).toHaveLength(7);
   } finally { f.cleanup(); }
 });
 
@@ -406,3 +425,58 @@ test('forget removes verifier excerpts and prompts, withdrawn documents and old 
  expect(f.runtime.accessForCaller('self',true,worker.runId).execution).toBeUndefined();
  }finally{f.cleanup();}
 });
+
+test('unreadable progress artifacts become a visible verification wait and never wedge terminal settlement',async()=>{
+ const f=new Harness();try{
+  const evidence=f.ingest('Prepare the requested train itinerary.');
+  f.service.pursue({actionKey:'owner-goal',expectedRevision:0,expectedVisibilityRevision:f.store.read().visibilityRevision,semanticKey:'train-before-noon',goal:'Prepare train itinerary',completionCriteria:[criterion],scope,reason:'explicit-goal',evidenceRefs:[evidence]},owner);
+  await f.runtime.tick();const worker=f.gateway.runs()[0];
+  const progress=f.service.progress({...f.mutation('bad-artifact-progress'),summary:'Needs further verification',artifactRefs:['mind-document:withdrawn'],originalReceiptRef:'withdrawn',evidenceRefs:[evidence],desiredStatus:'waiting'},f.workerAccess());
+  f.gateway.result(worker.runId,'progress',progress);f.gateway.result(worker.runId,'progress',progress,'replayed-progress');f.gateway.finish(worker.runId);await f.runtime.tick(false,false,false);
+  expect(f.runtime.journal.outstanding()).toBeUndefined();expect(f.pursuit.currentActor).toBeUndefined();expect(f.pursuit).toMatchObject({status:'waiting',waitFor:'verification'});
+  expect(f.pursuit.waitReason).toContain('需要重新核实');expect(f.pursuit.artifactRefs).toEqual([]);
+  f.restart();await f.runtime.tick(false,false,false);expect(f.runtime.journal.outstanding()).toBeUndefined();expect(f.gateway.runs()).toHaveLength(1);
+ }finally{f.cleanup();}
+});
+
+test('relabeling rejected artifact bytes as active progress cannot buy another automatic attempt',async()=>{
+ const f=new Harness();try{
+  const {worker}=await f.discover(),first=f.produce(worker);f.gateway.finish(worker.runId);await f.runtime.tick(true);
+  const verifier=f.runtime.verification.outstanding()!;
+  f.gateway.result(verifier.runId!,'artifact',f.actions.read(first.document.ref));
+  f.gateway.result(verifier.runId!,'verdict',f.verdict(first.document,first.candidate,'needs-work'));
+  f.gateway.finish(verifier.runId!);await f.runtime.tick(true);f.advance(60000);await f.runtime.tick(true);
+  const repair=f.gateway.runs().at(-1)!;
+  const duplicate=f.actions.create({...f.mutation('unchanged:document'),target:'document',arguments:{},document:{title:'Same content, new identity',body}},f.workerAccess());
+  expect(duplicate.ref).not.toBe(first.document.ref);expect(duplicate.digest).toBe(first.document.digest);
+  const progress=f.service.progress({...f.mutation('unchanged:progress'),summary:'Still working on it',artifactRefs:[duplicate.ref],originalReceiptRef:'unchanged:document',
+   evidenceRefs:f.pursuit.evidenceRefs,desiredStatus:'active',nextStep:'Recheck the timetable'},f.workerAccess());
+  f.gateway.result(repair.runId,'progress',progress);f.gateway.finish(repair.runId);await f.runtime.tick(true);
+  f.restart();f.advance(86400000);await f.runtime.tick(true);expect(f.gateway.runs()).toHaveLength(6);expect(f.runtime.view().retry).toEqual([]);
+ }finally{f.cleanup();}
+});
+
+test('verification failure before or after runtime waiting converges to one persisted repair',async()=>{
+ const fixtures:Harness[]=[];try{
+  await assertInterleavedSettlementConverges({
+   beginRequest:async()=>{
+    const f=new Harness();fixtures.push(f);const {worker}=await f.discover(),first=f.produce(worker);
+    f.gateway.finish(worker.runId);await f.runtime.tick(true);
+    return {f,first,verifier:f.runtime.verification.outstanding()!};
+   },
+   resolveExternally:async({f,first,verifier})=>{
+    f.gateway.result(verifier.runId!,'artifact',f.actions.read(first.document.ref));
+    f.gateway.result(verifier.runId!,'verdict',f.verdict(first.document,first.candidate,'needs-work'));
+    f.gateway.finish(verifier.runId!);
+   },
+   enterWaiting:async({f})=>{f.restart();await f.runtime.tick(true);},
+   readFinalState:async({f})=>{
+    await f.runtime.tick(true);f.restart();f.advance(60000);await f.runtime.tick(true);
+    const repair=f.gateway.runs().at(-1)!,prompt=String(repair.args.prompt);
+    return {status:f.pursuit.status,runCount:f.gateway.runs().length,workerOwnsGoal:f.pursuit.currentActor?.runRef===repair.runId,
+     failureIncluded:prompt.includes('Independent verification needs-work'),artifactIncluded:prompt.includes(body)};
+   },
+   isStuckWaiting:state=>state.runCount!==6||!state.workerOwnsGoal||!state.failureIncluded||!state.artifactIncluded,
+  });
+ }finally{for(const f of fixtures)f.cleanup();}
+},15000);

@@ -285,12 +285,13 @@ export class CoreMindService {
       const p = this.owned(tx, input, access); this.linked(tx, input.evidenceRefs, access, p.scope);
       text(input.summary, "progress summary"); text(input.originalReceiptRef, "original action receipt", 2048);
       if (!["active", "waiting", "done"].includes(input.desiredStatus) || !input.evidenceRefs.length) fail("INVALID_INPUT", "Progress needs evidence and a valid result status");
+      if (input.waitFor !== undefined && (input.desiredStatus !== "waiting" || !["user","permission","external","provider","budget","verification"].includes(input.waitFor))) fail("INVALID_INPUT","Invalid waiting category");
       input.artifactRefs.forEach(ref => text(ref, "artifact reference", 2048));
       const candidate = { id: randomUUID(), revision: 1, createdAt: now, updatedAt: now,
         receipt: randomUUID(), pursuitId: p.id, pursuitRevision: p.revision, visibilityRevision: tx.meta().visibilityRevision,
         actor: p.currentActor!.actor, runRef: p.currentActor!.runRef, actionKey: input.actionKey,
         evidenceRefs: unique(input.evidenceRefs), summary: input.summary, artifactRefs: unique(input.artifactRefs), originalReceiptRef: input.originalReceiptRef,
-        desiredStatus: input.desiredStatus, state: "pending" as const,
+        desiredStatus: input.desiredStatus, ...(input.waitFor ? { waitFor: input.waitFor } : {}), state: "pending" as const,
         ...(input.nextStep ? { nextStep: input.nextStep } : {}), ...(input.waitReason ? { waitReason: input.waitReason } : {}) };
       tx.put("candidate", candidate); return candidate;
     });
@@ -307,7 +308,7 @@ export class CoreMindService {
       this.active(tx); this.refs(tx, c.evidenceRefs, access);
       if (c.desiredStatus === "done" && (!v.criteriaSatisfied || !v.executionTerminal)) fail("CONFLICT", "Finished run alone does not establish completion; criteria and terminal execution must be verified");
       p.revision++; p.updatedAt = now; p.status = c.desiredStatus; p.artifactRefs = unique([...p.artifactRefs, ...c.artifactRefs]);
-      p.nextStep = c.nextStep; p.waitReason = c.waitReason;
+      p.nextStep = c.nextStep; p.waitReason = c.waitReason; p.waitFor = c.waitFor;
       p.verification = { at: now, method: v.method, originalReceiptRef: v.originalReceiptRef, runRef: v.runRef };
       // Terminal execution is not proof that unresolved effects are reconciled. release() owns that decision.
       c.state = "applied"; c.revision++; c.updatedAt = now; tx.put("candidate", c); tx.put("pursuit", p);
@@ -321,7 +322,7 @@ export class CoreMindService {
       if(c.state!=="pending")fail("CONFLICT","Candidate already reconciled");
       const stale=this.progressStale(tx,p,c,input.expectedRevision);
       c.state=stale?"stale":"rejected";c.revision++;c.updatedAt=now;tx.put("candidate",c);
-      if(!stale){p.status="waiting";p.waitReason=input.reason;p.revision++;p.updatedAt=now;tx.put("pursuit",p);}
+      if(!stale){p.status="waiting";p.waitFor="verification";p.waitReason=input.reason;p.revision++;p.updatedAt=now;tx.put("pursuit",p);}
       return {applied:false,reason:stale?"stale":"not-verified",pursuit:p};
     });
   }
@@ -357,7 +358,7 @@ export class CoreMindService {
         if (!input.completionCriteria.length) fail("INVALID_INPUT", "Completion criteria cannot be empty");
         input.completionCriteria.forEach(v => text(v, "completion criterion")); p.completionCriteria = input.completionCriteria;
       }
-      p.status = "waiting"; p.waitReason = "corrected; previous execution requires reconciliation"; delete p.verification;
+      delete p.waitFor; p.status = "waiting"; p.waitReason = "corrected; previous execution requires reconciliation"; delete p.verification;
     }
   }
   private controlPursuit(p: Pursuit, operation: unknown): void {
@@ -366,7 +367,7 @@ export class CoreMindService {
       case "resume":
         if (p.status === "ended") fail("CONFLICT", "Ended work needs a new pursuit");
         if (p.currentActor) fail("CONFLICT", "Previous execution must be reconciled before resume");
-        p.paused = false; p.status = "waiting"; p.waitReason = "ready to continue"; delete p.suppression; break;
+        delete p.waitFor; p.paused = false; p.status = "waiting"; p.waitReason = "ready to continue"; delete p.suppression; break;
       case "end": p.status = "ended"; p.paused = true; break;
       default: fail("INVALID_INPUT", "Unknown control operation");
     }
@@ -404,7 +405,7 @@ export class CoreMindService {
         const p = target as Pursuit;
         if (p.status === "ended") fail("CONFLICT", "Ended work needs a new pursuit");
         p.paused = !!p.currentActor; p.waitReason = p.currentActor ? "restart requested; old execution requires reconciliation" : "ready to continue";
-        if (p.status !== "done") p.status = "waiting";
+        p.status = "waiting"; p.evidenceRefs = unique([...p.evidenceRefs, ...item.evidenceRefs]); delete p.verification; delete p.waitFor;
       }
       target.revision++; target.updatedAt = now; tx.put(input.targetKind, target);
     }
@@ -487,7 +488,7 @@ export class CoreMindService {
           return evidence?.sourceIdentity === sourceIdentity && evidence.origin.rootId === conversationId;
         }) });
       const items = pursuits.map(p => ({ id: p.id, revision: p.revision, status: p.paused ? "paused" : p.status,
-        goal: p.goal.slice(0, 300), waitReason: p.waitReason?.slice(0, 500), nextStep: p.nextStep?.slice(0, 500),
+        goal: p.goal.slice(0, 300), waitFor:p.waitFor, waitReason: p.waitReason?.slice(0, 500), nextStep: p.nextStep?.slice(0, 500),
         artifactRefs: p.artifactRefs.slice(0, 3), updatedAt: p.updatedAt }));
       // Bound only projected status, not the source text needed for visibility checks.
       while (Buffer.byteLength(JSON.stringify({ items })) > 16384) items.pop();

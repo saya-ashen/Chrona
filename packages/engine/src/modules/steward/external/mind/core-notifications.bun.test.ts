@@ -242,7 +242,7 @@ describe("Mind bounded notification adapter", () => {
     await f.adapter.sync(noon); expect(f.calls).toHaveLength(0);
   });
 
-  test("reject suppresses the topic for 30 days; explicit restart restores it, silence never creates a reply", async () => {
+  test("reject suppresses the topic; explicit restart reopens work without resending an obsolete completion", async () => {
     const f = setup(); f.settings({ notifyEnabled: true }); const p = f.result("rejected");
     f.service.feedback({ actionKey: "reject", expectedVisibilityRevision: 0, expectedRevision: p.revision, targetKind: "pursuit", targetId: p.id, value: "reject", scope: {} }, owner);
     let view = await f.adapter.sync(noon);
@@ -253,8 +253,9 @@ describe("Mind bounded notification adapter", () => {
     const released = f.service.release({ actionKey: "release-rejected", expectedVisibilityRevision: 0, expectedRevision: stopped.revision,
       pursuitId: p.id, runRef: stopped.currentActor!.runRef, executionStopped: true, effectsReconciled: true }, runtime).value!;
     f.service.feedback({ actionKey: "restart", expectedVisibilityRevision: 0, expectedRevision: released.revision, targetKind: "pursuit", targetId: p.id, value: "restart", scope: {} }, owner);
-    view = await f.adapter.sync("2026-12-12T13:00:00Z"); expect(view.receipts).toHaveLength(1);
-    expect(f.calls[0]?.args.responds).toBe(false);
+    view = await f.adapter.sync("2026-12-12T13:00:00Z"); expect(view.receipts).toHaveLength(0);
+    expect(f.calls).toHaveLength(0);
+    const restarted=f.service.detail({kind:"pursuit",id:p.id},owner);expect(restarted.status).toBe("waiting");expect(restarted.suppression).toBeUndefined();expect(restarted.verification).toBeUndefined();
   });
 
   test("same outcome delivered by Chat and repeated explicit useless feedback suppress outbound", async () => {

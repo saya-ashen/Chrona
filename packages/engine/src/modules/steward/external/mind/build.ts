@@ -14,7 +14,9 @@ const result = await Bun.build({
 });
 if (!result.success) throw new AggregateError(result.logs, 'Mind workspace build failed');
 const javascript = await readFile(join(directory, 'dist/workspace.js'), 'utf8');
-const css = await readFile(join(directory, 'workspace.css'), 'utf8');
+const styles = await Bun.build({ entrypoints: [join(directory, 'workspace.css')], outdir: join(directory, 'dist'), naming: 'workspace.css', target: 'browser', minify: true });
+if (!styles.success) throw new AggregateError(styles.logs, 'Mind styles build failed');
+const css = await readFile(join(directory, 'dist/workspace.css'), 'utf8');
 // Leave room for the executable component's schema, tools and metadata (256 KiB total).
 const bytes = Buffer.byteLength(javascript) + Buffer.byteLength(css);
 if (bytes > 245 * 1024) throw Error(`Mind executable assets exceed the registration budget: ${bytes} bytes`);

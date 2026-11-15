@@ -6,9 +6,14 @@ import type { CoreMindService } from './core-service';
 import { CoreError, type CoreAccess, type GuardActionInput } from './core-types';
 import type { CoreApplication, ApplicationInvokeInput, ApplicationReceipt } from './core-application';
 import { canonical, coreDigest } from './core-store';
+import { projectApplicationOverview } from './core-application-projection';
 /** Lazy because the authoritative self module ID is available only after identity verification. */
 export type ApplicationActionAdapter = Pick<CoreApplication, 'invoke' | 'readReceipt' | 'cleanupWithdrawn'>;
 const digest=(s:string)=>createHash('sha256').update(s).digest('hex');
+/** Full artifact views share the original receipt and its authorization, never a second stored body. */
+export const applicationReceiptRef=(ref:string)=>ref.startsWith('mind-application:')&&ref.endsWith(':full')?ref.slice(0,-5):ref;
+const applicationTitle=(receipt:ApplicationReceipt,title?:string)=>
+ `Application read ${title??receipt.applicationName??coreDigest([receipt.moduleId,receipt.tool]).slice(0,16)}`;
 export type DocumentArtifact={ref:string;digest:string;title:string;body:string;format:'markdown'|'text';pursuitId:string;visibilityRevision:number;createdAt:string};
 /** Concrete documents and reviewed persisted application reads, guarded by the live core. */
 export class CoreActions {
@@ -36,35 +41,41 @@ export class CoreActions {
   return document;
  }
  private applicationAdapter(){if(!this.application)throw new CoreError('INVALID_INPUT','Application reads are unavailable');return this.application();}
- private applicationArtifact(receipt:ApplicationReceipt):DocumentArtifact{
+ private applicationArtifact(receipt:ApplicationReceipt,full=false):DocumentArtifact{
   if(receipt.status!=='succeeded'||receipt.responseBody===undefined||!receipt.responseDigest)throw new CoreError('CONFLICT','Application read has no confirmed successful response');
   if(coreDigest(receipt.responseBody)!==receipt.responseDigest)throw Error('Application response digest mismatch');
-  // The complete sanitized reply and observed identity come only from the persisted authoritative adapter.
+  // Projection is recomputed from the original receipt; no second response body or cache is stored.
+  const projection=receipt.focus?projectApplicationOverview(receipt.responseBody,receipt.focus):undefined;
+  const projected=full?undefined:projection;
+  const content=projected?{response:projected.response,projection:projected.projection}:{response:receipt.responseBody};
   const body=canonical({kind:'application-read',receiptRef:receipt.ref,adapterId:receipt.adapterId,moduleId:receipt.moduleId,activeHash:receipt.activeHash,
-   tool:receipt.tool,argsDigest:receipt.argsDigest,responseDigest:receipt.responseDigest,response:receipt.responseBody,
-   pursuitId:receipt.pursuitId,pursuitRevision:receipt.pursuitRevision,visibilityRevision:receipt.visibilityRevision,actor:receipt.actor,runRef:receipt.runRef});
-  return {ref:receipt.ref,digest:digest(body),title:`Application read ${coreDigest([receipt.moduleId,receipt.tool]).slice(0,16)}`,body,format:'text',
+   tool:receipt.tool,argsDigest:receipt.argsDigest,responseDigest:receipt.responseDigest,...content,
+   pursuitId:receipt.pursuitId,pursuitRevision:receipt.pursuitRevision,visibilityRevision:receipt.visibilityRevision,
+   actor:receipt.actor,runRef:receipt.runRef});
+  return {ref:full&&projection?`${receipt.ref}:full`:receipt.ref,digest:digest(body),title:applicationTitle(receipt,projected?.title),body,format:'text',
    pursuitId:receipt.pursuitId,visibilityRevision:receipt.visibilityRevision,createdAt:receipt.completedAt??receipt.createdAt};
  }
  async applicationRead(input:ApplicationInvokeInput,access:CoreAccess):Promise<DocumentArtifact|ApplicationReceipt>{
   // Ignore all model-provided bodies, outcomes and identities, including extra fields in tool JSON.
   const receipt=await this.applicationAdapter().invoke({actionKey:input.actionKey,pursuitId:input.pursuitId,expectedRevision:input.expectedRevision,
-   expectedVisibilityRevision:input.expectedVisibilityRevision,adapterId:input.adapterId,params:input.params},access);
+   expectedVisibilityRevision:input.expectedVisibilityRevision,adapterId:input.adapterId,params:input.params,...(input.focus?{focus:input.focus}:{})},access);
   if(receipt.status!=='succeeded')return receipt;
   const artifact=this.read(receipt.ref,access);
   const pursuit=this.service.detail({kind:'pursuit',id:artifact.pursuitId},access);
   this.db.query('INSERT OR IGNORE INTO application_reads(ref,pursuit_id,goal_digest) VALUES(?,?,?)').run(artifact.ref,artifact.pursuitId,coreDigest({goal:pursuit.goal,criteria:pursuit.completionCriteria,scope:pursuit.scope}));
   return artifact;
  }
- read(ref:string,access:CoreAccess={subject:'mind:artifact-reader',role:'runtime',scopes:[{}]}){
-  if(ref.startsWith('mind-application:')){
-   const receipt=this.applicationAdapter().readReceipt(ref,access);
-   const pursuit=this.service.detail({kind:'pursuit',id:receipt.pursuitId},access);
-   const original=this.db.query('SELECT goal_digest FROM application_reads WHERE ref=?').get(ref) as {goal_digest:string|null}|null;
-   const sameGoal=original?.goal_digest?original.goal_digest===coreDigest({goal:pursuit.goal,criteria:pursuit.completionCriteria,scope:pursuit.scope}):pursuit.revision===receipt.pursuitRevision;
-   if(!sameGoal||!pursuit.goal)throw new CoreError('CONFLICT','Application read belongs to a different pursuit goal revision');
-   return this.applicationArtifact(receipt);
-  }
+ private readApplication(ref:string,access:CoreAccess,full:boolean){
+  const receiptRef=applicationReceiptRef(ref),receipt=this.applicationAdapter().readReceipt(receiptRef,access);
+  const pursuit=this.service.detail({kind:'pursuit',id:receipt.pursuitId},access);
+  const original=this.db.query('SELECT goal_digest FROM application_reads WHERE ref=?').get(receiptRef) as {goal_digest:string|null}|null;
+  const sameGoal=original?.goal_digest?
+   original.goal_digest===coreDigest({goal:pursuit.goal,criteria:pursuit.completionCriteria,scope:pursuit.scope}):pursuit.revision===receipt.pursuitRevision;
+  if(!sameGoal||!pursuit.goal)throw new CoreError('CONFLICT','Application read belongs to a different pursuit goal revision');
+  return this.applicationArtifact(receipt,full||ref!==receiptRef);
+ }
+ read(ref:string,access:CoreAccess={subject:'mind:artifact-reader',role:'runtime',scopes:[{}]},options:{full?:boolean}={}){
+  if(ref.startsWith('mind-application:'))return this.readApplication(ref,access,options.full===true);
   const r=this.db.query('SELECT json FROM documents WHERE ref=?').get(ref) as {json:string}|null;if(!r)throw Error('Document not found');const d=JSON.parse(r.json) as DocumentArtifact;if(digest(d.body)!==d.digest)throw Error('Document digest mismatch');const pursuit=this.service.detail({kind:'pursuit',id:d.pursuitId},access);if(!pursuit.goal)throw new CoreError('CONFLICT','Document pursuit has been withdrawn');return d;
  }
  list(pursuitId:string,access?:CoreAccess){
@@ -73,7 +84,10 @@ export class CoreActions {
   if(!pursuit.goal)return [];
   const documents=(this.db.query('SELECT json FROM documents').all() as {json:string}[]).map(r=>JSON.parse(r.json) as DocumentArtifact).filter(d=>d.pursuitId===pursuitId);
   const applications=(this.db.query('SELECT ref FROM application_reads WHERE pursuit_id=?').all(pursuitId) as {ref:string}[]).flatMap(r=>{
-   try{return [this.read(r.ref,access)];}catch(error){console.error(JSON.stringify({component:'mind',event:'application_artifact_unavailable',ref:r.ref,error:error instanceof Error?error.message:String(error)}));return [];}// Withdrawn/changed-goal receipts are not current visible artifacts.
+   try{
+    const compact=this.read(r.ref,reader),full=this.read(r.ref,reader,{full:true});
+    return compact.digest===full.digest?[compact]:[compact,full];
+   }catch(error){console.error(JSON.stringify({component:'mind',event:'application_artifact_unavailable',ref:r.ref,error:error instanceof Error?error.message:String(error)}));return [];}// Withdrawn/changed-goal receipts are not current visible artifacts.
   });
   return [...documents,...applications].map(({body:_body,...d})=>d);
  }

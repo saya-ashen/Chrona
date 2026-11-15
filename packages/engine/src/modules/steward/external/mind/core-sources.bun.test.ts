@@ -8,6 +8,8 @@ import { Database } from "bun:sqlite";
 import { Observations } from "../chat/observations";
 import { CoreSources, type ResolveSource, type SourceCall, type SourceIngestor } from "./core-sources";
 import type { CoreAccess, IngestBatch } from "./core-types";
+import { z } from 'zod';
+import chatManifest from '../chat/module.json';
 
 const now = "2026-11-13T12:00:00.000Z";
 const identity = { moduleId: "actual-chat-module-id", hash: "approved-chat-hash", identityContinuityVerified: true };
@@ -51,6 +53,7 @@ describe("CoreSources pure Chat incremental synchronization", () => {
     const call: SourceCall = async (target, args) => {
       expect(target.moduleId).toBe(identity.moduleId);
       expect(["observations", "observation-scope", "observation-inventory", "snapshot"]).toContain(target.tool);
+      z.fromJSONSchema(chatManifest.tools.find(t => t.name === target.tool)!.parameters as unknown as Parameters<typeof z.fromJSONSchema>[0]).parse(args);
       calls.push({ tool: target.tool, args }); return handler(target.tool, args);
     };
     return { calls, call };
@@ -491,7 +494,8 @@ describe("CoreSources pure Chat incremental synchronization", () => {
     expect(next.status).toBe("degraded");
     expect((await sources.sync()).status).toBe("synced"); expect(store.read().checkpoints[0]?.cursor).toBe("600");
     expect(t.calls.some(c => c.tool === "observation-inventory")).toBe(false);
-  }, 30000);
+  // Hundreds of real durable checkpoint commits must tolerate shared-disk test contention.
+  }, 60000);
 
   test("learning pause and missing approved source are visible without source reads", async () => {
     let reads = 0; const call: SourceCall = async () => { reads++; throw Error("unexpected"); };

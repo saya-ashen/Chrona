@@ -45,6 +45,15 @@ test("real caller identity and current approved hash are required; arguments nev
   expect(await pages.component("alpha", "AudioPlayer", result.revision)).toBeTruthy();
 });
 
+test("component tools have no arbitrary name count cap and retain name validation", async () => {
+  const f = await fixture();
+  const tools = Array.from({length:200},(_,i)=>`operation-${i}`);
+  const registered = await f.pages.tool("component-set", {...definition,tools}, caller) as {revision:string};
+  expect(await createPages(f.deps).component("alpha","AudioPlayer",registered.revision)).toMatchObject({tools});
+  await expect(f.pages.tool("component-set", {...definition,tools:["bad.name"]}, caller)).rejects.toThrow();
+  await expect(f.pages.tool("component-set", {...definition,tools:["play","play"]}, caller)).rejects.toThrow();
+});
+
 test("atomic private persistence survives restart, retains source and pins declared tools without action bindings", async () => {
   const f = await fixture();
   const registered = await f.pages.tool("component-set", definition, caller) as { name: string; type: string; revision: string };

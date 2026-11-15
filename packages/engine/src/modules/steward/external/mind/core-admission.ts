@@ -1,3 +1,4 @@
+import {mainModelSelection} from './core-execution';
 import { randomUUID, createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { admissionPrompt } from './core-admission-prompt';
@@ -188,7 +189,7 @@ export class CoreAdmission {
     private readonly options: AdmissionOptions = {},
   ) {
     const directory = 'directory' in store && typeof store.directory === 'string' ? store.directory : process.cwd();
-    this.journal = new CoreExecutionJournal(join(directory, 'admission'));
+    this.journal = new CoreExecutionJournal(join(directory, 'admission'),()=>mainModelSelection(store.read().settings));
     this.journal.db.exec(`CREATE TABLE IF NOT EXISTS admission_requests(id TEXT PRIMARY KEY, created_at TEXT NOT NULL, json TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS admission_verdicts(request_id TEXT NOT NULL, run_id TEXT NOT NULL, json TEXT NOT NULL, PRIMARY KEY(request_id, run_id));`);
     this.executor = new CoreExecutor(this.journal, call, {

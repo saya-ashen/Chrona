@@ -55,7 +55,7 @@ function fixture() {
     restart: () => { app.close(); store.close(); store = new CoreMindStore(directory); service = new CoreMindService(store);
       app = new CoreApplication(directory, service, call, 'mind'); },
     forget: (kind: 'evidence' | 'understanding' | 'session') => service.forget({ actionKey: 'forget', expectedVisibilityRevision: 0,
-      target: kind === 'session' ? { kind, sessionId: 'unrelated-session' } : { kind,
+      target: kind === 'session' ? { kind, sessionId: 's1' } : { kind,
         id: kind === 'evidence' ? pursuit.evidenceRefs[0]! : understanding.id } }, owner),
   };
 }
@@ -233,3 +233,13 @@ test('cleanup detects missing or forgotten dependencies even without a visibilit
   expect(f.app.cleanupWithdrawn()).toEqual({ scrubbed: 1, deferred: 0, checkpoint: 'complete' });
   expectScrubbed(f.inspect(), original);
 });
+
+ test('forgetting an unrelated session preserves completed results across cleanup and restart', async () => {
+  const f = fixture(), adapter = await f.grant(), original = await f.app.invoke(f.input(adapter.id), runtime);
+  f.service.forget({ actionKey: 'forget-unrelated', expectedVisibilityRevision: 0,
+    target: { kind: 'session', sessionId: 'unrelated-session' } }, owner);
+  expect(f.app.readReceipt(f.ref, owner)).toEqual(original);
+  expect(f.app.cleanupWithdrawn()).toEqual({ scrubbed: 0, deferred: 0, checkpoint: 'complete' });
+  f.restart(); expect(f.app.readReceipt(f.ref, owner)).toEqual(original);
+  expect(f.calls).toHaveLength(1);
+ });

@@ -20,7 +20,7 @@ export class CoreDeliveryAdmission {
   for(const f of e.facts){
    if(f.target!=='modules.admit'||f.runId!==e.runId||f.moduleId!=='system:modules'||!f.hash||f.status!=='succeeded'||f.outputState!=='complete')continue;
    const parsed=admission.safeParse(f.output);if(!parsed.success)continue;
-   const value=parsed.data;if(new Set(value.targets.map(t=>t.name)).size!==value.targets.length||value.targets.some(t=>t.moduleId!==null||t.expectedActiveHash!==null))continue;
+   const value=parsed.data;if(new Set(value.targets.map(t=>t.name)).size!==value.targets.length||value.targets.some(t=>(t.moduleId===null)!==(t.expectedActiveHash===null)))continue;
    const proof:Proof={executionId:e.id,runId:e.runId,principal:e.principal,callId:f.callId,value};
    const prior=this.db.query('SELECT json FROM proofs WHERE id=?').get(value.admissionId) as {json:string}|null;
    if(prior&&canonical(JSON.parse(prior.json))!==canonical(proof))throw Error('Original admission proof identity changed');
@@ -31,7 +31,7 @@ export class CoreDeliveryAdmission {
   const row=this.db.query('SELECT json FROM proofs WHERE id=?').get(record.admissionId) as {json:string}|null;
   if(!row)throw Error('Authenticated original selected admission proof unavailable');
   const p=JSON.parse(row.json) as Proof;
-  if(p.executionId!==record.worker.executionId||p.runId!==record.worker.runId||canonical(p.principal)!==canonical(record.worker.principal)||canonical(p.value.submitter)!==canonical(record.author)||p.value.admissionId!==record.admissionId||p.value.targets.some(t=>t.moduleId!==null||t.expectedActiveHash!==null)||canonical(p.value.targets.map(t=>t.name).sort())!==canonical(record.materials.map(m=>m.name).sort()))throw Error('Original admission does not authorize this exact new capability handoff');
+  if(p.executionId!==record.worker.executionId||p.runId!==record.worker.runId||canonical(p.principal)!==canonical(record.worker.principal)||canonical(p.value.submitter)!==canonical(record.author)||p.value.admissionId!==record.admissionId||canonical([...p.value.targets].sort((a,b)=>a.name.localeCompare(b.name)))!==canonical(record.materials.map(m=>({name:m.name,moduleId:m.baseline?.moduleId??null,expectedActiveHash:m.baseline?.expectedActiveHash??null})).sort((a,b)=>a.name.localeCompare(b.name))))throw Error('Original admission does not authorize this exact capability handoff and update baselines');
  }
  close(){this.db.close();}
 }

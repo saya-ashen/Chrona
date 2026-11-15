@@ -129,8 +129,8 @@ test.each(['support', 'opposition'] as const)('Chat coverage gap reached only th
   } finally { f.close(); }
 });
 
-test.each(['value', 'supportingRefs', 'opposingRefs', 'missing', 'retracted', 'empty'] as const)
-('understanding %s alone invalidates accepted material even without a pursuit revision change', async mode => {
+test.each(['value', 'supportingRefs', 'opposingRefs', 'missing', 'retracted', 'empty'] as const)(
+'understanding %s alone invalidates accepted material even without a pursuit revision change', async mode => {
   const f = fixture(); try {
     const request = await f.accept();
     // Isolate verification's content/dependency fingerprint from service-level pursuit invalidation.

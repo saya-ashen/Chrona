@@ -48,11 +48,14 @@ async function start(applications: (input: Record<string, any>) => unknown | Pro
     const call: MindContext['call'] = async (tool, args) => {
         calls.push({ tool, args: structuredClone(args) });
         if (tool === 'overview') return envelope({ items: [], visibilityRevision: 7, settings: { learningEnabled: true } });
+        if (tool === 'settings') return envelope({ revision: 1, enabled:true, learningEnabled:true, notifyEnabled:false, autoSubmit:false, timezone:'UTC', quietStart:'23:00', quietEnd:'08:00' });
         if (tool === 'context') return envelope({ understandings: [] });
         if (tool === 'applications') return applications(JSON.parse(args.input));
         throw Error('Unexpected tool: ' + tool);
     };
-    lifecycle = mount(container, { call, props: { view: 'connections' } });
+    lifecycle = mount(container, { call, props: { view: 'settings' } });
+    await wait(()=>!!container.querySelector('.mind-source-settings summary'));
+    container.querySelector<HTMLElement>('.mind-source-settings summary')!.click();
     await wait(() => calls.some(c => c.tool === 'applications'));
     return calls;
 }

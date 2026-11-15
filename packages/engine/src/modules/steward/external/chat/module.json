@@ -27,7 +27,9 @@
     "pi.configure",
     "pi.models",
     "mind.context",
-    "mind.updates"
+    "mind.updates",
+    "mind.task-view",
+    "mind.task-control"
   ],
   "tests": [
     "test.ts"
@@ -595,7 +597,8 @@
                 "enum": [
                   "message",
                   "operation",
-                  "conversation"
+                  "conversation",
+                  "execution"
                 ]
               },
               "id": {
@@ -725,6 +728,69 @@
           "json"
         ],
         "additionalProperties": false
+      }
+    },
+    {
+      "name": "task-view",
+      "description": "Read the owner’s persistent tasks, or one task and its actual progress/artifacts. User interface only; no Agent execution.",
+      "visibility": [
+        "owner",
+        "modules"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "artifactRef": {
+            "type": "string"
+          }
+        },
+        "required": []
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "json": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "json"
+        ]
+      }
+    },
+    {
+      "name": "task-control",
+      "description": "Supplement, pause or resume the same persistent task through existing Mind feedback/control. Requires authenticated owner interface and original action key/revisions.",
+      "visibility": [
+        "owner",
+        "modules"
+      ],
+      "idempotent": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "json": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "json"
+        ]
       }
     }
   ]

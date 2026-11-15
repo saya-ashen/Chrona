@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { compileModuleOutput, moduleManifestSchema } from "@chrona/contracts/steward";
 import { createRegistrationTest } from "./registration-test";
-import { pageToolNames } from "./pages";
 import webManifest from "./module.json";
 
 const cleanups: (() => Promise<unknown>)[] = [];
@@ -146,14 +145,22 @@ test("portable built helper runs an ordinary app's actual handler outside the ch
   expect(stderr).toContain("2 pass");
 }, 60_000);
 
-test("reusable harness executes the existing Coding Web activated handler and validates its real tool contracts", async () => {
-  const h = await createRegistrationTest(join(import.meta.dirname, "../coding-web/index.ts"));
+test("registration harness runs app disconnect cleanup before deleting its data", async () => {
+  const root = await mkdtemp(join(tmpdir(), "chrona-registration-disconnect-"));
+  cleanups.push(() => rm(root, { recursive: true, force: true }));
+  const marker = join(root, "disconnected");
+  await writeFile(join(root, "module.json"), JSON.stringify({ name: "cleanup-app", entry: "index.ts", activated: true, keepAlive: true, effects: [], tests: ["test.ts"] }));
+  await writeFile(join(root, "index.ts"), `import { on, onDisconnect, chrona } from 'chrona';
+    import { writeFile } from 'node:fs/promises';
+    on('activated', () => {});
+    onDisconnect(async () => {
+      await writeFile(chrona.paths.data + '/cleanup', 'closed');
+      await writeFile(${JSON.stringify(marker)}, 'closed');
+    });`);
+  const h = await createRegistrationTest(join(root, "index.ts"));
   cleanups.push(h.close);
   await h.activate();
-  expect(h.calls.map(call => call.target)).toEqual(["web.page-set"]);
-  const pages = await h.pages.list();
-  expect(pages).toHaveLength(1);
-  const saved = await h.pages.get("coding-web", pages[0]!.id);
-  expect(saved?.moduleId).toBe(h.caller.moduleId);
-  expect(pageToolNames(saved!).length).toBeGreaterThan(0);
+  await h.close();
+  expect(await Bun.file(marker).text()).toBe("closed");
+  await h.close();
 });

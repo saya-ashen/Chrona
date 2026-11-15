@@ -30,7 +30,7 @@ function fill(selector: string, value: string) {
 async function start(call: MindContext['call'], props?: MindContext['props']) {
   container = window.document.createElement('div') as any; window.document.body.append(container as any);
   lifecycle = mount(container, { call, props });
-  await wait(() => !!container.querySelector('textarea'));
+  await wait(() => !!container.querySelector('.mind-workspace'));
 }
 beforeAll(async () => {
   for (const key of ['window', 'document', 'HTMLElement', 'HTMLInputElement', 'HTMLTextAreaElement', 'Element', 'Node', 'navigator', 'Event', 'MouseEvent', 'KeyboardEvent']) {
@@ -56,10 +56,10 @@ test('loading, empty, refresh recovery and scoped props are visible without fake
   expect(visible()).toContain('正在读取 Mind'); expect(button('交给 Mind').disabled).toBe(true);
   await wait(() => calls.length === 1);
   expect(calls).toEqual([{ tool: 'overview', args: {} }]);
-  release(envelope(overview())); await wait(() => visible().includes('还没有值得持续推进的事'));
+  release(envelope(overview())); await wait(() => visible().includes('还没有正在推进的改进'));
   expect(visible()).toContain('查看当前接入范围'); expect(visible()).not.toContain('费用：0');
-  lifecycle!.update({ call, props: { title: '我的 Mind', view: 'connections' } });
-  await wait(() => visible().includes('我的 Mind') && visible().includes('来源覆盖'));
+  lifecycle!.update({ call, props: { title: '我的 Mind', view: 'settings' } });
+  await wait(() => visible().includes('我的 Mind') && !!container.querySelector('.mind-source-settings summary')); container.querySelector<HTMLElement>('.mind-source-settings summary')!.click(); await wait(()=>visible().includes('来源覆盖'));
   expect(visible()).toContain('尚无真实调用验证记录'); expect(visible()).toContain('未知');
 });
 
@@ -68,7 +68,7 @@ test('overview failure offers a real read retry and does not send mutation calls
   await start(async tool => { calls.push(tool); if (fail) throw Error('服务暂不可用'); return envelope(overview()); });
   await wait(() => visible().includes('服务暂不可用'));
   expect(container.querySelector('[role=alert]')).not.toBeNull(); fail = false;
-  await click('刷新核对'); await wait(() => visible().includes('还没有值得持续推进的事'));
+  await click('刷新核对'); await wait(() => visible().includes('还没有正在推进的改进'));
   expect(calls).toEqual(['overview', 'overview']);
 });
 
@@ -76,7 +76,7 @@ test('completed and waiting work have readable Markdown, safe links and optional
   const result = '# 研究结果\n**已核对**\n- 两篇来源\n```text\n<script>unsafe()</script>\n```\n[危险](javascript:alert(1))\n[打开资料](https://example.test/report)';
   await start(async () => envelope({ ...overview(), pursuits: [{ ...pursuit, status: 'waiting', needsDecision: true, waitReason: '请确认范围' }], results: [{ ...pursuit, id: 'done', status: 'done', summary: result, verification: { method: '逐项核对' } }] }));
   await wait(() => visible().includes('研究结果'));
-  expect(visible()).toContain('需要你决定'); expect(visible()).toContain('已经帮你做成'); expect(visible()).toContain('请确认范围');
+  expect(visible()).toContain('需要你决定'); expect(visible()).toContain('最近完成'); expect(visible()).toContain('请确认范围');
   expect(container.querySelector('strong')?.textContent).toBe('已核对'); expect(container.querySelector('script')).toBeNull();
   expect(container.querySelector('a[href^="javascript:"]')).toBeNull(); expect(container.querySelector('a')?.getAttribute('href')).toBe('https://example.test/report');
   const toggle = container.querySelector<HTMLInputElement>('input[type=checkbox]')!; toggle.click();
@@ -134,12 +134,12 @@ test('uncertain natural submission retains input and retries exactly the same ac
     if (tool === 'overview') return envelope(overview());
     writes.push({ tool, args }); if (fail) throw Error('响应丢失'); return envelope({ outcome: 'applied', value: { id: 'p2' } });
   });
-  await wait(() => visible().includes('还没有值得持续推进的事'));
+  await wait(() => visible().includes('还没有正在推进的改进'));
   fill('textarea', '继续跟进论文'); await wait(() => !button('交给 Mind').disabled);
   button('交给 Mind').click(); button('交给 Mind').click();
   await wait(() => visible().includes('重试原请求'));
   expect(writes.length).toBe(1); expect(container.querySelector('textarea')?.value).toBe('继续跟进论文'); expect(button('交给 Mind').disabled).toBe(true);
-  const first = JSON.parse(writes[0].args.input); expect(first).toMatchObject({ goal: '继续跟进论文', reason: 'explicit-goal', expectedRevision: 0, completionCriteria: ['继续跟进论文'] });
+  const first = JSON.parse(writes[0].args.input); expect(first).toMatchObject({ goal: '继续跟进论文', reason: 'explicit-goal', expectedRevision: 0, completionCriteria: ['核实并解决用户反馈：继续跟进论文', '提供具体改动和验证结果；提交或启用不等于问题解决'] });
   fail = false; await click('重试原请求'); await wait(() => container.querySelector('textarea')?.value === '');
   expect(writes.length).toBe(2); expect(writes[1]).toEqual(writes[0]);
 });
@@ -155,9 +155,9 @@ test('settings save only edited supported fields and re-read the new revision', 
   await wait(() => buttons().some(b => b.textContent === '保存设置' && !b.disabled));
   expect(visible()).toContain('服务尚未提供可修改的预算');
   const toggle = (name: string) => Array.from(container.querySelectorAll('label')).find(label => label.textContent === name)!.querySelector<HTMLInputElement>('input')!;
-  const autoSubmit = () => toggle('自动安装通过检查的改进');
+  const autoSubmit = () => toggle('自动提交检查通过的候选');
   expect(autoSubmit().checked).toBe(false);
-  expect(window.document.getElementById(autoSubmit().getAttribute('aria-describedby')!)?.textContent).toBe('开启后，检查通过的改进会自动安装，可随时回滚');
+  expect(window.document.getElementById(autoSubmit().getAttribute('aria-describedby')!)?.textContent).toBe('只提交候选，仍需审批并核对启用和效果。');
   toggle('从获准的已发送内容学习').click(); await click('保存设置');
   await wait(() => saves.length === 1 && !button('保存设置').disabled);
   expect(saves[0]).toEqual({ patch: JSON.stringify({ learningEnabled: false }), revision: 3 });
@@ -212,7 +212,7 @@ test('forget invalidates older context and detail replies before they can restor
     if (tool === 'detail') return new Promise(resolve => { releaseDetail = resolve; });
     return envelope({ outcome: 'applied', value: { cleanup: { mind: 'complete' } } });
   }, { view: 'understanding' });
-  await wait(() => visible().includes(item.value)); await click('依据与纠正'); await click('搜索');
+  await wait(() => visible().includes(item.value)); await click('搜索'); await click('依据与纠正');
   await wait(() => !!releaseContext && !!releaseDetail); await click('忘记这条理解'); await click('确认忘记');
   await wait(() => visible().includes('Mind 内清理：已完成'));
   releaseContext(envelope({ understandings: [item] })); releaseDetail(envelope(item));
@@ -228,7 +228,7 @@ test('a structured conflict releases the pending write and refresh allows a new 
     if (writes.length === 1) throw Object.assign(new Error('版本已变化'), { code: 'CONFLICT' });
     return envelope({ outcome: 'applied', value: {} });
   });
-  await wait(() => visible().includes('还没有值得持续推进的事')); fill('textarea', '刷新版本后继续');
+  await wait(() => visible().includes('还没有正在推进的改进')); fill('textarea', '刷新版本后继续');
   await wait(() => !button('交给 Mind').disabled); await click('交给 Mind'); await wait(() => visible().includes('版本已变化'));
   expect(visible()).not.toContain('上一请求的结果尚不确定'); expect(container.querySelector('textarea')?.value).toBe('刷新版本后继续');
   fence = 8; await click('刷新核对'); await wait(() => !button('交给 Mind').disabled); await click('交给 Mind'); await wait(() => writes.length === 2);
@@ -293,10 +293,10 @@ test('real temporary Core service accepts owner input, control and confirmed for
         default: throw Error('Unexpected local UI tool: ' + tool);
       }
     });
-    await wait(() => visible().includes('还没有值得持续推进的事'));
+    await wait(() => visible().includes('还没有正在推进的改进'));
     fill('textarea', '整理真正可用的研究清单'); await wait(() => !button('交给 Mind').disabled); await click('交给 Mind');
     await wait(() => !!buttons().find(b => b.textContent === '整理真正可用的研究清单'));
-    const saved = store.read().pursuits[0]; expect(saved.goal).toBe('整理真正可用的研究清单'); expect(saved.completionCriteria).toEqual([saved.goal]);
+    const saved = store.read().pursuits[0]; expect(saved.goal).toBe('整理真正可用的研究清单'); expect(saved.completionCriteria).toEqual([`核实并解决用户反馈：${saved.goal}`, '提供具体改动和验证结果；提交或启用不等于问题解决']);
     await click(saved.goal); await wait(() => buttons().some(b => b.textContent === '暂停推进')); await click('暂停推进');
     await wait(() => store.read().pursuits[0].paused && !container.querySelector('.mind-detail'));
     expect(store.read().pursuits[0].revision).toBeGreaterThan(saved.revision);
@@ -305,7 +305,7 @@ test('real temporary Core service accepts owner input, control and confirmed for
     mode.dispatchEvent(new window.Event('change', { bubbles: true }) as any);
     fill('textarea', '研究结果请用中文'); await wait(() => !button('保存理解').disabled); await click('保存理解');
     await wait(() => store.read().understandings.length === 1 && container.querySelector('textarea')?.value === '');
-    await click('对你的理解'); await wait(() => visible().includes('研究结果请用中文'));
+    await click('理解与反馈'); await wait(() => visible().includes('研究结果请用中文'));
     await click('忘记这条理解'); await click('确认忘记');
     await wait(() => !container.querySelector('[role=dialog]') && !visible().includes('研究结果请用中文'));
     expect(store.read().understandings[0].value).toBe(''); expect(store.read().visibilityRevision).toBeGreaterThan(saved.visibilityRevision);
@@ -313,4 +313,95 @@ test('real temporary Core service accepts owner input, control and confirmed for
   } finally {
     lifecycle?.destroy(); lifecycle = undefined; store.close(); rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test('four destinations separate overview, improvements, understanding and settings; technical forms stay collapsed',async()=>{
+  const items=Array.from({length:6},(_,i)=>({...pursuit,id:`item-${i}`,goal:`改进应用 ${i}`}));
+  const calls:string[]=[];
+  await start(async tool=>{calls.push(tool);if(tool==='overview')return envelope(overview(items));if(tool==='delivery')return envelope({items:[],nextCursor:null});if(tool==='settings')return envelope(settings);if(tool==='context')return envelope({understandings:[]});throw Error('Unexpected tool');});
+  await wait(()=>visible().includes('改进应用 0'));
+  expect(Array.from(container.querySelectorAll('.mind-tabs button')).map(b=>b.textContent)).toEqual(['概览','改进','理解与反馈','设置']);
+  expect(container.querySelectorAll('.mind-card')).toHaveLength(3);
+  await click('改进');await wait(()=>container.querySelectorAll('.mind-card').length===6);expect(visible()).toContain('候选改动');
+  await click('设置');await wait(()=>!!buttons().find(b=>b.textContent==='保存设置'));
+  expect(calls).not.toContain('applications');expect(container.querySelector('.mind-composer')).toBeNull();
+});
+
+test('application feedback carries selected application, version and page with observable completion criteria',async()=>{
+  const writes:any[]=[];
+  await start(async(tool,args)=>{if(tool==='overview')return envelope({...overview(),applications:[{id:'chat-real',name:'chat',activeHash:'a'.repeat(40)}]});writes.push({tool,input:JSON.parse(args.input)});return envelope({outcome:'applied',value:{}});});
+  await wait(()=>!!container.querySelector('option[value="chat-real"]'));
+  const select=container.querySelector<HTMLSelectElement>('[aria-label="涉及应用"]')!;select.value='chat-real';select.dispatchEvent(new window.Event('change',{bubbles:true}) as any);
+  fill('[aria-label="问题所在页面"]','会话页');fill('textarea','发送失败后不能继续');await click('交给 Mind');await wait(()=>writes.length===1);
+  expect(writes[0].tool).toBe('pursue');expect(writes[0].input.goal).toContain('改进 chat：发送失败后不能继续');expect(writes[0].input.goal).toContain('a'.repeat(40));expect(writes[0].input.goal).toContain('会话页');expect(writes[0].input.completionCriteria).toContain('提供具体改动和验证结果；提交或启用不等于问题解决');
+});
+
+test('user can reopen an unresolved completed improvement from its detail',async()=>{
+  const writes:any[]=[];const item={...pursuit,status:'done'};
+  await start(async(tool,args)=>{if(tool==='overview')return envelope(overview([item]));if(tool==='detail')return envelope({...item,evidence:[],artifacts:[]});writes.push({tool,input:JSON.parse(args.input)});return envelope({outcome:'applied',value:{}});});
+  await wait(()=>visible().includes(item.goal));await click(item.goal);await wait(()=>buttons().some(b=>b.textContent==='仍未解决，继续改进'));await click('仍未解决，继续改进');await wait(()=>writes.length===1);
+  expect(writes[0]).toMatchObject({tool:'feedback',input:{targetKind:'pursuit',targetId:item.id,value:'restart',expectedRevision:item.revision}});
+});
+
+const feedbackGoal = `改进 应用中心：改善应用列表的布局与操作\n反馈对应版本：${'a'.repeat(40)}；应用：a72dc177-cd15-47fa-9335-18e2ec58e4c2；页面：/p/apps/available`;
+const readableTitle = '改进 应用中心：改善应用列表的布局与操作';
+
+test('existing goal supplies the same readable task and detail title; original identity stays expandable', async () => {
+  const item = { ...pursuit, goal: feedbackGoal, updatedAt: '2026-11-15T12:08:48Z' };
+  await start(async tool => envelope(tool === 'overview' ? overview([item]) : item));
+  await wait(() => !!container.querySelector('.mind-title-button'));
+  const card = container.querySelector('.mind-card')!;
+  expect(card.querySelector('h3')?.textContent).toBe(readableTitle);
+  const technical = card.querySelector('details')!;
+  expect(technical.open).toBe(false);
+  expect(technical.textContent).toContain(item.id);
+  expect(technical.textContent).toContain(feedbackGoal);
+  technical.querySelector('summary')!.click();
+  expect(technical.open).toBe(true);
+  await click(readableTitle);
+  await wait(() => !!container.querySelector('.mind-detail .mind-tag'));
+  expect(container.querySelector('.mind-detail h2')?.textContent).toBe(readableTitle);
+  expect(container.querySelector<HTMLDetailsElement>('.mind-detail details')?.open).toBe(false);
+});
+
+for (const [status, waitFor, waitReason, nextStep, expected] of [
+  ['waiting', 'user', '应用已启用，等待用户验收', '刷新页面并验收布局', '待你验收'],
+  ['waiting', 'user', '需要补充页面截图', '提供截图', '需要你处理'],
+  ['waiting', 'permission', '需要批准才能继续核验', '审阅候选改动', '需要你处理'],
+  ['waiting', 'external', '等待外部回执', '查询原回执', '等待条件'],
+  ['failed', undefined, '检查未通过', '查看失败原因', '执行失败'],
+  ['finished', undefined, '执行已结束，目标尚未核对', '核对实际效果', '本轮执行结束'],
+  ['active', undefined, '', '核对页面效果', '正在推进'],
+  ['done', undefined, '', '', '已完成'],
+] as const) {
+  test(`task card and detail retain truthful ${status}/${waitFor} status`, async () => {
+    const item = { ...pursuit, goal: feedbackGoal, status, waitFor, waitReason, nextStep, currentActor: { runRef: 'finished-run' } };
+    await start(async tool => envelope(tool === 'overview' ? overview([item]) : item));
+    await wait(() => !!container.querySelector('.mind-title-button'));
+    expect(container.querySelector('.mind-card .mind-tag')?.textContent).toBe(expected);
+    expect(container.querySelector('.mind-card h3')?.textContent).toBe(readableTitle);
+    if (status !== 'done') expect(container.querySelector('[aria-label="最近完成"]')).toBeNull();
+    await click(readableTitle);
+    await wait(() => !!container.querySelector('.mind-detail .mind-tag'));
+    expect(container.querySelector('.mind-detail .mind-tag')?.textContent).toBe(expected);
+    expect(container.querySelector('.mind-detail')?.textContent).toContain(nextStep);
+  });
+}
+
+test('artifact titles retain their meaning and technical references can be expanded', async () => {
+  const artifact = { id: 'artifact-001', ref: `doc:${'b'.repeat(64)}`, title: `应用列表改版 · ${'b'.repeat(64)}`, body: '已调整布局；等待你确认实际效果。', format: 'text' };
+  const item = { ...pursuit, goal: feedbackGoal, artifactRefs: [artifact.ref] };
+  await start(async tool => envelope(tool === 'overview' ? overview([item]) : { pursuit: item, artifacts: [artifact, { ref: 'doc:untitled', body: '核验记录' }], evidence: [] }));
+  await wait(() => !!container.querySelector('.mind-title-button'));
+  await click(readableTitle);
+  await wait(() => container.querySelectorAll('.mind-artifact').length === 2);
+  const cards = Array.from(container.querySelectorAll('.mind-artifact'));
+  expect(cards.map(card => card.querySelector('h4')?.textContent)).toEqual(['应用列表改版', `${readableTitle} · 成果`]);
+  const technical = cards[0]!.querySelector('details')!;
+  expect(technical.open).toBe(false);
+  technical.querySelector('summary')!.click();
+  expect(technical.open).toBe(true);
+  expect(technical.textContent).toContain(artifact.ref);
+  expect(technical.textContent).toContain(artifact.id);
+  expect(container.querySelector('.mind-detail')?.textContent).toContain('等待你确认实际效果');
 });

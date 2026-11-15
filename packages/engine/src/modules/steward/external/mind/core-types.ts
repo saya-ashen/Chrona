@@ -28,13 +28,14 @@ export interface Understanding extends Versioned {
   status: "active" | "candidate" | "needs-review" | "retracted";
   visibilityRevision: number; expiresAt?: string; suppression?: Suppression;
 }
+export type WaitFor = "user" | "permission" | "external" | "provider" | "budget" | "verification";
 export type PursuitStatus = "candidate" | "active" | "waiting" | "done" | "ended";
 export interface Responsibility { actor: string; runRef: string; claimedRevision: number; stopRequested: boolean }
 export interface Pursuit extends Versioned {
   semanticKey: string; goal: string; completionCriteria: string[]; scope: Scope;
   reason: "explicit-goal" | "unfinished-commitment" | "important-blocker" | "improvement";
   evidenceRefs: string[]; understandingRefs: string[]; status: PursuitStatus;
-  paused: boolean; waitReason?: string; nextStep?: string; nextCheckAt?: string;
+  paused: boolean; waitFor?: WaitFor; waitReason?: string; nextStep?: string; nextCheckAt?: string;
   currentActor?: Responsibility; artifactRefs: string[]; suppression?: Suppression;
   verification?: { at: string; method: string; originalReceiptRef: string; runRef: string };
   visibilityRevision: number;
@@ -49,7 +50,7 @@ export interface ProgressCandidate extends Versioned {
   receipt: string; pursuitId: string; pursuitRevision: number; visibilityRevision: number;
   actor: string; runRef: string; actionKey: string; evidenceRefs: string[];
   summary: string; artifactRefs: string[]; originalReceiptRef: string;
-  desiredStatus: "active" | "waiting" | "done"; nextStep?: string; waitReason?: string;
+  desiredStatus: "active" | "waiting" | "done"; waitFor?: WaitFor; nextStep?: string; waitReason?: string;
   state: "pending" | "applied" | "stale" | "rejected";
 }
 export interface ActionRecord {
@@ -65,6 +66,7 @@ export interface UserFeedback extends Versioned {
 }
 export interface CoreSettings {
   revision: number; enabled: boolean; learningEnabled: boolean; notifyEnabled: boolean; autoSubmit: boolean;
+  organizerProviderId?: string; organizerModel?: string; mainProviderId?: string; mainModel?: string;
   timezone: string; quietStart: string; quietEnd: string;
   eventRetentionDays: number; diagnosticRetentionDays: number;
   maxDatabaseBytes: number; restoreBlocked: boolean;
@@ -108,7 +110,7 @@ export interface ReleaseInput extends ClaimInput { runRef: string; executionStop
 export interface ProgressInput extends ClaimInput {
   summary: string; artifactRefs: string[]; originalReceiptRef: string;
   evidenceRefs: string[]; desiredStatus: "active" | "waiting" | "done";
-  nextStep?: string; waitReason?: string;
+  nextStep?: string; waitReason?: string; waitFor?: WaitFor;
 }
 /** Constructed by runtime after persisted tool-result and artifact inspection; never passed through tool JSON. */
 export interface VerifiedProgress {

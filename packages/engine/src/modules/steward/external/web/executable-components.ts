@@ -11,7 +11,8 @@ const names = (pattern: RegExp) => z.array(z.string().regex(pattern)).max(16).re
 const propsSchema = z.object({ type: z.literal("object"), properties: z.record(z.string(), z.record(z.string(), z.unknown())), required: z.array(z.string()).optional(), additionalProperties: z.literal(false) }).strict();
 const definitionSchema = z.object({
   name: z.string().regex(NAME), javascript: z.string().min(1), css: z.string().optional(), props: propsSchema,
-  events: names(/^[a-z][a-zA-Z0-9]*$/), slots: names(/^[a-z][a-zA-Z0-9]*$/), tools: names(SLUG),
+  events: names(/^[a-z][a-zA-Z0-9]*$/), slots: names(/^[a-z][a-zA-Z0-9]*$/),
+  tools: z.array(z.string().regex(SLUG)).refine(items => new Set(items).size === items.length, "Duplicate names").default([]),
 }).strict();
 const storedSchema = definitionSchema.extend({ module: z.string().regex(SLUG), moduleId: z.string().min(1), hash: z.string().min(1), revision: z.string().regex(/^[a-f0-9]{64}$/) }).strict();
 export type ExecutableComponent = z.infer<typeof storedSchema>;

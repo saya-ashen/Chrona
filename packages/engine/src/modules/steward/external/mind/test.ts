@@ -140,7 +140,8 @@ try {
   await denied("settings", forged, { kind: "module", module: "mind", moduleId: ids.mind, hash }, "FORBIDDEN");
 
   const settings = decode<CoreSettings>(await request("settings"));
-  assert.equal(settings.autoSubmit, false); assert.equal(settings.enabled, true); assert.equal(settings.learningEnabled, true); assert.equal(settings.notifyEnabled, false);
+  assert.equal(settings.autoSubmit, false); assert.equal(settings.enabled, true); assert.equal(settings.learningEnabled, true);
+  assert.equal(settings.notifyEnabled, false);
   // Current wire supplies patch + settings revision; the adapter owns visibility and the receipt key.
   const patch = { patch: JSON.stringify({ timezone: "Asia/Shanghai" }), revision: settings.revision };
   const receipt = decode<{ actionKey: string; outcome: string; value: CoreSettings }>(await request("settings", patch));

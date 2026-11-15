@@ -66,9 +66,16 @@ for(const ref of refs)for(const phase of ['prepare','capture','submit'] as const
   expect(f.service.detail({kind:'pursuit',id:f.input.pursuitId},owner)).toEqual(original);expect(f.store.read().visibilityRevision).toBe(0);
   if(phase==='prepare')await expect(f.delivery.prepare(f.input,f.worker)).rejects.toThrow('evidence');
   if(phase==='capture')await expect(f.stage()).rejects.toThrow('evidence');
-  if(phase==='submit')await expect(f.delivery.submit(r!.id,owner)).rejects.toThrow('evidence');
+  if(phase==='submit'){
+   await expect(f.delivery.submit(r!.id,owner)).rejects.toThrow('evidence');
+   expect(f.delivery.detail(r!.id,owner).status).toBe('failed');expect(f.delivery.pendingFor(f.input.pursuitId)).toBe(false);
+  }
   expect(f.state.submits).toBe(0);
-  if(r){expect(f.delivery.cleanupWithdrawn()).toEqual({deferred:0});expect(f.delivery.detail(r.id,owner)).toMatchObject({withdrawn:true,payload:null,status:'withdrawn'});}
+  if(r){
+   expect(f.delivery.cleanupWithdrawn()).toEqual({deferred:0});
+   expect(f.delivery.detail(r.id,owner)).toMatchObject({withdrawn:true,payload:null,status:phase==='submit'?'failed':'withdrawn'});
+   expect(f.delivery.pendingFor(f.input.pursuitId)).toBe(false);expect(f.state.submits).toBe(0);
+  }
  }finally{f.close();}
 });
 
@@ -86,7 +93,10 @@ for(const {name,change} of changes)test(`current ${name} invalidates frozen revi
   const before=f.delivery.detail(r.id,owner),p=f.service.detail({kind:'pursuit',id:f.input.pursuitId},owner);
   change(f);f.reopen();expect(f.service.detail({kind:'pursuit',id:p.id},owner)).toEqual(p);
   await expect(f.delivery.submit(r.id,owner)).rejects.toThrow();expect(f.state.submits).toBe(0);expect(f.delivery.detail(r.id,owner).pursuitBasis).toBe(before.pursuitBasis);
-  expect(f.delivery.cleanupWithdrawn()).toEqual({deferred:0});expect(f.delivery.detail(r.id,owner)).toMatchObject({withdrawn:true,payload:null,status:'withdrawn'});
+  expect(f.delivery.detail(r.id,owner).status).toBe('failed');expect(f.delivery.pendingFor(f.input.pursuitId)).toBe(false);
+  expect(f.delivery.cleanupWithdrawn()).toEqual({deferred:0});f.reopen();
+  expect(f.delivery.detail(r.id,owner)).toMatchObject({withdrawn:true,payload:null,status:'failed'});
+  expect(f.delivery.pendingFor(f.input.pursuitId)).toBe(false);expect(f.state.submits).toBe(0);
  }finally{f.close();}
 });
 
@@ -105,7 +115,7 @@ test('a pursuit-only saved basis cannot bypass current understanding dependencie
   // Seed the pre-fix pursuit-only digest to exercise stale persisted review, through SQLite.
   const {Database}=await import('bun:sqlite'),db=new Database(join(f.dir,'mind-delivery.sqlite'));
   try{
-   const p=f.service.detail({kind:'pursuit',id:f.input.pursuitId},owner),{revision,updatedAt,currentActor,...basis}=p;
+   const p=f.service.detail({kind:'pursuit',id:f.input.pursuitId},owner),{revision:_revision,updatedAt:_updatedAt,currentActor:_currentActor,...basis}=p;
    const old=f.delivery.detail(r.id,owner);old.pursuitBasis=coreDigest(basis);
    db.query('UPDATE delivery SET body=? WHERE id=?').run(JSON.stringify(old),r.id);
   }finally{db.close();}
@@ -141,7 +151,10 @@ for(const phase of ['admission','directory'] as const)test(`dependency loss duri
   const r=await f.delivery.prepare(f.input,f.worker);expect(await f.stage()).toBe(1);
   if(phase==='admission')f.state.admission=()=>f.gap(f.support);
   else{let reads=0;f.state.directory=()=>{if(++reads===2)f.changeUnderstanding(u=>{u.value='Changed during final directory read';});};}
-  await expect(f.delivery.submit(r.id,owner)).rejects.toThrow();expect(f.state.submits).toBe(0);expect(f.delivery.detail(r.id,owner).status).toBe('coordinator-ready');
+  await expect(f.delivery.submit(r.id,owner)).rejects.toThrow();expect(f.state.submits).toBe(0);expect(f.delivery.detail(r.id,owner).status).toBe('failed');
+  expect(f.delivery.pendingFor(f.input.pursuitId)).toBe(false);
+  f.reopen();expect(f.delivery.detail(r.id,owner).status).toBe('failed');
+  expect(f.delivery.pendingFor(f.input.pursuitId)).toBe(false);expect(f.state.submits).toBe(0);
  }finally{f.close();}
 });
 

@@ -22,7 +22,7 @@ class ModelError extends Error {
  * Build the portable .mjs in a Chrona checkout with:
  * bun build.ts --registration-test-only /absolute/support-directory
  * Copy that single file beside an ordinary app test and import createRegistrationTest from it.
- * Supported SDK surface: on('activated'), chrona.paths, synchronous chrona.call to web.*, ModelError.
+ * Supported SDK surface: on('activated'), onDisconnect cleanup, chrona.paths, synchronous chrona.call to web.*, ModelError.
  * This is trusted in-process app code, not a sandbox or proof of kernel activation/browser behavior.
  */
 export async function createRegistrationTest(entry: string, options: { manifest?: string; moduleId?: string; hash?: string } = {}) {
@@ -38,8 +38,10 @@ export async function createRegistrationTest(entry: string, options: { manifest?
   const pages = createPages({ dataDir: join(root, "web"), modules: async () => [{ id: caller.moduleId, name: caller.module, activeHash: caller.hash, status: "active" }], tools: async module => module === caller.module ? tools : new Map() });
   const calls: Call[] = [];
   let activated: Activated | undefined;
+  const disconnectHandlers: (() => void | Promise<void>)[] = [];
   const sdk = {
     ModelError,
+    onDisconnect(handler: () => void | Promise<void>) { disconnectHandlers.push(handler); },
     on(kind: string, handler: Activated) { if (kind === "activated") activated = handler; },
     chrona: {
       dependencies: { web: "web" },
@@ -69,7 +71,10 @@ export async function createRegistrationTest(entry: string, options: { manifest?
       },
     },
   };
-  async function close() { Reflect.deleteProperty(globalThis, key); await rm(root, { recursive: true, force: true }); }
+  async function close() {
+    try { for (const handler of disconnectHandlers.splice(0)) await handler(); }
+    finally { Reflect.deleteProperty(globalThis, key); await rm(root, { recursive: true, force: true }); }
+  }
   try {
     Reflect.set(globalThis, key, sdk);
     await mkdir(sdk.chrona.paths.data, { recursive: true });
@@ -78,7 +83,7 @@ export async function createRegistrationTest(entry: string, options: { manifest?
       build.onResolve({ filter: /^chrona$/ }, () => ({ path: "sdk", namespace: "registration-sdk" }));
       build.onLoad({ filter: /.*/, namespace: "registration-sdk" }, () => ({ loader: "js", contents: `
         const sdk = globalThis[${JSON.stringify(key)}];
-        export const chrona = sdk.chrona, on = sdk.on, ModelError = sdk.ModelError;
+        export const chrona = sdk.chrona, on = sdk.on, onDisconnect = sdk.onDisconnect, ModelError = sdk.ModelError;
       ` }));
     } }] });
     if (!build.success) throw new AggregateError(build.logs, "Cannot build registration test app");
