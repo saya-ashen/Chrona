@@ -1,6 +1,6 @@
 import { AuthorError, fail, name, object, relative, type Stage } from "./contracts";
 import { type MaterialFile, type SourceFiles } from "./files";
-import { digest, MATERIAL_LIMITS, validateMaterial } from "./material";
+import { digest, MATERIAL_LIMITS, validateMaterial, materialSummary } from "./material";
 function packageEntry(expectedName: string, files: MaterialFile[]): string {
   const manifestFile = files.find(file => file.path === "module.json");
   if (!manifestFile) return fail("Package is missing module.json.");
@@ -22,7 +22,7 @@ export function packageMaterial(expectedName: string, material: MaterialFile[], 
   if (!files.some(file => file.path === entry)) return fail("Package entry must be present in its source tree.");
   // This is intentionally not kernel manifest validation or a claim that the package passes checks.
   const index = files.map(file => ({ path: file.path, bytes: file.bytes.length, sha256: digest(file.bytes), executable: file.executable }));
-  const materialDigest = digest(JSON.stringify(index));
+  const materialDigest = materialSummary(files).materialDigest;
   const metadata = { schema: 1, name: expectedName, provenanceAuthority: "caller-declared", provenance, materialDigest, bytes, files: index };
   const metadataText = `${JSON.stringify(metadata, null, 2)}\n`;
   if (Buffer.byteLength(metadataText) > MATERIAL_LIMITS.recordBytes) throw new AuthorError("too_large", "Package provenance exceeds 1 MiB.");

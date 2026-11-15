@@ -98,5 +98,12 @@ export function validateMaterial(files: MaterialFile[]) {
   return { bytes: total, record };
 }
 export function materialSummary(files: MaterialFile[]) {
-  return { files: files.length, bytes: files.reduce((total, file) => total + file.bytes.length, 0), materialDigest: digest(JSON.stringify(files.map(file => ({ path: file.path, bytes: file.bytes.length, sha256: digest(file.bytes), executable: Boolean(file.executable) })).sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0))) };
+  // The stage proof and kernel receipt must identify the same frozen bytes.
+  const hash = createHash("sha256"), explicit = files.some(file => file.path === MATERIAL_RECORD);
+  for (const file of [...files].sort((a, b) => a.path.localeCompare(b.path))) {
+    hash.update(file.path).update("\0");
+    if (explicit) hash.update(`${file.executable ? "755" : "644"}:${file.bytes.length}:`);
+    hash.update(file.bytes).update("\0");
+  }
+  return { files: files.length, bytes: files.reduce((total, file) => total + file.bytes.length, 0), materialDigest: hash.digest("hex") };
 }
