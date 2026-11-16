@@ -13,7 +13,6 @@ import { checkoutModule } from "./module-files";
 import { moduleMaterialDigest, snapshotModuleMaterial } from "./module-artifacts";
 import { commitModuleSource, readModuleMaterial, type ModuleGitRevision } from "./module-git";
 import { assertCandidateAdmissionIn, assertCandidateOwner, assertCandidateSubmitter, candidateDigest, candidateRequestId, readCandidateAdmissionIn, readCandidateSetIn, type CandidateAdmissionRecord, type CandidateDb, type CandidateSet } from "./module-candidate-records";
-export { findCandidateSet } from "./module-candidate-records";
 
 async function confinedMaterial<T>(operation: () => Promise<T>): Promise<T> {
   try { return await operation(); }

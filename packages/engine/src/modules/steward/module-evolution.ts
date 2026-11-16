@@ -92,5 +92,3 @@ export async function updateModuleEvolution(db: Db, input: { workspaceId: string
   await save(db, input.workspaceId, outcome, input.now);
   return true;
 }
-
-export const MODULE_EVOLUTION_KIND = KIND;

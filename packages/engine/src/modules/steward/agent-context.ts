@@ -9,7 +9,7 @@ import { selectAgentProvider, providerView, type ProviderBinding } from "./agent
 import { contextDigest, contextRequestDigest, modulePrincipal, ownedContext, type ModulePrincipal } from "./agent-context-state";
 import { executeContextCommand, type ContextCommand } from "./agent-context-admission";
 
-export { ownedContext, ownedRun, view, type ModulePrincipal } from "./agent-context-state";
+export { ownedRun, view, type ModulePrincipal } from "./agent-context-state";
 
 async function selectContextProvider(ports: StewardPorts, principal: ModulePrincipal, args: Record<string, unknown>) {
   let providerId = args.providerId as string | undefined;

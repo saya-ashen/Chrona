@@ -43,17 +43,18 @@ export async function restoreApplications(root = ROOT, destination = join(root, 
   const lock = JSON.parse(await readFile(join(root, "resources/application-inputs/lock.json"), "utf8")) as { version: number; applications: ApplicationInput[] };
   if (lock.version !== 1) throw new Error("Unsupported application input lock");
   await mkdir(destination, { recursive: true });
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
   for (const app of lock.applications) {
     const bundle = join(root, app.bundle);
     if (sha256(await readFile(bundle)) !== app.bundleSha256) throw new Error(`Application bundle checksum mismatch: ${app.name}`);
-    const head = execFileSync("git", ["bundle", "list-heads", bundle, "refs/heads/main"], { encoding: "utf8", stdio: "pipe" }).trim();
+    const head = execFileSync("git", ["bundle", "list-heads", bundle, "refs/heads/main"], { env, encoding: "utf8", stdio: "pipe" }).trim();
     if (head !== `${app.commit} refs/heads/main`) throw new Error(`Application commit mismatch: ${app.name}`);
     if (app.artifacts && sha256(await readFile(join(root, app.artifacts.file))) !== app.artifacts.sha256) throw new Error(`Application artifact input checksum mismatch: ${app.name}`);
     const target = join(destination, app.name);
     if (!existsSync(target)) {
       const temporary = await mkdtemp(join(dirname(target), `.${app.name}-`));
       try {
-        execFileSync("git", ["-c", "core.hooksPath=/dev/null", "clone", "--no-hardlinks", "--branch", "main", bundle, temporary], { stdio: "pipe" });
+        execFileSync("git", ["-c", "core.hooksPath=/dev/null", "clone", "--no-hardlinks", "--branch", "main", bundle, temporary], { env, stdio: "pipe" });
         await rm(join(temporary, ".git"), { recursive: true });
         if (app.artifacts) execFileSync("tar", ["-xf", join(root, app.artifacts.file), "-C", temporary], { stdio: "pipe" });
         await publishRestoredApplication(temporary, target);

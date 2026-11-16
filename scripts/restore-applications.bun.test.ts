@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { stageModuleMaterial } from "../build/agent-dependencies";
 import { pinApplication } from "./pin-application";
 import { restoreApplications } from "./restore-applications";
@@ -36,6 +36,29 @@ test("offline inputs restore source, exact artifacts and executable modes withou
     await restoreApplications(f.root, f.restored);
     await chmod(join(f.restored, "example/runtime.js"), 0o644);
     await expect(restoreApplications(f.root, f.restored)).rejects.toThrow("executable mode mismatch");
+  } finally { await rm(f.root, { recursive: true, force: true }); }
+});
+
+test.each([false, true])("first restoration preserves the hook host index (all repository variables: %s)", async allRepositoryVariables => {
+  const f = await fixture();
+  const git = (args: string[]) => execFileSync("git", ["-C", f.root, ...args], { encoding: "utf8", stdio: "pipe" }).trim();
+  try {
+    git(["init", "--initial-branch=main"]);
+    git(["add", "resources"]);
+    const tree = git(["write-tree"]), index = join(f.root, ".git/index");
+    const before = await readFile(index), files = git(["ls-files", "-z"]);
+    const env = { ...process.env, GIT_INDEX_FILE: index };
+    if (allRepositoryVariables) Object.assign(env, {
+      GIT_DIR: join(f.root, ".git"), GIT_WORK_TREE: f.root, GIT_COMMON_DIR: join(f.root, ".git"),
+      GIT_OBJECT_DIRECTORY: join(f.root, ".git/objects"), GIT_PREFIX: "scripts/",
+    });
+    const code = `import { restoreApplications } from ${JSON.stringify(resolve("scripts/restore-applications.ts"))}; await restoreApplications(${JSON.stringify(f.root)}, ${JSON.stringify(f.restored)});`;
+    const result = Bun.spawnSync([process.execPath, "--eval", code], { cwd: f.root, env, stdout: "pipe", stderr: "pipe" });
+    expect(result.exitCode, result.stderr.toString() + result.stdout.toString()).toBe(0);
+    expect(await readFile(join(f.restored, "example/index.ts"), "utf8")).toContain('"pinned"');
+    expect((await readFile(index)).equals(before)).toBe(true);
+    expect(git(["ls-files", "-z"])).toBe(files);
+    expect(git(["write-tree"])).toBe(tree);
   } finally { await rm(f.root, { recursive: true, force: true }); }
 });
 

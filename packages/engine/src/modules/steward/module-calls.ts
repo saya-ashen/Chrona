@@ -1,7 +1,7 @@
 import { assertExpectedTarget, targetFence, bindInvocationTarget, checkInvocationTarget, routedTargetName, splitTarget, resolveTarget, assertRoutedIdentity, type Target } from "./module-call-target";
 export { routedTargetName } from "./module-call-target";
 import { systemError, systemFailureData, deliveryErrorCode, checkSystemOutput, checkModuleOutput, moduleOutputError, validArgs, stageOf, message } from "./module-call-output";
-export { checkSystemOutput, checkModuleOutput, moduleOutputError } from "./module-call-output";
+export { checkSystemOutput } from "./module-call-output";
 import { appendRunToolResultIn } from "./run-events";
 import { randomUUID } from "node:crypto";
 import { moduleRequestDigest as requestDigest } from "./module-request-digest";
@@ -17,7 +17,7 @@ export type { SystemTool, SystemModule } from "./module-system-types";
 import { isAgentContextEntry } from "./agent-context-entry";
 import { admitted } from "./module-call-admission";
 export { admitted } from "./module-call-admission";
-export { moduleCallbackContractHash, normalizedToolInputSchema, validateToolArgs, moduleToolExampleError } from "./module-tool-contract";
+export { moduleCallbackContractHash, validateToolArgs, moduleToolExampleError } from "./module-tool-contract";
 import { isModulePaused } from "./module-availability";
 export { registerLocalModule, registerSystemModule, listSystemModules, listLocalModules } from "./module-registry";
 
@@ -45,7 +45,6 @@ export function callerKey(caller: Caller) {
 }
 const callerName = (caller: Caller) => caller.kind === "module" || caller.kind === "system" ? caller.module : null;
 export const kernelOrigin = (workspaceId: string): CallOrigin => ({ workspaceId, caller: { kind: "kernel" }, chain: [], path: [] });
-export const systemOrigin = (workspaceId: string, module: string): CallOrigin => ({ workspaceId, caller: { kind: "system", module }, chain: [], path: [] });
 
 async function previousCall(db: Db, origin: CallOrigin, target: RoutedTarget, key: string) {
   const identity = typeof target === "string" ? await resolveTarget(db, origin.workspaceId, target) : null;

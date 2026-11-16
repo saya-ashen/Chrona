@@ -1,4 +1,3 @@
-import { z } from "zod";
 import type { SecretSpec } from "@chrona/contracts/steward";
 import { oauthDefinitionIdentity, type OAuthDefinition } from "./oauth-definition";
 
@@ -26,10 +25,3 @@ export function secretView(declared: string | SecretSpec, saved: Record<string, 
         .map(name => name === "refreshToken" ? "" : name.slice("refreshToken_".length)) } : null,
   };
 }
-export const secretViewSchema = z.object({
-  label: z.string().nullable(), description: z.string().nullable(),
-  fields: z.array(z.object({ name: z.string(), label: z.string(), description: z.string().nullable(), optional: z.boolean(), plain: z.boolean(), saved: z.boolean() })),
-  extraFields: z.object({ label: z.string(), valueLabel: z.string(), description: z.string().nullable(), saved: z.array(z.string()) }).nullable(),
-  savedFields: z.array(z.string()).nullable(),
-  oauth: z.object({ provider: z.string(), scopes: z.array(z.string()), accounts: z.boolean(), authorized: z.array(z.string()) }).nullable(),
-});

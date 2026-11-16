@@ -74,6 +74,41 @@ test("staged HEAD and release-default commit baselines retain app debt after ext
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
+test.each([false, true])("hook Git environment preserves the host index and baseline (all repository variables: %s)", allRepositoryVariables => {
+  const f = fixture();
+  try {
+    f.git(f.root, ["update-ref", "refs/remotes/origin/main", f.head]);
+    writeFileSync(join(f.root, "host-staged.txt"), "Host-only staged change\n");
+    f.git(f.root, ["add", "host-staged.txt"]);
+    const index = join(f.root, ".git/index");
+    const tree = f.git(f.root, ["write-tree"]);
+    const before = readFileSync(index), files = f.git(f.root, ["ls-files", "-z"]);
+    const env = { ...process.env, GIT_INDEX_FILE: index, LINT_RATCHET_BASE: "" };
+    if (allRepositoryVariables) Object.assign(env, {
+      GIT_DIR: join(f.root, ".git"), GIT_WORK_TREE: f.root, GIT_COMMON_DIR: join(f.root, ".git"),
+      GIT_OBJECT_DIRECTORY: join(f.root, ".git/objects"), GIT_PREFIX: "scripts/",
+    });
+    for (const args of [["scripts/lint-ratchet.ts", "--staged"], ["scripts/check-guardrails.ts", "--staged"], ["scripts/lint-ratchet.ts"]]) {
+      const result = Bun.spawnSync([process.execPath, ...args], { cwd: f.root, env, stdout: "pipe", stderr: "pipe" });
+      expect(result.exitCode, result.stderr.toString() + result.stdout.toString()).toBe(0);
+      expect(readFileSync(index).equals(before)).toBe(true);
+      expect(f.git(f.root, ["ls-files", "-z"])).toBe(files);
+      expect(f.git(f.root, ["write-tree"])).toBe(tree);
+    }
+    // Host object reads must still honor an explicitly selected hook index.
+    const hookIndex = join(f.root, ".git/hook.index");
+    cpSync(index, hookIndex);
+    const hookEnv = { ...env, GIT_INDEX_FILE: hookIndex };
+    execFileSync("git", ["rm", "--cached", "resources/application-inputs/lock.json"], { cwd: f.root, env: hookEnv, stdio: "pipe" });
+    const selectedIndex = readFileSync(hookIndex);
+    const result = Bun.spawnSync([process.execPath, "scripts/check-guardrails.ts", "--staged"], { cwd: f.root, env: hookEnv, stdout: "pipe", stderr: "pipe" });
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr.toString()).toContain("Stage the application input lock");
+    expect(readFileSync(hookIndex).equals(selectedIndex)).toBe(true);
+    expect(readFileSync(index).equals(before)).toBe(true);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
 test("a fatal parsing error cannot replace two inherited ordinary lint errors", () => {
   const f = fixture();
   try {

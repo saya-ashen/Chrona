@@ -10,8 +10,6 @@
     "@chrona/workspaces": "workspace:*",
     "@chrona/db": "workspace:*",
     "@chrona/integrations": "workspace:*",
-    "commander": "^15.0.0",
-    "chalk": "^6.0.0",
-    "cli-table3": "^0.6.5"
+    "commander": "^15.0.0"
   }
 }

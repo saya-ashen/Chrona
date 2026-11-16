@@ -17,14 +17,6 @@ export const modulesListOutput = z.array(appSchema.extend({
 const toolExampleOutput = z.object({ description: z.string().optional(), args: z.record(z.string(), z.json()), result: z.json().optional() });
 const toolErrorOutput = z.object({ code: z.string(), description: z.string(), recovery: z.string() });
 export const modulesToolsOutput = z.array(z.object({ moduleId: z.string().optional(), hash: z.string().optional(), target: routedTargetSchema, label: z.string(), description: z.string(), inputSchema: z.record(z.string(), z.json()), outputSchema: z.json().nullable(), examples: z.array(toolExampleOutput).nullable(), sideEffects: z.array(z.string()).nullable(), errors: z.array(toolErrorOutput).nullable(), retry: z.string(), idempotent: z.boolean() }));
-export const modulesRollbackOutput = z.discriminatedUnion("status", [
-  z.object({ status: z.literal("pending_approval"), approvalId: z.string() }),
-  z.object({ status: z.literal("active"), moduleId: z.string(), activeHash: z.string() }),
-]);
-export const modulesStatusOutput = z.discriminatedUnion("status", [
-  z.object({ status: z.literal("pending_approval"), approvalId: z.string() }),
-  z.object({ status: z.enum(["paused", "active"]), moduleId: z.string() }),
-]);
 export const secretGetOutput = z.object({ value: z.record(z.string(), z.string()) });
 export const secretSetOutput = z.object({ name: z.string(), configured: z.literal(true) });
 export const secretRemoveOutput = z.object({ name: z.string(), configured: z.boolean() });

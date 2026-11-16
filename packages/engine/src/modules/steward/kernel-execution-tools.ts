@@ -1,11 +1,10 @@
-import { kernelExecutionStartSchema, kernelCleanupInputSchema, kernelCleanupReceiptSchema, type ExecutionPrincipal, type KernelExecutionStart, type KernelLocation, type KernelCleanupInput, type KernelPlacementView } from "@chrona/contracts/steward";
+import { kernelExecutionStartSchema, kernelCleanupInputSchema, kernelCleanupReceiptSchema, type ExecutionPrincipal, type KernelExecutionStart, type KernelCleanupInput } from "@chrona/contracts/steward";
 import type { Prisma } from "@chrona/db";
 import type { StewardPorts } from "./ports";
 import { createExecutionDelivery } from "./execution-delivery";
-import { createExecutionV2Admission, executionPlacementIn } from "./execution-admission";
+import { createExecutionV2Admission } from "./execution-admission";
 import { assertExecutionPrincipal } from "./execution-principal";
-import { executionCallerKey, executionScope, executionDigest } from "./execution-state";
-import { kernelPlacementView } from "./execution-delivery-store";
+import { executionCallerKey, executionScope } from "./execution-state";
 import { receiptIn, replayIn, deliveryInclude, receiverIn } from "./execution-delivery-records";
 import { handleExecutionV2Tool } from "./execution-v2-tools";
 import { CallError } from "./module-call-error";
@@ -22,39 +21,6 @@ export async function startKernelExecution(ports: StewardPorts, p: ExecutionPrin
   // The private host workspace adapter retains its filesystem preparation/verification transaction.
   const result = await createExecutionV2Admission(ports).start(p, { ...input, placement: { executorId: "server", projectRef: input.placement.projectRef, mappingRevision: input.placement.mappingRevision }, budget: input.budget });
   return { execution: result.execution, placement: { ...result.placement, placement: input.placement, workspace: { workspaceRef: result.placement.workspace.workspaceRef, mode: result.placement.workspace.mode, baseline: result.placement.workspace.baseline, state: result.placement.workspace.state === "ready" ? "ready" : result.execution.stopConfirmed ? "retained" : result.execution.status === "unknown" ? "unknown" : "requested", retained: true } } };
-}
-export async function kernelExecutionPlacement(ports: StewardPorts, p: ExecutionPrincipal, workId: string): Promise<KernelPlacementView> {
-  return ports.db.$transaction(async tx => {
-    const a = await attemptIn(tx, p, workId);
-    if (a.targetBinding) return kernelPlacementView(a);
-    const old = await executionPlacementIn(tx, a, true);
-    return { ...old, placement: { kind: "local", projectRef: a.projectRef, mappingRevision: a.mappingRevision }, workspace: { workspaceRef: old.workspace.workspaceRef, mode: old.workspace.mode, baseline: old.workspace.baseline, state: old.workspace.state === "ready" ? "ready" : a.stopConfirmedAt ? "retained" : a.capabilityRevokedAt ? "unknown" : "requested", retained: true } };
-  });
-}
-export async function kernelExecutionLocations(ports: StewardPorts, p: ExecutionPrincipal, input: { after?: string; limit: number }) {
-  return ports.db.$transaction(async tx => {
-    await assertExecutionPrincipal(tx, p);
-    const locations: KernelLocation[] = [];
-    for (const selected of await ports.executionLocations?.(p, tx) ?? []) {
-      if (selected.executorId !== "server") continue;
-      const grant = await ports.resolveExecutionPlacement?.(p, selected, tx);
-      if (grant?.executor !== "server") continue;
-      locations.push({ placement: { kind: "local", projectRef: selected.projectRef, mappingRevision: selected.mappingRevision }, label: grant.label, online: true, baseline: grant.baseline, workspaceModes: grant.baseline.kind === "commit" ? ["existing", "independent_worktree"] : ["existing"] });
-    }
-    const authorities = await tx.executionAuthority.findMany({ where: { workspaceId: p.workspaceId, ownerId: p.ownerId, revokedAt: null } });
-    for (const authority of authorities) {
-      const scope = authority.scope as import("@chrona/contracts/steward").ExecutionAuthorityApproval["scope"];
-      if (p.caller.kind === "module" && !scope.callerModuleIds.includes(p.caller.moduleId)) continue;
-      let online = true;
-      try { await receiverIn(tx, { workspaceId: p.workspaceId, moduleId: authority.receiverModuleId, hash: authority.receiverHash, activationId: authority.receiverActivationId }, true); } catch (e) { if (!(e instanceof CallError)) throw e; online = false; }
-      for (const target of scope.targets) locations.push({ placement: { kind: "application", applicationId: authority.receiverModuleId, targetRef: target.targetRef, targetRevision: target.targetRevision, projectRef: target.projectRef }, label: target.targetRef, online, baseline: target.baseline, workspaceModes: target.workspaceModes });
-    }
-    const sorted = [...new Map(locations.map(item => [executionDigest(item.placement), item])).entries()].sort(([a], [b]) => a.localeCompare(b));
-    const offset = input.after ? sorted.findIndex(([key]) => key === input.after) : -1;
-    if (input.after && offset === -1) throw new CallError("not_found", "Execution location cursor changed");
-    const page = sorted.slice(offset + 1, offset + 1 + input.limit);
-    return { locations: page.map(([, item]) => item), after: sorted.length > offset + 1 + page.length ? page.at(-1)![0] : null };
-  });
 }
 export async function kernelExecutionCleanup(ports: StewardPorts, p: ExecutionPrincipal, raw: KernelCleanupInput) {
   const input = kernelCleanupInputSchema.parse(raw);

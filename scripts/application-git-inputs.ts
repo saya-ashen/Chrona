@@ -20,7 +20,8 @@ function verifyBundle(directory: string, app: ApplicationInput, bytes: Buffer) {
   if (sha256(bytes) !== app.bundleSha256) throw new Error(`Application bundle checksum mismatch: ${app.name}`);
   const path = join(directory, `${app.name}.bundle`);
   writeFileSync(path, bytes);
-  const head = execFileSync("git", ["bundle", "list-heads", path, "refs/heads/main"], { encoding: "utf8", stdio: "pipe" }).trim();
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
+  const head = execFileSync("git", ["bundle", "list-heads", path, "refs/heads/main"], { env, encoding: "utf8", stdio: "pipe" }).trim();
   if (head !== `${app.commit} refs/heads/main`) throw new Error(`Application commit mismatch: ${app.name}`);
   return path;
 }
@@ -31,13 +32,15 @@ export function applicationBaselineSources(root: string, ref: string): Map<strin
   if (!bytes) return null;
   const lock = JSON.parse(bytes.toString()) as { applications: ApplicationInput[] };
   const directory = temporaryInputs(root), sources = new Map<string, string>();
+  // Hook repository variables belong to the host; clones must use their own index and objects.
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
   try {
     for (const app of lock.applications) {
       const bundle = gitObject(root, `${ref}:${app.bundle}`);
       if (!bundle) throw new Error(`Baseline application bundle missing: ${app.name}`);
       const path = verifyBundle(directory, app, bundle), checkout = join(directory, app.name);
-      execFileSync("git", ["-c", "core.hooksPath=/dev/null", "clone", "--branch", "main", path, checkout], { stdio: "pipe" });
-      const files = execFileSync("git", ["-C", checkout, "ls-files", "-z"], { encoding: "utf8", stdio: "pipe" }).split("\0").filter(Boolean);
+      execFileSync("git", ["-c", "core.hooksPath=/dev/null", "clone", "--branch", "main", path, checkout], { env, stdio: "pipe" });
+      const files = execFileSync("git", ["-C", checkout, "ls-files", "-z"], { env, encoding: "utf8", stdio: "pipe" }).split("\0").filter(Boolean);
       for (const file of files) sources.set(`${applicationSourcePath}/${app.name}/${file}`, readFileSync(join(checkout, file), "utf8"));
     }
     return sources;

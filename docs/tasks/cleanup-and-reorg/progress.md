@@ -1,6 +1,6 @@
 # 执行进度
 
-- 当前阶段：0–4 已完成；阶段 4 最后一项 staged 发行锁 BLOCK 已由独立 reviewer `ef694628` 关闭，补丁后完整 verify:slice exit0（167关联文件）。阶段 1 提交 `48f1626`、阶段 2 `80b8ba3`、阶段 3 `c74a45d`。下一步阶段5减法清理。
+- 当前阶段：0–5 已完成；阶段5独立reviewer `7d831d67` 无问题，净减90行，最终完整slice及native build/smoke、Nix FOD通过。阶段1 `48f1626`、阶段2 `80b8ba3`、阶段3 `c74a45d`、阶段4 `21c63b8`。下一步阶段6职责与目录。
 - 基准：6966a5c3；任务分支 refactor/cleanup-and-reorg；隔离目录 /home/saya/workspace/Chrona-cleanup-and-reorg。
 - 原工作区未修改。依赖使用本机既有 node_modules 的独立 reflink/copy，未安装或启用任何插件；正式隔离发行仍需证明不依赖此开发副本。
 - 完整执行方案：plan.md。
@@ -47,3 +47,6 @@
 
 - 独立复审前三项关闭，第四项发行锁漏检已最小补齐：readLock与staged共用parseReleaseLock，要求index发行锁存在，校验必需集合和完整身份/branch/bundle/repository，再与app commit/SHA/bundle路径对应。仅3个源码/测试文件+79/-22净+57（生产净+3）；两CLI的10类坏index反例及既有发行合同共22 tests通过，typecheck通过；lint仅原有2条max-len。未操作主index，未重新运行API/build/browser。
 - 本补丁最终完整slice于2026-11-16T18:58:20.953Z exit0，583 touched、167关联测试文件；lint零新增、type零错误、guardrails含boundaries全部通过。日志staged-final-fix/verify-slice.log、结果staged-final-fix/results.json。stage-4-evidence的runs/finalSliceResult已刷新、pending=null；原349完整Bun失败和所有未覆盖保留。最终独立复审待父协调者，无需重跑已过检查。
+- 阶段 5 已完成源码减法并交父审查：基准 `21c63b8f` 主仓库未暂存/提交。用 knip 与 dependency-cruiser 生成候选并逐项核对动态入口；删除无消费者的执行 placement/location 旧包装、未消费 schema/投影、死转导出、孤立 `run-instructions.ts`，移除 CLI 的 `chalk@6`/`cli-table3` 及锁闭包；恢复真实测试消费者 `moduleCallbackContractHash` 转导出后 typecheck 通过。代码/依赖净减 90 行；无应用仓库改动，无合同 index、fixture、生成副本、暂停应用、测试断言或可靠性边界删除。`flake.nix` 固定 node_modules hash 随锁闭包同步，旧 hash 实际 mismatch 后新 hash FOD 构建 exit0 且 narHash 相符。定向 267 tests/11文件通过，补验 19 tests、typecheck、build、packaged smoke 通过；最终完整 `verify:slice` exit0（lint/type/guardrails/100关联测试）。完整 lint 存量 195 errors/1033 warnings、fatal0，dependency-cruiser 0 errors/48 warnings，knip 剩余候选不机械删除。证据 `docs/tasks/cleanup-and-reorg/stage-5-evidence.json`、摘要 `stage-5-summary.md`，日志 `.tmp/cleanup-and-reorg/stage-5/`。独立 reviewer `7d831d67` 已核对删除消费者与实际日志，无问题，阶段5验收完成；阶段6待实施。
+
+- 阶段5正常提交曾触发真实hook index污染：临时clone继承GIT_INDEX_FILE，主index被覆盖。父保存污染证据后从HEAD恢复index，不改工作树；修复只清跨仓库Git子进程环境，host gitObject保留hook index。新增4反例修前全失败、修后26 tests/127 assertions通过，独立reviewer d6dcf405 OK。修复后完整slice：102关联文件、types、guardrails全部通过；lint误用旧origin/platform-v2拒绝既有警告，父以任务基准21c63b8仅补lint通过，保留失败日志、不重跑已过部分。补丁生产净+4、含测试净+62；合并原净-90后功能净-28。正常hook提交仍需实际成功后确认。
