@@ -156,13 +156,13 @@ test("run pagination includes runs older than the old 15-row window", async () =
 test("interrupted timer claims become unknown before any delivery and are never replayed", async () => {
   const f = await fixture(), app = await f.app("interrupted-clock");
   await callSync(f.ports, app.origin, "timers.set", { id: "check", schedule: { kind: "every", milliseconds: 60_000 } }, { key: "set" });
-  const timer = await f.db.schedule.findFirstOrThrow({ where: { moduleId: app.row.id, mode: "timer" } });
+  const timer = await f.db.timer.findFirstOrThrow({ where: { moduleId: app.row.id,} });
   const revision = (timer.rule as { revision: string }).revision;
-  await f.db.schedule.update({ where: { id: timer.id }, data: { status: "running" } });
+  await f.db.timer.update({ where: { id: timer.id }, data: { status: "running" } });
   await f.db.moduleInvocation.create({ data: { workspaceId: f.workspace.id, caller: "kernel", target: app.row.name, targetIdentity: app.row.id, tool: "timer", mode: "timer", status: "running", key: "lost-event", args: { timerId: timer.id, revision } } });
   await drainTimers(f.ports, f.workspace.id); f.advance(120_000); await drainTimers(f.ports, f.workspace.id);
   expect(f.received).toHaveLength(0);
-  expect((await f.db.schedule.findUniqueOrThrow({ where: { id: timer.id } })).status).toBe("unknown");
+  expect((await f.db.timer.findUniqueOrThrow({ where: { id: timer.id } })).status).toBe("unknown");
 });
 
 test("async keys bind native arguments and can be recovered by target and key before delivery", async () => {

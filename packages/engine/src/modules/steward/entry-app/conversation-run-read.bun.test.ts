@@ -1,5 +1,6 @@
+import { readFile } from "./journal-test-storage";
 import { expect, test } from "bun:test";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { moduleManifestSchema, type AgentProviderRegistration } from "@chrona/contracts/steward";
@@ -57,7 +58,7 @@ test("a confirmed failed Run survives a throwing Provider transcript read withou
       throw new Error(`Unexpected app call: ${target}`);
     } });
     const sent = await restart().send({ text: "check state", requestKey: "original" }), runId = sent.runId!;
-    const journal = async () => JSON.parse(await readFile(join(dataDir, "conversations/state.json"), "utf8"));
+    const journal = async () => JSON.parse(await readFile(join(dataDir, "conversations/sessions.sqlite"), "utf8"));
     await db.run.update({ where: { id: runId }, data: { status: "running", stopStatus: "pending" } });
     await db.runEvent.create({ data: { runId, sequence: 323, kind: "progress", payload: { type: "progress", value: { phase: "thinking" } } } });
     await db.runEvent.create({ data: { runId, sequence: 324, kind: "raw", payload: { type: "chrona_raw_gap", reason: "too_large" } } });

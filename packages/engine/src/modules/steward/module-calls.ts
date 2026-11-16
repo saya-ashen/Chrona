@@ -78,20 +78,7 @@ function nextPath(origin: CallOrigin) {
 function toolEvent(target: Target, args: Record<string, unknown>, now: Date, caller: Caller, call: { id: string; key: string | null; attempt: number; chain: string[]; executionRunId?: string }): ModuleEvent {
   return { trigger: { id: target.tool.name, kind: "tool", firedAt: now.toISOString(), args, caller, call }, now: now.toISOString(), params: {} };
 }
-// Which modules are blocked in a sync call, on which targets (per runtime). A module waiting in one event cannot serve
-// another, so a sync call to a module that is (transitively) waiting on the caller would deadlock across events too.
-const waiting = new WeakMap<StewardPorts["db"], Map<string, string[]>>();
-function waitsOn(graph: Map<string, string[]>, from: string, to: string, seen = new Set<string>()): boolean {
-  if (from === to) return true;
-  if (seen.has(from)) return false;
-  seen.add(from);
-  return (graph.get(from) ?? []).some(next => waitsOn(graph, next, to, seen));
-}
-
-/**
- * Synchronous routed call: waits for the target's reply. Refused when the target is already waiting on this path
- * (the target's events are serial, so it could never answer). Unknown outcomes are reported, never retried.
- */
+/** Synchronous routed calls wait for their exact reply; unknown outcomes are never retried. */
 type SyncInvocation = { ports: StewardPorts; origin: CallOrigin; resolved: Target; target: string; args: Record<string, unknown>; chain: string[]; path: string[]; now: Date; key?: string; activationId?: string | null; privateTransport?: boolean };
 async function invokeSystemSync({ ports, origin, resolved, args, rowId, rowKey, finish, quiet }: SyncInvocation & { rowId: string; rowKey?: string; finish?: (data: Prisma.ModuleInvocationUpdateInput) => Promise<unknown>; quiet: boolean }) {
   // In-process: no event queue to wait on, so no deadlock to guard against.
@@ -111,7 +98,7 @@ async function invokeSystemSync({ ports, origin, resolved, args, rowId, rowKey, 
 }
 async function deliverSyncModule({ ports, origin, resolved, target, args, chain, path, now, key, timeoutMs, activationId, rowId, finish, privateTransport, transient }: SyncInvocation & { timeoutMs?: number; rowId: string; finish: (data: Prisma.ModuleInvocationUpdateInput) => Promise<unknown>; transient: boolean }) {
   try {
-    return await moduleSupervisor(ports).deliver(resolved.module.id, resolved.module.activeHash, toolEvent(resolved, args, now, origin.caller, { id: rowId, key: key ?? null, attempt: 1, chain: path, ...(isAgentContextEntry(ports, origin) ? {executionRunId:origin.run!.executionRunId} : {}) }), { chain, path, ...(privateTransport ? { private: true } : {}), ...(transient ? { retainOutput: false } : {}), beforeDelivery: targetFence(ports, origin.workspaceId, resolved, origin.caller), ...(activationId !== undefined ? { activationId } : {}), validateResult: output => moduleOutputError(target, resolved.tool, output), ...(timeoutMs ? { timeoutMs } : {}) });
+    return await moduleSupervisor(ports).deliver(resolved.module.id, resolved.module.activeHash, toolEvent(resolved, args, now, origin.caller, { id: rowId, key: key ?? null, attempt: 1, chain: path, ...(isAgentContextEntry(ports, origin) ? {executionRunId:origin.run!.executionRunId} : {}) }), { chain, path, callerRunId: origin.run?.moduleRunId, ...(privateTransport ? { private: true } : {}), ...(transient ? { retainOutput: false } : {}), ...(resolved.tool.readOnly ? { retainHistory: false } : {}), beforeDelivery: targetFence(ports, origin.workspaceId, resolved, origin.caller), ...(activationId !== undefined ? { activationId } : {}), validateResult: output => moduleOutputError(target, resolved.tool, output), ...(timeoutMs ? { timeoutMs } : {}) });
   } catch (caught) {
     let error = caught;
     // Supervisor activation checks can reject before its callback fence runs. Classify a version switch as conflict too.
@@ -133,31 +120,11 @@ async function deliverSyncModule({ ports, origin, resolved, target, args, chain,
     throw new CallError(code, code === "unknown" ? `${target}: outcome unknown (${detail})` : `${target}: ${detail}`, reason);
   }
 }
-function removeWaitEdge(edges: Map<string, string[]>, name: string, target: string) {
-  const rest = edges.get(name) ?? [], at = rest.indexOf(target);
-  if (at >= 0) rest.splice(at, 1);
-  if (!rest.length) edges.delete(name);
-}
-async function addWaitEdge(edges: Map<string, string[]>, name: string | null, target: string, label: string, finish: (data: Prisma.ModuleInvocationUpdateInput) => Promise<unknown>) {
-  if (!name) return;
-  if (waitsOn(edges, target, name)) {
-    await finish({ status: "failed", error: "cycle" });
-    throw new CallError("cycle", `${label}: ${target} is waiting on ${name} in another call`);
-  }
-  edges.set(name, [...edges.get(name) ?? [], target]);
-}
 async function invokeModuleSync({ ports, origin, resolved, target, args, chain, path, now, key, timeoutMs, activationId, rowId, finish, privateTransport }: SyncInvocation & { timeoutMs?: number; rowId: string; finish: (data: Prisma.ModuleInvocationUpdateInput) => Promise<unknown> }) {
-  let graph = waiting.get(ports.db);
-  if (!graph) { graph = new Map(); waiting.set(ports.db, graph); }
-  // A detached Agent entry has an identity, but no originating module event waiting on it.
-  const name = isAgentContextEntry(ports, origin) ? null : callerName(origin.caller), edges = graph;
   // A keyless module-to-module read can never be replayed, so its result is not kept.
   // Agent tool calls keep theirs: Run transcripts show them.
-  const transient = !key && resolved.tool.idempotent === true && origin.caller.kind === "module" && !isAgentContextEntry(ports, origin);
-  await addWaitEdge(edges, name, resolved.module.name, target, finish);
-  let reply;
-  try { reply = await deliverSyncModule({ ports, origin, resolved, target, args, chain, path, now, key, timeoutMs, activationId, rowId, finish, privateTransport, transient }); }
-  finally { if (name) removeWaitEdge(edges, name, resolved.module.name); }
+  const transient = !key && resolved.tool.readOnly === true && origin.caller.kind === "module" && !isAgentContextEntry(ports, origin);
+  const reply = await deliverSyncModule({ ports, origin, resolved, target, args, chain, path, now, key, timeoutMs, activationId, rowId, finish, privateTransport, transient });
   const output = "result" in reply ? reply.result.result ?? null : null;
   try { checkModuleOutput(target, resolved.tool, output); }
   catch (error) {
@@ -198,8 +165,11 @@ function createSyncInvocation({ ports, origin, resolved, args, path, now, key }:
     target: resolved.module.name, targetIdentity: resolved.module.id, tool: resolved.tool.name, args: (quiet ? {} : args) as Prisma.InputJsonValue, key: key ?? randomUUID(), requestDigest: digest, targetBound: true, targetModuleId: resolved.module.id, targetHash: resolved.module.activeHash, targetContractHash: null, chain: path, mode: "sync", idempotent: resolved.tool.idempotent, status: "running", attempts: 1, createdAt: now } }) };
   });
 }
-async function executeSyncInvocation({ ports, origin, resolved, target, args, chain, path, now, key, rowId, quiet, timeoutMs, privateTransport }: SyncInvocation & { rowId: string; quiet: boolean; timeoutMs?: number }) {
-  const finish = privateInvocationFinish(ports, rowId, resolved, privateTransport);
+async function executeSyncInvocation({ ports, origin, resolved, target, args, chain, path, now, key, rowId, quiet, timeoutMs, privateTransport, observation = false }: SyncInvocation & { rowId: string; quiet: boolean; timeoutMs?: number; observation?: boolean }) {
+  const finish = observation ? async (data: Prisma.ModuleInvocationUpdateInput) => {
+    if (data.status !== "succeeded") console.error(JSON.stringify({ component: "module-calls", event: "read_failed", target,
+      callId: rowId, error: data.error ?? data.errorCode ?? data.status }));
+  } : privateInvocationFinish(ports, rowId, resolved, privateTransport);
   const activationId = resolved.system ? undefined : (await currentModuleEvolution(ports.db, origin.workspaceId, resolved.module.id, resolved.module.activeHash))?.activationId ?? null;
   const invocation = { ports, origin, resolved, target, args, chain, path, now, key, privateTransport, ...(activationId !== undefined ? { activationId } : {}) };
   if (resolved.system) return invokeSystemSync({ ...invocation, rowId, rowKey: key, finish, quiet });
@@ -235,6 +205,10 @@ export async function callSync(ports: StewardPorts, origin: CallOrigin, requeste
   const args = validArgs(resolved.tool, raw), now = ports.now(), quiet = privateTransport || unrecorded(resolved);
   if (!key && unrecorded(resolved)) {
     return invokeSystemSync({ ports, origin, resolved, target, args, chain, path, now, rowId: randomUUID(), quiet });
+  }
+  if (!key && resolved.tool.readOnly) {
+    return executeSyncInvocation({ ports, origin, resolved, target, args, chain, path, now,
+      rowId: randomUUID(), quiet, timeoutMs, privateTransport, observation: true });
   }
   const row = await createSyncInvocation({ ports, origin, resolved, target, args, chain, path, now, key }, { requestedTarget, digest, quiet });
   if ("existing" in row) {

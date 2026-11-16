@@ -16,7 +16,7 @@ mock.module("chrona", () => ({ ModelError, chrona: { paths: { data }, dependenci
 }));
 mock.module("@chrona/pi", () => ({ piTranscriptPage, PI_TRANSCRIPT_MAX_BYTES, PI_MODEL_ENVIRONMENT_KEYS: ["OPENAI_API_KEY"],
   piLaunchConfig: (options: Record<string, unknown>) => options,
-  async piCompletionUnavailable() { return null; },
+  piCompletionVersionError() { return null; },
   createPiProvider(options: Record<string, unknown>) { configurations.push(options); return {
   name: "pi", supportsRunModel: true, async health() { return { available: true, sandboxed: false, error: null }; },
   start(input: ProviderRunInput) { starts++; runs.push(input); return { done: new Promise(resolve => { finish = resolve; }), async inject() {}, async abort() {}, async native(request: Record<string, unknown>) { return { type: "response", request, instance: starts }; } }; },

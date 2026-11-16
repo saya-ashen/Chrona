@@ -32,16 +32,11 @@ async function fixture(name = "pi", entry = false) {
   return { db, workspace, module, manifest, ports, context, data, approved };
 }
 
-test.each(["owned-session", "entry-session", "queued-run", "build-target", "dependency", "unknown-call", "unhandled-reply", "unknown-effect"])("removal rejects %s without deleting data or creating an approval", async kind => {
+test.each(["owned-session", "entry-session", "queued-run", "dependency", "unknown-call", "unhandled-reply", "unknown-effect"])("removal rejects %s without deleting data or creating an approval", async kind => {
   const f = await fixture();
   if (["owned-session", "entry-session", "queued-run"].includes(kind)) {
     const session = await f.db.session.create({ data: { workspaceId: f.workspace.id, key: "related", source: "module", status: kind === "queued-run" ? "ended" : "active", ...(kind === "entry-session" ? { entryModuleId: f.module.id } : { moduleId: f.module.id }) } });
     if (kind === "queued-run") await f.db.run.create({ data: { workspaceId: f.workspace.id, sessionId: session.id, lane: "background", trigger: "source", status: "queued", provider: "fake", tokenHash: "one", prompt: "work", cwd: f.ports.dataDir } });
-  }
-  if (kind === "build-target") {
-    const session = await f.db.session.create({ data: { workspaceId: f.workspace.id, key: "build", source: "build" } });
-    await f.db.buildTargets.create({ data: { sessionId: session.id, name: f.module.name, modules: [f.module.name, "second"] } });
-    await f.db.run.create({ data: { workspaceId: f.workspace.id, sessionId: session.id, lane: "build", trigger: "build", status: "running", provider: "fake", tokenHash: "two", prompt: "build", cwd: f.ports.dataDir } });
   }
   if (kind === "dependency") {
     const other = await f.db.module.create({ data: { workspaceId: f.workspace.id, name: "consumer", activeHash: "consumer" } });
@@ -58,11 +53,11 @@ test.each(["owned-session", "entry-session", "queued-run", "build-target", "depe
 test.each(["pi", "web", "notify", "other-entry", "files", "events"])("ordinary entry %s can be removed after approval with a data backup", async name => {
   const f = await fixture(name, true);
   expect(f.module.builtin).toBe(false);
-  const timer = await f.db.schedule.create({ data: { workspaceId: f.workspace.id, moduleId: f.module.id, mode: "module", triggerId: "daily", text: "retained timer", createdBy: "chrona", rule: { kind: "every", minutes: 60 }, status: "active", nextAt: f.ports.now() } });
+  const timer = await f.db.timer.create({ data: { workspaceId: f.workspace.id, moduleId: f.module.id, timerId: "retained timer", rule: { kind: "every", minutes: 60 }, status: "active", nextAt: f.ports.now() } });
   const action = await f.approved();
-  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: timer.id } })).toMatchObject({ status: "active" });
+  expect(await f.db.timer.findUniqueOrThrow({ where: { id: timer.id } })).toMatchObject({ status: "active" });
   await removeApproved(f.context, action);
-  expect(await f.db.schedule.findUnique({ where: { id: timer.id } })).toBeNull();
+  expect(await f.db.timer.findUnique({ where: { id: timer.id } })).toBeNull();
   expect(await f.db.module.findUnique({ where: { id: f.module.id } })).toBeNull();
   expect(await f.db.moduleRemoval.findUniqueOrThrow({ where: { moduleId: f.module.id } })).toMatchObject({ workspaceId: f.workspace.id, name: f.module.name, hash: f.module.activeHash });
   const removal = await f.db.audit.findFirstOrThrow({ where: { kind: "module_removed", subjectId: f.module.id } });

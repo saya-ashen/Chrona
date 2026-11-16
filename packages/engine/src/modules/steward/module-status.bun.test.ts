@@ -20,8 +20,8 @@ async function fixture() {
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest: moduleManifestSchema.parse({ name: "example", entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [] }), source: "user", status: "approved", intent: {}, report: {} } });
   const { activationId } = await db.$transaction(tx => recordModuleActivation(context, tx, { moduleId: module.id, previousHash: null, hash: "v1", generationId: "fixture" }));
   // Deliberately opaque rule: lifecycle governance must never interpret calendar schemas.
-  const schedule = (status = "active") => db.schedule.create({ data: {
-    workspaceId: workspace.id, moduleId: module.id, mode: "module", triggerId: "daily", text: "timer", createdBy: "chrona", rule: {}, status,
+  const schedule = (status = "active") => db.timer.create({ data: {
+    workspaceId: workspace.id, moduleId: module.id, timerId: crypto.randomUUID(), rule: {}, status,
     nextAt: status === "active" ? now : null,
   } });
   const status = (value: "active" | "paused", source = "owner", reason = source) => db.$transaction(tx => setStatusIn(context, tx, module.id, value, { source, reason }));
@@ -38,7 +38,7 @@ async function fixture() {
   return { db, workspace, module, ports, context, schedule, status, failure, audit, advance: () => { now = new Date(now.getTime() + 86400_000); } };
 }
 
-test("three failures pause the module and retire calendar work, preserving incident evidence", async () => {
+test("three failures pause the module, preserving timers and incident evidence", async () => {
   const f = await fixture(), timer = await f.schedule(), paused = await f.schedule("paused");
   await f.failure(); await f.failure();
   expect((await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).status).toBe("active");
@@ -48,29 +48,28 @@ test("three failures pause the module and retire calendar work, preserving incid
   const incident = await f.audit("module_runtime_incident");
   const details = (await f.audit("module_disabled")).details as { source: string; reason: string; schedules: string[]; incidentId: string };
   expect(details).toMatchObject({ source: "automatic", reason: "连续三次失败", incidentId: (incident.details as { id: string }).id });
-  expect(details.schedules.sort()).toEqual([timer.id, paused.id].sort());
-  expect(await f.db.schedule.findMany()).toEqual(expect.arrayContaining([
-    expect.objectContaining({ id: timer.id, status: "cancelled", nextAt: null }),
-    expect.objectContaining({ id: paused.id, status: "cancelled", nextAt: null }),
+  expect(await f.db.timer.findMany()).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: timer.id, status: "active" }),
+    expect.objectContaining({ id: paused.id, status: "paused", nextAt: null }),
   ]));
   expect(await notices(f.db, { title: "模块连续失败，已暂停" })).toHaveLength(1);
   await f.status("active");
-  expect(await f.db.schedule.count({ where: { status: "cancelled" } })).toBe(2);
+  expect(await f.db.timer.count({ where: { status: "active" } } )).toBe(1);
   expect((await f.audit("module_enabled")).details).toEqual({ source: "owner" });
 });
 
-test.each(["owner", "cli", "chrona"])("%s pause/resume is idempotent and never revives calendar work", async source => {
+test.each(["owner", "cli", "chrona"])("%s pause/resume is idempotent and preserves timer state", async source => {
   const f = await fixture(), timer = await f.schedule();
   const pause = () => source === "chrona" ? requestStatus(f.context, f.module.id, "paused", "maintenance") : f.status("paused", source, "maintenance");
   await pause(); await pause();
   expect(await f.db.audit.count({ where: { kind: "module_disabled" } })).toBe(1);
-  expect((await f.audit("module_disabled")).details).toEqual({ source, reason: "maintenance", schedules: [timer.id] });
+  expect((await f.audit("module_disabled")).details).toEqual({ source, reason: "maintenance" });
   await f.status("active", source); await f.status("active", source);
   await pause(); await f.status("active", source);
   // A fixed clock exercises same-millisecond transition ordering.
   expect(await f.db.audit.count({ where: { kind: "module_enabled" } })).toBe(2);
-  expect((await f.audit("module_disabled")).details).toEqual({ source, reason: "maintenance", schedules: [] });
-  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: timer.id } })).toMatchObject({ status: "cancelled", nextAt: null });
+  expect((await f.audit("module_disabled")).details).toEqual({ source, reason: "maintenance" });
+  expect(await f.db.timer.findUniqueOrThrow({ where: { id: timer.id } })).toEqual(timer);
 });
 
 test("three failures from a stale version cannot pause the current module or cancel its work", async () => {
@@ -78,7 +77,7 @@ test("three failures from a stale version cannot pause the current module or can
   await f.db.module.update({ where: { id: f.module.id }, data: { activeHash: "v2" } });
   await f.failure("v1"); await f.failure("v1"); await f.failure("v1");
   expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ activeHash: "v2", status: "active" });
-  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: timer.id } })).toMatchObject({ status: "active" });
+  expect(await f.db.timer.findUniqueOrThrow({ where: { id: timer.id } })).toMatchObject({ status: "active" });
   expect(await f.db.audit.count({ where: { kind: "module_disabled" } })).toBe(0);
   expect(await f.db.moduleInvocation.count()).toBe(0);
 });
@@ -89,18 +88,7 @@ test("resume does not interpret old pause audit or calculate missed calendar occ
   await f.db.module.update({ where: { id: f.module.id }, data: { status: "paused" } });
   f.advance(); await f.status("active");
   expect((await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).status).toBe("active");
-  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: timer.id } })).toEqual(timer);
+  expect(await f.db.timer.findUniqueOrThrow({ where: { id: timer.id } })).toEqual(timer);
   expect((await f.audit("module_enabled")).details).toEqual({ source: "owner" });
   expect(await f.db.moduleInvocation.count()).toBe(0);
-});
-
-test.each(["queued", "running", "unknown"])("pause handles %s delivery without weakening stop evidence", async deliveryStatus => {
-  const f = await fixture(), timer = await f.schedule("done");
-  const invocation = await f.db.moduleInvocation.create({ data: { workspaceId: f.workspace.id, caller: "system:schedules", target: f.module.name, tool: "schedule", mode: "schedule", key: `${timer.id}:occurrence`, args: {}, status: deliveryStatus, leaseToken: deliveryStatus === "running" ? "inflight" : null, leaseUntil: deliveryStatus === "running" ? f.ports.now() : null } });
-  const other = await f.db.moduleInvocation.create({ data: { workspaceId: f.workspace.id, caller: "system:schedules", target: "another-module", tool: "schedule", mode: "schedule", key: "another-timer:occurrence", args: {} } });
-  await f.status("paused"); await f.status("active");
-  const result = await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: invocation.id } });
-  if (deliveryStatus === "queued") expect(result).toMatchObject({ status: "cancelled", finishedAt: f.ports.now(), error: "Module paused before delivery" });
-  else expect(result).toEqual(invocation);
-  expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: other.id } })).toEqual(other);
 });

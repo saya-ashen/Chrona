@@ -12,7 +12,7 @@ type Proof={executionId:string;runId:string;principal:{moduleId:string;hash:stri
  * The owner coordinator consumes this proof; no caller-supplied admission object is authority. */
 export class CoreDeliveryAdmission {
  private db:Database;
- constructor(directory:string,private journal:CoreExecutionJournal){const path=join(directory,'mind-delivery-admission.sqlite');this.db=new Database(path,{create:true});chmodSync(path,0o600);this.db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; CREATE TABLE IF NOT EXISTS proofs(id TEXT PRIMARY KEY,json TEXT NOT NULL)');}
+ constructor(directory:string,private journal:CoreExecutionJournal){const path=join(directory,'mind.sqlite');this.db=new Database(path,{create:true});chmodSync(path,0o600);this.db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; CREATE TABLE IF NOT EXISTS proofs(id TEXT PRIMARY KEY,json TEXT NOT NULL)');}
  capture(e:Execution){
   const actual=this.journal.get(e.id);
   if(canonical(actual)!==canonical(e)||!e.runId||!e.principal||!e.ended||e.active||e.settled||e.status!=='settling'||e.terminalStatus!=='finished'||e.stopRequested||e.facts.some(f=>f.status==='unknown')||!e.tools.includes('modules.admit'))return 0;

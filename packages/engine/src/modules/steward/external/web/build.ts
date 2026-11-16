@@ -1,5 +1,5 @@
-// Builds src/pages.tsx (React + json-render for system and registered app pages) into the shipped pages.js.
-// Run `bun build.ts` after changing src/ or catalog.ts; committed artifacts need no installation build step.
+// Builds src/pages.tsx (shared React runtime for system and registered app pages) into the shipped pages.js.
+// Run `bun build.ts` after changing src/; committed artifacts need no installation build step.
 import { createHash } from "node:crypto";
 import { lstat, readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -22,6 +22,8 @@ if (process.argv[2] === "--registration-test-only") {
 
 async function buildWeb() {
   const root = import.meta.dirname;
+  const { buildApplicationUI } = await import("./build-ui");
+  await buildApplicationUI(root, "src/memory-settings.tsx");
   const result = await Bun.build({ entrypoints: [join(root, "src/pages.tsx")], target: "browser", format: "esm", minify: true, define: { "process.env.NODE_ENV": '"production"' } });
   if (!result.success) throw new Error(result.logs.join("\n"));
   await Bun.write(join(root, "pages.js"), `// Built from src/pages.tsx by build.ts; do not edit.\n${(await result.outputs[0]!.text()).replace(/[\t ]+$/gm, "")}`);

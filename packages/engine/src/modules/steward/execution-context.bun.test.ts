@@ -18,9 +18,7 @@ async function fixture() {
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "hash", manifest: moduleManifestSchema.parse({ name: "coding", entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true }), source: "user", status: "approved", intent: {}, report: {} } });
   const project = await mkdtemp(join(tmpdir(), "chrona-coding-context-project-"));
   await writeFile(join(project, "AGENTS.md"), "Fixture project rules");
-  await db.preference.create({ data: { workspaceId, text: "PRIVATE PERSONAL PREFERENCE", topic: "private", origin: "user" } });
-  const other = await db.session.create({ data: { workspaceId, source: "web", key: "web:secret", providerSessionId: "unrelated-provider" } });
-  await db.message.create({ data: { workspaceId, sessionId: other.id, direction: "in", channel: "in_app", text: "PRIVATE OTHER SESSION" } });
+  await db.session.create({ data: { workspaceId, source: "web", key: "web:secret", providerSessionId: "unrelated-provider" } });
   const ports: StewardPorts = { db, now: () => new Date("2026-11-05T12:00:00Z"), publicUrl: null, dataDir: await mkdtemp(join(tmpdir(), "chrona-coding-context-data-")),
     resolveExecutionProject: async (_, projectRef) => ({ projectRef, executor: "server", canonicalPath: project, baseline: "commit:fixture" }) };
   ports.executionEvents = createExecutionEventStore(ports);

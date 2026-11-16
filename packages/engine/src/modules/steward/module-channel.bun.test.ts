@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { createConnection, type Socket } from "node:net";
 import { createModuleChannel } from "./module-channel";
+import type { CallScope } from "./module-supervisor-state";
 
 const now = "2026-10-22T09:00:00.000Z";
 const event = { trigger: { kind: "schedule" as const, id: "daily", firedAt: now }, now, params: {} };
@@ -18,15 +19,42 @@ function lines(socket: Socket) {
   return () => values.length ? Promise.resolve(values.shift()) : new Promise<unknown>(resolve => waiters.push(resolve));
 }
 async function fixture(status: "queued" | "waiting" = "queued") {
-  const calls: unknown[] = [];
-  const channel = await createModuleChannel({ onCall: async call => { calls.push(call); return { id: call.id, result: { callId: "c1", status } }; } });
+  const calls: unknown[] = [], scopes: (CallScope | undefined)[] = [];
+  const channel = await createModuleChannel<CallScope>({ onCall: async (call, scope) => {
+    calls.push(call); scopes.push(scope); return { id: call.id, result: { callId: "c1", status } };
+  } });
   const socket = createConnection({ host: "127.0.0.1", port: Number(new URL(channel.endpoint).port) });
   const next = lines(socket);
   socket.write(JSON.stringify({ type: "auth", version: 1, token: channel.token }) + "\n");
   await next();
   await channel.ready;
-  return { channel, socket, next, calls, endpoint: channel.endpoint, close: async () => { socket.destroy(); await channel.close(); } };
+  return { channel, socket, next, calls, scopes, endpoint: channel.endpoint, close: async () => { socket.destroy(); await channel.close(); } };
 }
+test("nested calls use their event scope and completed events cannot make new calls", async () => {
+  const f = await fixture();
+  const scope = (moduleRunId: string): CallScope => ({
+    workspaceId: "workspace", moduleId: "module", hash: "version", manifest: {} as CallScope["manifest"], moduleRunId,
+  });
+  try {
+    const slow = f.channel.send(event, 1000, undefined, scope("slow"));
+    const a = await f.next() as { id: string };
+    const fast = f.channel.send(event, 1000, undefined, scope("fast"));
+    const b = await f.next() as { id: string };
+    for (const eventId of [b.id, a.id]) {
+      f.socket.write(JSON.stringify({ id: eventId + "call", eventId, method: "callStatus", params: { callId: "c1" } }) + "\n");
+      await f.next();
+    }
+    expect(f.scopes.map(value => value?.moduleRunId)).toEqual(["fast", "slow"]);
+    f.socket.write(JSON.stringify({ id: b.id, result: {} }) + "\n");
+    await fast;
+    f.socket.write(JSON.stringify({ id: "late", eventId: b.id, method: "callStatus", params: { callId: "c1" } }) + "\n");
+    expect(await f.next()).toMatchObject({ id: "late", error: { code: "conflict" } });
+    expect(f.calls).toHaveLength(2);
+    f.socket.write(JSON.stringify({ id: a.id, result: {} }) + "\n");
+    await slow;
+  } finally { await f.close(); }
+});
+
 test("channel validates calls and event replies, then recovers", async () => {
   const f = await fixture();
   try {
@@ -116,19 +144,23 @@ test("channel drops oversize lines and rejects in-flight event", async () => {
     expect(f.channel.diagnostics()).toContain("Invalid channel message");
   } finally { await f.close(); }
 });
-test("event sends serialize; timeout does not close channel; late reply is ignored", async () => {
+test("event sends overlap; timeout does not close channel; late reply is ignored", async () => {
   const f = await fixture();
   try {
     const first = f.channel.send(event, 30);
     const rejected = first.catch(error => error as Error);
     const second = f.channel.send(event, 1000);
     const a = await f.next() as { id: string };
-    expect((await rejected as Error).message).toBe("Module event timeout");
     const b = await f.next() as { id: string };
     expect(b.id).not.toBe(a.id);
+    f.socket.write(JSON.stringify({ id: b.id, result: { result: "fast" } }) + "\n");
+    expect(await second).toEqual({ id: b.id, result: { result: "fast" } });
+    expect((await rejected as Error).message).toBe("Module event timeout");
     f.socket.write(JSON.stringify({ id: a.id, result: {} }) + "\n");
-    f.socket.write(JSON.stringify({ id: b.id, error: "handler failed" }) + "\n");
-    expect(await second).toEqual({ id: b.id, error: "handler failed" });
+    const third = f.channel.send(event, 1000);
+    const c = await f.next() as { id: string };
+    f.socket.write(JSON.stringify({ id: c.id, result: {} }) + "\n");
+    await third;
     expect(f.channel.diagnostics()).toContain("Unmatched event reply");
   } finally { await f.close(); }
 });

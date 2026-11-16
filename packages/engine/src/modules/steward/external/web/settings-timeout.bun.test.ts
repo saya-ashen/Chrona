@@ -3,7 +3,7 @@ import puppeteer from "puppeteer-core";
 import { join } from "node:path";
 
 test("global Settings saves and clears the optional task timeout across viewports", async () => {
-  const bundle = await Bun.build({ entrypoints: [join(import.meta.dir, "src/settings-timeout.browser.test.tsx")], target: "browser", minify: true, define: { "process.env.NODE_ENV": '"production"' } });
+  const bundle = await Bun.build({ entrypoints: [join(import.meta.dir, "src/settings-timeout.browser-test.tsx")], target: "browser", minify: true, define: { "process.env.NODE_ENV": '"production"' } });
   expect(bundle.success).toBe(true);
   const [script, base, primitives, shell] = await Promise.all([
     bundle.outputs[0]!.text(), Bun.file(join(import.meta.dir, "style.css")).text(),

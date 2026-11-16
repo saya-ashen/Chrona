@@ -1,12 +1,12 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { runInNewContext } from "node:vm";
 import { createPages, type Deps, type ModuleState, type PageTool } from "./pages";
 
 const dirs: string[] = [];
 afterEach(async () => { for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true }); });
-const spec = { root: "text", elements: { text: { type: "Text", props: { text: "Read" }, children: [] } } };
-const input = { id: "main", title: "Page", data: { view: { tool: "read" } }, spec };
+const javascript = "export default function mount() { return () => {}; }";
+const input = { id: "main", title: "Page", tools: ["read"], javascript };
 async function fixture(register = true) {
   const dataDir = await mkdtemp("/tmp/chrona-page-inventory-"); dirs.push(dataDir);
   const modules: ModuleState[] = ["alpha", "beta"].map(name => ({ id: `${name}-id`, name, status: "active", activeHash: "approved" }));
@@ -20,7 +20,7 @@ async function fixture(register = true) {
   };
   const pages = createPages(deps);
   if (register) for (const module of ["alpha", "beta"]) {
-    const caller = { kind: "module", module, moduleId: `${module}-id` };
+    const caller = { kind: "module", module, moduleId: `${module}-id`, hash: "approved" };
     await pages.tool("page-set", input, caller);
     await pages.tool("page-set", { ...input, id: "second" }, caller);
   }
@@ -34,7 +34,7 @@ test("navigation discovers all apps once per operation while individual page rea
   expect(f.state).toMatchObject({ discoveries: 1, moduleReads: 1, filteredReads: 0 });
   await Promise.all([f.pages.list(), f.pages.list()]);
   expect(f.state).toMatchObject({ discoveries: 3, moduleReads: 3, filteredReads: 0 });
-  expect(await f.pages.get("alpha", "main")).toMatchObject({ moduleId: "alpha-id", data: { view: { tool: "read" } } });
+  expect(await f.pages.get("alpha", "main")).toMatchObject({ moduleId: "alpha-id", tools: ["read"] });
   expect(f.state).toMatchObject({ discoveries: 3, moduleReads: 4, filteredReads: 1 });
 });
 
@@ -51,32 +51,32 @@ test("next navigation read rechecks visibility, exact prefixes and identities wh
   f.state.inventory[f.state.inventory.length - 1] = alpha;
   expect(await f.pages.list()).toHaveLength(4);
   expect(f.state.discoveries).toBe(5);
-  expect(JSON.parse(await readFile(`${f.dataDir}/pages.json`, "utf8")).pages).toHaveLength(4);
+  expect(JSON.parse(await readFile(`${f.dataDir}/pages-v2.json`, "utf8")).pages).toHaveLength(4);
 });
 
 test("complete module inventory alone controls pruning even when tool discovery omits an owner", async () => {
   const f = await fixture();
   f.state.inventory = [];
   expect(await f.pages.list()).toEqual([]);
-  expect(JSON.parse(await readFile(`${f.dataDir}/pages.json`, "utf8")).pages).toHaveLength(4);
+  expect(JSON.parse(await readFile(`${f.dataDir}/pages-v2.json`, "utf8")).pages).toHaveLength(4);
   f.modules.splice(0, 1);
   expect(await f.pages.list()).toEqual([]);
-  const saved = JSON.parse(await readFile(`${f.dataDir}/pages.json`, "utf8"));
-  expect(saved.pages.map((page: { module: string }) => page.module)).toEqual(["beta", "beta"]);
+  const saved = JSON.parse(await readFile(`${f.dataDir}/pages-v2.json`, "utf8"));
+  expect(saved.pages).toHaveLength(4);
   f.state.inventory = [{ target: "beta.read", inputSchema: {}, moduleId: "beta-id" }];
   expect(await createPages(f.deps).list()).toHaveLength(2);
 });
 
 test("discovery and authoritative inventory failures fail closed and never erase registrations", async () => {
-  const f = await fixture(), before = await readFile(`${f.dataDir}/pages.json`, "utf8");
+  const f = await fixture(), before = await readFile(`${f.dataDir}/pages-v2.json`, "utf8");
   f.state.fail = true; f.state.filteredFailure = true;
   await expect(f.pages.list()).rejects.toThrow("discovery unavailable");
   expect(f.state).toMatchObject({ discoveries: 1, filteredReads: 2 });
-  expect(await readFile(`${f.dataDir}/pages.json`, "utf8")).toBe(before);
+  expect(await readFile(`${f.dataDir}/pages-v2.json`, "utf8")).toBe(before);
   f.state.moduleFailure = true;
   await expect(f.pages.list()).rejects.toThrow("directory unavailable");
   expect(f.state.discoveries).toBe(1);
-  expect(await readFile(`${f.dataDir}/pages.json`, "utf8")).toBe(before);
+  expect(await readFile(`${f.dataDir}/pages-v2.json`, "utf8")).toBe(before);
   f.state.fail = false; f.state.filteredFailure = false; f.state.moduleFailure = false;
   expect(await f.pages.list()).toHaveLength(4);
   expect(f.state.discoveries).toBe(2);
@@ -117,7 +117,7 @@ test("Web wiring completes list and user discovery pages through its existing SD
   const pages = entry.slice(entry.indexOf("const pages = createPages("), entry.indexOf('\non("tool"'));
   const script = new Bun.Transpiler({ loader: "ts" }).transformSync(`${adapter}\n${call}\n${pages}\nglobalThis.wiredPages = pages;`);
   const wired = runInNewContext(`${script}\nglobalThis.wiredPages;`, { chrona: sdk, createPages, createMaterialAdmission: () => ({}) }) as ReturnType<typeof createPages>;
-  for (const module of ["alpha", "beta"]) await wired.tool("page-set", input, { kind: "module", module, moduleId: `${module}-id` });
+  for (const module of ["alpha", "beta"]) await wired.tool("page-set", input, { kind: "module", module, moduleId: `${module}-id`, hash: "approved" });
   requests.length = 0;
   expect((await wired.list()).map(page => page.module)).toEqual(["alpha", "beta"]);
   expect(requests.map(request => request.target)).toEqual(["modules.list", "modules.list", "modules.describe", "modules.describe"]);
@@ -130,26 +130,17 @@ test("Web wiring completes list and user discovery pages through its existing SD
 
 test("shared discovery preserves executable page version and revision pins", async () => {
   const f = await fixture(false), caller = { kind: "module", module: "alpha", moduleId: "alpha-id", hash: "approved" };
-  const component = { name: "Widget", javascript: "export default () => {};", tools: ["read"],
-    props: { type: "object", properties: {}, additionalProperties: false } };
-  const registration = { id: "widget", title: "Widget", spec: { root: "widget", elements: { widget: { type: "alpha:Widget", props: {}, children: [] } } } };
-  await f.pages.tool("component-set", component, caller);
-  await f.pages.tool("page-set", registration, caller);
-  expect(await f.pages.list()).toHaveLength(1);
+  await f.pages.tool("page-set", input, caller);
+  const original = await f.pages.get("alpha", "main");
   f.modules[0]!.activeHash = "new-approved";
   expect(await f.pages.list()).toEqual([]);
+  await f.pages.tool("page-set", { ...input, title: "New" }, { ...caller, hash: "new-approved" });
+  expect((await f.pages.get("alpha", "main"))?.title).toBe("New");
   f.modules[0]!.activeHash = "approved";
-  expect(await f.pages.list()).toHaveLength(1);
-  await f.pages.tool("component-set", { ...component, css: ".widget { color: inherit; }" }, caller);
-  expect(await f.pages.list()).toEqual([]);
-  await f.pages.tool("page-set", registration, caller);
-  expect(await f.pages.list()).toHaveLength(1);
-  f.state.inventory[0]!.inputSchema.description = "Updated read description";
-  expect(await f.pages.list()).toHaveLength(1);
+  expect((await f.pages.get("alpha", "main"))?.revision).toBe(original!.revision);
   f.state.inventory[0]!.moduleId = "replacement-id";
   expect(await f.pages.list()).toEqual([]);
 });
-
 
 test("unrelated oversized inventory falls back to current filtered discovery once per page owner", async () => {
   const f = await fixture();
@@ -162,4 +153,13 @@ test("unrelated oversized inventory falls back to current filtered discovery onc
   f.deps.tools = async () => new Map();
   expect(await f.pages.list()).toEqual([]);
   expect(f.state.discoveries).toBe(3);
+});
+
+ test("new registrations preserve the previous page format for rollback", async () => {
+  const f = await fixture(false), previous = JSON.stringify({ pages: [{ id: "legacy", spec: { type: "text" } }] });
+  await writeFile(`${f.dataDir}/pages.json`, previous);
+  expect(await f.pages.list()).toEqual([]);
+  await f.pages.tool("page-set", input, { kind: "module", module: "alpha", moduleId: "alpha-id", hash: "approved" });
+  expect(await createPages(f.deps).get("alpha", "main")).toMatchObject({ javascript });
+  expect(await readFile(`${f.dataDir}/pages.json`, "utf8")).toBe(previous);
 });

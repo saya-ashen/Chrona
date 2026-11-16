@@ -194,6 +194,10 @@
           "idempotent": {
             "default": false,
             "type": "boolean"
+          },
+          "readOnly": {
+            "type": "boolean",
+            "const": true
           }
         },
         "required": [

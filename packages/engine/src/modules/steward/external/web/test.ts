@@ -2,12 +2,9 @@ import { checkSystemPages, checkHealthRendering } from "./test-system-pages";
 import { checkMaterialAdmission } from "./test-material-admission";
 await checkMaterialAdmission();
 import { strict as assert } from "node:assert";
-import { catalog } from "./catalog";
-import { pageErrors } from "./pages";
 import { systemCall } from "./src/system/adapter";
 import { checkAttachments } from "./test-attachments";
 import { checkRasterContent } from "./test-content";
-import { checkExecutableComponents } from "./test-executable";
 const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 255]);
 // @ts-expect-error Chrona supplies the test kernel at run time.
 import { startModule } from "chrona/testing";
@@ -118,6 +115,11 @@ try {
 
   // The data API answers from routed calls.
   assert.deepEqual((await (await get("/api/web/today")).json()).approvals, []);
+  const beforeContent = calls.length;
+  const content = await (await get("/api/web/today-content")).json();
+  assert.deepEqual(content.approvals, []); assert.equal(content.health, undefined);
+  assert.equal(calls.slice(beforeContent).some(([target]) => target === "activity.runtime" || target === "notify.counts"), false);
+  assert.equal((await (await get("/api/web/runtime")).json()).provider.available, false);
   assert.deepEqual(await (await get("/api/web/modules/a1/diagnostics")).json(), [{ moduleId: "a1", incidents: [] }]);
   assert.deepEqual(calls.at(-1), ["modules.health", { moduleId: "a1", detail: true }]);
   assert.equal((await (await get("/api/web/activity?module=web&before=2026-10-27T05:00:00.000Z")).json()).items[0].text, "web 已切换到版本 5caef53c");
@@ -267,18 +269,12 @@ try {
   // Apps register pages (module-dependency-direction §4): owned by the recorded caller, checked against the catalog and the app's own tools.
   const tool = (id: string, args: Args, caller?: unknown) => module.send({ trigger: { kind: "tool", id, firedAt: new Date().toISOString(), args, caller }, now: new Date().toISOString(), params: {} });
   const files = { kind: "module", module: "files", moduleId: "m-files", hash: "h" }, planning = { kind: "module", module: "planning", moduleId: "m-p", hash: "h" };
-  const spec = { root: "card", elements: {
-    card: { type: "Card", props: { title: "文档" }, children: ["remove"] },
-    remove: { type: "Button", props: { label: "删除" }, children: [], on: { press: { action: "call", params: { tool: "delete", args: { path: { $state: "/selected" } } }, confirm: { title: "删除", message: "移到回收站" } } } },
-  } };
-  assert.match(JSON.stringify(await tool("page-set", { id: "main", title: "文档", spec, data: { list: { tool: "list", args: { path: "" }, refresh: 30 } } }, files)), /json-render@/);
-  // Only the build's smoke start calls without a recorded caller: nothing is stored.
-  assert.match(JSON.stringify(await tool("page-set", { id: "main", title: "x", spec }, undefined)), /no caller/);
-  assert.match(JSON.stringify(await tool("page-set", { id: "main", title: "x", spec }, { kind: "owner", via: null })), /只有身份完整的应用/);
-  const wrong = JSON.stringify(await tool("page-set", { id: "bad", title: "x", spec: { root: "b", elements: { b: { type: "Button", props: { label: 1 }, children: [], on: { press: { action: "call", params: { tool: "get" } } } } } } }, files));
-  assert.match(wrong, /props\.label/); assert.match(wrong, /没有工具 get/);
+  const javascript = "export default function mount() { return () => {}; }";
+  assert.match(JSON.stringify(await tool("page-set", { id: "main", title: "文档", javascript, tools: ["list", "delete"] }, files)), /revision/);
+  assert.match(JSON.stringify(await tool("page-set", { id: "main", title: "x", javascript }, undefined)), /no caller/);
+  assert.match(JSON.stringify(await tool("page-set", { id: "main", title: "x", javascript }, { kind: "owner" })), /只有身份和版本完整/);
   // Another app's page with the same id is its own; the page lists only active apps' pages.
-  await tool("page-set", { id: "main", title: "计划", spec: { root: "t", elements: { t: { type: "Text", props: { text: "x" }, children: [] } } } }, planning);
+  await tool("page-set", { id: "main", title: "计划", javascript }, planning);
   inventory[1]!.status = "paused";
   assert.deepEqual(await (await get("/api/web/pages")).json(), [{ module: "files", moduleId: "m-files", id: "main", title: "文档" }]);
   assert.equal((await get("/api/web/pages/planning/main")).status, 409);
@@ -291,27 +287,15 @@ try {
   assert.deepEqual(module.calls.findLast((call: { method: string; params: Args }) => call.method === "call" && targetName(call.params.target) === "files.list")?.params.expectedTarget, { moduleId: "m-files" });
   assert.equal((await post("/api/web/call", { ...pageCall, page: { ...pageCall.page, revision: "stale" } })).status, 409);
   assert.equal((await post("/api/web/call", { ...pageCall, target: "planning.get" })).status, 409);
-  assert.equal(page.data.list.tool, "list"); assert.equal(page.spec.elements.remove.on.press.params.tool, "delete");
-  // A source is not read while a required argument is empty (files.delete needs path; list needs nothing).
-  assert.deepEqual(page.needs, { list: [] }); assert.deepEqual(page.keyed, []);
-  // Image specs accept literals and bindings, but literals must belong to the registering app.
-  for (const ref of ["files/picture.png", { $state: "/image/ref" }, { $template: "files/${name}.png" }]) {
-    const imageSpec = { root: "image", elements: { image: { type: "Image", props: { ref, alt: "生成的图片", width: 640, height: null }, children: [] } } };
-    assert.equal(catalog.validate(imageSpec).success, true);
-    assert.deepEqual(pageErrors({ spec: imageSpec }, new Map(), "files"), []);
-    assert.match(JSON.stringify(await tool("page-set", { id: "images", title: "图片", spec: imageSpec, content: { tool: "read-image" } }, files)), /json-render@/);
-  }
-  const foreignSpec = { root: "image", elements: { image: { type: "Image", props: { ref: "planning/private.png", alt: "越权" }, children: [] } } };
-  assert.match(pageErrors({ spec: foreignSpec }, new Map(), "files").join(), /只能引用本应用/);
-  assert.match(JSON.stringify(await tool("page-set", { id: "bad-image", title: "图片", spec: foreignSpec }, files)), /只能引用本应用/);
-  const imageUrl = "/api/web/pages/files/images/content?ref=";
+  assert.deepEqual(page.tools, ["list", "delete"]); assert.deepEqual(page.keyed, []);
+  await tool("page-set", { id: "images", title: "图片", javascript, content: { tool: "read-image" } }, files);
+  const imagePage = await (await get("/api/web/pages/files/images")).json();
+  const imageUrl = `/api/web/pages/files/images/content?revision=${imagePage.revision}&ref=`;
   const before = calls.filter(([target]) => target === "files.read-image").length;
-  assert.equal((await get("/api/web/pages/files/main/content?ref=files%2Fpicture.png")).status, 403);
-  assert.match(JSON.stringify(await tool("page-set", { id: "bad-content", title: "图片", spec, content: { tool: "planning.get" } }, files)), /content/);
-  assert.match(JSON.stringify(await tool("page-set", { id: "bad-content", title: "图片", spec, content: { tool: "invisible" } }, files)), /没有工具/);
+  assert.equal((await get(`/api/web/pages/files/main/content?revision=${page.revision}&ref=files%2Fpicture.png`)).status, 403);
   for (const ref of ["planning/private.png", "files-other/a.png", "files/../planning/private.png", "files/\\private.png", ""])  assert.equal((await get(imageUrl + encodeURIComponent(ref))).status, 403);
   assert.equal(calls.filter(([target]) => target === "files.read-image").length, before); // Rejected before the owner's tool.
-  await checkRasterContent(get, png);
+  await checkRasterContent(path => get(path.replace("?ref=", `?revision=${imagePage.revision}&ref=`)), png);
   assert.deepEqual(calls.at(-1), ["files.read-image", { ref: "files/picture.png" }]);
   assert.deepEqual(module.calls.findLast((call: { method: string; params: Args }) => call.method === "call" && targetName(call.params.target) === "files.read-image")?.params.expectedTarget, { moduleId: "m-files" });
   inventory[0]!.status = "paused";
@@ -329,13 +313,6 @@ try {
   Object.assign(inventory[1]!, { id: "planning-reinstalled", status: "active" });
   assert.equal((await get("/api/web/pages/planning/main")).status, 404);
   assert.ok(!(await (await get("/api/web/pages")).json()).some((item: { module: string }) => item.module === "planning"));
-  await checkExecutableComponents(tool, get, post, files, inventory[0]!);
-  // Chat is an ordinary app: its executable callbacks follow the same page and contract guards.
-  const chatState = { id: "m-chat", name: "chat", status: "active", activeHash: "h", health: { module: "chat", moduleId: "m-chat", open: false, incident: null, contractFailureCount: 0, nextAction: null, truncated: false } };
-  inventory.push(chatState);
-  const chat = { ...files, module: "chat", moduleId: "m-chat" };
-  await checkExecutableComponents(tool, get, post, chat, chatState);
-  assert.ok(calls.some(([target]) => target === "chat.list"), "Chat callback reaches its own tool");
   await tool("page-remove", { id: "images" }, files);
   assert.match(JSON.stringify(await tool("pages", {}, files)), /"id":"main"/);
   assert.match(JSON.stringify(await tool("page-remove", { id: "main" }, files)), /"removed":true/);

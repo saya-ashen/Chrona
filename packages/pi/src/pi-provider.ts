@@ -420,7 +420,7 @@ export function createPiProvider(options: PiProviderOptions): ProviderAdapter {
     transcript: piTranscript,
     supportsRunModel: true,
     async health() {
-      const error = await inspectPiLaunch(config);
+      const error = await inspectPiLaunch(config, true);
       return { available: error === null, sandboxed: false, error };
     },
     complete: createPiCompletion(options),

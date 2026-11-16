@@ -4,27 +4,19 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createStewardService, type StewardPorts } from "@chrona/engine";
 import { testDb } from "@chrona/engine/test-support";
+import { createProviderChannel } from "../../../packages/engine/src/modules/steward/provider-channel";
+import { liveRuns } from "../../../packages/engine/src/modules/steward/runs";
 import { testReleaseRuntimeChecks } from "../../../packages/engine/src/modules/steward/module-release-test-fixture";
 import type { ProviderAnswer, ProviderRunView } from "@chrona/contracts";
-import { queueBuild } from "../../../packages/engine/src/modules/steward/module-build-session";
 let db: ReturnType<typeof testDb>, ports: StewardPorts, service: ReturnType<typeof createStewardService>;
 let workspaceId: string;
 let answers: ProviderAnswer[];
 beforeEach(async () => {
   db = testDb(); workspaceId = (await db.workspace.create({ data: { name: "owner" } })).id; answers = [];
-  ports = { db, ...testReleaseRuntimeChecks(), now: () => new Date(), dataDir: await mkdtemp(join(tmpdir(), "chrona-provider-api-")), publicUrl: null,
-    provider: { name: "fake", health: async () => ({ available: true, sandboxed: true, error: null }), start(input) {
-      const controller = new AbortController();
-      const done = (async () => {
-        await input.events!.progress({ phase: "reading", tool: "read" });
-        answers.push(await input.events!.question({ method: "confirm", title: "Fixture permission", message: "Only this attempt", options: [], timeoutMs: 1000 }, controller.signal));
-        return { outcome: "finished" as const, sessionId: null, error: null };
-      })();
-      return { done, inject: async () => {}, abort: async () => { controller.abort(); await done; } };
-    } } };
+  ports = { db, ...testReleaseRuntimeChecks(), now: () => new Date(), dataDir: await mkdtemp(join(tmpdir(), "chrona-provider-api-")), publicUrl: null };
   service = createStewardService(ports);
-  await queueBuild(ports, workspaceId, { key: "provider-fixture", actorKey: "owner", originSessionId: null,
-    request: { name: "fixture-app", goal: "Fixture only", examples: [], files: [], intent: { changes: ["Fixture"], preserves: [] } } });
+  const session = await db.session.create({ data: { workspaceId, key: "provider-fixture", source: "web" } });
+  await service.forWorkspace(workspaceId).runs.enqueue({ sessionId: session.id, lane: "background", trigger: "source", prompt: "Fixture only" });
 
 });
 afterEach(async () => {
@@ -33,7 +25,15 @@ afterEach(async () => {
 });
 // Internal channel regression. Public Agent SDK question/control behavior is covered in agent-module-calls.
 async function start() {
-  await service.tick();
+  const runs = service.forWorkspace(workspaceId).runs, run = (await runs.claimNext("background"))!;
+  const channel = createProviderChannel(ports, run), controller = new AbortController();
+  const done = (async () => {
+    await channel.events.progress({ phase: "reading", tool: "read" });
+    answers.push(await channel.events.question({ method: "confirm", title: "Fixture permission", message: "Only this attempt", options: [], timeoutMs: 1000 }, controller.signal));
+    return { outcome: "finished" as const, sessionId: null, error: null };
+  })();
+  liveRuns.set(run.id, { done, inject: async () => {}, abort: async () => { controller.abort(); await done; } });
+  void done.then(async outcome => { await channel.close(); await runs.finish(run.id, outcome, { stopEvidence: "provider_exited" }); liveRuns.delete(run.id); });
   for (let i = 0; i < 100; i++) {
     const run = (await service.forWorkspace(workspaceId).provider.list() as ProviderRunView[])[0];
     if (run?.interactions.length) return run; await Bun.sleep(5);
@@ -49,7 +49,7 @@ test("the user answers a running Provider's question through the internal channe
   await expect(answer(id, "not json")).rejects.toMatchObject({ code: "invalid" });
   await answer(id, { decision: "submit", value: false });
   await finished(run.id); expect(answers).toEqual([{ decision: "submit", value: false }]);
-  expect(await db.grant.count()).toBe(0); expect(await db.approval.count()).toBe(0);
+  expect(await db.approval.count()).toBe(0);
   await expect(answer(id, { decision: "submit", value: true })).rejects.toMatchObject({ code: "conflict", message: "Provider interaction is no longer active" });
   expect(answers).toEqual([{ decision: "submit", value: false }]);
 });

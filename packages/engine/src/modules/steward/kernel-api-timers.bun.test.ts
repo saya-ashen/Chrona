@@ -51,7 +51,7 @@ test("cancel confirmed before process connects prevents the unsent timer", async
   f.advance(60_000); await drainTimers(f.ports, f.workspace.id);
   expect(cancelledBeforeSend).toBe(true);
   expect(f.received).toHaveLength(0);
-  expect((await f.db.schedule.findFirstOrThrow()).status).toBe("cancelled");
+  expect((await f.db.timer.findFirstOrThrow()).status).toBe("cancelled");
 });
 
 test("slow handlers cannot backdate another application wake admission", async () => {
@@ -102,7 +102,7 @@ test("restart reconciles exact successful completion without redelivery", async 
   await drainTimers(firstPorts, f.workspace.id);
   const restartedPorts = { ...f.ports, db: new Proxy(f.db, {}) };
   await drainTimers(restartedPorts, f.workspace.id);
-  const after = await f.db.schedule.findFirstOrThrow({ where: { mode: "timer" } });
+  const after = await f.db.timer.findFirstOrThrow({ where: {} });
   expect(evidence.triggerId).toBe(before.id);
   expect(after.status).toBe("active"); expect(after.nextAt).not.toBeNull();
   expect((await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: before.id } })).status).toBe("succeeded");
@@ -143,7 +143,7 @@ test("pause while connecting defers the unsent timer until the same version resu
   f.advance(60_000); await drainTimers(f.ports, f.workspace.id);
   expect(f.received).toHaveLength(0);
   expect((await f.db.moduleRun.findFirstOrThrow()).output).toEqual({ delivery: "not_sent" });
-  expect((await f.db.schedule.findFirstOrThrow()).status).toBe("active");
+  expect((await f.db.timer.findFirstOrThrow()).status).toBe("active");
   await f.db.module.update({ where: { id: app.row.id }, data: { status: "active" } });
   f.ports.sandbox!.startModule = start;
   await drainTimers(f.ports, f.workspace.id);

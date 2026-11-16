@@ -164,3 +164,19 @@ test("a valid native request whose full reply exceeds the shared envelope fails 
   expect(f.counts()).toEqual({ starts: 1, native: 1 });
   f.finish(); await f.application.stop();
 });
+
+test("Pi application health reuses its version observation across adapters and completion availability", async () => {
+  const data = await mkdtemp("/tmp/chrona-pi-health-probe-"); directories.push(data);
+  const profile = join(data, "profile"), command = join(data, "pi"), extension = join(data, "extension.ts"), counter = join(data, "probes");
+  await mkdir(profile); await writeFile(extension, "");
+  await writeFile(command, `#!${process.execPath}\nimport {appendFileSync} from 'node:fs';\nif(!process.argv.includes('--version'))throw Error('Health must not start a model');\nappendFileSync(${JSON.stringify(counter)},'probe\\n');console.log('1.5.2');\n`, {mode:0o755});
+  const { createPiProvider } = await import("@chrona/pi");
+  const app = createPiApplication({ data, options: { command, agentDir: profile, expectedVersion: "1.5.2", model: "fake/model", chronaExtension: extension, agentUrl: "http://127.0.0.1:3101/api/steward-agent" }, createProvider: createPiProvider, call: async () => ({}) });
+  try {
+    await app.activate();
+    expect(await app.handle("health", {}, kernel)).toMatchObject({available:true,complete:true});
+    expect(await readFile(counter,"utf8")).toBe("probe\n");
+    expect(await app.handle("health", {}, kernel)).toMatchObject({available:true,complete:true});
+    expect(await readFile(counter,"utf8")).toBe("probe\n");
+  } finally { await app.stop(); }
+});

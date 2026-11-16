@@ -99,7 +99,7 @@ export function createExternalModuleInstaller(ports: StewardPorts): ExternalModu
 export async function matchesInitialInstallation(context: ModuleContext, version: ModuleVersion, module: { id: string; name: string; activeHash: string | null; status: string }) {
   const { db, workspaceId } = context;
   const name = PREINSTALLED_MODULE_NAMES.find(name => name === module.name);
-  if (!name || module.activeHash !== null || module.status !== "active" || version.source !== "user" || version.buildSessionId) return false;
+  if (!name || module.activeHash !== null || module.status !== "active" || version.source !== "user") return false;
   const workspace = await db.workspace.findUniqueOrThrow({ where: { id: workspaceId } });
   const settings = workspace.settings as { moduleInitialization?: unknown } | null;
   const state = moduleInitializationStateSchema.safeParse(settings?.moduleInitialization).data;

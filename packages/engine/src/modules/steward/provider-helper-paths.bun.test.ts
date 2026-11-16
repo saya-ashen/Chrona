@@ -7,7 +7,6 @@ import { moduleManifestSchema, type AgentProviderRegistration, type ProviderTran
 import { registerAgentProvider } from "./agent-provider";
 import { assertExecutionModuleIdle } from "./execution-module-guard";
 import { runtimeHealth } from "./runtime-health";
-import { sessionTranscript } from "./transcript";
 import { moduleSupervisor } from "./module-supervisor";
 import { testModuleProcess } from "./module-test-process";
 import { testDb } from "./test-db";
@@ -21,10 +20,11 @@ async function fixture() {
   const db = testDb({ injectedAgent: false }), dataDir = await mkdtemp(join(tmpdir(), "chrona-provider-helpers-"));
   const databases = await db.$queryRawUnsafe<{ name: string; file: string }[]>("PRAGMA database_list");
   const workspaceId = (await db.workspace.create({ data: { name: "provider helpers" } })).id;
-  const requests: { name: string; args: unknown }[] = [], state = { health: health(), transcript: [] as ProviderTranscriptItem[] };
+  const requests: { name: string; args: unknown }[] = [], state = { health: health(), transcript: [] as ProviderTranscriptItem[], healthWait: undefined as Promise<void> | undefined };
   const peer = testModuleProcess(async event => {
     if (event.trigger.kind !== "tool") return {};
     requests.push({ name: event.trigger.id, args: event.trigger.args });
+    if (event.trigger.id.endsWith("health")) await state.healthWait;
     return { result: event.trigger.id.endsWith("transcript") ? state.transcript : state.health };
   });
   const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => new Date("2026-11-11T00:00:00Z"), sandbox: { available: true, isolated: false, startModule: peer.startModule } };
@@ -63,42 +63,6 @@ test("health discovers registered providers without a host Provider adapter", as
   expect(f.requests.every(request => request.name === "offline-health")).toBe(true);
 });
 
-test("session transcript uses the latest Run's endpoint and admitted directory, retaining redaction and bounds", async () => {
-  const f = await fixture(), first = await f.register(), second = await f.register("second"), session = await f.session();
-  await f.run(session.id, first.registration);
-  const latest = await f.run(session.id, second.registration, new Date("2026-11-11T00:00:01Z"));
-  const secret = "fake-helper-secret-value", prior = process.env.CHRONA_TEST_API_KEY;
-  process.env.CHRONA_TEST_API_KEY = secret;
-  cleanups.push(async () => { if (prior === undefined) delete process.env.CHRONA_TEST_API_KEY; else process.env.CHRONA_TEST_API_KEY = prior; });
-  f.state.transcript = [
-    { at: "1", kind: "text", text: "older omitted" },
-    { at: "2", kind: "tool", tool: "fake", args: `${secret} ${"x".repeat(1000)}` },
-    { at: "3", kind: "result", tool: "fake", text: `${secret} ${"x".repeat(4000)}`, error: false },
-  ];
-  f.requests.length = 0;
-  const items = await sessionTranscript(f.ports, session.id, 2);
-  expect(items).toHaveLength(2);
-  expect(JSON.stringify(items)).not.toContain(secret);
-  expect(items[0]!.kind === "tool" && items[0]!.args.length).toBeLessThan(600);
-  expect(items[1]!.kind === "result" && items[1]!.text.length).toBeLessThan(2100);
-  expect(f.requests).toEqual([{ name: "second-transcript", args: { sessionDir: join(latest.cwd, ".chrona", "sessions"), limit: 2 } }]);
-  await f.db.module.update({ where: { id: second.module.id }, data: { activeHash: "changed" } });
-  f.requests.length = 0;
-  await expect(sessionTranscript(f.ports, session.id)).rejects.toMatchObject({ code: "forbidden" });
-  expect(f.requests).toHaveLength(0);
-});
-
-test("empty sessions and providers without transcript have no transcript; missing latest binding fails closed", async () => {
-  const f = await fixture(), backend = await f.register("offline", { transcript: false }), session = await f.session();
-  expect(await sessionTranscript(f.ports, session.id)).toEqual([]);
-  const run = await f.run(session.id, backend.registration);
-  const before = f.requests.length;
-  expect(await sessionTranscript(f.ports, session.id)).toEqual([]);
-  expect(f.requests).toHaveLength(before);
-  await f.db.agentRunProvider.delete({ where: { runId: run.id } });
-  await expect(sessionTranscript(f.ports, session.id)).rejects.toMatchObject({ code: "unavailable" });
-});
-
 test("provider lifecycle guard holds unrelated consumers until queued, running and unknown stop have cleared", async () => {
   const f = await fixture(), backend = await f.register(), session = await f.session(), run = await f.run(session.id, backend.registration);
   for (const state of [{ status: "queued", stopStatus: "pending" }, { status: "running", stopStatus: "pending" }, { status: "failed", stopStatus: "unknown" }]) {
@@ -108,4 +72,35 @@ test("provider lifecycle guard holds unrelated consumers until queued, running a
   await f.db.run.update({ where: { id: run.id }, data: { status: "finished", stopStatus: "confirmed" } });
   await f.db.$transaction(tx => assertExecutionModuleIdle(tx, backend.module.id));
   expect(await f.db.agentContext.count()).toBe(0);
+});
+
+test("concurrent health reads share an ongoing probe without caching later results or revoked eligibility", async () => {
+  const f = await fixture(), provider = await f.register();
+  const gate = Promise.withResolvers<void>(); f.state.healthWait = gate.promise;
+  const first = runtimeHealth(f.ports, f.workspaceId), second = runtimeHealth(f.ports, f.workspaceId);
+  for (let i = 0; i < 100 && !f.requests.length; i++) await Bun.sleep(5);
+  expect(f.requests).toHaveLength(1);
+  await f.db.module.update({ where: { id: provider.module.id }, data: { status: "paused" } });
+  expect((await runtimeHealth(f.ports, f.workspaceId)).provider.available).toBe(false);
+  gate.resolve();
+  expect((await Promise.all([first, second])).every(result => result.provider.available)).toBe(true);
+  await f.db.module.update({ where: { id: provider.module.id }, data: { status: "active" } });
+  f.state.healthWait = undefined; f.state.health.available = false;
+  expect((await runtimeHealth(f.ports, f.workspaceId)).provider.available).toBe(false);
+  expect(f.requests).toHaveLength(2);
+});
+
+test("runtime counts retain old active runs and today's failures by local end date", async () => {
+  const f = await fixture(), provider = await f.register(), session = await f.session();
+  await f.db.workspace.update({ where: { id: f.workspaceId }, data: { settings: { timezone: "America/Los_Angeles" } } });
+  const old = new Date("2026-11-01T00:00:00Z");
+  const queued = await f.run(session.id, provider.registration, old), running = await f.run(session.id, provider.registration, old);
+  await f.db.run.update({ where: { id: running.id }, data: { status: "running" } });
+  for (const [status, endedAt] of [["failed", "2026-11-10T23:00:00Z"], ["timed_out", "2026-11-10T01:00:00Z"], ["provider_unavailable", "2026-11-09T23:00:00Z"]]) {
+    const run = await f.run(session.id, provider.registration, old);
+    await f.db.run.update({ where: { id: run.id }, data: { status, endedAt: new Date(endedAt) } });
+  }
+  expect(await runtimeHealth(f.ports, f.workspaceId)).toMatchObject({ queuedRuns: 1, runningRuns: 1, failedRunsToday: 1 });
+  await f.db.run.update({ where: { id: queued.id }, data: { status: "finished" } });
+  expect((await runtimeHealth(f.ports, f.workspaceId)).queuedRuns).toBe(0);
 });

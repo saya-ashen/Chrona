@@ -42,7 +42,7 @@ for (const method of ["select", "confirm", "input", "editor"] as const) test(`${
   expect(await result).toEqual({ decision: "submit", value });
   expect((await api.provider.list())[0]!.interactions[0]!.status).toBe("answered");
   expect(JSON.stringify(await db.audit.findMany())).not.toContain("PRIVATE_FIXTURE_ANSWER_DO_NOT_STORE");
-  expect(await db.grant.count()).toBe(0); expect(await db.approval.count()).toBe(0);
+  expect(await db.approval.count()).toBe(0);
   await expect(api.provider.answer(request.id, { decision: "submit", value })).rejects.toMatchObject({ code: "conflict" });
 });
 test("interaction observer uses persisted public identity and retains answer authority after detail failure", async () => {
@@ -101,12 +101,10 @@ test("restart/no live process cannot reuse pending requests", async () => {
 });
 test("owner cancel blocks tools immediately, retains input and never retries the aborted run", async () => {
   const f = await fixture(), result = f.channel.events.question(question(), f.controller.signal), request = await waiting();
-  await db.message.create({ data: { workspaceId, sessionId: f.session.id, channel: "in_app", direction: "in", text: "Keep my input", at: time } });
   await api.provider.cancel(f.run.id);
   expect(await result).toEqual({ decision: "cancel" });
   expect((await db.run.findUniqueOrThrow({ where: { id: f.run.id } })).status).toBe("cancelled");
   expect(await db.run.count({ where: { status: "queued" } })).toBe(0);
-  expect(await db.message.count({ where: { text: "Keep my input" } })).toBe(1);
   await expect(api.runs.authenticate(f.run.token)).rejects.toMatchObject({ code: "forbidden" });
   await expect(api.provider.answer(request.id, { decision: "submit", value: true })).rejects.toMatchObject({ code: "conflict" });
 });
@@ -145,11 +143,11 @@ test("a failed run creates no kernel retry and late cancellation leaves app time
   const unrelated = await api.runs.enqueue({ sessionId: f.session.id, lane: "background", trigger: "schedule", prompt: "Separate work" });
   const module = await db.module.create({ data: { workspaceId, name: "timer-owner" } });
   // Private legacy row: cancellation must not mutate unrelated stored state.
-  const schedule = await db.schedule.create({ data: { workspaceId, moduleId: module.id, triggerId: "future", mode: "module", label: "Future arrangement", text: "legacy inert fixture", createdBy: "chrona", rule: { kind: "every", minutes: 60 }, payload: {}, nextAt: new Date("2030-01-01Z") } });
+  const schedule = await db.timer.create({ data: { workspaceId, moduleId: module.id, timerId: "legacy inert fixture", rule: { kind: "every", minutes: 60 }, payload: {}, nextAt: new Date("2030-01-01Z") } });
   await db.run.update({ where: { id: f.run.id }, data: { cancelRequestedAt: new Date() } });
   await api.provider.cancel(f.run.id);
   expect((await db.run.findUniqueOrThrow({ where: { id: unrelated.id } })).status).toBe("queued");
-  expect((await db.schedule.findUniqueOrThrow({ where: { id: schedule.id } })).status).toBe("active");
+  expect((await db.timer.findUniqueOrThrow({ where: { id: schedule.id } })).status).toBe("active");
 });
 test("a failed reply receipt never releases a positive answer", async () => {
   const f = await fixture(), result = f.channel.events.question(question(), f.controller.signal), request = await waiting();

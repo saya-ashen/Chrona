@@ -13,18 +13,19 @@ function problems(apps: App[]) {
 async function optionalNotify(call: Call, target: string, args?: Record<string, unknown>) {
   try { return await call(target, args); }
   catch (error) {
+    console.error(JSON.stringify({ component: "web", event: "optional_notify_read_failed", target, error: String(error) }));
     if (["not_found", "unavailable"].includes((error as { code?: string }).code ?? "")) return null;
     throw error;
   }
 }
 /** Web owns ordering and presentation; upcoming is an empty private page field without a schedule source. */
-export async function todayView(call: Call, sessionsView: () => Promise<unknown[]>) {
+export async function todayView(call: Call, sessionsView: () => Promise<unknown[]>, includeRuntime = true) {
   const [runtime, approvals, notifications, sessions, apps, notificationStatus] = await Promise.all([
-    call("activity.runtime"), call("approvals.list").then(page => (page as { items: unknown }).items), optionalNotify(call, "notify.list", { limit: 20 }),
-    sessionsView().then(items => items.slice(0, 20)), call("modules.list").then(page => (page as { items: unknown }).items), optionalNotify(call, "notify.counts"),
-  ]) as [{ at: string; [key: string]: unknown }, unknown[], { items: { format?: string; [key: string]: unknown }[] } | null, unknown[], App[], { queued: number; failed: number } | null];
-  const { at, ...health } = runtime;
+    includeRuntime ? call("activity.runtime") : null, call("approvals.list").then(page => (page as { items: unknown }).items), optionalNotify(call, "notify.list", { limit: 20 }),
+    sessionsView().then(items => items.slice(0, 20)), call("modules.list").then(page => (page as { items: unknown }).items), includeRuntime ? optionalNotify(call, "notify.counts") : null,
+  ]) as [{ at: string; [key: string]: unknown } | null, unknown[], { items: { format?: string; [key: string]: unknown }[] } | null, unknown[], App[], { queued: number; failed: number } | null];
+  const { at, ...health } = runtime ?? { at: new Date().toISOString() };
   return { generatedAt: at, approvals, upcoming: [], updates: (notifications?.items ?? []).map(({ format: _format, ...item }) => item),
     apps: apps.map(({ id, name, description, status, builtin, activeHash, origin, capabilities }) => ({ id, name, description, status, builtin, activeHash, origin, capabilities })),
-    problems: problems(apps), sessions, health: { ...health, queuedNotifications: notificationStatus?.queued ?? 0, failedNotifications: notificationStatus?.failed ?? 0 } };
+    problems: problems(apps), sessions, ...(runtime ? { health: { ...health, queuedNotifications: notificationStatus?.queued ?? 0, failedNotifications: notificationStatus?.failed ?? 0 } } : {}) };
 }

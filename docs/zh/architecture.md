@@ -25,6 +25,7 @@ Chrona 是单一 owner 的个人工具：用户自然交流，Agent 选择方法
 
 - 路由绑定真实 caller 和活动版本，敏感处理器核对实际权限。owner 工具检查实际批准版本的 `authority: "owner"`；`uses` 只声明依赖。
 - 入口应用拥有会话和交付。Agent 使用原应用获准的工具，不借 Provider 或 owner 身份提权。
+- 同一应用的普通工具事件允许并发；生命周期、timer 和 call_result 等事件等待已接纳投递，后续工具等待该屏障。内核和 SDK 以内部事件 ID 绑定独立调用 scope；公开 `chrona.call` 参数不变。单条调用链仍拒绝递归与过深调用，跨事件只拒绝实际生命周期等待环。应用负责跨 `await` 后重读并合并自己的可变数据。
 - 内核保留单 Run 队列；取消请求不证明停止，未知停止仍占容量。Agent 持久化结果并发送事件，丢通知核对原回执，重启不重新执行未知效果。
 - 身份、运行准入、候选、安装、激活及恢复采用专用记录；审计用于观察，不作为备用授权来源。结构化工具结果绑定实际 Run、目标版本和合同，过滤或遗漏结果不能证明完整交付。
 - 当前材料创作复用现有 Agent Run，经 Author 导入源码和产物，再按精确准入提交；Author 不启动模型或编译器。pending 回执不表示激活。
@@ -32,7 +33,15 @@ Chrona 是单一 owner 的个人工具：用户自然交流，Agent 选择方法
 
 相关合同：[Agent](agent-builtin-application.md)、[结构化状态与恢复](kernel-agent-migration.md)、[版本材料](author-version-materials.md)、[有限事实](kernel-notification-facts.md)。
 
-## 4. 代码地图
+## 4. 存储
+
+kernel 不保存业务消息或通用偏好，Workspace 默认设置为 `{}`。已移除旧 `Preference / Grant / Message / BuildTargets / BuildRequest` 和旧 StewardState 租约字段。`Timer` 只承载应用的持久唤醒。remote-execution 的八张表仍有队列、授权、交付和停止证据消费者，继续保留。
+
+应用摘要按应用分别执行最近五条版本及执行查询；SQLite 执行 LIMIT，使用确定的 `createdAt/id` 排序。主库连接建立时同步开启外键；共享连接保留事务全程 gate 和同步 `changes()` 处理。暂未新增专用只读连接：先消除已证实的历史全量读取，另开连接需要明确快照一致性及事务内读取路由，当前没有第二个连接的收益测量。
+
+Mind 的组件和三类执行日志共用 `mind.sqlite`，执行预算与恢复按各自表读取；entry-app 会话按会话一行保存到 SQLite，只更新发生变更的行，加载仍读取全部会话。留存及旧数据拒绝边界见[运维](operations.md#当前存储与旧数据边界)。这些源码改动未部署或转换真实数据。
+
+## 5. 代码地图
 
 | 位置 | 职责 |
 | --- | --- |
@@ -43,9 +52,9 @@ Chrona 是单一 owner 的个人工具：用户自然交流，Agent 选择方法
 | `packages/integrations/src/steward`、`packages/pi` | 宿主、SDK、进程监管与 Pi Provider |
 | `packages/db`、`packages/cli` | SQLite/Prisma、迁移与备份恢复、启动和诊断 |
 
-依赖方向：`apps → engine → domain → contracts`。页面由普通 Web 应用承载，共用 React/json-render；Web 拥有外壳，业务应用拥有内容及设置。可信可执行组件无浏览器沙箱。详见[Web 合同](web-components-and-shell.md)、[应用设置](application-settings.md)、[依赖方向](module-dependency-direction.md)。
+依赖方向：`apps → engine → domain → contracts`。页面由普通 Web 应用承载，共用 React runtime 与 UI 组件；Web 拥有外壳，业务应用拥有内容及设置。应用直接登记编译后的 React / TSX 页面，可信页面无浏览器沙箱。详见[Web 合同](web-components-and-shell.md)、[应用设置](application-settings.md)、[依赖方向](module-dependency-direction.md)。
 
-## 5. 运行与证据
+## 6. 运行与证据
 
 数据为 SQLite 加 dataDir 下的 platform、sessions 和 secrets；停机完整备份，不能只复制数据库。开发及验收使用全新临时数据，初始迁移不兼容旧库。实际操作见[运维](operations.md)。
 

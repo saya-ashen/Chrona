@@ -1,5 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { randomUUID } from "node:crypto";
 import { moduleHttpReady } from "./module-http-ready";
 import { listenPaths, moduleManifestSchema, RUN_LIMITS, type ModuleEvent, type ModuleManifest } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
@@ -13,7 +14,7 @@ import { rollbackFailedStart } from "./module-generation";
 import { resolveExternalRelease } from "./module-release";
 import { assertModuleOperation } from "./module-identity";
 import { assertModuleAvailable, isModulePaused, ModuleUnavailableError } from "./module-availability";
-import { eventLimits, activationChanged, availableInstance, evidence, failureDetail, deliveryFailure, handlerFailureData, instanceStatus, isHandlerRejection, keyOf, moduleEffects, restartDelay, staged, triggerKey, type CallScope, type DeliveryOptions, type DeliveryStage, type Instance, type Options, type Process, type Reply, type Timers } from "./module-supervisor-state";
+import { trackDelivery, eventLimits, activationChanged, availableInstance, evidence, failureDetail, deliveryFailure, handlerFailureData, instanceStatus, isHandlerRejection, keyOf, moduleEffects, restartDelay, staged, triggerKey, type CallScope, type Delivery, type DeliveryOptions, type DeliveryStage, type Instance, type Options, type Process, type Reply, type Timers } from "./module-supervisor-state";
 export { registerModuleEffects, type CallScope, type DeliveryStage } from "./module-supervisor-state";
 
 const isClosing = (instance: Instance) => instance.closing;
@@ -29,6 +30,7 @@ export function moduleSupervisor(ports: StewardPorts) {
 }
 
 class ModuleSupervisor {
+  private readonly deliveryRuns = new Map<string, Delivery>();
   private readonly instances = new Map<string, Instance>();
   private readonly current = new Map<string, string>();
   private readonly backoffFailures = new Map<string, number>();
@@ -69,7 +71,7 @@ class ModuleSupervisor {
     instance.retiring = true;
     // A web page approving its own module's version waits on that call: answer it, then give the reply time to reach the browser.
     const answered = async () => { if (await instance.channel?.drained()) await new Promise(resolve => this.timers.setTimeout(resolve, RETIRE_GRACE_MS)); };
-    instance.retirement = instance.queue.then(answered, answered).finally(() => this.close(instance)).then(() => this.ensureActive(instance.moduleId));
+    instance.retirement = Promise.allSettled([...instance.deliveries.keys()]).then(answered).finally(() => this.close(instance)).then(() => this.ensureActive(instance.moduleId));
     void instance.retirement.catch(error => this.failure(instance, String(error))).catch(() => {});
   }
   private assertOwnershipAvailable(moduleId: string, key: string) {
@@ -114,16 +116,18 @@ class ModuleSupervisor {
   private async failure(instance: Instance, error: string, runId?: string, event?: ModuleEvent, delivery?: DeliveryStage) {
     const { ports } = this;
     // The socket and process can report the same exit; a failed event may observe it too.
-    if (instance.failureRecorded) return;
+    const first = !instance.failureRecorded;
+    if (!first && !runId) return;
     instance.failureRecorded = true;
     if (!await this.currentFailure(instance)) return;
     const now = ports.now(), execution = { workspaceId: instance.scope.workspaceId, moduleId: instance.moduleId, hash: instance.hash, activationId: instance.activationId, triggerId: event ? triggerKey(event) : "process", firedAt: event ? new Date(event.trigger.firedAt) : now };
     const failureKey = keyOf(instance.moduleId, instance.hash, instance.activationId);
-    this.backoffFailures.set(failureKey, (this.backoffFailures.get(failureKey) ?? 0) + 1);
+    if (first) this.backoffFailures.set(failureKey, (this.backoffFailures.get(failureKey) ?? 0) + 1);
     const detail = failureDetail(instance, { error, runId, event, delivery, triggerId: execution.triggerId });
     // Journal still has attributed evidence if SQLite itself cannot record the incident.
     console.error(JSON.stringify({ component: "module-supervisor", event: "module.failure", moduleId: instance.moduleId, module: instance.manifest.name, hash: instance.hash, ...detail }));
     const failureRunId = await this.persistFailure(instance, { execution, detail, runId, now });
+    if (!first) return;
     const rolledBack = await this.rollbackFailedStart(instance, execution.workspaceId, event, delivery);
     if (!rolledBack && failureRunId) await moduleEffects().pauseFailedModule(ports, execution, failureRunId).catch(pauseError => console.error(JSON.stringify({ component: "module-supervisor", event: "module.pause.persist_failed", moduleId: instance.moduleId, hash: instance.hash, error: diagnosticText(String(pauseError), 300) })));
   }
@@ -201,7 +205,7 @@ class ModuleSupervisor {
   }
   private async spawn(instance: Instance, sandbox: NonNullable<StewardPorts["sandbox"]>) {
     const { ports, timers } = this, codeDir = await this.codeDir(instance);
-    instance.channel = await createModuleChannel({ onCall: call => moduleEffects().handleModuleCall(ports, { ...instance.scope }, call), timers });
+    instance.channel = await createModuleChannel<CallScope>({ onCall: (call, scope) => moduleEffects().handleModuleCall(ports, scope ?? { ...instance.scope }, call), timers });
     if (this.isStopped() || isClosing(instance)) throw new Error("Module supervisor stopped");
     const dataDir = join(ports.dataDir, "platform/data", instance.moduleId);
     await mkdir(dataDir, { recursive: true });
@@ -276,7 +280,7 @@ class ModuleSupervisor {
     const existing = availableInstance(this.instances.get(key));
     if (existing) return existing;
     const manifest = moduleManifestSchema.parse(version.manifest);
-    const instance: Instance = { moduleId, hash, activationId, manifest, scope: { workspaceId: module.workspaceId, moduleId, hash, receiverActivationId: module.activationId, manifest }, queue: Promise.resolve(), retiring: false, closing: false, busy: false };
+    const instance: Instance = { moduleId, hash, activationId, manifest, scope: { workspaceId: module.workspaceId, moduleId, hash, receiverActivationId: module.activationId, manifest }, deliveries: new Map(), retiring: false, closing: false, busy: false, activeEvents: 0 };
     this.instances.set(key, instance);
     return instance;
   }
@@ -376,10 +380,6 @@ class ModuleSupervisor {
       case "timer":
         if (!await this.ports.db.moduleInvocation.findFirst({ where: { id: trigger.eventId, workspaceId: instance.scope.workspaceId, targetModuleId: moduleId, targetHash: instance.hash, mode: "timer", status: "running" } })) throw staged(new Error("Timer event lacks its exact delivery claim"), "unavailable");
         return;
-      case "schedule":
-        // Only the module's own runtime timers deliver schedule events.
-        if (trigger.scheduleId === undefined || trigger.payload === undefined || !await this.ports.db.schedule.findFirst({ where: { id: trigger.scheduleId, moduleId, mode: "module" } })) throw staged(new Error("Dynamic schedule requires its own timer"), "unavailable");
-        return;
       case "tool":
         if (!manifest.tools.some(tool => tool.name === trigger.id)) throw staged(new Error("Module trigger missing"), "unavailable");
         return;
@@ -390,19 +390,19 @@ class ModuleSupervisor {
       default: throw staged(new Error("Unsupported module event kind"), "unavailable");
     }
   }
-  private async sendEvent(instance: Instance, event: ModuleEvent, workspaceId: string, requested?: number, dispatch?: DeliveryOptions["dispatch"]) {
+  private async sendEvent(instance: Instance, event: ModuleEvent, workspaceId: string, requested?: number, dispatch?: DeliveryOptions["dispatch"], scope?: CallScope) {
     const { manifest } = instance;
     try { await (instance.start ??= this.startInstance(instance)); }
     catch (error) { throw staged(error, "unavailable"); }
     const { timeoutMs, params } = await eventLimits(this.ports, manifest, workspaceId, requested);
     const bindings = await this.bindings(workspaceId);
     let reply: Reply;
-    try { reply = await instance.channel!.send({ ...event, params, bindings }, timeoutMs, dispatch); }
+    try { reply = await instance.channel!.send({ ...event, params, bindings }, timeoutMs, dispatch, scope); }
     catch (error) { throw staged(error, (error as { written?: boolean }).written === false ? "unavailable" : "lost"); }
     if ("error" in reply) throw staged(Object.assign(new Error(reply.error), { code: reply.errorCode, reason: reply.errorReason }), "handler");
     return reply;
   }
-  private async failedDelivery(instance: Instance, event: ModuleEvent, runId: string, error: unknown) {
+  private async failedDelivery(instance: Instance, event: ModuleEvent, runId: string | undefined, error: unknown) {
     if (error instanceof Error) await this.collectExit(instance, error.message);
     await this.close(instance).catch(() => {});
     await this.failure(instance, instance.stopUnknown ? String(instance.stopUnknown) : error instanceof Error ? error.message : String(error), runId, event, (error as { stage?: DeliveryStage }).stage);
@@ -410,19 +410,27 @@ class ModuleSupervisor {
     await this.restartCurrent(instance);
   }
   private async finishEvent(instance: Instance) {
+    if (--instance.activeEvents > 0) return;
     await this.finishBusy(instance);
-    delete instance.scope.moduleRunId; delete instance.scope.eventKey; delete instance.scope.chain; delete instance.scope.path;
-    if (!isClosing(instance) && !instance.manifest.keepAlive) instance.idle = this.timers.setTimeout(() => { void instance.queue.then(() => this.close(instance)).catch(error => this.failure(instance, String(error))).catch(() => {}); }, this.idleMs);
+    if (!isClosing(instance) && !instance.manifest.keepAlive) {
+      if (instance.idle) this.timers.clearTimeout(instance.idle);
+      instance.idle = this.timers.setTimeout(() => {
+        if (instance.deliveries.size || instance.activeEvents) return;
+        void this.close(instance).catch(error => this.failure(instance, String(error))).catch(error => {
+          console.error(JSON.stringify({ component: "module-supervisor", event: "idle_close_failed", error: String(error) }));
+        });
+      }, this.idleMs);
+    }
   }
-  private async recordEventResult(input: { instance: Instance; event: ModuleEvent; workspaceId: string; runId: string; reply: Reply; private?: boolean; retainOutput?: boolean; validateResult?: DeliveryOptions["validateResult"] }) {
+  private async recordEventResult(input: { instance: Instance; event: ModuleEvent; workspaceId: string; runId: string; reply: Reply; private?: boolean; retainHistory?: boolean; retainOutput?: boolean; validateResult?: DeliveryOptions["validateResult"] }) {
     const { instance, event, workspaceId, runId, reply, validateResult } = input;
     if ("error" in reply) throw staged(Object.assign(new Error(reply.error), { code: reply.errorCode, reason: reply.errorReason }), "handler");
     const outputError = validateResult?.(reply.result.result ?? null) ?? null;
     if (outputError) {
-      await this.ports.db.moduleRun.update({ where: { id: runId }, data: { exitCode: 1, error: input.private ? "Private operation returned an invalid result" : outputError.slice(0, 1000) } });
+      if (input.retainHistory !== false) await this.ports.db.moduleRun.update({ where: { id: runId }, data: { exitCode: 1, error: input.private ? "Private operation returned an invalid result" : outputError.slice(0, 1000) } });
       return;
     }
-    await this.ports.db.moduleRun.update({ where: { id: runId }, data: { exitCode: 0, ...(input.retainOutput === false ? {} : { output: input.private ? {} : reply.result }) } });
+    if (input.retainHistory !== false) await this.ports.db.moduleRun.update({ where: { id: runId }, data: { exitCode: 0, ...(input.retainOutput === false ? {} : { output: input.private ? {} : reply.result }) } });
     this.backoffFailures.set(keyOf(instance.moduleId, instance.hash, instance.activationId), 0);
     await recordModuleRecovery(this.ports, { workspaceId, moduleId: instance.moduleId, hash: instance.hash, activationId: instance.activationId, triggerId: triggerKey(event), runId }).catch(error => console.error(JSON.stringify({ component: "module-supervisor", event: "recovery_diagnostic.persist_failed", moduleId: instance.moduleId, hash: instance.hash, error: diagnosticText(String(error), 300) })));
   }
@@ -440,31 +448,36 @@ class ModuleSupervisor {
     }
     return module;
   }
-  private async deliverEvent(instance: Instance, event: ModuleEvent, { chain = [], path = [], timeoutMs, validateResult, beforeDelivery, dispatch, private: privateTransport, retainOutput }: DeliveryOptions): Promise<Reply> {
+  private async deliverEvent(instance: Instance, event: ModuleEvent, { chain = [], path = [], timeoutMs, validateResult, beforeDelivery, dispatch, private: privateTransport, retainOutput, retainHistory }: DeliveryOptions, delivery: Delivery): Promise<Reply> {
+    if (instance.idle) this.timers.clearTimeout(instance.idle);
     const { moduleId, hash } = instance, module = await this.assertCurrentActivation(instance);
     // Admission/metadata rejection is not a real execution result.
     await this.validateTrigger(instance, event);
     try { await beforeDelivery?.(); } catch (error) { throw staged(error, "unavailable"); }
-    const run = await this.ports.db.moduleRun.create({ data: { moduleId, hash, triggerId: triggerKey(event), firedAt: new Date(event.trigger.firedAt), exitCode: -1, createdAt: this.ports.now() } });
+    // Budget reservations require this exact event row; omit only its result body.
+    if (retainHistory === false && instance.manifest.model) { retainHistory = true; retainOutput = false; }
+    const run = retainHistory === false ? { id: randomUUID() } : await this.ports.db.moduleRun.create({ data: { moduleId, hash, triggerId: triggerKey(event), firedAt: new Date(event.trigger.firedAt), exitCode: -1, createdAt: this.ports.now() } });
+    delivery.runId = run.id;
+    this.deliveryRuns.set(run.id, delivery);
     instance.busy = true;
-    instance.scope.moduleRunId = run.id;
-    instance.scope.eventKey = `${event.trigger.id}:${event.trigger.firedAt}`;
-    instance.scope.chain = chain; instance.scope.path = path;
+    instance.activeEvents++;
+    const scope: CallScope = { ...instance.scope, moduleRunId: run.id,
+      eventKey: `${event.trigger.id}:${event.trigger.firedAt}`, chain, path };
     try {
-      const reply = await this.sendEvent(instance, event, module.workspaceId, timeoutMs, dispatch);
-      await this.recordEventResult({ instance, event, workspaceId: module.workspaceId, runId: run.id, reply, validateResult, private: privateTransport, retainOutput });
+      const reply = await this.sendEvent(instance, event, module.workspaceId, timeoutMs, dispatch, scope);
+      await this.recordEventResult({ instance, event, workspaceId: module.workspaceId, runId: run.id, reply, validateResult, private: privateTransport, retainOutput, retainHistory });
       return reply;
     } catch (error) {
       if ((error as { staleActivation?: boolean }).staleActivation) throw error;
       if (isHandlerRejection(error) || (error as { deliveryRejected?: boolean }).deliveryRejected) {
         // A validated application rejection (invalid input, conflict, permission, capacity)
         // completes this call; the SDK process remains healthy and can serve the next one.
-        await this.ports.db.moduleRun.update({ where: { id: run.id }, data: handlerFailureData(error, privateTransport) });
-      } else await this.failedDelivery(instance, event, run.id, privateTransport ? staged(new Error("Private operation failed"), (error as { stage?: DeliveryStage }).stage ?? "lost") : error);
+        if (retainHistory !== false) await this.ports.db.moduleRun.update({ where: { id: run.id }, data: handlerFailureData(error, privateTransport) });
+      } else await this.failedDelivery(instance, event, retainHistory === false ? undefined : run.id, privateTransport ? staged(new Error("Private operation failed"), (error as { stage?: DeliveryStage }).stage ?? "lost") : error);
       throw deliveryFailure(error, privateTransport);
     } finally { await this.finishEvent(instance); }
   }
-  /** Delivers one event serially; chain/path track routed calls, and failures carry their delivery stage. */
+  /** Tool calls can overlap; lifecycle events wait for all previously admitted deliveries. */
   async deliver(moduleId: string, hash: string, event: ModuleEvent, options: DeliveryOptions = {}): Promise<Reply> {
     // A new request must not bypass recovery backoff or count as another failed execution.
     if (this.restarts.has(moduleId)) throw staged(new Error("模块正在等待恢复，请稍后查看诊断状态"), "unavailable");
@@ -474,9 +487,7 @@ class ModuleSupervisor {
     if (options.private) instance.privateTransport = true;
     if (instance.idle) this.timers.clearTimeout(instance.idle);
     if (options.activationId !== undefined && options.activationId !== instance.activationId) throw staged(new Error("Module activation changed before event delivery"), "unavailable");
-    const result = instance.queue.then(() => this.deliverEvent(instance, event, options));
-    instance.queue = result.catch(() => {});
-    return result;
+    return trackDelivery(instance, event, this.deliveryRuns, options.callerRunId, delivery => this.deliverEvent(instance, event, options, delivery));
   }
   /** Authenticated HTTP endpoint of the active module serving path; null when unavailable. */
   async listener(path: string) {
@@ -525,7 +536,7 @@ class ModuleSupervisor {
     await Promise.all(instances.map(async instance => {
       instance.retiring = true;
       await instance.start?.catch(() => {});
-      await instance.queue.catch(() => {});
+      await Promise.allSettled([...instance.deliveries.keys()]);
       await this.close(instance);
     }));
   }

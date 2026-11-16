@@ -15,11 +15,11 @@ import { startLocalProvider } from "./local-runtime";
 type Fixture = Awaited<ReturnType<typeof fixture>>;
 type Read = { run: { runId: string; status: string; active: boolean }; items: { sequence: number; kind: string; payload: unknown }[]; nextCursor: string; ended: boolean; interactions: { id: string; status: string }[]; transcript: unknown[] };
 const owner = (f: Fixture) => ({ ...kernelOrigin(f.workspaceId), caller: { kind: "owner" as const, via: null } });
-async function install(f: Fixture, name: string, source: string, tools = ["relay"], uses = ["agent.run", "agent.read", "agent.write", "agent.stop", "agent.native"]) {
+async function install(f: Fixture, name: string, source: string, tools = ["relay"], uses = ["agent.run", "agent.read", "agent.write", "agent.stop", "agent.native"], readOnly = false) {
   const hash = name + "-v1", directory = join(f.ports.dataDir, "platform/store", hash);
   await mkdir(directory); await writeFile(join(directory, "index.ts"), source);
   const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", effects: [], uses, model: { tier: "any", maxCalls: 1, maxOutputTokens: 100 }, tests: ["test.ts"],
-    tools: tools.map(name => ({ name, description: "Offline SDK fixture", visibility: ["owner"], parameters: { type: "object", properties: name === "relay" ? { tool: { type: "string" }, args: { type: "string" }, key: { type: "string" } } : {} }, output: {} })) });
+    tools: tools.map(name => ({ name, ...(readOnly ? { readOnly: true } : {}), description: "Offline SDK fixture", visibility: ["owner"], parameters: { type: "object", properties: name === "relay" ? { tool: { type: "string" }, args: { type: "string" }, key: { type: "string" } } : {} }, output: {} })) });
   const module = await f.ports.db.module.create({ data: { workspaceId: f.workspaceId, name, status: "active", activeHash: hash } });
   await f.ports.db.moduleVersion.create({ data: { moduleId: module.id, hash, source: "user", manifest, status: "approved", intent: {}, report: {} } });
   return { module, hash, manifest, origin: { ...kernelOrigin(f.workspaceId), caller: { kind: "module" as const, module: name, moduleId: module.id, hash } } };
@@ -130,7 +130,7 @@ test("SDK Agent contexts preserve ownership, selected tools, scoped reads, inter
   } finally { liveRuns.clear(); await f.close(); }
 }, 45000);
 
-test("SDK completion uses public run/read with the original event budget and no content in ordinary audits", async () => {
+for (const readOnly of [false, true]) test(`SDK completion preserves event budgets and private content (readOnly=${readOnly})`, async () => {
   const f = await fixture();
   try {
     await f.ports.db.run.update({ where: { id: f.input.runId }, data: { status: "cancelled", stopStatus: "confirmed" } });
@@ -146,7 +146,7 @@ let page;const deadline=Date.now()+10000;do{page=await chrona.call('agent.read',
 if(!page.ended)throw new Error('completion remains unconfirmed');
 let second;try{await chrona.call('agent.run',{...args,prompt:'second private SDK prompt'},{key:key+':second'});}catch(e){second={code:e.code,message:e.message};}
 return {result:{first:page.items.find(item=>item.kind==='completion')?.payload,second}};});`;
-    const consumer = await install(f, "sdk-model-consumer", source, ["exercise"]);
+    const consumer = await install(f, "sdk-model-consumer", source, ["exercise"], undefined, readOnly);
     const result = callSync(f.ports, owner(f), "sdk-model-consumer.exercise", {});
     void result.catch(() => {});
     const queued = await eventually(() => f.ports.db.run.findFirst({ where: { workspaceId: f.workspaceId, status: "queued" } }), value => !!value);
@@ -159,6 +159,9 @@ return {result:{first:page.items.find(item=>item.kind==='completion')?.payload,s
     // Failed admission rolls its reservation back; the original event cannot buy a second Run.
     expect(calls.map(row => [row.moduleId, row.hash, row.status])).toEqual([[consumer.module.id, consumer.hash, "executed"]]);
     expect(calls.every(row => row.moduleRunId && row.eventKey)).toBe(true);
+    if (readOnly) expect(await f.ports.db.moduleRun.findMany({ where: { moduleId: consumer.module.id } })).toEqual([
+      expect.objectContaining({ id: calls[0]!.moduleRunId, exitCode: 0, output: null }),
+    ]);
     expect(await f.ports.db.run.count({ where: { session: { moduleId: consumer.module.id } } })).toBe(1);
     expect(await f.ports.db.providerLaunch.count()).toBe(1);
     const logs = JSON.stringify({ invocations: await f.ports.db.moduleInvocation.findMany({ where: { target: { in: ["agent", "pi", "runtime-callback"] } } }), audits: await f.ports.db.audit.findMany(), calls });

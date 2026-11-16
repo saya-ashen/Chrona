@@ -79,7 +79,6 @@ test.each(["deadline", "lease", "cancel"] as const)("%s invalidates a capability
   expect((await db.run.findUniqueOrThrow({ where: { id: run.id } })).toolCalls).toEqual([]);
   await api.runs.finish(run.id, finished);
   expect(await db.run.findUniqueOrThrow({ where: { id: run.id } })).toMatchObject({ status: reason === "cancel" ? "cancelled" : "timed_out", leaseUntil: null, endedAt: now });
-  expect(await db.message.count()).toBe(0);
 });
 
 test("lease expiry releases both lane and session capacity exactly once", async () => {
@@ -138,16 +137,14 @@ for (const scope of ["session", "workspace"] as const) test(`${scope} budget adm
 });
 
 test("failed tool dispatch consumes the last call slot and the next call is rejected before dispatch", async () => {
-  await db.session.update({ where: { id: sessionId }, data: { source: "build" } });
   await enqueue();
   const run = (await api.runs.claimNext("foreground"))!;
-  const history = Array.from({ length: RUN_LIMITS.maxChronaToolCalls - 1 }, () => ({ tool: "chrona_reply", at: now.toISOString(), ok: false }));
+  const history = Array.from({ length: RUN_LIMITS.maxChronaToolCalls - 1 }, () => ({ tool: "unavailable_tool", at: now.toISOString(), ok: false }));
   await db.run.update({ where: { id: run.id }, data: { toolCalls: history } });
-  await expect(service.tools.call(run.token, "removed_tool", {})).rejects.toMatchObject({ code: "invalid" });
-  await expect(service.tools.call(run.token, "chrona_reply", { text: "Over budget" })).rejects.toMatchObject({ code: "forbidden", message: "Chrona tool call limit reached" });
+  await expect(service.tools.call(run.token, "removed_tool", {})).rejects.toMatchObject({ code: "forbidden", message: "Provider tools require an application Agent context" });
+  await expect(service.tools.call(run.token, "unavailable_tool", {})).rejects.toMatchObject({ code: "forbidden", message: "Chrona tool call limit reached" });
   const stored = await db.run.findUniqueOrThrow({ where: { id: run.id } });
   expect(stored.toolCalls).toEqual([...history, { tool: "removed_tool", at: now.toISOString(), ok: false }]);
   expect(await db.audit.count({ where: { subjectId: run.id, kind: "tool_started" } })).toBe(1);
   expect(await db.audit.count({ where: { subjectId: run.id, kind: "tool_limit_rejected" } })).toBe(1);
-  expect(await db.message.count()).toBe(0);
 });

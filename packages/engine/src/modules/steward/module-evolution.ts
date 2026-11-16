@@ -55,9 +55,9 @@ export async function recordModuleActivation(context: ModuleContext, tx: Db, inp
 /** Latest activation epoch for a hash; same-hash reactivation gets a different id. */
 export async function latestModuleEvolution(db: Db, workspaceId: string, moduleId: string, hash: string) {
   const row = await db.moduleActivation.findFirst({ where: { moduleId, candidateHash: hash, module: { workspaceId } }, orderBy: [{ createdAt: "desc" }, { activationId: "desc" }] });
-  return row ? activationOutcome(row) : null;
+  return row ? moduleActivationOutcome(row) : null;
 }
-function activationOutcome(row: Prisma.ModuleActivationGetPayload<object>) {
+export function moduleActivationOutcome(row: Prisma.ModuleActivationGetPayload<object>) {
   const { createdAt: _createdAt, updatedAt: _updatedAt, grouped: _grouped, ...outcome } = row;
   return moduleEvolutionOutcomeSchema.parse(outcome);
 }
@@ -69,7 +69,7 @@ export async function currentModuleEvolution(db: Db, workspaceId: string, module
 
 export async function moduleEvolutionOutcomes(db: Db, workspaceId: string, moduleId: string) {
   const rows = await db.moduleActivation.findMany({ where: { moduleId, module: { workspaceId } }, orderBy: [{ updatedAt: "desc" }, { activationId: "desc" }], take: 5 });
-  return rows.map(activationOutcome);
+  return rows.map(moduleActivationOutcome);
 }
 
 // eslint-disable-next-line complexity -- Keep activation-epoch guards and outcome transitions together before writing the audit record.

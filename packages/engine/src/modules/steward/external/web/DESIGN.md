@@ -4,14 +4,14 @@
 
 ## 约束
 
-- 聊天页（含新会话与会话详情）、今天页、登录页、活动页、应用列表、应用详情（全部标签与故障面板）、系统应用详情、设置与应用登记的页面共用 `pages.js` 的 PageView / Renderer（React + json-render，源码 `src/pages.tsx`，`bun build.ts` 生成并提交）；系统 spec 位于 `src/system/`，通过仅系统页挂载时创建的 adapter 访问现有数据 API。`app.js` 仅保留 shell 基础设施（认证、请求、路由、导航链接、退出、启动与单一 SSE 连接），不构造页面内容；登记页标题也由共享 renderer 绘制，路由错误使用系统 spec。`mountSystem` 按页面接收 typed params 对象，不序列化路由参数。聊天组件通过系统 host 订阅回复；样式统一在 `style.css`，不引入外部字体或 CDN（页面要能离线打开）。
+- 系统页面位于 `src/system/*.tsx`，使用普通 React 和系统 adapter。应用页面直接由 `web.page-set` 登记 ESM，通过 `src/pages.tsx` 挂载，共享 `src/ui.tsx` 与 `src/workspace.tsx`；`bun build.ts` 生成 `pages.js` 和样式。`app.js` 负责认证、路由、导航、退出和单一 SSE，不构造页面内容。`mountSystem` 接收 typed params。
 - 静态页面不含数据；数据只来自 `/api/web`（带用户的 key）。`index.ts` 只发 `/app.js`、`/pages.js`、`/style.css` 和 `index.html`，新增静态文件要在那里登记。
 - 中文优先。文案用用户的说法（应用、文档、对话、通知、需要你确认），不用内部名词（run、grant、token、hash、module）。
-- web 不按模块名写专门页面：应用在 `on("activated")` 里调用 `web.page-set` 登记页面（组件目录见 `catalog.ts`，说明由 `web.catalog` 返回），web 统一绘制；共享显示需求在 `src/pages.tsx` 实现并加入 `catalog.ts`；只有系统页需要的交互组件留在 `src/system/`，不公开到 `web.catalog`。登记页只调用本应用工具，不获得系统 adapter；样式只用本文件的语义变量（见 [module-dependency-direction](../../../../../../../docs/zh/module-dependency-direction.md) §4）。
+- Web 不按业务应用名写专页。应用在自身 activated handler 调用 `web.page-set {id,title,javascript,css?,props?,tools?}`；共享 React 与 UI 从 `/pages.js` 导入。系统交互留在 `src/system/`，登记页不获得系统 adapter。完整合同见 [开发指南](UI-DEVELOPMENT.md)。
 
 ### 应用图片
 
-`Image` 只接收本应用内容引用 `ref: "<本应用名>/<path>"`、`alt` 和可选的 `width`/`height`，不接收任意 `src`；`ref` 可用 `$state`/`$template` 绑定。`GET /api/web/pages/<module>/<page>/content?ref=...` 沿用入口认证，仅为已登记页面读取该应用自身的 PNG/JPEG/GIF/WebP。由于入口认证使用 Bearer 请求头，页面复用认证请求取得 Blob 后交给 `<img>`，切换图片或卸载时回收 URL；不把 key 放入 URL。加载中和失败时显示中文提示，图片宽度不超过容器。
+应用用 `host.contentUrl(ref)` 读取自己声明的内容工具，返回 Blob URL 给 `<img>`；认证路由绑定应用、页面 revision 与内容引用，支持 PNG/JPEG/GIF/WebP。凭据不进入 URL；页面不再使用 `$state` / `$template`。宿主在卸载时回收对象 URL，应用也应及时释放不再需要的内容。加载和失败显示中文提示，图片宽度不超过容器。
 
 ## 性格
 

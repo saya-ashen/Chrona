@@ -50,7 +50,7 @@
   "artifacts": [
     {
       "path": "dist/ui.js",
-      "sha256": "5dbf477ec2a5aa07a9b15992b045455e4315670b0d7604f4d8f4b1d14daa4cd9"
+      "sha256": "8c54bb4340f9d63d9f0d40934e6bb21ea21dafc1f09cfe1d3ebdced1dd7dc6fc"
     }
   ],
   "build": {

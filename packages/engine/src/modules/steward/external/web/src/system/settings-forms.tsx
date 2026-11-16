@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useStateStore } from "@json-render/react";
 import { useAction } from "./action";
 import type { CapRow } from "./model-settings";
 import type { GlobalSettings, KernelModelCaps } from "./types";
@@ -20,10 +19,10 @@ function values(form: HTMLFormElement) {
   return result;
 }
 function useSaveSettings() {
-  const action = useAction(), store = useStateStore(), [message, setMessage] = useState("");
+  const action = useAction(), [message, setMessage] = useState("");
   const save = (settings: Record<string, unknown>, success = "已保存") => {
     setMessage("正在保存……");
-    void action.act(async () => { const saved = await action.call("settings-update", { settings }); store.set("/settingsView", saved); setMessage(success); });
+    void action.act(async () => { await action.call("settings-update", { settings }); setMessage(success); });
   };
   return { ...action, message, save };
 }

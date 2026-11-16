@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useStateStore } from "@json-render/react";
 import { useAction } from "./action";
 import { Time } from "../display";
 type TranscriptItem = { kind: string; text: string; tool?: string; args?: string; error?: boolean };
@@ -16,13 +15,6 @@ export function Transcript({ session, open }: { session: string; open: boolean }
 export function SessionWork({ props }: { props: { session: { id: string; createdAt: string; status: string }; open: boolean } }) {
   return <div id={`session-${props.session.id}`}><Time value={props.session.createdAt} /> · {props.session.status === "active" ? "进行中" : "已结束"} <Transcript session={props.session.id} open={props.open} /></div>;
 }
-export function DiagnosticRefresh({ props }: { props: { id: string } }) {
-  const action = useAction(), store = useStateStore();
-  return <button type="button" disabled={action.pending || !store.get("/diagnostics")} onClick={() => void action.act(async () => {
-    store.set("/diagnostics", undefined);
-    store.set("/diagnostics", await action.call("diagnostics", { id: props.id }));
-  })}>刷新诊断</button>;
-}
 type MemoryState = { provider?: string; available: boolean; autoRecall: boolean; autoRetain: boolean; last24h: { retained: number; recalled: number; forgotten: number } };
 type MemoryItem = { id: string; content: string; at?: string };
 function memoryText(state: MemoryState) {
@@ -30,7 +22,7 @@ function memoryText(state: MemoryState) {
 }
 export function MemoryPanel() {
   const action = useAction(), [state, setState] = useState<MemoryState | null>(null), [items, setItems] = useState<MemoryItem[]>([]), [note, setNote] = useState("");
-  useEffect(() => { let stopped = false; void action.call("memory", {}).then(result => { if (!stopped) setState(result as MemoryState); }).catch(() => {}); return () => { stopped = true; }; }, []);
+  useEffect(() => { let stopped = false; void action.call("memory", {}).then(result => { if (!stopped) setState(result as MemoryState); }).catch(error => { console.error(JSON.stringify({ component: "web", event: "memory_read_failed", error: String(error) })); setNote(String(error)); }); return () => { stopped = true; }; }, []);
   return <section><h2>记忆</h2><p className="muted">{state ? memoryText(state) : "状态读取失败"}</p>
     <form onSubmit={event => {
       event.preventDefault(); const query = String(new FormData(event.currentTarget).get("query")); setNote("检索中……"); setItems([]);

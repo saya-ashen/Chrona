@@ -1,3 +1,4 @@
+import { javascript } from "./settings-bundle.js";
 import { memoryForget, memoryPreferences } from "./memory";
 import type { createPreferences } from "./settings-store";
 
@@ -41,31 +42,7 @@ export async function webPreferences(call: Call, args: Args) {
   return { items: await memoryPreferences(call, "web") };
 }
 
-const state = (path: string) => ({ $state: path });
-const bind = (path: string) => ({ $bindState: path });
-const node = (type: string, props: Args, children: string[] = []) => ({ type, props, children });
 export const WEB_SETTINGS_PAGE = {
-  id: "settings", title: "Web 设置", purpose: "settings", layout: "document",
-  data: { config: { tool: "ui-settings" }, preferences: { tool: "ui-preferences" } },
-  spec: { root: "root", state: { saved: false, failed: false }, elements: {
-    root: node("Stack", { gap: "lg" }, ["title", "description", "card", "preferences"]),
-    title: node("Heading", { text: "Web 设置", level: "h1" }),
-    description: node("Text", { text: "这些偏好只影响 Web 对话。MCP 和 QQ 在各自应用中设置。", variant: "muted" }),
-    card: node("Card", { title: "对话记忆" }, ["provider", "hint", "recall", "retain", "save", "saved", "failed"]),
-    provider: node("Input", { label: "记忆应用", name: "provider", placeholder: "留空关闭，例如 memory-local", value: bind("/config/provider") }),
-    hint: node("Text", { text: "填写已安装的记忆应用名称；应用暂不可用时，已保存的偏好仍会保留。", variant: "muted" }),
-    recall: node("Switch", { label: "自动回忆", name: "autoRecall", checked: bind("/config/autoRecall") }),
-    retain: node("Switch", { label: "自动保留对话记忆", name: "autoRetain", checked: bind("/config/autoRetain") }),
-    save: { ...node("Button", { label: "保存 Web 设置" }), on: { press: [
-      { action: "setState", params: { statePath: "/saved", value: false } },
-      { action: "setState", params: { statePath: "/failed", value: false } },
-      { action: "call", params: { tool: "ui-settings", args: { provider: state("/config/provider"), "auto-recall": state("/config/autoRecall"), "auto-retain": state("/config/autoRetain") }, result: "/config", reload: false }, onSuccess: { set: { "/saved": true } }, onError: { set: { "/failed": true } } },
-    ] } },
-    saved: { ...node("Text", { text: "Web 设置已保存。" }), visible: { $state: "/saved" } },
-    failed: { ...node("Text", { text: "保存未完成，请核对输入并重试。" }), visible: { $state: "/failed" } },
-    preferences: node("Card", { title: "记忆应用保存的偏好" }, ["preferenceList"]),
-    preferenceList: { ...node("Stack", { gap: "md" }, ["preferenceText", "forget"]), repeat: { statePath: "/preferences/items", key: "id" } },
-    preferenceText: node("Text", { text: { $item: "text" } }),
-    forget: { ...node("Button", { label: "删除这条偏好", variant: "secondary" }), on: { press: { action: "call", params: { tool: "ui-preferences", args: { forget: { $item: "id" } }, result: "/preferences", reload: false } } } },
-  } },
+  id: "settings", title: "Web 设置", purpose: "settings", layout: "document", tools: ["ui-settings", "ui-preferences"], props: { preferences: true },
+  javascript,
 };

@@ -93,9 +93,9 @@ test('lost reply survives restart and withdrawal; only original admission/key re
  const f=fixture();try{const r=await f.delivery.prepare(f.input,f.worker);await f.stage(r.id);f.state.lost=true;await expect(f.delivery.submit(r.id,owner)).rejects.toThrow('lost reply');expect(f.delivery.detail(r.id,owner).status).toBe('submit-unknown');f.reopen();
   f.store.update(tx=>{const m=tx.meta();m.visibilityRevision++;tx.setMeta(m);});
   const forgotten=f.delivery.withdraw(r.id,owner);expect(forgotten.payload).toBeNull();expect(forgotten.cleanup).toContain('content-free');
-  const bytes=readFileSync(join(f.dir,'mind-delivery.sqlite'));expect(bytes.includes(Buffer.from('private-intent-marker'))).toBe(false);expect(bytes.includes(Buffer.from('private-criteria-marker'))).toBe(false);
+  const bytes=readFileSync(join(f.dir,'mind.sqlite'));expect(bytes.includes(Buffer.from('private-intent-marker'))).toBe(false);expect(bytes.includes(Buffer.from('private-criteria-marker'))).toBe(false);
   f.reopen();const recovered=await f.delivery.submit(r.id,owner);expect(recovered.receipt!.receiptId).toBe('real-receipt');expect(recovered.withdrawn).toBe(true);expect(recovered.payload).toBeNull();expect(f.state.submits).toBe(1);expect(f.state.receiptQueries).toEqual([{admissionId:'admission',requestKey:'stable-command'}]);
-  expect(statSync(join(f.dir,'mind-delivery.sqlite')).mode&0o777).toBe(0o600);expect(statSync(f.dir).mode&0o777).toBe(0o700);
+  expect(statSync(join(f.dir,'mind.sqlite')).mode&0o777).toBe(0o600);expect(statSync(f.dir).mode&0o777).toBe(0o700);
  }finally{f.cleanup();}
 });
 test('proof rejects wrong run, called Author identity, target, result state, material and unselected tools',async()=>{
@@ -184,7 +184,7 @@ test('pre-dispatch failure preserves its reason through restart and scrubs detai
   expect((await f.delivery.reconcile(id,owner)).status).toBe('failed');expect(f.calls).toHaveLength(calls);
   f.delivery.forget(id,owner);f.reopen();
   expect(f.delivery.detail(id,owner)).toMatchObject({status:'failed',payload:null,withdrawn:true,observation:'withdrawn; submission failed before dispatch'});
-  expect(readFileSync(join(f.dir,'mind-delivery.sqlite')).includes(Buffer.from('private-intent-marker'))).toBe(false);
+  expect(readFileSync(join(f.dir,'mind.sqlite')).includes(Buffer.from('private-intent-marker'))).toBe(false);
  }finally{f.cleanup();}
 });
 
@@ -279,7 +279,7 @@ test.each([false,true])('forget scrubs private error details even when an except
   f.delivery.cleanupWithdrawn();f.reopen();
   const record=f.delivery.detail(id,owner);expect(record.payload).toBeNull();expect(record.withdrawn).toBe(true);
   expect(record.observation).not.toContain(privateReason);
-  expect(readFileSync(join(f.dir,'mind-delivery.sqlite')).includes(Buffer.from('private-intent-marker'))).toBe(false);
+  expect(readFileSync(join(f.dir,'mind.sqlite')).includes(Buffer.from('private-intent-marker'))).toBe(false);
  }finally{f.cleanup();}
 });
 

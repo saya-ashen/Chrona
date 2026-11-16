@@ -73,12 +73,29 @@ function logAvailabilityChange(key: string, provider: string, error: string | nu
   lastAvailabilityError.set(key, error);
   console.error(JSON.stringify({ component: "agent-provider", event: error === null ? "provider_available" : "provider_unavailable", provider, ...(error === null ? {} : { error }) }));
 }
+type ProviderHealth = z.infer<typeof runtimeHealthSchema>;
+const pendingHealth = new WeakMap<StewardPorts["db"], Map<string, Promise<ProviderHealth>>>();
+async function providerHealth(ports: StewardPorts, workspaceId: string, binding: ProviderBinding) {
+  let pending = pendingHealth.get(ports.db);
+  if (!pending) { pending = new Map(); pendingHealth.set(ports.db, pending); }
+  const key = JSON.stringify([workspaceId, binding.providerId, binding.moduleId, binding.hash, binding.revision]);
+  const existing = pending.get(key);
+  if (existing) {
+    // Sharing an ongoing probe must not let a newly paused or replaced provider remain eligible.
+    await checkProviderBinding(ports.db, workspaceId, binding);
+    return existing;
+  }
+  const probe = callProviderEndpoint(ports, workspaceId, binding, "health", {}).then(value => runtimeHealthSchema.parse(value))
+    .finally(() => { pending.delete(key); });
+  pending.set(key, probe);
+  return probe;
+}
 export async function providerView(ports: StewardPorts, workspaceId: string, binding: ProviderBinding, observeHealth = true) {
   const snapshot = providerSnapshot(binding.declaration);
   let available = false, error: string | null = null;
   try {
     if (!observeHealth) throw new CallError("unavailable", "Provider health has not been observed");
-    const health = runtimeHealthSchema.parse(await callProviderEndpoint(ports, workspaceId, binding, "health", {}));
+    const health = await providerHealth(ports, workspaceId, binding);
     available = health.available; error = health.available ? null : health.error ?? "unavailable without a reason";
   } catch (failure) {
     // An installed registration remains discoverable while its module is unavailable.

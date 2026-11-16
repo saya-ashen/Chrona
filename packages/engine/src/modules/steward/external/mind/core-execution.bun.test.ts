@@ -6,6 +6,18 @@ import {CoreExecutionJournal,CoreExecutor,type CoreCall,type Execution} from './
 function fixture(){const dir=mkdtempSync(join(tmpdir(),'mind-execution-'));const journal=new CoreExecutionJournal(dir);return {dir,journal,cleanup(){journal.close();rmSync(dir,{recursive:true,force:true});}};}
 const input={purpose:'understand' as const,subject:'batch:1',revision:1,visibilityRevision:1,prompt:'Understand source evidence',tools:[{moduleId:'mind-id',tool:'progress'}]};
 const now='2026-11-13T14:00:00.000Z';
+test('main, admission and verification journals share one file and preserve independent budgets',()=>{
+ const f=fixture(),admission=new CoreExecutionJournal(f.dir,undefined,'admission'),verification=new CoreExecutionJournal(f.dir,undefined,'verification');
+ try{
+  const entries=[f.journal,admission,verification].map(journal=>journal.prepare(input,now,1));
+  for(const [i,journal] of [f.journal,admission,verification].entries()){
+   expect(journal.all().map(e=>e.id)).toEqual([entries[i]!.id]);
+   expect(()=>journal.prepare(input,now,1)).toThrow('Previous execution');
+   const e=entries[i]!;e.settled=true;journal.save(e);
+   expect(()=>journal.prepare(input,now,1)).toThrow('budget');
+  }
+ }finally{verification.close();admission.close();f.cleanup();}
+});
 test('lost reply and restart reconcile exact original run once, only complete real selected tool results settle',async()=>{
  const f=fixture();let runCalls=0;const keys:string[]=[];let settled:Execution|undefined;
  const call:CoreCall=async(target,args,options)=>{if(target==='agent.run'){runCalls++;keys.push(options!.key!);if(runCalls===1)throw Error('reply lost');return {runId:'r',contextId:'c',active:true,status:'running'};}

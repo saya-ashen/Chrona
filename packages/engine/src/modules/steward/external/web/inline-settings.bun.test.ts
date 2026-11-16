@@ -1,12 +1,13 @@
 import { test, expect } from "bun:test";
 import puppeteer from "puppeteer-core";
 import { join } from "node:path";
+import { settingsJavascript } from "./src/settings-fixture";
 
 test("inline settings retains app lifecycle, authority and store isolation", async () => {
-  const bundle = await Bun.build({ entrypoints: [join(import.meta.dir, "src/settings-inline.browser.test.tsx")], target: "browser", minify: true, define: { "process.env.NODE_ENV": '"production"' } });
+  const bundle = await Bun.build({ entrypoints: [join(import.meta.dir, "src/settings-inline.browser-test.tsx")], target: "browser", minify: true, define: { "process.env.NODE_ENV": '"production"' } });
   expect(bundle.success).toBe(true);
   const script = await bundle.outputs[0]!.text();
-  const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: request => new URL(request.url).pathname === "/test.js"
+  const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: request => new URL(request.url).pathname.endsWith("/source") ? new Response(settingsJavascript, { headers: { "content-type": "text/javascript" } }) : new URL(request.url).pathname === "/test.js"
     ? new Response(script, { headers: { "content-type": "text/javascript" } })
     : new Response('<!doctype html><html lang="zh"><body><script type="module" src="/test.js"></script></body></html>', { headers: { "content-type": "text/html" } }) });
   const chrome = process.env.CHRONA_TEST_CHROME ?? Bun.which("google-chrome") ?? Bun.which("chromium");
@@ -18,7 +19,7 @@ test("inline settings retains app lifecycle, authority and store isolation", asy
     await page.goto(server.url.href);
     await page.waitForFunction(() => "inlineSettingsTest" in window);
     const checks = await page.evaluate(() => (window as unknown as { inlineSettingsTest: { run: () => Promise<string[]> } }).inlineSettingsTest.run());
-    expect(checks.length).toBeGreaterThanOrEqual(18);
+    expect(checks.length).toBeGreaterThanOrEqual(13);
     expect(errors).toEqual([]);
   } finally { await browser.close(); server.stop(true); }
 }, 60000);

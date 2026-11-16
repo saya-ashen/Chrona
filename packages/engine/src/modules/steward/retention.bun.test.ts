@@ -51,6 +51,23 @@ async function fixture() {
   return { db, workspaceId, moduleId, run, invocation, moduleRun, call, event, fact, audit, epoch, result };
 }
 
+test("ninety-day payload expiry preserves consumed receipt identities and unknown work", async () => {
+  const f = await fixture(), expired = new Date("2026-07-01T00:00:00Z");
+  const run = await f.run("settled-90", { prompt: "old request body", summary: "old result body", error: "old diagnostic", toolCalls: [{ tool: "effect" }], endedAt: expired, createdAt: expired });
+  await f.run("unknown-90", { prompt: "must keep unknown request", stopStatus: "unknown", endedAt: expired, createdAt: expired });
+  for (const status of ["succeeded", "unknown", "running"] as const) await f.invocation(`receipt-${status}`, {
+    targetIdentity: f.moduleId, mode: "sync", tool: "write", args: { private: "old arguments" }, output: { private: "old output" },
+    requestDigest: "fixed-digest", runId: status === "succeeded" ? run.id : null, status, createdAt: expired, finishedAt: expired,
+  });
+  await pruneHistory(f.db, now);
+  const receipt = await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: "receipt-succeeded" } });
+  expect(receipt).toMatchObject({ key: "receipt-succeeded", requestDigest: "fixed-digest", args: {}, output: null, status: "failed", errorCode: "conflict" });
+  expect(receipt.error).toContain("key remains consumed");
+  expect(await f.db.run.findUniqueOrThrow({ where: { id: run.id } })).toMatchObject({ prompt: "", summary: null, error: null, toolCalls: [], stopStatus: "confirmed" });
+  expect(await f.db.run.findUniqueOrThrow({ where: { id: "unknown-90" } })).toMatchObject({ prompt: "must keep unknown request", stopStatus: "unknown" });
+  for (const status of ["unknown", "running"]) expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: `receipt-${status}` } })).toMatchObject({ args: { private: "old arguments" }, output: { private: "old output" }, status });
+});
+
 test("seven-day boundary is strict for every expiring model; current failure-policy state and event sequence survive", async () => {
   const f = await fixture();
   await f.epoch("old"); await f.epoch("new", boundary);
@@ -96,14 +113,16 @@ test("pending/unknown claims, leases, undelivered replies, keyed receipts and li
   await f.run("awaiting-reply"); await f.invocation("pending-on-run", { runId: "awaiting-reply", reply: true }); await f.event("awaiting-reply");
   await f.invocation("settled-reply", { reply: true, repliedAt: old });
   await f.invocation("settled-failure", { status: "failed" });
-  // Reads are never receipts, keyed or not; a recent read and a keyed effect stay.
+  // Explicit keys preserve exact read replies as well as effect receipts.
   await f.invocation("keyed-read", { mode: "sync", target: "modules", tool: "describe" });
   await f.invocation("stream-event", { mode: "sync", target: "runtime-callback", tool: "event" });
   await f.invocation("recent-read", { mode: "sync", target: "modules", tool: "list", createdAt: now, finishedAt: now });
   const before = await f.db.moduleInvocation.count();
-  expect(await pruneHistory(f.db, now)).toMatchObject({ invocations: 4, events: 0 });
-  expect(await f.db.moduleInvocation.count()).toBe(before - 4);
+  expect(await pruneHistory(f.db, now)).toMatchObject({ invocations: 2, events: 0 });
+  expect(await f.db.moduleInvocation.count()).toBe(before - 2);
   expect(await f.db.moduleInvocation.findUnique({ where: { id: "keyed-sync" } })).not.toBeNull();
+  expect(await f.db.moduleInvocation.findUnique({ where: { id: "keyed-read" } })).not.toBeNull();
+  expect(await f.db.moduleInvocation.findUnique({ where: { id: "stream-event" } })).not.toBeNull();
   expect(await f.db.moduleInvocation.findUnique({ where: { id: "recent-read" } })).not.toBeNull();
   expect(await f.db.moduleInvocation.findUnique({ where: { id: "settled-reply" } })).toBeNull();
   expect(await f.db.moduleInvocation.findUnique({ where: { id: "settled-failure" } })).toBeNull();
@@ -140,6 +159,15 @@ test("failure-policy deduplication keeps every current/unmatched epoch receipt i
   await f.db.module.update({ where: { id: f.moduleId }, data: { activationId: "resume-is-not-epoch" } });
   expect(await pruneHistory(f.db, now)).toMatchObject({ results: 1 });
   expect((await f.db.moduleExecutionResult.findMany({ orderBy: { id: "asc" }, select: { id: true } })).map(r => r.id)).toEqual(["current-1", "current-2", "unmatched"]);
+});
+
+test("a newer different-hash activation retires inactive execution history", async () => {
+  const f = await fixture();
+  await f.epoch("old-hash"); await f.epoch("new-hash", now, "new");
+  await f.result("old-result", "old-hash");
+  await f.db.module.update({ where: { id: f.moduleId }, data: { activeHash: "new" } });
+  expect(await pruneHistory(f.db, now)).toMatchObject({ results: 1 });
+  expect(await f.db.moduleExecutionResult.count()).toBe(0);
 });
 
 test("pruning the Audit copy preserves failure streaks and duplicate success/failure replay", async () => {

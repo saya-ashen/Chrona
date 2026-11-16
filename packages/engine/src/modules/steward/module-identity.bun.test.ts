@@ -1,22 +1,16 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { BUILTIN_MODULE_NAMES, KERNEL_MODULE_NAMES, moduleManifestSchema } from "@chrona/contracts/steward";
+import { KERNEL_MODULE_NAMES, moduleManifestSchema } from "@chrona/contracts/steward";
 import { testDb } from "./test-db";
 import { moduleContext } from "./module-context";
-import { propose } from "./module-proposal";
-import { queueBuild } from "./module-build-session";
 import { activateIn } from "./module-generation";
 import { rollback } from "./module-activation";
 import { buildPending } from "./module-build";
-import { requestGroup } from "./module-group";
 import { resolveBuiltinRelease } from "./module-release";
-import { currentModuleEvolution, updateModuleEvolution } from "./module-evolution";
 import { requestStatus, setStatusIn } from "./module-status";
-import { rollbackFailedStart } from "./module-generation";
 import { assertExternalName, assertModuleOperation, moduleIdentity } from "./module-identity";
 import { isModulePaused, PAUSED_MODULE_NAMES } from "./module-availability";
-import { requestRemove, removeApproved } from "./module-remove";
 import { moduleSupervisor } from "./module-supervisor";
 import type { StewardPorts } from "./ports";
 
@@ -36,24 +30,6 @@ async function fixture() {
   }
   return { db, workspace, ports, context, app, dataDir };
 }
-const request = (name: string) => ({ name, goal: "Change application", intent: { changes: ["fix"], preserves: [] }, examples: [], files: [] });
-
-test.each([...BUILTIN_MODULE_NAMES, ...KERNEL_MODULE_NAMES, "rescue"])("empty-workspace reserved name %s rejects admission and proposal without records", async name => {
-  const f = await fixture();
-  await expect(queueBuild(f.ports, f.workspace.id, { key: "build", actorKey: "user", originSessionId: null, request: request(name) })).rejects.toMatchObject({ code: "forbidden" });
-  await mkdir(join(f.dataDir, "candidate"));
-  const manifest = { name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [] };
-  await writeFile(join(f.dataDir, "candidate/module.json"), JSON.stringify(manifest));
-  await writeFile(join(f.dataDir, "candidate/index.ts"), "export {};");
-  const proposal = propose(f.context, { root: f.dataDir, dir: "candidate", intent: request(name).intent }, "user");
-  if (moduleManifestSchema.safeParse(manifest).success) await expect(proposal).rejects.toMatchObject({ code: "forbidden" });
-  else expect(await proposal).toMatchObject({ moduleId: null, status: "rejected", report: { errors: [expect.stringContaining("reserved")] } });
-  expect(await f.db.module.count()).toBe(0);
-  expect(await f.db.moduleVersion.count()).toBe(0);
-  expect(await f.db.session.count()).toBe(0);
-  expect(await f.db.run.count()).toBe(0);
-  expect(await f.db.approval.count()).toBe(0);
-});
 
 test.each(["pi", "web", "notify"])("ordinary preinstalled %s accepts checked updates, rollback and deletion", async name => {
   const f = await fixture(), app = await f.app(name, false);
@@ -106,18 +82,18 @@ test.each(["building", "pending_review"])("%s candidate becoming builtin is reje
 test("version source does not grant builtin identity and external activation preserves pause", async () => {
   const f = await fixture(), app = await f.app("example", false, "builtin");
   expect(moduleManifestSchema.safeParse({ ...app.manifest, triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }] }).success).toBe(false);
-  const dynamic = await f.db.schedule.create({ data: { workspaceId: f.workspace.id, moduleId: app.id, mode: "module", triggerId: "timer", rule: { kind: "at", at: "2026-12-01T12:00:00Z" }, payload: { task: "later" }, text: "later", createdBy: "example", nextAt: new Date("2026-12-01T12:00:00Z") } });
-  const independentlyPaused = await f.db.schedule.create({ data: { workspaceId: f.workspace.id, moduleId: app.id, mode: "module", triggerId: "manual", rule: { kind: "at", at: "2026-12-01T12:00:00Z" }, payload: { task: "manual" }, text: "manual", createdBy: "example", status: "paused" } });
+  const dynamic = await f.db.timer.create({ data: { workspaceId: f.workspace.id, moduleId: app.id, rule: { kind: "at", at: "2026-12-01T12:00:00Z" }, payload: { task: "later" }, timerId: "later", nextAt: new Date("2026-12-01T12:00:00Z") } });
+  const independentlyPaused = await f.db.timer.create({ data: { workspaceId: f.workspace.id, moduleId: app.id, rule: { kind: "at", at: "2026-12-01T12:00:00Z" }, payload: { task: "manual" }, timerId: "manual", status: "paused" } });
   await requestStatus(f.context, app.id, "paused", "maintenance");
   await f.db.$transaction(tx => activateIn(f.context, tx, { moduleId: app.id, hash: "next", reason: "activate" }));
   expect((await f.db.module.findUniqueOrThrow({ where: { id: app.id } }))).toMatchObject({ activeHash: "next", builtin: false, status: "paused" });
-  expect(await f.db.schedule.count({ where: { moduleId: app.id, triggerId: "daily" } })).toBe(0);
-  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: dynamic.id } })).toMatchObject({ status: "cancelled", nextAt: null });
+  expect(await f.db.timer.count({ where: { moduleId: app.id } })).toBe(2);
+  expect(await f.db.timer.findUniqueOrThrow({ where: { id: dynamic.id } })).toMatchObject({ status: "active" });
   await requestStatus(f.context, app.id, "active", "explicit enable");
   expect(await f.db.module.findUniqueOrThrow({ where: { id: app.id } })).toMatchObject({ status: "active", activeHash: "next", builtin: false });
-  expect(await f.db.schedule.count({ where: { moduleId: app.id, triggerId: "daily" } })).toBe(0);
-  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: dynamic.id } })).toMatchObject({ status: "cancelled", nextAt: null });
-  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: independentlyPaused.id } })).toMatchObject({ status: "cancelled", nextAt: null });
+  expect(await f.db.timer.count({ where: { moduleId: app.id } })).toBe(2);
+  expect(await f.db.timer.findUniqueOrThrow({ where: { id: dynamic.id } })).toMatchObject({ status: "active", nextAt: dynamic.nextAt });
+  expect(await f.db.timer.findUniqueOrThrow({ where: { id: independentlyPaused.id } })).toMatchObject({ status: "paused", nextAt: null });
 });
 
 test("Agent has no builtin release even when old resources are supplied", async () => {
@@ -125,24 +101,6 @@ test("Agent has no builtin release even when old resources are supplied", async 
   f.ports.moduleBuiltinResources = join(f.dataDir, "release");
   await expect(resolveBuiltinRelease(f.ports, "agent")).rejects.toMatchObject({ reason: "release_not_found" });
   expect(await f.db.module.count()).toBe(0);
-});
-
-test("a real automatically activated group cannot partially roll back after start failure", async () => {
-  const f = await fixture(), apps = [await f.app("first"), await f.app("second")];
-  const session = await f.db.session.create({ data: { workspaceId: f.workspace.id, key: "build", source: "build" } });
-  await f.db.buildTargets.create({ data: { sessionId: session.id, name: "first", modules: ["first", "second"] } });
-  for (const app of apps) {
-    const version = await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: app.id, hash: "next" } }, data: { source: "build", status: "pending_review" } });
-    await f.db.moduleVersion.update({ where: { id: version.id }, data: { buildSessionId: session.id } });
-    await f.db.moduleReview.create({ data: { versionId: version.id, prefix: "", suffix: "", codeDiff: "", detail: "", needsMigration: false } });
-  }
-  expect(await requestGroup(f.ports, f.workspace.id, session.id, apps.map(app => ({ module: app.name, hash: "next" })))).toEqual({ status: "approved" });
-  expect(await f.db.approval.count()).toBe(0);
-  await f.db.audit.deleteMany();
-  const app = apps[0]!, activation = await currentModuleEvolution(f.db, f.workspace.id, app.id, "next");
-  await updateModuleEvolution(f.db, { workspaceId: f.workspace.id, moduleId: app.id, activationId: activation!.activationId, hash: "next", status: "failed", now: f.ports.now() });
-  expect(await rollbackFailedStart(f.context, app.id, "next", activation!.activationId)).toMatchObject({ rolledBack: false, reason: expect.stringContaining("group") });
-  expect((await f.db.module.findMany()).map(app => app.activeHash)).toEqual(["next", "next"]);
 });
 
 test.each(["building", "pending_review"])("stored %s candidates for a paused app reject without interrupting build recovery", async status => {
@@ -173,36 +131,4 @@ test.each([...PAUSED_MODULE_NAMES])("paused %s cannot enable through owner or pr
     expect(await f.db.module.findUniqueOrThrow({ where: { id: app.id } })).toMatchObject({ status, activeHash: "old" });
   }
   expect(await f.db.audit.count({ where: { kind: "module_enabled" } })).toBe(0);
-});
-
-test.each([...PAUSED_MODULE_NAMES])("paused %s rejects new and installed dynamic work while retaining cleanup", async name => {
-  const f = await fixture();
-  await expect(queueBuild(f.ports, f.workspace.id, { key: "paused-new", actorKey: "user", originSessionId: null, request: request(name) })).rejects.toMatchObject({ code: "unavailable", reason: "module_paused" });
-  expect(await f.db.module.count()).toBe(0);
-  const app = await f.app(name);
-  const capabilities = moduleIdentity(app, { configurable: true }).capabilities;
-  for (const operation of ["build", "propose", "group", "activate", "update", "rollback", "install", "enable", "configure"] as const) {
-    expect(capabilities[operation]).toBe(false);
-    expect(() => assertModuleOperation(app, operation)).toThrow("unavailable: paused");
-    await expect(assertExternalName(f.db, f.workspace.id, name, operation)).rejects.toMatchObject({ code: "unavailable", reason: "module_paused" });
-  }
-  for (const operation of ["disable", "remove", "diagnose"] as const) {
-    expect(capabilities[operation]).toBe(true);
-    expect(() => assertModuleOperation(app, operation)).not.toThrow();
-  }
-  await expect(queueBuild(f.ports, f.workspace.id, { key: "paused-existing", actorKey: "user", originSessionId: null, request: request(name) })).rejects.toMatchObject({ code: "unavailable" });
-  await expect(f.db.$transaction(tx => activateIn(f.context, tx, { moduleId: app.id, hash: "next", reason: "activate" }))).rejects.toMatchObject({ code: "unavailable" });
-  await expect(rollback(f.context, app.id, "next")).rejects.toMatchObject({ code: "unavailable" });
-  expect(await f.db.module.findUniqueOrThrow({ where: { id: app.id } })).toMatchObject({ activeHash: "old" });
-  expect(await f.db.session.count()).toBe(0);
-  expect(await f.db.run.count()).toBe(0);
-  expect(await f.db.approval.count()).toBe(0);
-  await requestStatus(f.context, app.id, "paused", "cleanup");
-  expect(await f.db.module.findUniqueOrThrow({ where: { id: app.id } })).toMatchObject({ status: "paused", activeHash: "old" });
-  const removal = await requestRemove(f.context, app.id, "Owner approved cleanup");
-  const approval = await f.db.approval.update({ where: { id: removal.approvalId }, data: { status: "approved" } });
-  await removeApproved(f.context, { workspaceId: f.workspace.id, approvalId: approval.id, payload: approval.payload! });
-  expect(await f.db.module.findUnique({ where: { id: app.id } })).toBeNull();
-  expect(await f.db.moduleVersion.count({ where: { moduleId: app.id } })).toBe(0);
-  expect(await f.db.audit.count({ where: { subjectId: app.id, kind: "module_removed" } })).toBe(1);
 });

@@ -21,7 +21,6 @@
     "modules.list",
     "modules.receipt",
     "modules.health",
-    "web.component-set",
     "web.page-set",
     "web.pages",
     "pi.configure",
@@ -37,6 +36,7 @@
   "tools": [
     {
       "name": "catalog",
+      "readOnly": true,
       "description": "发现真实 Provider 配置与按应用分组的工具",
       "visibility": [
         "owner"
@@ -62,6 +62,7 @@
     },
     {
       "name": "list",
+      "readOnly": true,
       "description": "读取 Chat 自己的会话列表",
       "visibility": [
         "owner"
@@ -122,6 +123,7 @@
     },
     {
       "name": "read",
+      "readOnly": true,
       "description": "核对已有执行及读取会话；observe=true 仅观测，不恢复待执行命令",
       "visibility": [
         "owner"
@@ -344,6 +346,7 @@
     },
     {
       "name": "image",
+      "readOnly": true,
       "description": "读取此会话拥有的图片",
       "visibility": [
         "owner"
@@ -541,6 +544,7 @@
     },
     {
       "name": "observations",
+      "readOnly": true,
       "description": "纯读取已公开的持久来源事件；不核对或启动 Agent；epoch+cursor恢复，撤回不泄漏旧片段",
       "visibility": [
         "owner"
@@ -581,6 +585,7 @@
     },
     {
       "name": "snapshot",
+      "readOnly": true,
       "description": "纯读取已发送对象；可按 inventory token固定水位；范围缩小立即拒绝旧token",
       "visibility": [
         "owner"
@@ -651,6 +656,7 @@
     },
     {
       "name": "observation-inventory",
+      "readOnly": true,
       "description": "固定来源epoch、范围版本和高水位的有界重建清单；token五分钟/进程重启失效",
       "visibility": [
         "owner"
@@ -691,6 +697,7 @@
     },
     {
       "name": "observation-scope",
+      "readOnly": true,
       "description": "owner学习范围：默认关闭，只从开启后新提交消息；版本化排除/私密立即撤回，不回扫历史",
       "visibility": [
         "owner"
@@ -732,6 +739,7 @@
     },
     {
       "name": "task-view",
+      "readOnly": true,
       "description": "Read the owner’s persistent tasks, or one task and its actual progress/artifacts. User interface only; no Agent execution.",
       "visibility": [
         "owner",

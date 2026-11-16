@@ -57,7 +57,7 @@ export function systemFailureData(failure: CallError, quiet = false) {
 
 export function deliveryErrorCode(error: unknown) {
   const stage = stageOf(error);
-  if (stage === "unavailable") return error instanceof CallError && error.code === "conflict" ? "conflict" : "unavailable";
+  if (stage === "unavailable") return error instanceof CallError && (error.code === "conflict" || error.code === "cycle") ? error.code : "unavailable";
   if (stage === "handler") return (error as { code?: CallErrorCode }).code ?? "failed";
   return "unknown";
 }

@@ -3,8 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { SystemContext } from "./system/action";
 import { systemCall } from "./system/adapter";
 import { LoginForm, LoginPasswordSettings } from "./system/password-forms";
-import { loginSpec } from "./system/login";
-import { settingsSpec } from "./system/settings";
+import { LoginPage } from "./system/login";
+import { Settings } from "./system/settings";
 
 const unavailable = async () => { throw new Error("Credentials must never reach the Web module proxy"); };
 describe("system password forms and auth boundary", () => {
@@ -39,12 +39,11 @@ describe("system password forms and auth boundary", () => {
     expect(render("bootstrap")).not.toContain('name="password"');
     expect(render("error")).toContain("重新读取登录状态");
     expect(render("error")).not.toContain("<input");
-    expect(JSON.stringify(loginSpec(undefined, "bootstrap"))).toContain("原访问授权");
-    expect(JSON.stringify(loginSpec())).not.toContain("API_KEY");
+    expect(renderToStaticMarkup(<SystemContext.Provider value={{ call: unavailable, refresh: () => {} }}><LoginPage mode="bootstrap" /></SystemContext.Provider>)).toContain("原访问授权");
+    expect(renderToStaticMarkup(<SystemContext.Provider value={{ call: unavailable, refresh: () => {} }}><LoginPage /></SystemContext.Provider>)).not.toContain("API_KEY");
   });
   test("Settings exposes the shared password component with current and new autocomplete", () => {
-    const spec = settingsSpec({});
-    expect(Object.values(spec.elements).some(node => node.type === "LoginPasswordSettings")).toBe(true);
+    expect(renderToStaticMarkup(<SystemContext.Provider value={{ call: unavailable, refresh: () => {} }}><Settings /></SystemContext.Provider>)).toContain("登录密码");
     const form = renderToStaticMarkup(<SystemContext.Provider value={{ call: unavailable, refresh: () => {} }}><LoginPasswordSettings /></SystemContext.Provider>);
     expect(form).toContain('name="currentPassword"');
     expect(form.match(/autoComplete="current-password"/g)).toHaveLength(1);

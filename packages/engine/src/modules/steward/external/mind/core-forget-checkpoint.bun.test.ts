@@ -38,7 +38,7 @@ function fixture() {
 
 test('forgotten document WAL stays deferred across restart until its pinned reader releases', () => {
  const f = fixture(), marker = 'PRIVATE-CHECKPOINT-DOCUMENT'; let reader: Database | undefined;
- const path = join(f.directory, 'mind-artifacts.sqlite');
+ const path = join(f.directory, 'mind.sqlite');
  try {
   const evidence: Evidence = { id: 'e', revision: 1, createdAt: now, updatedAt: now, sourceIdentity: 'owner', epoch: '1', eventId: 'message', cursor: '1',
    object: { kind: 'message', id: 'message', revision: 1 }, kind: 'message', scope: { sessionId: 's1' }, actor: 'user', origin: { rootId: 'message' },
@@ -54,11 +54,11 @@ test('forgotten document WAL stays deferred across restart until its pinned read
   // Withdrawal hides derived content before any recovery I/O or artifact deletion.
   expect(f.actions.list('p', owner)).toEqual([]);
   expect(() => f.actions.read(document.ref, owner)).toThrow('Document pursuit has been withdrawn');
-  expect(f.runtime.cleanupWithdrawn().deferred).toBe(1);
+  expect(f.runtime.cleanupWithdrawn().deferred).toBeGreaterThan(0);
   expect(() => f.actions.read(document.ref)).toThrow('Document not found');
   expect(readFileSync(`${path}-wal`).includes(Buffer.from(marker))).toBe(true);
   f.restart();
-  expect(f.runtime.cleanupWithdrawn().deferred).toBe(1);
+  expect(f.runtime.cleanupWithdrawn().deferred).toBeGreaterThan(0);
   expect(() => f.actions.read(document.ref)).toThrow('Document not found');
   expect(readFileSync(`${path}-wal`).includes(Buffer.from(marker))).toBe(true);
   reader.close(); reader = undefined;
@@ -70,13 +70,13 @@ test('forgotten document WAL stays deferred across restart until its pinned read
 
 for (const settled of [false, true]) test(`${settled ? 'settled' : 'prepared'} journal WAL busy propagates through runtime and later maintenance erases bytes`, () => {
  const f = fixture(); let reader: Database | undefined;
- const journal = f.runtime.journal, path = join(f.directory, 'mind-execution.sqlite');
+ const journal = f.runtime.journal, path = join(f.directory, 'mind.sqlite');
  try {
   let e = journal.prepare(input, now);
   e = journal.save({ ...e, settled, status: settled ? 'finished' : 'prepared', summary: input.prompt, interactions: [input.prompt], error: input.prompt,
    facts: [{ runId: 'r', callId: 'c', target: 'mind.progress', moduleId: 'mind', hash: 'current', status: 'succeeded', outputState: 'complete', output: input.prompt }] });
   reader = pin(path, 'executions'); f.forget();
-  expect(f.runtime.cleanupWithdrawn().deferred).toBe(1);
+  expect(f.runtime.cleanupWithdrawn().deferred).toBeGreaterThan(0);
   const clean = journal.get(e.id);
   expect(clean.args).toEqual({}); expect(clean.interactions).toEqual([]); expect(clean.summary).toBe(''); expect(clean.error).toBeNull();
   expect(clean.facts[0].output).toBeUndefined(); expect(clean.key).toBe(e.key); expect(clean.stopKey).toBe(e.stopKey);
@@ -89,7 +89,7 @@ for (const settled of [false, true]) test(`${settled ? 'settled' : 'prepared'} j
 
 test('busy cleanup preserves unknown original command occupancy until recovery, then erases late content', async () => {
  const directory = mkdtempSync(join(tmpdir(), 'mind-unknown-checkpoint-')), journal = new CoreExecutionJournal(directory);
- const path = join(directory, 'mind-execution.sqlite'); let reader: Database | undefined;
+ const path = join(directory, 'mind.sqlite'); let reader: Database | undefined;
  try {
   const prepared = journal.prepare(input, now), original = journal.save({ ...prepared, status: 'unknown' });
   reader = pin(path, 'executions');

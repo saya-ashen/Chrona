@@ -24,10 +24,9 @@ test.each(["modify_external", "delete_data"] as const)("%s approval records a on
     await expect(f.approvals.resolve(approval.id, { decision: "approve", scope: "always" })).rejects.toMatchObject({ code: "invalid" });
     const resolved = await f.approvals.resolve(approval.id, { decision: "approve" });
     expect(resolved.approval.status).toBe("approved");
-    expect(await f.db.approval.findUniqueOrThrow({ where: { id: approval.id } })).toMatchObject({ status: "approved", scope: "once", grantId: null });
-    expect(resolved.grantId).toBeNull();
+    expect(await f.db.approval.findUniqueOrThrow({ where: { id: approval.id } })).toMatchObject({ status: "approved", action, moduleId: moduleId ?? null });
   }
-  expect(await f.db.grant.count()).toBe(0);
+
 });
 
 test("group activation matches approval id and payload without creating or checking grants", async () => {
@@ -44,14 +43,13 @@ test("group activation matches approval id and payload without creating or check
     const payload = { kind: "activate_modules", versions };
     const approval = await f.approvals.create({ action: "activate_module", title: "Group", detail: "", preview: "", payload });
     await expect(f.approvals.resolve(approval.id, { decision: "approve", scope: "always" })).rejects.toMatchObject({ code: "invalid" });
-    const resolved = await f.approvals.resolve(approval.id, { decision: "approve", scope: "once" });
-    expect(resolved.grantId).toBeNull();
+    await f.approvals.resolve(approval.id, { decision: "approve", scope: "once" });
     const action = { workspaceId: f.workspaceId, approvalId: approval.id, payload };
     await expect(onApproved(context, { ...action, approvalId: "wrong-id" })).rejects.toMatchObject({ code: "conflict" });
     await expect(onApproved(context, { ...action, payload: { ...payload, versions: [...versions].reverse() } })).rejects.toMatchObject({ code: "conflict" });
     await onApproved(context, action);
     for (const version of versions) expect(await f.db.module.findUniqueOrThrow({ where: { id: version.moduleId } })).toMatchObject({ activeHash: version.hash });
     expect(await f.db.generation.count()).toBe(1);
-    expect(await f.db.grant.count()).toBe(0);
+
   } finally { await rm(dataDir, { recursive: true, force: true }); }
 });

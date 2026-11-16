@@ -2,7 +2,6 @@ import type { StewardPorts } from "./ports";
 import { createApprovals } from "./approvals";
 import { createModules, isModuleApproval } from "./modules";
 import { createTools } from "./tools";
-import { createGrants } from "./grants";
 import { createSettings } from "./settings";
 import { createRuns } from "./runs";
 import { createTick } from "./tick";
@@ -25,7 +24,7 @@ export function createStewardService(inputPorts: StewardPorts) {
       if (isModuleApproval(action.payload)) await modules.onApproved(action);
       else await ports.onApproved?.(action);
     }, ports);
-    return { provider: createProviderControl(ports, workspaceId), runs: createRuns(ports, workspaceId), modules, approvals, grants: createGrants(ctx), settings: createSettings(ctx) };
+    return { provider: createProviderControl(ports, workspaceId), runs: createRuns(ports, workspaceId), modules, approvals, settings: createSettings(ctx) };
   } };
 }
 export type StewardService = ReturnType<typeof createStewardService>;

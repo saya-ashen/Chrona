@@ -1,7 +1,7 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
 import { mkdtemp, writeFile, readFile, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { createPiCompletion, piCompletionUnavailable } from "./pi-completion";
+import { createPiCompletion, piCompletionUnavailable, piCompletionVersionError } from "./pi-completion";
 import { piLaunchConfig } from "./pi-launch";
 import { launchPiProcess } from "./pi-process";
 
@@ -256,4 +256,21 @@ test("abort cannot claim cancellation when descendant closure is unknown", async
   expect((await stat(launch.cwd)).isDirectory()).toBe(true);
   const pid = Number(await readFile(f.pid, "utf8"));
   expect(() => process.kill(pid, 0)).toThrow();
+});
+
+test("health reuses one version observation while real completion still probes afresh", async () => {
+  const f = await fixture("ok", { version: "1.5.2", pin: "1.5.2" });
+  let probes = 0;
+  const options = { ...f.providerOptions, agentUrl: "http://127.0.0.1:3101/api/steward-agent", launch(input: Parameters<typeof launchPiProcess>[0]) {
+    if (input.args.includes("--version")) probes++;
+    return launchPiProcess(input);
+  } };
+  const { createPiProvider } = await import("./pi-provider");
+  const health = await createPiProvider(options).health();
+  expect(health.available).toBe(true);
+  expect(piCompletionVersionError(piLaunchConfig(options).version)).toBeNull();
+  expect(probes).toBe(1);
+  await createPiCompletion(options)(f.input);
+  expect(probes).toBe(2);
+  expect(piCompletionVersionError("0.85.0")).toContain("configured 0.85.0");
 });

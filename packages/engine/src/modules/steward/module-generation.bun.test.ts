@@ -26,19 +26,18 @@ test("approved application activation records a generation without creating cale
   const generation = await f.db.$transaction(tx => activateIn(f.context, tx, { moduleId: f.module.id, hash: "approved", reason: "activate" }));
   expect(generation.modules).toEqual({ [f.module.id]: "approved" });
   expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ status: "active", activeHash: "approved" });
-  expect(await f.db.schedule.count()).toBe(0);
+  expect(await f.db.timer.count()).toBe(0);
   expect(await f.db.moduleInvocation.count()).toBe(0);
 });
 
-test("activation preserves a pause and cancels undelivered calendar work without parsing its rule", async () => {
+test("activation preserves app and timer pause without parsing a dormant rule", async () => {
   const f = await fixture("example", "paused");
-  const timer = await f.db.schedule.create({ data: { workspaceId: f.workspace.id, moduleId: f.module.id, mode: "module", status: "paused", rule: {}, text: "retired calendar", createdBy: "chrona" } });
-  const delivery = await f.db.moduleInvocation.create({ data: { workspaceId: f.workspace.id, target: f.module.name, caller: "system:schedules", tool: "schedule", mode: "schedule", key: `${timer.id}:recorded`, args: {} } });
+  const timer = await f.db.timer.create({ data: { workspaceId: f.workspace.id, moduleId: f.module.id, status: "paused", rule: {}, timerId: "retired calendar",} });
   await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash: "approved", manifest: f.manifest, source: "user", status: "approved", intent: {}, report: {} } });
   await f.db.$transaction(tx => activateIn(f.context, tx, { moduleId: f.module.id, hash: "approved", reason: "activate" }));
   expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ status: "paused", activeHash: "approved" });
-  expect(await f.db.schedule.findMany()).toEqual([expect.objectContaining({ id: timer.id, status: "cancelled", nextAt: null })]);
-  expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: delivery.id } })).toMatchObject({ status: "cancelled" });
+  expect(await f.db.timer.findMany()).toEqual([expect.objectContaining({ id: timer.id, status: "paused" })]);
+  expect(await f.db.moduleInvocation.count()).toBe(0);
 });
 
 test("removing calendar setup retains the approved-version guard", async () => {
@@ -68,6 +67,6 @@ test("approved ordinary Pi release activates once and proposal replay creates no
   expect(first.modules).toEqual({ [f.module.id]: hash });
   expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ name: "pi", builtin: false, status: "active", activeHash: hash });
   expect(await f.db.moduleVersion.count({ where: { moduleId: f.module.id } })).toBe(1);
-  expect(await f.db.schedule.count()).toBe(0);
+  expect(await f.db.timer.count()).toBe(0);
   expect(await f.db.moduleInvocation.count()).toBe(0);
 });

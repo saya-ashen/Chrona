@@ -146,6 +146,35 @@ await chrona.call("timers.list", {}, { mode: "async", key: "operation" });
   }
 }, 30_000);
 
+test("SDK overlaps handlers and preserves nested call ownership across awaits", async () => {
+  const { root } = await fixture(`import { chrona, on } from "chrona";
+  on("tool", async event => {
+    await chrona.call("agent.providers", { marker: event.args.marker });
+    await Promise.resolve();
+    return { result: await chrona.call("modules.list", { marker: event.args.marker }) };
+  });`);
+  let release!: () => void, entered!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  const module = await launch(root, {
+    "agent.providers": async args => { if (args.marker === "slow") { entered(); await held; } return {}; },
+    "modules.list": args => ({ marker: args.marker }),
+  });
+  const slow = module.send(event({ marker: "slow" }));
+  await started;
+  try {
+    expect(await module.send(event({ marker: "fast" }))).toMatchObject({ result: { result: { marker: "fast" } } });
+  } finally { release(); }
+  expect(await slow).toMatchObject({ result: { result: { marker: "slow" } } });
+  const calls = module.calls as unknown as { eventId?: string; params: { args: { marker: string } } }[];
+  const ids = (marker: string) => calls.filter(call => call.params.args.marker === marker).map(call => call.eventId);
+  expect(ids("slow")).toHaveLength(2);
+  expect(ids("slow")[0]).toBeTruthy();
+  expect(new Set(ids("slow")).size).toBe(1);
+  expect(new Set(ids("fast")).size).toBe(1);
+  expect(ids("slow")[0]).not.toBe(ids("fast")[0]);
+});
+
 test("SDK forwards exact expectedTarget versions for sync and async application calls", async () => {
   const { root } = await fixture(`import { chrona, on } from "chrona";
 const target = { moduleId: "reviewed-app", tool: "read" };

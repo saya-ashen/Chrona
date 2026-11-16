@@ -72,7 +72,7 @@ export class CoreApplication {
     private readonly selfModuleId: string) {
     text(selfModuleId, 'Mind module ID');
     mkdirSync(directory, { recursive: true, mode: 0o700 });
-    const path = join(directory, 'mind-application.sqlite');
+    const path = join(directory, 'mind.sqlite');
     this.db = new Database(path, { create: true }); chmodSync(path, 0o600);
     this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA secure_delete=ON;
       CREATE TABLE IF NOT EXISTS adapters(id TEXT PRIMARY KEY, json TEXT NOT NULL);

@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
-import { type ProviderAdapter, BUILTIN_MODULE_NAMES, KERNEL_MODULE_NAMES, MODULE_OPERATIONS, PREINSTALLED_MODULE_NAMES, runtimeStartSchema, moduleManifestSchema, moduleInstallRequestSchema } from "@chrona/contracts/steward";
+import { type ProviderAdapter, BUILTIN_MODULE_NAMES, KERNEL_MODULE_NAMES, MODULE_OPERATIONS, PREINSTALLED_MODULE_NAMES, moduleManifestSchema, moduleInstallRequestSchema } from "@chrona/contracts/steward";
 import { assertExternalName, assertExternalModule, assertModuleOperation, moduleIdentity } from "./module-identity";
 import { seedTestModuleRelease } from "./module-release-test-fixture";
 import { resolveBuiltinRelease, resolveExternalRelease } from "./module-release";
@@ -14,8 +14,6 @@ import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
 import { createModules } from "./modules";
 import { createApprovals } from "./approvals";
-import { createRuns, createRunSession } from "./runs";
-import { createTick } from "./tick";
 import { createApps } from "./apps";
 import { createStewardService } from "./service";
 import { modulePermissions } from "./module-overview";
@@ -24,12 +22,8 @@ import { createSecrets } from "./secrets";
 import { callSync, enqueueCall, kernelOrigin, runDueCalls } from "./module-calls";
 
 import { moduleLifecycleFixtures as fixtures } from "./module-lifecycle.fixtures";
-import { registerAgentProvider } from "./agent-provider";
-import { createRegisteredProviderClient } from "./agent-client";
-import { registerLocalRuntime } from "./local-runtime";
 import { moduleSupervisor } from "./module-supervisor";
 import { testModuleProcess } from "./module-test-process";
-import { REGISTRATION } from "./external/pi/registration";
 import { createPiOperations } from "./external/pi/operations";
 import { createBrowsers } from "./external/pi/browser";
 import { currentHostGeneration, hostStopped } from "./external/pi/host-recovery";
@@ -191,46 +185,6 @@ test("credential readiness projects generic adapter and saved metadata without t
   const projected = await permissions();
   expect(projected.secrets[0]).toMatchObject({ configured: true, fields: [{ saved: true }] });
   expect(JSON.stringify(projected)).not.toContain("synthetic-test-only");
-});
-
-test("build claim refuses changed identities and continues to a valid queued build before Provider start", async () => {
-  registerLocalRuntime();
-  const f = await fixture(), starts: string[] = [];
-  const peer = testModuleProcess(async (event, call) => {
-    if (event.trigger.kind !== "tool") return {};
-    const { id, args } = event.trigger;
-    if (id === "health") return { result: { name: "Pi fixture", supportsRunModel: true, complete: true, available: true, sandboxed: false, error: null } };
-    if (id === "start") {
-      const input = runtimeStartSchema.parse(args);
-      if (!input.callbacks) throw new Error("Expected a Run callback binding");
-      starts.push(input.runId);
-      const settled = await call("call", { target: "runtime-callback.event", mode: "sync", reply: false, args: { callbackId: input.callbacks, event: { kind: "settled", operationId: input.operationId, outcome: { outcome: "finished", sessionId: null, error: null } } } });
-      expect(settled).not.toHaveProperty("error");
-      return { result: { operationId: input.operationId } };
-    }
-    if (id === "release") return { result: { released: true } };
-    return { result: {} };
-  });
-  f.ports.sandbox = { available: true, isolated: false, startModule: peer.startModule };
-  f.ports.provider = createRegisteredProviderClient(() => f.ports);
-  const pi = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "pi", status: "active", activeHash: "pi-v1" } });
-  const manifest = moduleManifestSchema.parse(await Bun.file(join(import.meta.dir, "external/pi/module.json")).json());
-  await f.db.moduleVersion.create({ data: { moduleId: pi.id, hash: pi.activeHash!, status: "approved", source: "user", manifest, intent: {}, report: {} } });
-  await registerAgentProvider(f.ports, f.workspaceId, { kind: "module", module: pi.name, moduleId: pi.id, hash: pi.activeHash! }, REGISTRATION);
-  const module = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "alpha", builtin: false } });
-  const runs = createRuns(f.ports, f.workspaceId), queued: string[] = [];
-  for (const name of ["alpha", "beta"]) {
-    const session = await createRunSession(f.db, f.workspaceId, "build", f.ports.now());
-    queued.push((await runs.enqueue({ sessionId: session.id, lane: "build", trigger: "source", prompt: "Synthetic build", label: name })).id);
-    await f.db.buildTargets.create({ data: { sessionId: session.id, name: name, modules: [name] } });
-  }
-  await f.db.module.update({ where: { id: module.id }, data: { builtin: true } });
-  const tick = createTick(f.ports);
-  await tick(); await tick.settled({ includeRuns: true });
-  expect(starts).toEqual([queued[1]!]);
-  expect(await f.db.run.findUniqueOrThrow({ where: { id: queued[0]! } })).toMatchObject({ status: "failed", startedAt: null, error: expect.stringContaining("Built-in") });
-  await tick(); await tick.settled({ includeRuns: true });
-  expect(starts).toEqual([queued[1]!]);
 });
 
 test("approval creation refuses reserved kernel identities without records and permits ordinary Pi", async () => {

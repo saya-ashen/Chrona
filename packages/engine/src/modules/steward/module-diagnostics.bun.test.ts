@@ -240,3 +240,42 @@ test("detailed diagnostics admit Provider, owner and available modules without a
     expect((await callSync(f.ports, { workspaceId: f.workspace.id, caller, chain: [], path: [] }, "modules.health", {} )).output).toMatchObject({ items: expect.any(Array) });
   }
 });
+
+test("batched list health matches single-app diagnostics through pause, reactivation and rollback", async () => {
+  const f = await fixture(), api = createModules(f.ports, f.workspace.id);
+  await f.fail();
+  const check = async (status: string, activeHash: string, consecutiveFailures: number) => {
+    const row = await f.db.module.update({ where: { id: f.module.id }, data: { status, activeHash } });
+    const listed = (await api.list()).find(item => item.id === row.id)!;
+    expect(listed.health).toEqual(await moduleHealthSummary(f.ports, f.workspace.id, row));
+    expect(listed.health.consecutiveFailures).toBe(consecutiveFailures);
+  };
+  await check("active", "v1", 1);
+  await check("paused", "v1", 0);
+  await check("active", "v1", 1);
+  await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.workspace.id), tx, { moduleId: f.module.id, previousHash: "v1", hash: "v1", generationId: "reactivated" }));
+  await check("active", "v1", 0);
+  const first = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.module.id, hash: "v1" } } });
+  await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash: "v2", manifest: moduleManifestSchema.parse(first.manifest), source: "user", status: "approved", intent: {}, report: {} } });
+  await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.workspace.id), tx, { moduleId: f.module.id, previousHash: "v1", hash: "v2", generationId: "other-version" }));
+  await check("active", "v2", 0);
+  await check("active", "v1", 0);
+});
+
+test("a same-hash activation interleaved with list reads cannot inherit the previous failure streak", async () => {
+  const f = await fixture(); await f.fail(); let reactivated = false;
+  const moduleReads = new Proxy(f.db.module, { get(target, key, receiver) {
+    if (key !== "findMany") return Reflect.get(target, key, receiver);
+    return async (args: Parameters<typeof f.db.module.findMany>[0]) => {
+      if (!reactivated) {
+        reactivated = true;
+        await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.workspace.id), tx, { moduleId: f.module.id, previousHash: "v1", hash: "v1", generationId: "interleaved-reactivation" }));
+      }
+      return target.findMany(args);
+    };
+  } });
+  const db = new Proxy(f.db, { get(target, key, receiver) { return key === "module" ? moduleReads : Reflect.get(target, key, receiver); } });
+  const listed = await createModules({ ...f.ports, db }, f.workspace.id).list();
+  expect(reactivated).toBe(true);
+  expect(listed.find(item => item.id === f.module.id)!.health.consecutiveFailures).toBe(0);
+});

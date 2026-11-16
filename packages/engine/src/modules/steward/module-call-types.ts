@@ -11,4 +11,4 @@ export type Json = z.output<ReturnType<typeof z.json>>;
  */
 export type CallOrigin = { workspaceId: string; caller: Caller; chain: string[]; path: string[]; run?: { moduleRunId?: string; eventKey?: string; executionRunId?: string }; deadline?: number };
 export type Tool = ModuleManifest["tools"][number];
-export type RoutedTool = Pick<Tool, "name" | "description" | "parameters" | "visibility" | "idempotent"> & { output?: unknown; examples?: unknown; sideEffects?: unknown; errors?: unknown };
+export type RoutedTool = Pick<Tool, "name" | "description" | "parameters" | "visibility" | "idempotent"> & { readOnly?: true; output?: unknown; examples?: unknown; sideEffects?: unknown; errors?: unknown };

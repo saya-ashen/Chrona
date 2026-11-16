@@ -12,18 +12,15 @@ datasource db {
 model Workspace {
   id String @id @default(uuid())
   name String
-  settings Json @default(dbgenerated("'{\"notifications\":{\"dailyCap\":5,\"quietHours\":{\"start\":\"23:00\",\"end\":\"08:00\"},\"timezone\":\"Asia/Shanghai\",\"digestAt\":\"09:00\"}}'"))
+  settings Json @default(dbgenerated("'{}'"))
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   sessions Session[]
   modules Module[]
   generations Generation[]
-  schedules Schedule[]
+  timers Timer[]
   runs Run[]
-  messages Message[]
   approvals Approval[]
-  grants Grant[]
-  preferences Preference[]
   invocations ModuleInvocation[]
   audits Audit[]
   stewardState StewardState?
@@ -36,7 +33,6 @@ model Workspace {
   installations ModuleInstallation[]
   installationHeads ModuleInstallationHead[]
   moduleRemovals ModuleRemoval[]
-  buildRequests BuildRequest[]
   executions ExecutionAttempt[]
 }
 
@@ -64,13 +60,8 @@ model Session {
   module Module? @relation(fields: [moduleId], references: [id], onDelete: SetNull)
   origin Session? @relation("SessionOrigin", fields: [originSessionId], references: [id], onDelete: SetNull)
   spawned Session[] @relation("SessionOrigin")
-  messages Message[]
   runs Run[]
   agentContext AgentContext?
-  submittedVersions ModuleVersion[]
-  buildTargets BuildTargets?
-  buildRequests BuildRequest[]
-  schedules Schedule[]
   @@index([workspaceId, key, status])
   @@index([workspaceId, source, lastActivityAt])
 }
@@ -91,7 +82,7 @@ model Module {
   versions ModuleVersion[]
   runs ModuleRun[]
   calls ModuleCall[]
-  schedules Schedule[]
+  timers Timer[]
   sessions Session[]
   approvals Approval[]
   executionResults ModuleExecutionResult[]
@@ -103,8 +94,6 @@ model Module {
 }
 
 model ModuleVersion {
-  buildSessionId String?
-  buildSession Session? @relation(fields: [buildSessionId], references: [id], onDelete: SetNull)
   review ModuleReview?
   id String @id @default(uuid())
   moduleId String
@@ -118,6 +107,7 @@ model ModuleVersion {
   module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   @@unique([moduleId, hash])
   @@index([moduleId, status, createdAt])
+  @@index([moduleId, createdAt, id])
 }
 
 model Generation {
@@ -142,7 +132,7 @@ model ModuleRun {
   error String?
   createdAt DateTime @default(now())
   module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  @@index([moduleId, createdAt])
+  @@index([moduleId, createdAt, id])
   @@index([moduleId, hash, firedAt])
 }
 
@@ -220,29 +210,22 @@ model ModuleInvocation {
   @@index([runId, status])
 }
 
-model Schedule {
+/// Kernel wake-up only; calendar policy and labels belong to the owning app.
+model Timer {
   id String @id @default(uuid())
   workspaceId String
-  originSessionId String?
-  mode String
+  moduleId String
+  timerId String
   rule Json
-  text String
-  moduleId String?
-  triggerId String?
-  /// Dynamic module schedules (remind, v2-24 module timers whose key is `text`) carry their data here.
   payload Json?
-  module Module? @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  until DateTime?
   status String @default("active")
   nextAt DateTime?
   lastAt DateTime?
   lastResult String?
-  failures Int @default(0)
-  label String?
-  createdBy String
   createdAt DateTime @default(now())
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  origin Session? @relation(fields: [originSessionId], references: [id], onDelete: SetNull)
+  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  @@unique([moduleId, timerId])
   @@index([workspaceId, status, nextAt])
   @@index([moduleId, status])
 }
@@ -463,25 +446,6 @@ model ExecutionCommand {
   @@id([attemptId, commandKey])
 }
 
-model Message {
-  id String @id @default(uuid())
-  workspaceId String
-  direction String
-  channel String
-  text String
-  sessionId String
-  attachments Json @default(dbgenerated("'[]'"))
-  quotedMessageId String?
-  externalId String?
-  at DateTime @default(now())
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  quotedMessage Message? @relation("MessageQuote", fields: [quotedMessageId], references: [id], onDelete: SetNull)
-  replies Message[] @relation("MessageQuote")
-  @@unique([workspaceId, externalId])
-  @@index([sessionId, at])
-}
-
 model Approval {
   id String @id @default(uuid())
   workspaceId String
@@ -491,44 +455,13 @@ model Approval {
   detail String
   preview String
   payload Json
-  scope String @default("once")
-  grantId String?
   status String @default("open")
   createdAt DateTime @default(now())
   resolvedAt DateTime?
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   module Module? @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  grant Grant? @relation(fields: [grantId], references: [id], onDelete: SetNull)
   @@index([workspaceId, status, createdAt])
   @@index([moduleId, status])
-}
-
-model Grant {
-  id String @id @default(uuid())
-  workspaceId String
-  action String
-  mode String
-  scope Json
-  once Boolean @default(false)
-  consumedAt DateTime?
-  expiresAt DateTime?
-  createdAt DateTime @default(now())
-  revokedAt DateTime?
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  approvals Approval[]
-  @@index([workspaceId, action, revokedAt, expiresAt])
-}
-
-model Preference {
-  id String @id @default(uuid())
-  workspaceId String
-  text String
-  origin String
-  topic String @default("general")
-  createdAt DateTime @default(now())
-  lastUsedAt DateTime?
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  @@index([workspaceId, createdAt])
 }
 
 model Audit {
@@ -547,12 +480,6 @@ model Audit {
 model StewardState {
   workspaceId String @id
   lastTickAt DateTime?
-  leaseUntil DateTime?
-  leaseToken String?
-  providerName String @default("unconfigured")
-  providerAvailable Boolean @default(false)
-  providerSandboxed Boolean @default(false)
-  providerLastError String?
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
@@ -722,7 +649,7 @@ model ModuleExecutionResult {
   createdAt DateTime
   module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   @@unique([activationId, resultId])
-  @@index([moduleId, activationId, createdAt])
+  @@index([moduleId, activationId, createdAt, id])
 }
 
 /// One governed activation epoch; updates never replace its identity or ordering.
@@ -824,25 +751,6 @@ model ModuleRemoval {
   createdAt DateTime
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   @@index([workspaceId, name, hash, createdAt])
-}
-
-model BuildTargets {
-  sessionId String @id
-  name String
-  modules Json
-  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-}
-
-model BuildRequest {
-  id String @id
-  workspaceId String
-  sessionId String
-  fingerprint String?
-  cause Json?
-  createdAt DateTime @default(now())
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  @@index([workspaceId, sessionId])
 }
 
 model ModuleReview {

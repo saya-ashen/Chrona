@@ -1,97 +1,31 @@
-# Web 外壳与应用组合组件
+# Web 页面与外壳
 
-> 当前状态：Coding 与 coding-web 已退役，包含旧 work-v2；当前 Chat 独立拥有会话与执行记录。本文的 Coding/Editor 接口、源码路径、验收和部署描述仅作历史记录，不是现行接入指引。详见[Coding 退役说明](coding-retirement.md)。
+Web 是普通应用，负责认证、导航、主题和页面布局。业务应用通过 `web.page-set` 登记自己的 React / TSX 编译页面；内核不承载业务 UI。页面共享 React runtime、基础组件与 Design Tokens，不再使用 JSON 页面 DSL。
 
-> 2026-11-09 补充：本页保留声明式组合的历史设计和验收证据。新增的可信应用浏览器组件登记与执行见 [Web 应用组件登记与执行](web-executable-components.md)；下文“没有脚本加载器”等表述仅描述当时的声明式机制。
+## 代码组织
 
-2026-11-08：全站统一外壳与应用私有声明式组件已完成开发集成。以下描述源码能力；随后已更新运行在 3111 端口的本机试用部署，见文末。页面继续使用共享 json-render，不引入应用脚本加载器。
+| 责任 | 源码 |
+| --- | --- |
+| 认证、路由、导航、单一 SSE 连接 | `external/web/app.js` |
+| 页面持久登记、调用者/版本/工具合同验证 | `external/web/pages.ts` |
+| 浏览器运行时导出、系统页挂载 | `external/web/src/pages.tsx` |
+| 应用页面显示、设置嵌入、反馈 | `external/web/src/application-pages.tsx` |
+| ESM 加载、宿主 API、资源清理 | `external/web/src/page-runtime.ts` |
+| 浏览器宿主合同与固定 revision 回调 | `external/web/src/registered-page.ts` |
+| 共享 React UI / 工作区组件 | `external/web/src/ui.tsx`、`src/workspace.tsx` |
+| 今天、应用、活动、设置、登录、会话等系统页面 | `external/web/src/system/*.tsx` |
+| 系统 API adapter、本地数据查询与状态 | `src/system/adapter.ts`、`query.tsx`、`action.ts` |
+| 应用私有页面 | 各应用的 `settings-ui.tsx` / `page-ui.tsx` 或现有 workspace UI |
+| 浏览器 bundle 生成 | `build/application-pages.ts`、各应用 `build-ui.ts`、Web `build.ts` |
 
-## 职责
+系统页面是普通 React 组件，直接复用已有表单、会话流和故障面板，通过系统 adapter 读取认证 API。应用页面只能通过自己的宿主调用声明工具，不获得系统 adapter。轮询保留已挂载页面、草稿和滚动位置，读取失败有错误与重试；请求过期结果不覆盖新页面。
 
-Web 拥有登录、导航、路由、主题、字体、控件实现、响应式布局、无障碍和页面校验。今天、对话、应用、活动、设置，以及应用登记的页面共用外壳。内置页的系统操作仍通过 `mountSystem` 的受限适配器处理；普通登记页只能调用登记应用自己的工具。
+页面显式选择 `layout: document|workspace`。应用设置依 `purpose: settings` 登记，由应用详情嵌入。Web 不根据工具名推断设置界面。共享 React 和 UI 从同源 `/pages.js` 导出；源码由认证路由返回并核对 revision。可信页面直接同页运行，没有浏览器隔离。
 
-应用决定业务内容、信息结构、组件组合、状态含义和业务操作。例如 Chat 管理会话、消息、附件和执行记录，登记自己的页面与组件，并提供工具回调。
+## 样式与交互
 
-页面可以声明 `layout: "document" | "workspace"`，默认 document。document 内容居中，workspace 使用可用的视口区域。Web 根据页面声明设置外壳状态，在导航、错误、登录和退出时更新或清理。页面中的某个子组件不再改变整站导航和主题。
+`src/base.css` 提供基础样式和共享控件 class，`src/pages.css` 提供工作区与页面组件样式，`shell.css` 管理导航与主题。应用使用自己的根 class，继承语义颜色变量，不写污染外壳的全局标签规则。所有页面随 Web 主题切换，不加载 CDN 或远程字体。
 
-## 随页面登记组合定义
+`Workspace` 提供侧栏/主区，`WorkspaceHeader.statusTone` 由应用明确传入；`Composer.onSubmit` 是普通回调。应用负责草稿、loading、错误与显式重试。主要动作和待决定事项清晰，手机无横向滚动；浏览器验证 1440×900、1024×768、390×844。
 
-在已有 `web.page-set` 参数中传入 `components`。定义按当前应用命名空间命名，跟随该页面版本生效；同一应用可从自己的源文件复用定义。当前没有单独的全局组件注册表，也不支持跨应用引用定义。
-
-```json
-{
-  "id": "main",
-  "title": "笔记",
-  "layout": "document",
-  "components": {
-    "notes:NoteCard": {
-      "props": {
-        "type": "object",
-        "properties": { "title": { "type": "string" } },
-        "required": ["title"],
-        "additionalProperties": false
-      },
-      "events": ["open"],
-      "slots": ["default"],
-      "spec": {
-        "root": "card",
-        "elements": {
-          "card": { "type": "Panel", "props": {}, "children": ["heading", "$slot:default", "open"] },
-          "heading": { "type": "Heading", "props": { "text": { "$prop": "title" } }, "children": [] },
-          "open": { "type": "Button", "props": { "label": "打开" }, "on": { "press": { "$event": "open" } }, "children": [] }
-        }
-      }
-    }
-  },
-  "spec": {
-    "root": "note",
-    "elements": {
-      "note": {
-        "type": "notes:NoteCard",
-        "props": { "title": "今天的笔记" },
-        "children": ["body"],
-        "on": { "open": { "action": "call", "params": { "tool": "open-note", "args": { "id": "today" } } } }
-      },
-      "body": { "type": "Text", "props": { "text": "笔记摘要" }, "children": [] }
-    }
-  }
-}
-```
-
-上例假定登记应用名为 notes，并且它已经公开 `open-note` 工具和对应输入契约。Web 在登记时展开定义，再校验公共组件、属性、事件、数据源与本应用工具。只有通过校验的展开结果会存储，浏览器不执行模板解释器或应用代码。
-
-- `{$prop:"name"}` 转发声明的属性，包括 `$state`、`$bindState`、`$item` 等表达式。字面值按属性 JSON Schema 检查；动态值仍按公共组件规则处理。
-- `{$event:"name"}` 转发使用方提供的事件绑定。业务工具调用仍接受原有应用身份、工具契约指纹与页面 revision 校验。
-- 子节点引用 `$slot:default` 接入 children，`$slot:actions` 等接入具名 slots。每次实例展开生成独立内部节点名；嵌套组件、列表 item 作用域、可见条件和绑定保持有效。
-- 模板不能声明私有 state、脚本、任意 HTML/CSS 或新增系统能力。需要交互状态时由页面显式提供绑定。
-- 每页至多 16 个定义、每定义 100 个节点、嵌套 8 层、展开后 300 个节点。原始与展开页面分别限制为 64 KiB；展开过程中在复制前累计限制 4096 个子节点引用，并累计检查节点字节量，避免插槽转发产生指数级分配。递归、节点循环、未知属性/事件/插槽与失效工具契约会拒绝登记或要求重新登记。
-
-增加浏览器原生能力（例如编辑器、终端）仍需要 Web 的明确实现和契约。组合定义只复用现有公共能力。
-
-## 通用交互契约
-
-`Composer.on.submit` 是明确的提交事件。Enter 在非输入法组合、非 Shift 且未禁用时触发它；点击发送按钮由页面绑定相同操作。`Composer.disabled` 控制键盘提交，按钮是否禁用也由页面明确绑定。键盘行为不再寻找某个样式类的按钮。
-
-`WorkspaceHeader.statusTone` 可为 neutral、success、warning、danger，默认 neutral。业务应用提供含义；应用可将确认完成显示为 success、失败显示为 danger、未知或等待停止显示为 warning。状态文本本身不被 Web 猜测为成功。
-
-## 验证与证据
-
-使用临时数据库、受控 HTTP 返回与 fake Agent；未调用真实模型、操作真实项目或修改部署数据。
-
-- 组合、页面生命周期、catalog、通用组件与 Coding 工作台：80 项 Bun 测试、659 个断言通过。包括属性/插槽/事件、嵌套重复、绑定、注册持久化、工具契约失效，以及审查发现的插槽放大回归。
-- 实际 coding/editor 安装、作者测试和 Web 图片边界：另 9 项测试、31 个断言通过（合计 89 项、690 个断言）。
-- 全站浏览器：1440×900、1024×768、390×844 共 47 组场景通过。涵盖内置页、注册文档/工作区页、亮暗主题、active 导航、浏览器历史、过期凭证、退出重登与延迟响应；使用与部署相同的 CSP。
-- 实际 Coding 页面与业务 handler：三种宽度通过目录选择、原生问题、草稿轮询、Enter/Shift+Enter、续接轮次、成果页停止和刷新恢复。审查另外核对三种输入模式的 Enter 与按钮请求一致。
-- 通用浏览器组件另检查输入法组合、焦点/光标、阅读位置和自动跟随。TypeScript、变更文件 ESLint、`git diff --check` 通过。
-
-截图采用受控数据： [桌面今天](../validation/web-components/today-desktop.png)、[手机设置](../validation/web-components/settings-mobile.png)、[应用组合页](../validation/web-components/document-desktop.png)。旧 Coding 桌面与手机截图已随应用退役删除，可从 Git 历史查阅。截图证明呈现与布局，不代表真实模型执行。
-
-关键源码：`builtin/web/composition.ts`、`pages.ts`、`catalog.ts`、`app.js`、`shell.css`、`src/workspace.tsx`，以及 `external/coding/components.ts`、`page.ts`。Web 的 `build.ts` 将共享组件样式与全站样式写入同源 `style.css`，不放宽 CSP。
-
-源码提交：`094768c1`（登记展开）、`f2216d8f`（全站外壳、应用组合消费及资源边界修复）。
-
-## 本机试用部署更新
-
-2026-11-08 已更新实际 `chrona-v1-preview.service`（3111）。源码 `5b21907c`，受检激活 Web `f0d0cc93a1d7d4e73e1849b205a2c1d9b169ed36`、Coding `1353d948ccbef466b5dcc465c5303a2d4181cbfb`。首次更新因 Coding 的 layout 被推断成 string、未满足新 Web 枚举契约而拒绝，脚本完整回滚；修正为字面量，并让安装回归使用实际 Web 契约后重新构建和更新通过。
-
-更新前备份：`/home/saya/.local/share/chrona-v1-preview/backups/before-whole-web-20261108T065822Z`。数据库结构无变化；原 8 个 Session、4 个 Message、8 个 Run、0 个 ExecutionAttempt 及模块状态保留，完整性和外键检查通过。健康和就绪正常。实际认证浏览器在三种尺寸检查六条页面路线，共 18 次页面检查，并确认 Coding 登记为 workspace、私有组件已在服务端展开。未调用模型或编辑项目。实例详情与验证引用记录在部署目录的 `deployment.json` 和 README 中。
+详见 [可执行页面合同](web-executable-components.md)、[应用设置](application-settings.md)、[随 Web 交付的开发指南](../../packages/engine/src/modules/steward/external/web/UI-DEVELOPMENT.md)。源码、测试、隔离验收、实际部署及真实使用分别报告；本次源码迁移不证明任何运行部署已更新。

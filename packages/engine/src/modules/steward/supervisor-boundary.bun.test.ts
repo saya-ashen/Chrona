@@ -79,7 +79,7 @@ test.each(["health", "calendar", "undeclared-tool", "undeclared-activation", "st
   if (kind === "static-schedule") trigger = { kind: "schedule", id: "daily", firedAt };
   if (kind === "foreign-timer") {
     const foreign = await f.app("foreign");
-    const timer = await f.db.schedule.create({ data: { workspaceId: f.workspace.id, moduleId: foreign.row.id, mode: "module", status: "done", text: "once", rule: {}, payload: {}, lastAt: now, createdBy: "module" } });
+    const timer = await f.db.timer.create({ data: { workspaceId: f.workspace.id, moduleId: foreign.row.id, status: "done", timerId: "once", rule: {}, payload: {}, lastAt: now,} });
     trigger = { kind: "schedule", id: "timer", firedAt, scheduleId: timer.id, payload: {} };
   }
   await expect(app.deliver({ ...event, trigger } as ModuleEvent)).rejects.toMatchObject({ stage: "unavailable" });
@@ -87,26 +87,6 @@ test.each(["health", "calendar", "undeclared-tool", "undeclared-activation", "st
   expect(await f.db.moduleRun.count()).toBe(0);
   expect(await f.db.audit.count()).toBe(0);
   expect(await f.db.module.findUniqueOrThrow({ where: { id: app.row.id } })).toMatchObject({ status: "active" });
-});
-
-test("ordinary manual tool delivery, declared activation, owned timers and runtime call results still execute", async () => {
-  const seen: ModuleEvent[] = [];
-  const f = await fixture(async input => { seen.push(input); return { result: input.trigger.kind }; });
-  const app = await f.app("ordinary", { activated: true });
-  const timer = await f.db.schedule.create({ data: { workspaceId: f.workspace.id, moduleId: app.row.id, mode: "module", status: "done", text: "once", rule: {}, payload: { value: 1 }, lastAt: now, createdBy: "module" } });
-  const inputs: ModuleEvent[] = [event,
-    { ...event, trigger: { kind: "activated", id: "activated", firedAt } },
-    { ...event, trigger: { kind: "schedule", id: "timer", firedAt, scheduleId: timer.id, payload: { value: 1 } } },
-    { ...event, trigger: { kind: "call_result", id: "call", firedAt, callId: "call-1", target: { moduleId: "other-id", tool: "go" }, key: "request-1", status: "succeeded", output: {} } },
-  ];
-  for (const input of inputs) expect(await app.deliver(input)).toMatchObject({ result: { result: input.trigger.kind } });
-  expect(seen.map(input => input.trigger)).toEqual(inputs.map(input => input.trigger));
-  expect(f.peer.processes).toHaveLength(1);
-  expect(await f.db.moduleRun.count({ where: { exitCode: 0 } })).toBe(4);
-  expect(f.supervisor.status(app.row.id, app.hash, false)).toEqual({ state: "running", pid: 1 });
-  await f.supervisor.stop();
-  expect(f.peer.processes[0]!.socket.destroyed).toBe(true);
-  expect(f.supervisor.status(app.row.id, app.hash, false)).toEqual({ state: "unobserved", pid: null });
 });
 
 for (const model of [false, true]) test(`literal params ignore caller/workspace preferences; timeout caps survive (model=${model})`, async () => {

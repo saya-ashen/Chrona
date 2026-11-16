@@ -4,9 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { installationId, installExternal } from "./module-install";
-import { callSync, enqueueCall, runDueCalls } from "./module-calls";
-import { drainSchedules } from "./schedule-delivery";
-import { createStewardService } from "./service";
+import { callSync, enqueueCall } from "./module-calls";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
 
@@ -51,7 +49,6 @@ async function expectNoExecution() {
   expect(await db.moduleRun.count()).toBe(0);
   expect(await db.moduleCall.count()).toBe(0);
   expect(await db.run.count()).toBe(0);
-  expect(await db.message.count()).toBe(0);
   expect(await db.approval.count()).toBe(0);
   await expectSourcesRetained();
 }
@@ -93,30 +90,7 @@ test("retained approved remind cannot receive synchronous or newly queued owner 
     await expect(db.$transaction(tx => enqueueCall({ tx, ports, origin: { ...origin, chain: [], path: [] }, target: `remind.${tool}`, raw: args }, { key: `paused-${tool}` }))).rejects.toMatchObject(paused);
   }
   expect(await db.moduleInvocation.count()).toBe(0);
-  expect(await db.schedule.count()).toBe(0);
-  expect(await db.module.findUniqueOrThrow({ where: { id: module.id } })).toEqual(module);
-  await expectNoExecution();
-});
-
-test("due private reminder rows stay inert and an old async call backs off without dispatch", async () => {
-  const module = await retainedModule();
-  const timer = await db.schedule.create({ data: { workspaceId: "w", moduleId: module.id, mode: "module", rule: { kind: "at", at: now.toISOString() }, text: "retained-reminder", label: "Retained reminder", payload: { text: "喝水" }, createdBy: "user", nextAt: now } });
-  const api = createStewardService(ports).forWorkspace("w");
-  expect(api).not.toHaveProperty("schedules");
-  // These drains settle recorded deliveries; a retained timer is not a calendar producer.
-  await drainSchedules(ports, "w");
-  expect(await runDueCalls(ports, "w")).toBe(0);
-  expect(await db.moduleInvocation.count()).toBe(0);
-  expect(await db.schedule.findUniqueOrThrow({ where: { id: timer.id } })).toEqual(timer);
-  const queued = await db.moduleInvocation.create({ data: { workspaceId: "w", caller: "owner", target: "remind", tool: "create", mode: "async", key: "retained-call", args: { text: "喝水" }, idempotent: true, nextAttemptAt: now } });
-  expect(await runDueCalls(ports, "w")).toBe(1);
-  const deferred = await db.moduleInvocation.findUniqueOrThrow({ where: { id: queued.id } });
-  expect(deferred).toMatchObject({ status: "queued", attempts: 1, nextAttemptAt: new Date(now.getTime() + 30_000), leaseToken: null, leaseUntil: null, finishedAt: null });
-  expect(deferred.error).toContain("Module remind is unavailable");
-  expect(await runDueCalls(ports, "w")).toBe(0);
-  await drainSchedules(ports, "w");
-  expect(await db.moduleInvocation.count()).toBe(1);
-  expect(await db.schedule.findUniqueOrThrow({ where: { id: timer.id } })).toEqual(timer);
+  expect(await db.timer.count()).toBe(0);
   expect(await db.module.findUniqueOrThrow({ where: { id: module.id } })).toEqual(module);
   await expectNoExecution();
 });

@@ -297,7 +297,8 @@
     "network"
   ],
   "data": {
-    "schema": 1
+    "schema": 2,
+    "migrate": "migrate-storage.ts"
   },
   "tests": [
     "test.ts",

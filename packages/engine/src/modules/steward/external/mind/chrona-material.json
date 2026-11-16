@@ -1,8 +1,6 @@
 {
   "schema": 1,
   "source": [
-    "LICENSE",
-    "README.md",
     "build.ts",
     "bun.lock",
     "core-actions.ts",
@@ -62,9 +60,13 @@
     "core-verification.bun.test.ts",
     "core-verification.ts",
     "index.ts",
+    "LICENSE",
+    "migrate-storage.ts",
     "module.json",
     "offline-entry.ts",
     "package.json",
+    "README.md",
+    "test-support/storage.ts",
     "test.ts",
     "workspace-applications.bun.test.tsx",
     "workspace-delivery.bun.test.tsx",

@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { CoreError, type CoreMeta, type CoreRecords, type CoreSettings, type CoreState, type Receipt, type RecordKind, type Understanding, type ContextResult, type Scope, type Pursuit } from "./core-types";
 
-export const CORE_DATABASE_FILE = "mind-core.sqlite";
+export const CORE_DATABASE_FILE = "mind.sqlite";
 export function canonical(value: unknown): string {
   if (value === null || typeof value === "string" || typeof value === "boolean") return JSON.stringify(value);
   if (typeof value === "number" && Number.isFinite(value)) return JSON.stringify(value);
@@ -382,11 +382,14 @@ export class CoreMindStore {
     mkdirSync(directory, { recursive: true, mode: 0o700 });
     if (lstatSync(directory).isSymbolicLink()) throw new Error("Mind private directory must not be a symlink");
     this.path = join(resolve(directory), CORE_DATABASE_FILE);
+    if (!existsSync(this.path) && ["mind-core.sqlite", "mind-execution.sqlite", "mind-delivery.sqlite", "mind-delivery-admission.sqlite", "mind-application.sqlite", "mind-artifacts.sqlite", "mind-notifications.sqlite"].some(name => existsSync(join(directory, name)))) {
+      throw new Error("Legacy Mind storage requires an explicit offline migration; refusing to start an empty database");
+    }
     if (existsSync(this.path) && (!lstatSync(this.path).isFile() || lstatSync(this.path).isSymbolicLink())) throw new Error("Mind core database must be a regular file");
     this.db = new Database(this.path, { create: true, strict: true });
     chmodSync(this.path, 0o600);
-    this.db.exec("PRAGMA busy_timeout=5000; PRAGMA journal_mode=DELETE; PRAGMA synchronous=FULL; PRAGMA secure_delete=ON;");
-    // DELETE journal avoids a long-lived WAL copy of forgotten snippets. This is logical deletion, not forensic erasure.
+    this.db.exec("PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA secure_delete=ON;");
+    // Logical deletion applies to every private table; cleanup checkpoints report any remaining WAL reader.
     this.db.exec(`CREATE TABLE IF NOT EXISTS mind_meta(key TEXT PRIMARY KEY, data TEXT NOT NULL CHECK(json_valid(data)));
       CREATE TABLE IF NOT EXISTS mind_records(kind TEXT NOT NULL, id TEXT NOT NULL, data TEXT NOT NULL CHECK(json_valid(data)), PRIMARY KEY(kind,id));
       CREATE TABLE IF NOT EXISTS mind_receipts(subject TEXT NOT NULL, action_key TEXT NOT NULL, digest TEXT NOT NULL, result TEXT NOT NULL CHECK(json_valid(result)), at TEXT NOT NULL, PRIMARY KEY(subject,action_key));

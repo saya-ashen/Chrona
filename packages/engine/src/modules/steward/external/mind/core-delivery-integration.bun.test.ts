@@ -68,7 +68,6 @@ class Gateway {
   }
   if(typeof target==='object'&&target.moduleId==='new-timetable'&&target.tool==='lookup')return {departure:'09:00',arrival:'11:30',source:'published timetable'};
   if(typeof target==='object'&&target.moduleId==='chat-current'){this.sourceCalls++;throw Error('Source offline');}
-  if(typeof target==='object'&&target.tool==='component-set')return {type:'MindWorkspace'};
   if(typeof target==='object'&&target.tool==='page-set')return {};
   if(target==='timers.list')return {items:[{id:'mind-core'}]};
   throw Error(`Unexpected gateway call ${JSON.stringify(target)}`);
@@ -260,7 +259,7 @@ test('lost explicit submit is queried by original admission/key after restart an
   await expect(f.delivery.submit(id,owner)).rejects.toThrow('Lost submit');f.restart();
   f.service.forget({actionKey:'forget-original-goal',expectedVisibilityRevision:0,target:{kind:'evidence',id:f.pursuit.evidenceRefs[0]}},owner);
   const cleanup=f.runtime.cleanupWithdrawn();expect(cleanup.delivery?.deferred).toBe(0);expect(f.delivery.detail(id,owner).payload).toBeNull();
-  expect(readFileSync(join(f.directory,'mind-delivery.sqlite')).includes(Buffer.from('Existing apps'))).toBe(false);
+  expect(readFileSync(join(f.directory,'mind.sqlite')).includes(Buffer.from('Existing apps'))).toBe(false);
   await f.delivery.reconcile(id,owner);expect(f.gateway.commands('modules.receipt').map(c=>({admissionId:c.args.admissionId,requestKey:c.args.key}))).toEqual([{admissionId:'original-admission',requestKey:'original-submit-key'}]);
   expect(f.gateway.commands('submit')).toHaveLength(1);expect(f.delivery.detail(id,owner).withdrawn).toBe(true);
  }finally{f.close();}
@@ -367,7 +366,7 @@ test('entry point enforces actual callers and keeps reconciling after source err
  const manifest=JSON.parse(readFileSync(join(import.meta.dir,'module.json'),'utf8')) as {tools:unknown[]};
  const pageTools=new Map<string,PageTool>(manifest.tools.map(value=>moduleToolSchema.parse(value)).filter(tool=>tool.visibility.includes('owner')).map(tool=>[tool.name,{moduleId:identity.moduleId,inputSchema:tool.parameters}]));
  const pages=createPages({dataDir:join(directory,'web'),modules:async()=>[{id:identity.moduleId,name:'mind',status:'active',activeHash:identity.hash}],tools:async()=>pageTools});
- const registeredCall:CoreCall=async(target,args,options)=>typeof target==='object'&&['component-set','page-set'].includes(target.tool)?pages.tool(target.tool,args,{kind:'module',module:'mind',moduleId:identity.moduleId,hash:identity.hash}):gateway.call(target,args,options);
+ const registeredCall:CoreCall=async(target,args,options)=>typeof target==='object'&&target.tool==='page-set'?pages.tool(target.tool,args,{kind:'module',module:'mind',moduleId:identity.moduleId,hash:identity.hash}):gateway.call(target,args,options);
  const sdk={chrona:{paths:{data:directory,module:import.meta.dir},dependencies:{chat:'chat-current',web:'web-current'},call:registeredCall},on:(name:string,handler:(event:any)=>Promise<any>)=>handlers.set(name,handler),onDisconnect:(handler:()=>void)=>{disconnect=handler;},ModelError:FakeModelError};
  mock.module('chrona',()=>sdk);
  const ownerCaller={kind:'owner'},workerCaller={kind:'module',...identity};
@@ -378,7 +377,7 @@ test('entry point enforces actual callers and keeps reconciling after source err
   await import(`./index.ts?delivery-integration=${Date.now()}`);
   for(let attempt=0;attempt<100&&!(await pages.get('mind','main'));attempt++)await Bun.sleep(10);
   const registeredPage=await pages.get('mind','main');expect(registeredPage).not.toBeNull();
-  const extension=Object.values(registeredPage!.extensions!)[0]!;expect(extension.tools).toContain('applications');expect(extension.tools).toContain('delivery');expect(extension.tools).not.toContain('admission-verdict');
+  const extension=registeredPage!;expect(extension.tools).toContain('applications');expect(extension.tools).toContain('delivery');expect(extension.tools).not.toContain('admission-verdict');
   await tool('pursue',{actionKey:'entry-goal',expectedRevision:0,expectedVisibilityRevision:0,semanticKey:'entry-goal',goal:'Prepare a useful timetable capability',completionCriteria:['Actual published timetable result'],scope:{},reason:'explicit-goal',evidenceRefs:[]});
   await tool('check');
   // Source observation no longer owns the coordinator await; wait for its actual asynchronous completion.

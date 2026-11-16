@@ -27,7 +27,6 @@ const id = z.string().trim().min(1).max(128);
 const iso = z.string().datetime({ offset: true }).max(40);
 const short = z.string().trim().min(1).max(200);
 const text = z.string().trim().min(1);
-const hhmm = z.string().regex(/^\d\d:\d\d$/);
 /** Relative path inside a content area or session directory: no `..`, no leading slash, not under `.git`. */
 export const relativePathSchema = z.string().trim().min(1).max(500)
   .refine(p => !p.startsWith("/") && !p.split("/").some(s => s === ".." || s === "" || s === ".git"), "invalid path");
@@ -40,21 +39,12 @@ export const SESSION_STATUSES = ["active", "ended"] as const;
 export const RUN_LANES = ["foreground", "background", "build"] as const;
 export const RUN_TRIGGERS = ["message", "schedule", "source", "edit", "approval", "retry", "build"] as const;
 export const RUN_STATUSES = ["queued", "running", "finished", "failed", "timed_out", "cancelled", "provider_unavailable"] as const;
-/** Private persisted schedule vocabulary; no public schedule creation API. */
-export const SCHEDULE_MODES = ["wake", "module"] as const;
-export const SCHEDULE_STATUSES = ["active", "paused", "done", "cancelled"] as const;
 export const APPROVAL_STATUSES = ["open", "approved", "denied", "expired"] as const;
 /** Private approval resolution is once-only. */
 export const APPROVAL_SCOPES = ["once"] as const;
 
 /** Approval records for governed module changes and application-requested decisions. */
 export const ACTIONS = ["activate_module", "delete_data", "modify_external"] as const;
-/** Private policy storage vocabulary; approvals do not create grants. */
-export const GRANT_MODES = ["allow", "ask"] as const;
-export const DEFAULT_POLICY = {
-  activate_module: "ask", delete_data: "ask", modify_external: "ask",
-} as const satisfies Record<(typeof ACTIONS)[number], (typeof GRANT_MODES)[number]>;
-
 export const DELIVERY_CHANNELS = ["in_app", "chrona_qqbot"] as const;
 
 export const RUN_LIMITS = {
@@ -70,20 +60,11 @@ export type SessionSource = (typeof SESSION_SOURCES)[number];
 export type RunLane = (typeof RUN_LANES)[number];
 export type RunTrigger = (typeof RUN_TRIGGERS)[number];
 export type RunStatus = (typeof RUN_STATUSES)[number];
-export type ScheduleMode = (typeof SCHEDULE_MODES)[number];
 export type Action = (typeof ACTIONS)[number];
-export type GrantMode = (typeof GRANT_MODES)[number];
 export type DeliveryChannel = (typeof DELIVERY_CHANNELS)[number];
 
 // ------------------------------------------ private schedule and manifest ---
 
-/** Retained for domain schedule calculations and stored-record parsing across packages. */
-export const scheduleRuleSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("at"), at: iso }).strict(),
-  z.object({ kind: z.literal("daily"), time: hhmm }).strict(),
-  z.object({ kind: z.literal("weekly"), days: z.array(z.number().int().min(0).max(6)).min(1).max(7), time: hhmm }).strict(),
-  z.object({ kind: z.literal("every"), minutes: z.number().int().min(5).max(10080) }).strict(),
-]);
 /** `network`: the sandbox lets the module reach the network. */
 export const MODULE_EFFECTS = ["network"] as const;
 /** Application-declared model tier; Agent owns its mapping to exact models. */
@@ -270,12 +251,12 @@ export const moduleCallSchema = z.discriminatedUnion("method", [
    * caller's idempotency `key` (a repeat returns the same call) and returns at once; Chrona delivers it, retrying only
    * deliveries that never reached the target, or `idempotent` targets. `reply` sends a `call_result` event back.
    */
-  z.object({ id: channelId, method: z.literal("call"), params: z.object({
+  z.object({ id: channelId, eventId: channelId.optional(), method: z.literal("call"), params: z.object({
     target: routedTargetSchema, args: z.record(z.string(), z.json()).default({}), mode: z.enum(["sync", "async"]).default("sync"),
     key: z.string().min(1).max(200).optional(), reply: z.boolean().default(false), timeoutMs: z.number().int().min(1000).max(600_000).optional(), expectedTarget: expectedModuleTargetSchema.optional(),
   }).strict().refine(params => params.mode === "sync" || params.key !== undefined, "async calls need a key") }).strict(),
   /** State of an async call this module made. */
-  z.object({ id: channelId, method: z.literal("callStatus"), params: z.union([z.object({ callId: z.string().min(1).max(128) }).strict(), z.object({ target: routedTargetSchema, key: z.string().min(1).max(200) }).strict()]) }).strict(),
+  z.object({ id: channelId, eventId: channelId.optional(), method: z.literal("callStatus"), params: z.union([z.object({ callId: z.string().min(1).max(128) }).strict(), z.object({ target: routedTargetSchema, key: z.string().min(1).max(200) }).strict()]) }).strict(),
 ]);
 export const moduleCallReplySchema = z.object({ id: channelId, result: z.union([
   /** Sync `call` replies: the target's result. */
@@ -288,21 +269,6 @@ export type ModuleEvent = z.infer<typeof moduleEventSchema>;
 export type ModuleCall = z.infer<typeof moduleCallSchema>;
 export type ModuleManifest = z.infer<typeof moduleManifestSchema>;
 export type ModuleEffect = (typeof MODULE_EFFECTS)[number];
-
-export const scheduleSchema = z.object({
-  id, mode: z.enum(SCHEDULE_MODES), rule: scheduleRuleSchema,
-  /** Stored instruction for a private wake or module schedule. */
-  text: z.string().max(4000),
-  /** wake: the session the result is posted back to. */
-  originSessionId: id.nullable(),
-  moduleId: id.nullable(),
-  /** Optional end: after this time the schedule stops. */
-  until: iso.nullable(),
-  status: z.enum(SCHEDULE_STATUSES), nextAt: iso.nullable(), lastAt: iso.nullable(), lastResult: z.string().max(2000).nullable(),
-  /** Short user-facing name shown on pages; `text` of a wake is an internal instruction and is never primary UI. */
-  label: z.string().max(80).nullable(),
-  createdBy: z.enum(["user", "chrona", "module"]), createdAt: iso,
-}).strict();
 
 // ---------------------------------------------------------------- views ----
 
@@ -346,19 +312,6 @@ export const approvalSchema = z.object({
   status: z.enum(APPROVAL_STATUSES), createdAt: iso, resolvedAt: iso.nullable(),
 }).strict();
 
-export const grantScopeSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("global") }).strict(),
-  z.object({ kind: z.literal("module"), moduleId: id }).strict(),
-]);
-export const grantSchema = z.object({
-  id, action: z.enum(ACTIONS), mode: z.enum(GRANT_MODES), scope: grantScopeSchema,
-  once: z.boolean(), consumedAt: iso.nullable(), expiresAt: iso.nullable(), createdAt: iso, revokedAt: iso.nullable(),
-}).strict();
-export const policyDecisionSchema = z.object({ action: z.enum(ACTIONS), mode: z.enum(GRANT_MODES), grantId: id.nullable(), reason: z.string().max(500) }).strict();
-
-export const PREFERENCE_TOPICS = ["general", "ui"] as const;
-export const preferenceSchema = z.object({ id, text: text.max(500), origin: z.enum(["said", "learned"]), topic: z.enum(PREFERENCE_TOPICS), createdAt: iso, lastUsedAt: iso.nullable() }).strict();
-
 export const moduleModelSettingsSchema = z.object({
   maxCallsPerEvent: z.number().int().min(1).max(20), maxOutputTokens: z.number().int().min(1).max(32_000),
   /** All modules together per local day; `moduleDailyCalls` caps single modules (v2-17), absent ones only by this. */
@@ -389,7 +342,6 @@ export const healthSchema = z.object({
 // ------------------------------------------------------------- requests ----
 
 export const resolveApprovalSchema = z.object({ decision: z.enum(["approve", "deny"]), scope: z.enum(APPROVAL_SCOPES).default("once") }).strict();
-export const createGrantSchema = z.object({ action: z.enum(ACTIONS), mode: z.enum(GRANT_MODES), scope: grantScopeSchema, expiresAt: iso.optional() }).strict();
 export const updateSettingsSchema = z.object({ wake: wakeBudgetSchema.optional(), timezone: z.string().min(1).max(80).optional(), runTimeoutMinutes: settingsSchema.shape.runTimeoutMinutes.removeDefault().optional(), moduleModel: moduleModelSettingsSchema.nullable().optional() }).strict();
 
 /** Short codes (e.g. QQ binding codes): no 0/O/1/I/L. */
@@ -461,18 +413,12 @@ export type ProviderAdapter = {
 
 // ---------------------------------------------------------------- types ----
 
-export type ScheduleRule = z.infer<typeof scheduleRuleSchema>;
-export type Schedule = z.infer<typeof scheduleSchema>;
 export type Session = z.infer<typeof sessionSchema>;
 export type App = z.infer<typeof appSchema>;
 export type Run = z.infer<typeof runSchema>;
 export type Attachment = z.infer<typeof attachmentSchema>;
 export type Message = z.infer<typeof messageSchema>;
 export type Approval = z.infer<typeof approvalSchema>;
-export type GrantScope = z.infer<typeof grantScopeSchema>;
-export type Grant = z.infer<typeof grantSchema>;
-export type PolicyDecision = z.infer<typeof policyDecisionSchema>;
-export type Preference = z.infer<typeof preferenceSchema>;
 export type Settings = z.infer<typeof settingsSchema>;
 export type Health = z.infer<typeof healthSchema>;
 

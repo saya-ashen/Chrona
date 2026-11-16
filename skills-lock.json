@@ -7,23 +7,11 @@
       "skillPath": "skills/agent-browser/SKILL.md",
       "computedHash": ""
     },
-    "core": {
-      "source": "vercel-labs/json-render",
-      "sourceType": "github",
-      "skillPath": "skills/core/SKILL.md",
-      "computedHash": ""
-    },
     "improve": {
       "source": "shadcn/improve",
       "sourceType": "github",
       "skillPath": "skills/improve/SKILL.md",
       "computedHash": "9e8fe9ea4f9a0e4155801d1624e38ca23798467bb88b447efaa5120f7b1fe802"
-    },
-    "shadcn": {
-      "source": "vercel-labs/json-render",
-      "sourceType": "github",
-      "skillPath": "skills/shadcn/SKILL.md",
-      "computedHash": ""
     }
   }
 }

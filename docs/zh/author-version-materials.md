@@ -69,7 +69,7 @@ Author 导入明确选定的源码和运行产物，计算文件摘要，形成�
 
 ## Web 组件指导
 
-入口 Agent 的指导同步补充：普通应用调用 `web.component-set` 注册可信 JavaScript/CSS，在 `web.page-set` 中引用 `app:ComponentName`；应用在自己的 activated 生命周期中注册，以绑定实际身份和活动版本。组件直接在 Web 同页执行，不承诺 iframe 或沙箱隔离；回调保留页面与工具契约校验，卸载时释放媒体、文件 URL 和监听器。
+入口 Agent 指导：普通应用在自身 activated 生命周期中调用 `web.page-set`，直接登记可信 JavaScript/CSS、props 与工具引用。React / TSX 编译时将 `/pages.js` 作为 external，共享 Web 运行时。登记绑定实际身份、活动版本和页面 revision；页面直接在 Web 同页执行，无 iframe 或沙箱隔离。回调保留工具合同校验，卸载时释放媒体、对象 URL 和监听器。
 
 ## 验证
 

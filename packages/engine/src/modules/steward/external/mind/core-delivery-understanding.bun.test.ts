@@ -53,7 +53,7 @@ test('SQLite handoff with live supporting and opposing evidence permits unchange
   const r=await f.delivery.prepare(f.input,f.worker);expect(await f.stage()).toBe(1);f.reopen();
   f.service.release({actionKey:'release',pursuitId:f.input.pursuitId,expectedRevision:f.input.expectedRevision,expectedVisibilityRevision:0,runRef:f.worker.execution!.runRef,executionStopped:true,effectsReconciled:true},f.worker);
   expect((await f.delivery.submit(r.id,owner)).receipt!.receiptId).toBe('receipt');expect(f.state.submits).toBe(1);
-  expect(readFileSync(join(f.dir,'mind-delivery.sqlite')).subarray(0,15).toString()).toBe('SQLite format 3');
+  expect(readFileSync(join(f.dir,'mind.sqlite')).subarray(0,15).toString()).toBe('SQLite format 3');
  }finally{f.close();}
 });
 
@@ -113,7 +113,7 @@ test('a pursuit-only saved basis cannot bypass current understanding dependencie
  const f=fixture();try{
   const r=await f.delivery.prepare(f.input,f.worker);expect(await f.stage()).toBe(1);
   // Seed the pre-fix pursuit-only digest to exercise stale persisted review, through SQLite.
-  const {Database}=await import('bun:sqlite'),db=new Database(join(f.dir,'mind-delivery.sqlite'));
+  const {Database}=await import('bun:sqlite'),db=new Database(join(f.dir,'mind.sqlite'));
   try{
    const p=f.service.detail({kind:'pursuit',id:f.input.pursuitId},owner),{revision:_revision,updatedAt:_updatedAt,currentActor:_currentActor,...basis}=p;
    const old=f.delivery.detail(r.id,owner);old.pursuitBasis=coreDigest(basis);

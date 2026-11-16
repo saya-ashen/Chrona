@@ -65,7 +65,7 @@ async function fixture() {
     }
     const privateFile = join(root, "platform/data", web.id, "memory-preferences.json");
     const changeManifest = (value: typeof manifest) => db.moduleVersion.update({ where: { moduleId_hash: { moduleId: web.id, hash } }, data: { manifest: value } });
-    return { db, web, runtime, manifest, request, activate, page, privateFile, changeManifest, close };
+    return { db, web, runtime, manifest, app, request, activate, page, privateFile, changeManifest, close };
   } catch (error) { await close(); throw error; }
 }
 
@@ -117,8 +117,8 @@ test("own-settings HTTP retains page revisions and validation while tool contrac
   settings.parameters.properties.provider = { type: "string", enum: ["memory-other"] };
   await f.changeManifest(changed);
   const invalid = await f.request("web.ui-settings", savedArgs, current);
-  expect(invalid.status).toBe(400);
-  expect(await invalid.json()).toMatchObject({ code: "invalid" });
+  expect(invalid.status).toBe(409);
+  expect(await invalid.json()).toMatchObject({ code: "conflict" });
   expect((await f.request("web.ui-settings", savedArgs)).status).toBe(400);
   settings.output = { type: "object", properties: { unexpected: { type: "string" } }, required: ["unexpected"], additionalProperties: false };
   await f.changeManifest(changed);
@@ -126,6 +126,26 @@ test("own-settings HTTP retains page revisions and validation while tool contrac
   expect(output.status).toBe(502);
   expect(await output.json()).toMatchObject({ code: "failed" });
   await expect(readFile(f.privateFile)).rejects.toMatchObject({ code: "ENOENT" });
+}, 30_000);
+
+test("page ESM source uses authentication and the exact active registration revision", async () => {
+  await f.activate();
+  const page = await f.page();
+  const path = `/api/web/pages/web/settings/source?revision=${encodeURIComponent(page.revision)}`;
+  expect((await f.app.request(path)).status).toBe(401);
+  const headers = { authorization: "Bearer web-own-settings-offline" };
+  const source = await f.app.request(path, { headers });
+  expect(source.status).toBe(200);
+  expect(source.headers.get("content-type")).toContain("text/javascript");
+  expect(source.headers.get("cache-control")).toBe("private, no-store");
+  const javascript = await source.text(), scanned = new Bun.Transpiler().scan(javascript);
+  expect(scanned.exports).toContain("default");
+  expect(scanned.imports.map(item => item.path)).toEqual(["/pages.js"]);
+  await f.activate();
+  const stale = await f.app.request(path, { headers });
+  expect(stale.status).toBe(409);
+  expect(await stale.json()).toMatchObject({ code: "conflict" });
+  expect((await f.app.request("/api/web/pages/web/missing/source?revision=x", { headers })).status).toBe(404);
 }, 30_000);
 
 test("local own-settings dispatch cannot retain revoked approved-owner authority", async () => {

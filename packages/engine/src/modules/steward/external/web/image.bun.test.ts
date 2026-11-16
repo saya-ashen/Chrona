@@ -2,21 +2,6 @@ import { expect, test } from "bun:test";
 import { Hono } from "hono";
 import { apiKeyAuth } from "../../../../../../../apps/server/src/middleware/auth";
 import { resetEnvCacheForTests } from "../../../../../../../apps/server/src/config/env";
-import { catalog } from "./catalog";
-import { pageErrors } from "./pages";
-
-test.each([
-  ["files/a.png", true],
-  ["planning/a.png", false],
-  ["files-other/a.png", false],
-  [{ $state: "/image/ref" }, true],
-  [{ $template: "files/${name}.png" }, true],
-])("Image ref %j is checked against its registering app", (ref, valid) => {
-  const spec = { root: "image", elements: { image: { type: "Image", props: { ref, alt: "图片", width: null, height: 480 }, children: [] } } };
-  expect(catalog.validate(spec).success).toBe(true);
-  expect(pageErrors({ spec }, new Map(), "files").length === 0).toBe(valid);
-});
-
 test("the existing API authentication rejects anonymous image requests before forwarding", async () => {
   const previous = process.env.API_KEY;
   try {

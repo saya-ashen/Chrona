@@ -16,5 +16,7 @@ export const moduleToolSchema = z.object({
   parameters: z.object({ type: z.literal("object"), properties: z.record(z.string().min(1).max(100), moduleToolParameterSchema).default({}), required: z.array(z.string().min(1).max(100)).default([]) }).strict(),
   visibility: z.array(z.enum(TOOL_VISIBILITY)).min(1).max(TOOL_VISIBILITY.length).default(["provider", "owner"]),
   idempotent: z.boolean().default(false),
+  /** Recomputable observation: no execution history. Explicit keys still retain their exact reply. */
+  readOnly: z.literal(true).optional(),
 }).strict();
 export type ModuleTool = z.infer<typeof moduleToolSchema>;

@@ -86,7 +86,7 @@ on("tool", async (event: { id: string; args: Args; caller?: Caller }) => {
 on("activated", async () => {
   const modules = await call("modules.list").then(page => (page as { items: unknown }).items) as ModuleState[];
   const own = modules.find(module => module.name === "web" && module.status === "active" && module.activeHash);
-  if (own) await pages.tool("page-set", WEB_SETTINGS_PAGE, { kind: "module", module: "web", moduleId: own.id });
+  if (own) await pages.tool("page-set", WEB_SETTINGS_PAGE, { kind: "module", module: "web", moduleId: own.id, hash: own.activeHash ?? undefined });
 });
 
 const getSessions = () => conversations.list();
@@ -160,11 +160,7 @@ async function moduleRoute({ request, path, body }: ApiContext): Promise<ApiResu
   if (path[0] !== "modules" || path.length !== 3 || !Object.hasOwn(MODULE_ROUTES, route)) return NO_ROUTE;
   return MODULE_ROUTES[route]!(path[1]!, body);
 }
-async function pageRoute({ request, path, url }: ApiContext): Promise<ApiResult> {
-  if (request.method === "GET" && path[0] === "components" && path.length === 3) {
-    const component = await pages.component(path[1]!, path[2]!, url.searchParams.get("revision"));
-    return Response.json(component, { headers: { "cache-control": "private, no-store", "x-content-type-options": "nosniff" } });
-  }
+async function pageRoute({ request, path }: ApiContext): Promise<ApiResult> {
   if (request.method !== "GET" || path[0] !== "pages" || path.length !== 3) return NO_ROUTE;
   const page = await pages.get(path[1]!, path[2]!);
   if (!page) throw Object.assign(new Error("没有这个页面"), { code: "not_found" });
@@ -178,6 +174,8 @@ async function api(request: Request, path: string[]) {
   const context: ApiContext = { request, url, path, body, route: `${request.method} /${path.join("/")}` };
   const routes: Record<string, ApiHandler> = {
     "GET /today": () => todayView(call, getSessions),
+    "GET /today-content": () => todayView(call, getSessions, false),
+    "GET /runtime": () => call("activity.runtime"),
     "GET /sessions": () => getSessions(),
     "GET /history": async () => (await getSessions()).slice(0, 100),
     "POST /chat": async () => {
@@ -213,18 +211,28 @@ async function moduleCall(body: Args) {
   // Conversations, approvals and app records have their own routes above.
   const target = String(body.target), args = (body.args ?? {}) as Args;
   if (!/^[a-z][a-z0-9-]{1,40}\.[a-z][a-z0-9-]{1,40}$/.test(target) || /^(approvals|modules|settings|schedules|secrets)\./.test(target)) throw Object.assign(new Error(`Unknown module tool ${target}`), { code: "not_found" });
+  const started = performance.now(), startedAt = new Date().toISOString();
   if (body.page && typeof body.page === "object") {
     const ref = body.page as { module: string; id: string; revision: string }, page = await pages.get(ref.module, ref.id);
+    const pageReadyMs = performance.now() - started;
     if (!page || page.revision !== ref.revision || !target.startsWith(`${page.module}.`) || !pageToolNames(page).includes(target.slice(page.module.length + 1))) throw Object.assign(new Error("页面或工具已变化，请重新打开页面"), { code: "conflict" });
     const expectedTarget = { moduleId: page.moduleId };
     // pages.get already validated current user-visible tools. The routed
     // call rechecks admission and module identity atomically; local settings still
     // need their in-process input/output validation below.
-    if (!ownSettings.has(target)) return applicationCall(target, args, { expectedTarget });
+    if (!ownSettings.has(target)) return pageCall(target, args, expectedTarget, { started, startedAt, pageReadyMs });
     return invokeUserTool(target, args, await userTool(target), expectedTarget);
   }
   const tool = await userTool(target);
   return invokeUserTool(target, args, tool, tool.moduleId ? { moduleId: tool.moduleId } : undefined);
+}
+async function pageCall(target: string, args: Args, expectedTarget: TargetPin,
+  timing: { started: number; startedAt: string; pageReadyMs: number }) {
+  try { return await applicationCall(target, args, { expectedTarget }); }
+  finally {
+    if (target === "chat.catalog") console.error(JSON.stringify({ component: "web", event: "catalog_timing", startedAt: timing.startedAt,
+      pageReadyMs: timing.pageReadyMs, callMs: performance.now() - timing.started - timing.pageReadyMs, durationMs: performance.now() - timing.started }));
+  }
 }
 async function invokeUserTool(target: string, args: Args, tool: UserTool, expectedTarget?: TargetPin) {
   const own = ownSettings.get(target);
@@ -278,9 +286,12 @@ async function pageContentResponse(request: Request, module: string, id: string)
   try {
     const page = await pages.get(module, id);
     if (!page) return new Response("没有这张图片", { status: 404, headers: imageHeaders });
-    const ref = new URL(request.url).searchParams.get("ref") ?? "";
+    const url = new URL(request.url);
+    if (url.searchParams.get("revision") !== page.revision) throw Object.assign(new Error("页面版本已变化"), { code: "conflict" });
+    const ref = url.searchParams.get("ref") ?? "";
     if (!page.content || !validPageContentRef(ref, page.module)) return new Response("只能读取本应用声明的图片", { status: 403, headers: imageHeaders });
-    const file = await chrona.call({ moduleId: page.moduleId, tool: page.content.tool }, { ref }, { expectedTarget: { moduleId: page.moduleId } }) as { base64: string; mime: string } | null;
+    const file = await chrona.call({ moduleId: page.moduleId, tool: page.content.tool }, { ref },
+      { expectedTarget: { moduleId: page.moduleId } }) as { base64: string; mime: string } | null;
     return rasterResponse(file, imageHeaders);
   } catch (error) {
     const { code } = error as { code?: string };
@@ -292,11 +303,22 @@ function apiError(error: unknown) {
   const { code = "failed", message = "failed" } = error as { code?: string; message?: string };
   return Response.json({ code, message }, { status: STATUS[code] ?? 502 });
 }
+async function pageSourceResponse(request: Request, module: string, id: string) {
+  try {
+    const page = await pages.get(module, id);
+    if (!page) throw Object.assign(new Error("页面不存在"), { code: "not_found" });
+    if (new URL(request.url).searchParams.get("revision") !== page.revision) throw Object.assign(new Error("页面版本已变化"), { code: "conflict" });
+    return new Response(page.javascript, { headers: {
+      "content-type": "text/javascript", "cache-control": "private, no-store", "x-content-type-options": "nosniff",
+    } });
+  } catch (error) { return apiError(error); }
+}
 async function apiResponse(request: Request, path: string[]) {
   const parts = path.join("/");
   if (request.method === "GET") {
     if (parts === "events") return events();
     if (parts === "file") return fileResponse(request);
+    if (path.length === 4 && path[0] === "pages" && path[3] === "source") return pageSourceResponse(request, path[1]!, path[2]!);
     if (path.length === 4 && path[0] === "pages" && path[3] === "content") return pageContentResponse(request, path[1]!, path[2]!);
   }
   try {

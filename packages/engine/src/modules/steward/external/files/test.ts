@@ -6,7 +6,7 @@ import { paths, startModule } from "chrona/testing";
 let failRegistration = false;
 const module = await startModule("index.ts", { stubs: { "web.page-set": () => {
   if (failRegistration) return { error: "web temporarily unavailable" };
-  return { id: "main", catalog: "json-render@0.21.4" };
+  return { id: "main", revision: "fixture" };
 } } });
 const now = "2026-10-22T00:00:00Z";
 async function tool(id: string, args: Record<string, unknown> = {}) {

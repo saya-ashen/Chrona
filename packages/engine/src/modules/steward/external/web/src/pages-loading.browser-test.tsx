@@ -1,53 +1,57 @@
-// Browser regression fixture: bundle this entry, serve it on loopback, then call pageLoadingTest.run().
-import { mount, type Page } from "./pages";
-
-function deferred() {
-  let resolve!: (value: unknown) => void, reject!: (error: Error) => void;
-  const promise = new Promise<unknown>((yes, no) => { resolve = yes; reject = no; });
-  return { promise, resolve, reject };
-}
+import { useState } from "react";
+import { createRoot } from "react-dom/client";
+import { SystemContext } from "./system/action";
+import { useQuery, QueryStatus } from "./system/query";
+import { TodayPage } from "./system/today";
 const frame = () => new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
 async function until(check: () => boolean) {
   for (let i = 0; i < 120; i++) { if (check()) return; await frame(); }
   throw new Error("Browser state did not settle");
 }
-const page: Page = {
-  module: "fixture", id: "loading", title: "PageView loading regression", data: { first: { tool: "first" }, second: { tool: "second" } },
-  spec: { root: "root", state: { first: { text: "已有工作列表" } }, elements: {
-    root: { type: "Stack", props: {}, children: ["first", "second", "refresh"] },
-    first: { type: "Text", props: { text: { $state: "/first/text" } } },
-    second: { type: "Text", props: { text: { $state: "/second/text" } } },
-    refresh: { type: "Button", props: { label: "刷新测试数据" }, on: { press: { action: "call", params: { tool: "refresh" } } } },
-  } },
-};
+function deferred() {
+  let resolve!: (value: unknown) => void, reject!: (error: Error) => void;
+  const promise = new Promise<unknown>((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject };
+}
 export function setupPageLoadingTest() {
-  const element = document.createElement("main"); document.body.append(element);
-  const requests: { target: string; result: ReturnType<typeof deferred> }[] = [];
-  let unmount = mount(element, page, {
-    call: async target => {
-      if (target === "fixture.refresh") return {};
-      const result = deferred(); requests.push({ target, result }); return result.promise;
-    }, navigate: () => {}, content: async () => new Blob(),
-  });
-  const initial = () => element.textContent.includes("正在读取应用数据……");
-  const refreshing = () => element.textContent.includes("正在刷新应用数据……");
-  const loading = () => initial() || refreshing();
-  const has = (text: string) => element.textContent.includes(text);
-  const checks: string[] = [];
-  const assert = (value: boolean, label: string) => { if (!value) throw new Error(label); checks.push(label); };
-  return {
-    checks,
-    async pending() { await until(() => requests.length === 2 && initial()); assert(has("已有工作列表"), "pending preserves previous work"); },
-    async partial() { requests[0]!.result.resolve({ text: "工作列表已恢复" }); await until(() => has("工作列表已恢复")); assert(loading(), "first response does not hide second pending source"); },
-    async complete() { requests[1]!.result.resolve({ text: "叶任务列表已恢复" }); await until(() => !loading() && has("叶任务列表已恢复")); assert(has("工作列表已恢复"), "both successful source results visible"); },
-    async refresh() { element.querySelector("button")!.click(); await until(() => requests.length === 4 && refreshing() && !initial()); assert(has("工作列表已恢复") && has("叶任务列表已恢复"), "refresh keeps existing lists"); },
-    async error() { requests[2]!.result.reject(new Error("受控读取失败")); await until(() => has("受控读取失败")); assert(loading(), "error does not hide other pending source"); requests[3]!.result.resolve({ text: "刷新后的叶任务" }); await until(() => !loading() && has("刷新后的叶任务")); assert(has("工作列表已恢复") && has("受控读取失败"), "failed refresh preserves old data and visible error"); },
-    async missing() {
-      unmount(); let calls = 0;
-      unmount = mount(element, { ...page, data: { first: { tool: "first" } }, needs: { first: ["required"] } }, { call: async () => { calls++; return {}; }, navigate: () => {}, content: async () => new Blob() });
-      await frame(); await frame(); assert(calls === 0 && !loading(), "missing required args do not request or leave loading");
+  const element = document.body.appendChild(document.createElement("main")), requests: ReturnType<typeof deferred>[] = [], checks: string[] = [];
+  const assert = (condition: unknown, label: string) => { if (!condition) throw new Error(label); checks.push(label); };
+  function Content() {
+    const first = useQuery<{ text: string }>("first"), second = useQuery<{ text: string }>("second");
+    return <><QueryStatus query={first} /><p>{first.data?.text}</p>
+      <QueryStatus query={second} /><p>{second.data?.text}</p><button onClick={() => { first.retry(); second.retry(); }}>刷新测试数据</button></>;
+  }
+  function Host() {
+    const [revision] = useState(0);
+    const call = async () => { const request = deferred(); requests.push(request); return request.promise; };
+    return <SystemContext.Provider value={{ revision, refresh: () => {}, call }}><Content /></SystemContext.Provider>;
+  }
+  const root = createRoot(element); root.render(<Host />);
+  return { checks,
+    async run() {
+      await until(() => requests.length === 2); assert(element.textContent.includes("加载中"), "independent sources expose loading");
+      requests[0]!.resolve({ text: "工作列表已恢复" }); await until(() => element.textContent.includes("工作列表已恢复")); assert(element.textContent.includes("加载中"), "one response cannot hide another pending query");
+      requests[1]!.resolve({ text: "叶任务列表已恢复" }); await until(() => !element.textContent.includes("加载中")); assert(element.textContent.includes("叶任务列表已恢复"), "both responses render");
+      element.querySelector("button")!.click(); await until(() => requests.length === 4);
+      requests[2]!.reject(new Error("受控读取失败")); requests[3]!.resolve({ text: "刷新后的叶任务" });
+      await until(() => element.textContent.includes("受控读取失败")); assert(element.textContent.includes("刷新后的叶任务"), "failure remains visible beside successful data");
+      root.unmount();
+      const reads = new Map<string, ReturnType<typeof deferred>>();
+      const call = async (tool: string) => { const request = deferred(); reads.set(tool, request); return request.promise; };
+      const todayRoot = createRoot(element);
+      todayRoot.render(<SystemContext.Provider value={{ call, refresh: () => {} }}><TodayPage /></SystemContext.Provider>);
+      await until(() => reads.size === 3);
+      reads.get("today")!.resolve({approvals:[],problems:[],upcoming:[],updates:[],apps:[],sessions:[]});
+      await until(() => element.textContent.includes("没有待处理的事项"));
+      assert(element.textContent.includes("加载中"), "Today content renders while runtime and runs remain pending");
+      reads.get("runtime")!.reject(new Error("受控健康探测失败"));
+      await until(() => element.textContent.includes("受控健康探测失败"));
+      assert(element.textContent.includes("没有待处理的事项"), "runtime failure does not hide Today content");
+      reads.get("runs")!.resolve([{id:"pending-run",active:true,status:"running",sessionTitle:"实际正在处理",interactions:[]}]);
+      await until(() => element.textContent.includes("实际正在处理"));
+      assert(element.textContent.includes("停止"), "runs remain actionable beside a runtime error");
+      assert(document.documentElement.scrollWidth <= innerWidth, "Today has no horizontal overflow");
+      todayRoot.unmount(); element.remove(); return checks;
     },
-    async run() { await this.pending(); await this.partial(); await this.complete(); await this.refresh(); await this.error(); await this.missing(); return checks; },
   };
 }
 Object.assign(window, { pageLoadingTest: setupPageLoadingTest() });

@@ -26,7 +26,7 @@ async function rollbackFixture(options: { paused?: boolean; migrating?: boolean;
   if (options.verified) await updateModuleEvolution(db, { workspaceId: workspace.id, moduleId: module.id, activationId: activation.activationId, hash: "candidate", capability: "tool:read", now: ports.now() });
   if (options.migration) await db.moduleMigration.create({ data: { moduleId: module.id, hash: "candidate", fromSchema: 1, toSchema: 1, previousStatus: "active", createdAt: ports.now() } });
   if (options.recordedDelivery) {
-    const schedule = await db.schedule.create({ data: { workspaceId: workspace.id, moduleId: module.id, triggerId: "previous-occurrence", mode: "module", rule: {}, text: "Recorded delivery", createdBy: "chrona", status: "done" } });
+    const schedule = await db.timer.create({ data: { workspaceId: workspace.id, moduleId: module.id, rule: {}, timerId: "Recorded delivery", status: "done" } });
     await db.moduleInvocation.create({ data: { workspaceId: workspace.id, caller: "system:schedules", target: module.name, tool: "schedule", mode: "schedule", key: `${schedule.id}:recorded`, args: { scheduleId: schedule.id }, status: "unknown", error: "Delivery interrupted; outcome unknown" } });
   }
   const attempt = () => rollbackFailedStart(context, module.id, "candidate", activation.activationId);
@@ -154,11 +154,11 @@ test("removed module cannot be switched by a stale rollback callback", async () 
 test("eligible rollback preserves current data and unknown delivery evidence without replay", async () => {
   const f = await rollbackFixture({ recordedDelivery: true });
   const data = join(f.dataDir, "platform/data", f.module.id); await mkdir(data, { recursive: true }); await writeFile(join(data, "current.txt"), "current data");
-  const schedule = await f.db.schedule.findFirstOrThrow({ where: { moduleId: f.module.id } });
+  const schedule = await f.db.timer.findFirstOrThrow({ where: { moduleId: f.module.id } });
   const delivery = await f.db.moduleInvocation.findFirstOrThrow({ where: { target: f.module.name } });
   expect(await f.attempt()).toMatchObject({ rolledBack: true });
   expect(await readFile(join(data, "current.txt"), "utf8")).toBe("current data");
-  expect(await f.db.schedule.findMany({ where: { moduleId: f.module.id } })).toEqual([schedule]);
+  expect(await f.db.timer.findMany({ where: { moduleId: f.module.id } })).toEqual([schedule]);
   expect(await f.db.moduleInvocation.findMany({ where: { target: f.module.name } })).toEqual([delivery]);
   const outcomes = await moduleEvolutionOutcomes(f.db, f.workspace.id, f.module.id);
   expect(outcomes[0]).toMatchObject({ candidateHash: "previous", rollback: { attempted: false, result: "blocked" } });

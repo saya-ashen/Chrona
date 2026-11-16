@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { grantedUses, DEFAULT_POLICY, moduleManifestSchema, moduleCallSchema, moduleEventReplySchema, scheduleSchema, chronaToolInputSchemas } from "@chrona/contracts/steward";
-import { decidePolicy } from "./policy";
+import { grantedUses, moduleManifestSchema, moduleCallSchema, moduleEventReplySchema } from "@chrona/contracts/steward";
 
 const manifest = {
   name: "price-watch", entry: "index.ts",
@@ -93,20 +92,4 @@ describe("module channel contract", () => {
   test.each(["model", "wake_provider", "notify_user"])("rejects retired effect %s instead of inferring uses", effect => {
     expect(moduleManifestSchema.safeParse({ ...manifest, effects: [effect, "network"] }).success).toBe(false);
   });
-});
-
-test("private stored schedules retain their record contract without native scheduling tools", () => {
-  expect(Object.keys(chronaToolInputSchemas)).toEqual(["chrona_reply"]);
-  for (const mode of ["module", "wake"] as const) {
-    const stored = { rule: { kind: "every", minutes: 5 }, text: "Check", label: "Check", id: "stored-schedule", originSessionId: null, moduleId: null, mode, until: null, status: "paused", nextAt: null, lastAt: null, lastResult: null, createdBy: "chrona", createdAt: "2026-10-20T00:00:00Z" } as const;
-    expect(scheduleSchema.parse(stored)).toEqual(stored);
-    for (const patch of [{ rule: { kind: "every", minutes: 0 } }, { mode: "job" }, { status: "unknown" }]) {
-      expect(scheduleSchema.safeParse({ ...stored, ...patch }).success).toBe(false);
-    }
-  }
-});
-
-test("module activation defaults to ask with its policy label", () => {
-  expect(DEFAULT_POLICY.activate_module).toBe("ask");
-  expect(decidePolicy("activate_module", {}, [], new Date())).toMatchObject({ mode: "ask", reason: "内置规则：启用模块需要先问你" });
 });

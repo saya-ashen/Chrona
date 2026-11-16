@@ -1,5 +1,7 @@
 import { afterEach, expect, test } from 'bun:test';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
+import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Store, APPLICATION_DELIVERY_GUIDANCE } from './state';
@@ -51,6 +53,85 @@ for (const mode of ['private', 'excluded', 'global-off'] as const) {
     expect(f.store.observations.evidence(f.id, 'private-command')).toBeNull();
   });
 }
+
+test('concurrent sends reserve one Run and provider preflight preserves draft edits', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'chat-send-admission-'));
+  let release!: () => void, entered!: () => void, runs = 0;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  const prompts: string[] = [];
+  const store = new Store(join(dir, 'data'), join(dir, 'content'), async (target, args) => {
+    if (target === 'agent.providers') {
+      entered(); await gate;
+      return { items: [{ id: 'pi', available: true, hash: 'h', revision: 'v', capabilities: { conversation: true } }] };
+    }
+    if (target === 'agent.run') { runs++; prompts.push(args.prompt); return { runId: 'r1', contextId: 'ctx', status: 'running' }; }
+    if (target === 'agent.read') return { run: { runId: 'r1', active: true, status: 'running' }, items: [], interactions: [], ended: false };
+    throw Error(`Unexpected call: ${JSON.stringify(target)}`);
+  });
+  fixtures.push({ store, dir }); store.version = 'chat-hash';
+  const conversation = store.create('pi');
+  store.draft(conversation.id, { draft: 'original' }, conversation.revision);
+  const first = store.operate(conversation.id, 'send-one', 'send', {});
+  await started;
+  const second = store.operate(conversation.id, 'send-two', 'send', {});
+  const current = store.get(conversation.id);
+  store.draft(conversation.id, { draft: 'edited during preflight' }, current.revision);
+  release();
+  await Promise.all([first, second]);
+  expect(runs).toBe(1);
+  expect(prompts[0]).toStartWith('edited during preflight');
+  expect(store.get(conversation.id).operations).toHaveLength(2);
+  expect(store.get(conversation.id).operations.filter((op: any) => op.status === 'rejected')).toHaveLength(1);
+});
+
+test('delivery lookup merges current drafts and cannot recreate a deleted conversation', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'chat-delivery-concurrent-'));
+  const data = join(dir, 'data'), content = join(dir, 'content');
+  const store = new Store(data, content, async () => { throw Error('Unexpected Store call'); });
+  fixtures.push({ store, dir });
+  let handler!: (event: any) => Promise<any>, release!: () => void, entered!: () => void;
+  let gate: Promise<void>;
+  const disconnect: (() => void)[] = [];
+  const key = 'chat-concurrent-' + randomUUID();
+  class ModelError extends Error { constructor(public code: string, message: string) { super(message); } }
+  const sdk = {
+    ModelError, on: (kind: string, fn: typeof handler) => { if (kind === 'tool') handler = fn; },
+    onDisconnect: (fn: () => void) => { disconnect.push(fn); },
+    chrona: { paths: { module: import.meta.dirname, data, content }, dependencies: {}, call: async (target: string) => {
+      if (target === 'modules.receipt') { entered(); await gate; return { requestKey: 'receipt', state: 'submitted', members: [] }; }
+      if (target === 'modules.list') return { items: [] };
+      throw Error('Unexpected tool: ' + target);
+    } },
+  };
+  Reflect.set(globalThis, key, sdk);
+  try {
+    const build = await Bun.build({ entrypoints: [join(import.meta.dirname, 'index.ts')], target: 'bun', plugins: [{
+      name: 'chat-concurrent-sdk', setup(build) {
+        build.onResolve({ filter: /^chrona$/ }, () => ({ path: 'sdk', namespace: 'chat-concurrent-sdk' }));
+        build.onLoad({ filter: /.*/, namespace: 'chat-concurrent-sdk' }, () => ({ loader: 'js', contents:
+          `const sdk=globalThis[${JSON.stringify(key)}]; export const {chrona,on,onDisconnect,ModelError}=sdk;` }));
+      },
+    }] });
+    expect(build.success).toBe(true);
+    const entry = join(dir, 'entry.mjs'); writeFileSync(entry, await build.outputs[0]!.text());
+    await import(pathToFileURL(entry).href);
+    for (const deleted of [false, true]) {
+      const c = store.create('pi');
+      const started = new Promise<void>(resolve => { entered = resolve; });
+      gate = new Promise<void>(resolve => { release = resolve; });
+      const lookup = handler({ id: 'delivery', args: { id: c.id, receiptId: 'receipt-id' } });
+      const result = lookup.then(value => ({ value }), error => ({ error }));
+      await started;
+      if (deleted) store.delete(c.id, true);
+      else store.draft(c.id, { draft: 'edited during receipt lookup' }, c.revision);
+      release();
+      const settled = await result;
+      if (deleted) { expect(settled).toHaveProperty('error'); expect(() => store.get(c.id)).toThrow(); }
+      else { expect(settled).toHaveProperty('value'); expect(store.get(c.id).draft).toBe('edited during receipt lookup'); }
+    }
+  } finally { for (const close of disconnect) close(); Reflect.deleteProperty(globalThis, key); }
+});
 
 test('learning disabled by default never transmits submitted text or session to Mind', async () => {
   const f = fixture();

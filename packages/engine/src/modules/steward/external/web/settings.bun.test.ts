@@ -98,6 +98,5 @@ test("provider read failure cannot disguise a successful local save", async () =
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 test("Web own settings page passes the actual declarative page validator", async () => {
-  const manifest = await Bun.file(join(import.meta.dir, "module.json")).json() as { tools: { name: string; parameters: Args }[] };
-  expect(pageErrors(WEB_SETTINGS_PAGE, new Map(manifest.tools.map(tool => [tool.name, tool.parameters])), "web")).toEqual([]);
+  expect(pageErrors(WEB_SETTINGS_PAGE)).toEqual([]);
 });

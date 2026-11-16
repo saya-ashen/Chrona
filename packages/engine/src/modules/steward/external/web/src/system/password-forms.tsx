@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useAction } from "./action";
-import type { LoginMode } from "./login";
+import type { LoginMode } from "./types";
 
 function passwordError(password: string, confirmation: string) {
   if (password.length < 10 || password.length > 256) return "密码长度应为 10–256 个字符。";

@@ -11,6 +11,11 @@ test("runtime adapter uses WAL/FULL and retains committed receipts through abrup
   try {
     writeFileSync(driver, `
       import { db } from ${JSON.stringify(join(import.meta.dir, "db.ts"))};
+      // First operation is a write: FK enforcement must already be enabled.
+      let rejected = false;
+      try { await db.module.create({data:{workspaceId:'missing-workspace',name:'orphan'}}); }
+      catch { rejected = true; }
+      if (!rejected) throw new Error('First write bypassed foreign keys');
       const journal = await db.$queryRawUnsafe('PRAGMA journal_mode');
       const synchronous = await db.$queryRawUnsafe('PRAGMA synchronous');
       const foreignKeys = await db.$queryRawUnsafe('PRAGMA foreign_keys');
@@ -25,7 +30,7 @@ test("runtime adapter uses WAL/FULL and retains committed receipts through abrup
     const child = Bun.spawn([process.execPath, driver], { cwd: process.cwd(), env: { ...process.env, NODE_ENV: "test", CHRONA_CONFIG_DIR: join(root, "config"), DATABASE_URL: databaseUrl }, stdout: "pipe", stderr: "pipe" });
     const [status, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
     expect(status).not.toBe(0); expect(stderr).toBe("");
-    expect(JSON.parse(stdout)).toEqual({ journal: [{ journal_mode: "wal" }], synchronous: [{ synchronous: 2 }], foreignKeys: [{ foreign_keys: 1 }] });
+    expect(JSON.parse(stdout.trim().split("\n").at(-1)!)).toEqual({ journal: [{ journal_mode: "wal" }], synchronous: [{ synchronous: 2 }], foreignKeys: [{ foreign_keys: 1 }] });
     const backup = join(root, "backup.db");
     // No clean disconnect/checkpoint: VACUUM INTO must include the committed WAL.
     backupSqliteDatabase(databaseUrl, backup);

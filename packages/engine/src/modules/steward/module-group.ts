@@ -3,11 +3,9 @@ import { join } from "node:path";
 import { z } from "zod";
 import type { Prisma } from "@chrona/db";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
-import type { ApprovedAction, StewardPorts } from "./ports";
+import type { ApprovedAction } from "./ports";
 import { StewardError } from "./errors";
-import { createApprovals } from "./approvals";
-import { assertDynamicModuleActivation, expireModuleApprovals, groupPayloadSchema, json, moduleContext, type ModuleContext, type ModuleVersion } from "./module-context";
-import { declaredModules } from "./module-build-targets";
+import { assertDynamicModuleActivation, expireModuleApprovals, groupPayloadSchema, json, type ModuleContext, type ModuleVersion } from "./module-context";
 import { dataEmpty } from "./module-data";
 import { recordGeneration, switchActiveIn } from "./module-generation";
 import { recordModuleActivation } from "./module-evolution";
@@ -28,17 +26,9 @@ import { assertExecutionModuleIdle } from "./execution-module-guard";
  */
 const reviewSchema = z.object({ prefix: z.string(), suffix: z.string(), codeDiff: z.string(), detail: z.string(), needsMigration: z.boolean() });
 
-/** The build conversation that submitted a version (recorded by `modules.propose`). */
-async function submittedBy(db: Prisma.TransactionClient, workspaceId: string, version: Pick<ModuleVersion, "moduleId" | "hash">) {
-  const row = await db.moduleVersion.findFirst({ where: { moduleId: version.moduleId, hash: version.hash, module: { workspaceId } }, select: { buildSessionId: true } });
-  return row?.buildSessionId ?? null;
-}
-/** Group candidates must never acquire a standalone approval, even if recording their review failed. */
+/** Receipt membership is the only group identity. */
 export async function isGroupCandidate(context: ModuleContext, version: ModuleVersion) {
-  if (await findCandidateSet(context, version)) return true;
-  if (version.source !== "build") return false;
-  const sessionId = await submittedBy(context.db, context.workspaceId, version);
-  return !!sessionId && ((await declaredModules(context.db, context.workspaceId, sessionId))?.length ?? 0) >= 2;
+  return !!await findCandidateSet(context, version);
 }
 /** When the version belongs to a build that declared several modules, keep its review for the group approval and say so. */
 export async function recordGroupReview(context: ModuleContext, version: ModuleVersion, review: z.input<typeof reviewSchema>) {
@@ -58,69 +48,6 @@ function groupPreview(members: { name: string; hash: string; review: z.output<ty
   });
   const preview = sections.every(section => section !== null) ? sections.join("\n\n") : null;
   return preview !== null && preview.length <= 20_000 ? preview : null;
-}
-
-/** One declared module's candidate, checked for the group: submitted by this build, reviewed, waiting, no migration. */
-async function groupMember(db: Prisma.TransactionClient, workspaceId: string, sessionId: string, name: string, hash: string) {
-  const module = await db.module.findFirst({ where: { workspaceId, name } });
-  const version = module ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash } } }) : null;
-  if (!module || !version) throw new StewardError("not_found", `${name} ${hash} not found`);
-  await assertExternalModule(db, workspaceId, module.id, "group");
-  if (version.status !== "pending_review") throw new StewardError("conflict", `${name} ${hash} is ${version.status}, not waiting for review`);
-  if (await submittedBy(db, workspaceId, version) !== sessionId) throw new StewardError("forbidden", `${name} ${hash} was not submitted by this build`);
-  const review = reviewSchema.safeParse(await db.moduleReview.findUnique({ where: { versionId: version.id }, select: { prefix: true, suffix: true, codeDiff: true, detail: true, needsMigration: true } })).data;
-  if (!review) throw new StewardError("conflict", `${name} ${hash} has not been reviewed yet`);
-  if (review.needsMigration) throw new StewardError("conflict", `${name} needs a data migration: build and approve it on its own first, then the rest together`);
-  const active = module.activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } }) : null;
-  const previous = active ? moduleManifestSchema.parse(active.manifest) : null;
-  const manifest = moduleManifestSchema.parse(version.manifest);
-  const addsCredentials = requiresCapabilityApproval(manifest, previous);
-  return { module, version, name, hash, review, addsCredentials };
-}
-function checkedGroupNames(declared: string[], versions: { module: string; hash: string }[]) {
-  const names = versions.map(version => version.module);
-  if (names.length !== declared.length || new Set(names).size !== names.length || !declared.every(name => names.includes(name))) throw new StewardError("invalid", `Give one version of each declared module: ${declared.join(", ")}`);
-  return names;
-}
-/** `modules.request-group`: one approval for one version of every module the calling build declared. */
-export async function requestGroup(ports: StewardPorts, workspaceId: string, sessionId: string | null, versions: { module: string; hash: string }[]) {
-  const context = moduleContext(ports, workspaceId), { db } = context;
-  const invalidBuild = "Only a build that declared several modules asks for one approval; a single module gets its own";
-  if (!sessionId) throw new StewardError("invalid", invalidBuild);
-  const declared = await declaredModules(db, workspaceId, sessionId);
-  if (!declared || declared.length < 2) throw new StewardError("invalid", invalidBuild);
-  const names = checkedGroupNames(declared, versions);
-  const members: Awaited<ReturnType<typeof groupMember>>[] = [];
-  for (const { module: name, hash } of versions) {
-    const member = await groupMember(db, workspaceId, sessionId, name, hash);
-    if (await findCandidateSet(context, member.version)) throw new StewardError("conflict", "Fixed candidates advance only through their receipt");
-    members.push(member);
-  }
-  if (!members.some(member => member.addsCredentials)) {
-    for (const member of members) await fenceExecutionVersionChange(ports, workspaceId, member.module.id, member.hash);
-    await db.$transaction(async tx => {
-      for (const { module, hash } of members) {
-        await expireModuleApprovals(context, module.id, tx);
-        await approveMemberIn(context, tx, module.id, hash);
-      }
-      for (const { module, hash } of members) await switchActiveIn(context, tx, module.id, hash);
-      const generation = await recordGeneration(context, tx, "activate");
-      await audit(tx, { workspaceId, actor: "chrona", kind: "module_group_activation", subjectId: generation.id, details: { modules: members.map(member => member.module.id) } });
-      for (const { module, version, hash } of members) {
-        await recordModuleActivation(context, tx, { moduleId: module.id, previousHash: module.activeHash, hash, generationId: generation.id, grouped: true });
-        await audit(tx, { workspaceId, actor: "chrona", kind: "module_auto_activated", subjectId: module.id, details: { versionId: version.id, hash, generationId: generation.id } });
-        await activationNotice(context, tx, version, !!module.activeHash);
-      }
-    });
-    return { status: "approved" as const };
-  }
-  const preview = groupPreview(members);
-  if (preview === null) throw new StewardError("conflict", "The combined review does not fit one approval; split the change into smaller builds");
-  for (const { module } of members) await expireModuleApprovals(context, module.id);
-  const approval = await createApprovals(context).create({ action: "activate_module", title: `一起启用模块 ${names.join("、")}`.slice(0, 200),
-    detail: `这组改动一起启用：${names.join("、")}。任何一个不能启用时，全部保持原样。${members[0]!.review.detail}`,
-    payload: { kind: "activate_modules", versions: members.map(member => ({ moduleId: member.module.id, hash: member.hash })) }, preview });
-  return { status: "pending_approval" as const, approvalId: approval.id };
 }
 
 /** Marks one group version approved, after the same checks as a single activation; no migration here. */

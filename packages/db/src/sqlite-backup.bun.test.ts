@@ -28,6 +28,38 @@ function readValue(path: string): string {
 }
 
 describe("SQLite backup and restore", () => {
+  it("archives a checked private SQLite snapshot including committed WAL pages", () => {
+    const root = mkdtempSync(join(tmpdir(), "chrona-private-wal-"));
+    const data = join(root, "data"), directory = join(data, "platform/data/app");
+    mkdirSync(directory, { recursive: true });
+    const source = join(directory, "private.sqlite"), main = join(root, "main.db"), backup = join(root, "backup.db");
+    const writer = new Database(source);
+    try {
+      createDatabase(main, "kernel");
+      writer.exec("PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; CREATE TABLE items(value TEXT); INSERT INTO items VALUES('committed-in-wal')");
+      backupSqliteDatabase(`file:${main}`, backup, data);
+      const restored = join(root, "restored");
+      restoreSqliteDatabase(`file:${join(root, "restored.db")}`, backup, { dataDir: restored });
+      const path = join(restored, "platform/data/app/private.sqlite"), db = new Database(path, { readonly: true });
+      try {
+        expect(db.query("SELECT value FROM items").all()).toEqual([{ value: "committed-in-wal" }]);
+        expect(db.query("PRAGMA quick_check").all()).toEqual([{ quick_check: "ok" }]);
+      } finally { db.close(); }
+      expect(existsSync(`${path}-wal`)).toBe(false);
+    } finally { writer.close(); rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it.skipIf(process.platform !== "linux")("refuses a still-running orphan app after the service lock was released", async () => {
+    const root = mkdtempSync(join(tmpdir(), "chrona-orphan-backup-"));
+    const data = join(root, "data"), directory = join(data, "platform/data/app");
+    mkdirSync(directory, { recursive: true });
+    const main = join(root, "main.db"); createDatabase(main, "kernel");
+    const child = Bun.spawn([process.execPath, "-e", "console.log('ready');setInterval(()=>{},1000)"], { cwd: directory, stdout: "pipe", stderr: "ignore" });
+    try {
+      const reader = child.stdout.getReader(); await reader.read(); reader.releaseLock();
+      expect(() => backupSqliteDatabase(`file:${main}`, join(root, "backup.db"), data)).toThrow("stopped application processes");
+    } finally { child.kill(); await child.exited; rmSync(root, { recursive: true, force: true }); }
+  });
   it("round trips app content, module store/data, sessions and private connector secrets, replacing stale files", () => {
     const directory = mkdtempSync(join(tmpdir(), "chrona-files-backup-"));
     try {

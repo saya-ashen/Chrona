@@ -73,7 +73,10 @@ export const modules: SystemModule = {
   async handle(context, name, args) {
     const { ports, workspaceId, caller, call } = context;
     const api = createModules(ports, workspaceId);
-    if (name === "list") return json(apiPage(await api.list(), { cursor: args.cursor, limit: args.limit }, `modules:${workspaceId}`, row => row.id));
+    if (name === "list") {
+      const input = { cursor: args.cursor, limit: args.limit }, scope = `modules:${workspaceId}`;
+      return json(apiPage(await api.list(pagePosition(input, scope)), input, scope, row => row.id));
+    }
     if (name === "describe") return describe(ports, workspaceId, caller, args);
     if (name === "health") return health(ports, workspaceId, args);
     if (name === "admit" || name === "submit") return writeCandidates(context, name, args);

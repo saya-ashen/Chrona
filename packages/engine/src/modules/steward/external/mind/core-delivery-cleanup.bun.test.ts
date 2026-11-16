@@ -1,5 +1,6 @@
+import { tableBytes } from "./test-support/storage";
 import {test,expect} from 'bun:test';
-import {mkdirSync,mkdtempSync,readFileSync,rmSync,statSync} from 'node:fs';
+import {mkdirSync,mkdtempSync,rmSync,statSync} from 'node:fs';
 import {join} from 'node:path';
 import {CoreMindStore,coreDigest} from './core-store';
 import {CoreMindService} from './core-service';
@@ -18,8 +19,8 @@ function temporaryDirectory(){
 test('coordinator wait holds only original pursuit; withdrawal cleans its private payload and preserves unknown identity',()=>{
  const dir=temporaryDirectory(),store=new CoreMindStore(dir),service=new CoreMindService(store),owner:CoreAccess={subject:'owner',role:'owner',scopes:[{}]};
  const p=service.pursue({actionKey:'goal',expectedVisibilityRevision:0,expectedRevision:0,scope:{},semanticKey:'new',goal:'New capability',completionCriteria:['real outcome'],reason:'explicit-goal',evidenceRefs:[],understandingRefs:[]},owner).value as Pursuit;
- const delivery=new CoreDelivery(dir,service,async()=>{throw Error('No external call expected');},{worker:()=>undefined,verifyAdmission:async()=>{throw Error('No submission expected');}}),db=new Database(join(dir,'mind-delivery.sqlite'));
- try{const {revision,updatedAt,currentActor,...basis}=p;const r={id:'record',pursuitId:p.id,revision:p.revision-1,visibilityRevision:0,author:{moduleId:'author',hash:'a'.repeat(40)},admissionId:'admission',requestKey:'original',worker:{executionId:'e',runId:'run',actor:'mind',principal:{moduleId:'mind',hash:'b'.repeat(40)}},pursuitBasis:coreDigest(basis),materials:[{name:'calendar',materialDigest:'c'.repeat(64)}],status:'submit-unknown',withdrawn:false,receipt:null,directory:[],proof:[],payload:{criteria:['erase-me'],items:[{dir:'packages/stage/source'}]}} as unknown as DeliveryRecord;
+ const delivery=new CoreDelivery(dir,service,async()=>{throw Error('No external call expected');},{worker:()=>undefined,verifyAdmission:async()=>{throw Error('No submission expected');}}),db=new Database(join(dir,'mind.sqlite'));
+ try{const {revision:_revision,updatedAt:_updatedAt,currentActor:_currentActor,...basis}=p;const r={id:'record',pursuitId:p.id,revision:p.revision-1,visibilityRevision:0,author:{moduleId:'author',hash:'a'.repeat(40)},admissionId:'admission',requestKey:'original',worker:{executionId:'e',runId:'run',actor:'mind',principal:{moduleId:'mind',hash:'b'.repeat(40)}},pursuitBasis:coreDigest(basis),materials:[{name:'calendar',materialDigest:'c'.repeat(64)}],status:'submit-unknown',withdrawn:false,receipt:null,directory:[],proof:[],payload:{criteria:['erase-me'],items:[{dir:'packages/stage/source'}]}} as unknown as DeliveryRecord;
  db.query('INSERT INTO delivery(id,command_key,body) VALUES(?,?,?)').run(r.id,'key',JSON.stringify(r));expect(delivery.pendingFor(p.id)).toBe(true);expect(delivery.pendingFor('other')).toBe(false);
  store.update(tx=>{const m=tx.meta();m.visibilityRevision++;tx.setMeta(m);});expect(delivery.cleanupWithdrawn().deferred).toBe(0);const clean=delivery.detail(r.id,owner);expect(clean.withdrawn).toBe(true);expect(clean.payload).toBeNull();expect(clean.status).toBe('submit-unknown');expect(clean.requestKey).toBe('original');expect(delivery.pendingFor(p.id)).toBe(false);
  }finally{db.close();delivery.close();store.close();rmSync(dir,{recursive:true,force:true});}
@@ -88,18 +89,18 @@ function originalIdentity(r:DeliveryRecord){
  return {id,pursuitId,author,admissionId,requestKey,worker,commandDigest,prepareDigest,materials,proof};
 }
 function pinReader(dir:string,id:string){
- const reader=new Database(join(dir,'mind-delivery.sqlite'),{readonly:true});
+ const reader=new Database(join(dir,'mind.sqlite'),{readonly:true});
  reader.exec('BEGIN');
  const row=reader.query('SELECT body FROM delivery WHERE id=?').get(id) as {body:string};
  expect(JSON.parse(row.body).payload.criteria).toEqual(['private-cleanup-criteria']);
  return reader;
 }
-function walSize(dir:string){return statSync(join(dir,'mind-delivery.sqlite-wal')).size;}
+function walSize(dir:string){return statSync(join(dir,'mind.sqlite-wal')).size;}
 function expectErased(r:DeliveryRecord,identity:ReturnType<typeof originalIdentity>){
  expect(r).toMatchObject({...identity,withdrawn:true,payload:null});
 }
 function expectPrivateBytesRemoved(dir:string){
- const bytes=readFileSync(join(dir,'mind-delivery.sqlite'));
+ const bytes=tableBytes(join(dir, "mind.sqlite"), "delivery");
  for(const value of ['private-cleanup-criteria','private-cleanup-intent','packages/private-calendar-stage/source'])expect(bytes.includes(Buffer.from(value))).toBe(false);
 }
 function observeSubmit(pending:Promise<DeliveryRecord>){

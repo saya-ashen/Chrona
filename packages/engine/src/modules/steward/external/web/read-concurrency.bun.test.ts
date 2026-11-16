@@ -5,8 +5,8 @@ import { createPages, type ModuleState, type PageTool } from "./pages";
 
 const dirs: string[] = [];
 afterEach(async () => { for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true }); });
-const spec = { root: "text", elements: { text: { type: "Text", props: { text: "Read" }, children: [] } } };
-const input = { id: "main", title: "Original", data: { view: { tool: "read" } }, spec };
+const javascript = "export default function mount() { return () => {}; }";
+const input = { id: "main", title: "Original", tools: ["read"], javascript };
 const caller = (module: string) => ({ kind: "module", module, moduleId: `${module}-id`, hash: "approved" });
 async function fixture() {
   const dataDir = await mkdtemp("/tmp/chrona-page-reads-"); dirs.push(dataDir);
@@ -18,17 +18,15 @@ async function fixture() {
   return { dataDir, modules, tools, deps, pages };
 }
 
-test("independent page, component and navigation reads overlap fresh authoritative inventories", async () => {
+test("independent page and navigation reads overlap fresh authoritative inventories", async () => {
   const f = await fixture(), entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
-  const registered = await f.pages.tool("component-set", { name: "Example", javascript: "export default function mount() {}", props: { type: "object", properties: {}, additionalProperties: false } }, caller("alpha")) as { revision: string };
   let reads = 0;
   f.deps.modules = async () => { if (++reads === 3) entered.resolve(); await release.promise; return f.modules; };
-  const list = f.pages.list(), page = f.pages.get("alpha", "main"), component = f.pages.component("alpha", "Example", registered.revision);
-  try { await entered.promise; expect(reads).toBe(3); }
-  finally { release.resolve(); }
+  const list = f.pages.list(), alpha = f.pages.get("alpha", "main"), beta = f.pages.get("beta", "main");
+  try { await entered.promise; expect(reads).toBe(3); } finally { release.resolve(); }
   expect(await list).toHaveLength(2);
-  expect(await page).toMatchObject({ title: "Original" });
-  expect(await component).toMatchObject({ name: "Example", revision: registered.revision });
+  expect(await alpha).toMatchObject({ module: "alpha", title: "Original" });
+  expect(await beta).toMatchObject({ module: "beta", title: "Original" });
 });
 
 test("a queued writer waits for earlier validation and precedes later reads", async () => {
@@ -89,6 +87,6 @@ test("overlapping reads serialize durable pruning without losing retained owners
   const pages = createPages(f.deps);
   const reads = await Promise.all(Array.from({ length: 12 }, (_, index) => index % 2 ? pages.list() : pages.get("beta", "main")));
   expect(reads).toHaveLength(12);
-  expect(JSON.parse(await readFile(`${f.dataDir}/pages.json`, "utf8"))).toMatchObject({ pages: [{ module: "beta" }] });
+  expect(JSON.parse(await readFile(`${f.dataDir}/pages-v2.json`, "utf8")).pages).toHaveLength(2);
   expect((await createPages(f.deps).list()).map(page => page.module)).toEqual(["beta"]);
 });

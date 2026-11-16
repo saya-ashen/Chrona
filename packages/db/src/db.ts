@@ -65,15 +65,6 @@ function createDbClient() {
     log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
   });
 
-  // Prisma adapter connections inherit this for subsequent operations in Bun SQLite.
-  client.$executeRawUnsafe("PRAGMA foreign_keys = ON").catch((error: unknown) => {
-    console.error(JSON.stringify({
-      component: "db",
-      event: "foreign_keys_pragma_failed",
-      error: error instanceof Error ? error.message : String(error),
-    }));
-  });
-
   return client;
 }
 

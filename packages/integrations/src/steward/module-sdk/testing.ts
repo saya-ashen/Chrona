@@ -114,7 +114,6 @@ export async function startModule(entry: string | ExplicitModuleEntry, { stubs =
   // Tests may only use send()/stop(). Keep a natural unknown exit observable by
   // those methods without an unhandled rejection or releasing its resources.
   void exited.catch(() => {});
-  let queue: Promise<unknown> = Promise.resolve();
   return {
     calls,
     /** Rejects if descendant shutdown cannot be confirmed. */
@@ -132,7 +131,7 @@ export async function startModule(entry: string | ExplicitModuleEntry, { stubs =
       return globalThis.fetch(url, { ...options, headers, redirect: "manual" });
     },
     send(event: Event): Promise<Reply> {
-      const run = queue.then(() => new Promise<Reply>((resolve, reject) => {
+      return new Promise<Reply>((resolve, reject) => {
         const id = randomUUID();
         const timer = setTimeout(() => { pending.delete(id); reject(new Error("Module event timeout")); }, 5000);
         pending.set(id, { resolve, reject, timer });
@@ -142,9 +141,7 @@ export async function startModule(entry: string | ExplicitModuleEntry, { stubs =
             channel.send({ id, event: { ...event, bindings } });
           }
         }).catch(error => { pending.delete(id); clearTimeout(timer); reject(error); });
-      }));
-      queue = run.catch(() => {});
-      return run;
+      });
     },
     async stop() {
       fail(); task.stop();

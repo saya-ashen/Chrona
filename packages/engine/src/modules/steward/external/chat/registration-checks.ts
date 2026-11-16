@@ -6,15 +6,10 @@ export async function runRegistrationChecks() {
     await h.activate();
     // The portable JS bundle loses its generic read result during TS inference.
     const page: unknown = await h.pages.get('chat','main');
-    assert.ok(page && typeof page === 'object' && 'layout' in page && 'spec' in page);
+    assert.ok(page && typeof page === 'object' && 'layout' in page && 'javascript' in page);
     assert.equal(page.layout,'workspace');
-    const spec = page.spec;
-    assert.ok(spec && typeof spec === 'object' && 'elements' in spec);
-    const elements = spec.elements;
-    assert.ok(elements && typeof elements === 'object' && 'chat' in elements);
-    const chat = elements.chat;
-    assert.ok(chat && typeof chat === 'object' && 'type' in chat);
-    assert.equal(chat.type,'chat:Workbench');
-    return { component:'chat:Workbench', layout:'workspace' };
+    assert.equal(typeof page.javascript,'string');
+    assert.ok('moduleId' in page && 'hash' in page && 'revision' in page);
+    return { page:'main', layout:'workspace' };
   } finally { await h.close(); }
 }

@@ -39,7 +39,7 @@ async function offlineResources(dataDir: string, name: string) {
 }
 test("admin commands are registered", () => {
   const admin = createProgram().commands.find(c => c.name() === "admin")!;
-  expect(admin.commands.map(c => c.name())).toEqual(["legacy", "git-status", "git-associate", "git-push", "modules", "catalog", "install", "diagnostics", "approvals", "rollback", "disable", "enable", "remove", "approve", "reject", "secret-set", "secret-remove"]);
+  expect(admin.commands.map(c => c.name())).toEqual(["git-status", "git-associate", "git-push", "modules", "catalog", "install", "diagnostics", "approvals", "rollback", "disable", "enable", "remove", "approve", "reject", "secret-set", "secret-remove"]);
 });
 
 
@@ -95,7 +95,7 @@ test.each(["web", "notify"])("admin remove requests %s deletion offline and only
     for (const dir of [data, content]) expect(readFileSync(join(dir, "keep.txt"), "utf8")).toBe("valuable");
     expect(existsSync(join(f.options.dataDir, "platform", "removed"))).toBe(false);
     expect(await f.db.audit.count({ where: { kind: "module_removed" } })).toBe(0);
-    expect(await f.db.grant.count()).toBe(0);
+
     const released = acquireSqliteRuntimeLock(f.options.databaseUrl); released.release();
 
     await runAdmin("approve", [request.approvalId], f.options);
@@ -105,7 +105,7 @@ test.each(["web", "notify"])("admin remove requests %s deletion offline and only
     const backup = (removal.details as { backup: string }).backup;
     for (const part of ["data", "content"]) expect(readFileSync(join(backup, part, "keep.txt"), "utf8")).toBe("valuable");
     for (const dir of [data, content]) expect(existsSync(dir)).toBe(false);
-    expect(await f.db.approval.findUniqueOrThrow({ where: { id: request.approvalId } })).toMatchObject({ status: "approved", scope: "once", grantId: null });
+    expect(await f.db.approval.findUniqueOrThrow({ where: { id: request.approvalId } })).toMatchObject({ status: "approved", action: "delete_data" });
     expect(await f.db.audit.findFirst({ where: { kind: "approval_resolved", subjectId: request.approvalId } })).toMatchObject({ details: { source: "cli" } });
     expect(await f.db.stewardState.count()).toBe(0);
     expect(await f.db.run.count()).toBe(0);

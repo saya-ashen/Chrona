@@ -1,5 +1,7 @@
+import { readFile, writeFile } from "./journal-test-storage";
+import { Database } from "bun:sqlite";
 import { afterEach, expect, test } from "bun:test";
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm, stat, utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAgentConversations } from "./conversations";
@@ -21,7 +23,7 @@ function session(source: "web" | "mcp" | "qq", count = 137) {
 }
 async function fixture(create = createAgentConversations, source: "web" | "mcp" | "qq" = "web") {
   const dataDir = await mkdtemp(join(tmpdir(), "chrona-journal-snapshot-")); directories.push(dataDir);
-  const directory = join(dataDir, "conversations"), path = join(directory, "state.json");
+  const directory = join(dataDir, "conversations"), path = join(directory, "sessions.sqlite");
   await mkdir(directory);
   const saved = session(source);
   await writeFile(path, JSON.stringify({ version: 1, sessions: [saved] }));
@@ -64,6 +66,18 @@ test("snapshot and list reads are detached, including nested attachments and mem
   expect((await f.app.snapshot(f.saved.id)).execution?.status).toBe("running");
   expect((await f.app.list())[0]?.memory?.provider).toBe("memory-local");
   expect(await f.disk()).toEqual(before);
+});
+
+test("updating one session leaves other session rows untouched", async () => {
+  const f = await fixture(), other = { ...session("web"), id: "web-agent:other" };
+  await writeFile(f.path, JSON.stringify({ version: 1, sessions: [f.saved, other] }));
+  const db = new Database(f.path);
+  try {
+    db.exec("CREATE TABLE writes(id TEXT); CREATE TRIGGER observe_session_update AFTER UPDATE ON conversations BEGIN INSERT INTO writes VALUES(new.id); END");
+    await f.app.update(f.saved.id, { title: "Changed session" });
+    expect(db.query("SELECT id FROM writes").all()).toEqual([{ id: f.saved.id }]);
+    expect(JSON.parse((db.query("SELECT data FROM conversations WHERE id=?").get(other.id) as { data: string }).data)).toEqual(other);
+  } finally { db.close(); }
 });
 
 test("missing, invalid and other-entry identities return not_found without effects", async () => {

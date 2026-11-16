@@ -119,5 +119,5 @@ test("resolving a legacy session-linked approval never resurrects a retired conv
   expect(await f.db.run.count({ where: { workspaceId: f.workspaceId } })).toBe(0);
   expect((await f.db.session.findUniqueOrThrow({ where: { id: session.id } })).status).toBe("waiting_approval");
   expect((await f.db.approval.findUniqueOrThrow({ where: { id: approval.id } })).status).toBe("approved");
-  expect(await f.db.grant.count({ where: { workspaceId: f.workspaceId } })).toBe(0);
+
 });

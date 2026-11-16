@@ -7,12 +7,12 @@ import { ensureSqliteDatabase } from "./sqlite-migrations";
 
 const models = [
   "Workspace", "Session", "Module", "ModuleVersion", "Generation",
-  "ModuleRun", "ModuleCall", "ModuleInvocation", "Schedule", "Run",
+  "ModuleRun", "ModuleCall", "ModuleInvocation", "Timer", "Run",
   "ExecutionAttempt", "ExecutionAuthority", "ExecutionDelivery", "ExecutionReceipt", "ExecutionDetail",
-  "ExecutionSnapshot", "ExecutionControl", "ExecutionCommand", "Message", "Approval",
-  "Grant", "Preference", "Audit", "StewardState", "AgentContext",
+  "ExecutionSnapshot", "ExecutionControl", "ExecutionCommand", "Approval",
+  "Audit", "StewardState", "AgentContext",
   "AgentRunAdmission", "AgentCommand", "AgentProvider", "AgentRunProvider", "ProviderLaunch", "RunEvent", "RunInteraction",
-  "ModuleMigration", "ModuleReview", "BuildTargets", "BuildRequest", "ModuleInstallation", "ModuleInstallationHead", "ModuleInstallationSubmission", "ModuleRemoval", "ModuleUpstream", "ModuleUpstreamMerge", "ModuleActivation", "ModuleExecutionResult", "KernelFact", "KernelFactConsumer", "CandidateAdmission", "CandidateReceipt", "CandidateMember",
+  "ModuleMigration", "ModuleReview", "ModuleInstallation", "ModuleInstallationHead", "ModuleInstallationSubmission", "ModuleRemoval", "ModuleUpstream", "ModuleUpstreamMerge", "ModuleActivation", "ModuleExecutionResult", "KernelFact", "KernelFactConsumer", "CandidateAdmission", "CandidateReceipt", "CandidateMember",
 ];
 
 function fixture() {
@@ -40,7 +40,7 @@ describe("clean steward SQLite baseline", () => {
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
       ).all().map((row) => row.name).sort();
       expect(names).toEqual([...models, "_chrona_migrations"].sort());
-      for (const model of ["Session", "Module", "Generation", "ModuleInvocation", "Schedule", "Run", "Message", "Approval", "Grant", "Preference", "Audit", "StewardState"]) {
+      for (const model of ["Session", "Module", "Generation", "ModuleInvocation", "Timer", "Run", "Approval", "Audit", "StewardState"]) {
         const keys = db.query<{ table: string; from: string; on_delete: string }, []>(
           `PRAGMA foreign_key_list("${model}")`,
         ).all();
@@ -74,7 +74,7 @@ describe("clean steward SQLite baseline", () => {
     ensureSqliteDatabase(options);
     inspect(options.databasePath, (db) => {
       for (const [table, columns, unique] of [
-        ["Schedule", ["workspaceId", "status", "nextAt"], false],
+        ["Timer", ["workspaceId", "status", "nextAt"], false],
         ["Run", ["workspaceId", "lane", "status", "createdAt"], false],
         ["Run", ["tokenHash"], true],
         ["Approval", ["workspaceId", "status", "createdAt"], false],
@@ -83,7 +83,6 @@ describe("clean steward SQLite baseline", () => {
         ["ExecutionDetail", ["attemptId", "seq"], true],
         ["ExecutionDetail", ["expiresAt"], false],
         ["ExecutionSnapshot", ["expiresAt"], false],
-        ["Message", ["workspaceId", "externalId"], true],
         ["Module", ["workspaceId", "name"], true],
       ] as const) {
         const indexes = db.query<{ name: string; unique: number }, []>(`PRAGMA index_list("${table}")`).all();

@@ -53,14 +53,14 @@ async function fixture() {
 
 test("ordinary web owner controls pause and resume, audits the user and keeps retired schedules cancelled", async () => {
   const f = await fixture();
-  const timer = await f.db.schedule.create({ data: { workspaceId: f.workspace.id, moduleId: f.target.id, mode: "module", triggerId: "daily", text: "mail", createdBy: "chrona", rule: { kind: "every", minutes: 60 }, status: "active", nextAt: f.ports.now() } });
+  const timer = await f.db.timer.create({ data: { workspaceId: f.workspace.id, moduleId: f.target.id, timerId: "mail", rule: { kind: "every", minutes: 60 }, status: "active", nextAt: f.ports.now() } });
   await moduleSupervisor(f.ports).reconcile();
   const running = () => f.processes.filter(process => process.input.codeDir.endsWith("/gmail") && !process.socket.destroyed);
   expect(running()).toHaveLength(1);
   for (const [operation, status, kind] of [["disable", "paused", "module_disabled"], ["enable", "active", "module_enabled"]]) {
     expect(await f.call(`modules.${operation}`, { moduleId: f.target.id, reason: "用户在网页操作" })).toMatchObject({ status: "done", result: { status } });
     expect(await f.db.module.findUniqueOrThrow({ where: { id: f.target.id } })).toMatchObject({ status });
-    expect(await f.db.schedule.findUniqueOrThrow({ where: { id: timer.id } })).toMatchObject({ status: "cancelled", nextAt: null });
+    expect(await f.db.timer.findUniqueOrThrow({ where: { id: timer.id } })).toMatchObject({ status: "active" });
     expect(await f.db.audit.findFirstOrThrow({ where: { subjectId: f.target.id, kind } })).toMatchObject({ actorKey: "user", details: { source: "owner" } });
     // Retiring or starting the process completes after the call returns.
     for (let attempt = 0; attempt < 100 && running().length !== (status === "paused" ? 0 : 1); attempt++) await Bun.sleep(10);
@@ -83,18 +83,18 @@ test("ordinary modules and Provider cannot acquire owner lifecycle access; inter
 test("web removal approval backs up data, removes the app and schedules, and cleans its registered page", async () => {
   const f = await fixture(), data = join(f.dataDir, "platform", "data", f.target.id);
   await mkdir(data, { recursive: true }); await writeFile(join(data, "mail.json"), "[1]");
-  const timer = await f.db.schedule.create({ data: { workspaceId: f.workspace.id, moduleId: f.target.id, mode: "module", triggerId: "daily", text: "retained mail timer", createdBy: "chrona", rule: { kind: "every", minutes: 60 }, status: "active", nextAt: f.ports.now() } });
+  const timer = await f.db.timer.create({ data: { workspaceId: f.workspace.id, moduleId: f.target.id, timerId: "retained mail timer", rule: { kind: "every", minutes: 60 }, status: "active", nextAt: f.ports.now() } });
   const pages = createPages({ dataDir: join(f.dataDir, "pages"), modules: () => f.db.module.findMany({ where: { workspaceId: f.workspace.id }, select: { id: true, name: true, status: true, activeHash: true } }), tools: async () => new Map() });
-  await pages.tool("page-set", { id: "inbox", title: "收件箱", spec: { root: "title", elements: { title: { type: "Text", props: { text: "邮件" }, children: [] } } } }, { kind: "module", module: "gmail", moduleId: f.target.id });
+  await pages.tool("page-set", { id: "inbox", title: "收件箱", javascript: "export default function mount() { return () => {}; }" }, { kind: "module", module: "gmail", moduleId: f.target.id, hash: f.target.activeHash! });
   const result = await f.call("modules.remove", { moduleId: f.target.id, reason: "用户在网页申请删除应用" }) as { status: string; approvalId: string };
   expect(result.status).toBe("pending_approval");
   expect(await f.db.module.findUnique({ where: { id: f.target.id } })).not.toBeNull();
-  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: timer.id } })).toMatchObject({ status: "active" });
+  expect(await f.db.timer.findUniqueOrThrow({ where: { id: timer.id } })).toMatchObject({ status: "active" });
   expect(await readFile(join(data, "mail.json"), "utf8")).toBe("[1]");
   expect(await f.db.approval.findUniqueOrThrow({ where: { id: result.approvalId } })).toMatchObject({ action: "delete_data", status: "open" });
   await f.call("approvals.resolve", { approval: result.approvalId, decision: "approve" });
   expect(await f.db.module.findUnique({ where: { id: f.target.id } })).toBeNull();
-  expect(await f.db.schedule.findUnique({ where: { id: timer.id } })).toBeNull();
+  expect(await f.db.timer.findUnique({ where: { id: timer.id } })).toBeNull();
   expect(await stat(data).catch(() => null)).toBeNull();
   const apps = (await f.call("modules.list", {}) as { items: { name: string; status: string }[] }).items;
   expect(apps.some(app => app.name === "gmail")).toBe(false);

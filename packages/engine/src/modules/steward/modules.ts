@@ -66,19 +66,27 @@ function hasOpenDiagnostics(current: ModuleIncident | undefined, contractFailure
 }
 
 /** The single current-health projection. Audit history is deliberately separate. */
-export async function moduleHealthSummary(ports: StewardPorts, workspaceId: string, moduleRow: { id: string; name: string; activeHash: string | null; status: string }, activeVersion?: { manifest: unknown } | null) {
+export async function moduleHealthSummary(ports: StewardPorts, workspaceId: string,
+  moduleRow: { id: string; name: string; activeHash: string | null; status: string },
+  activeVersion?: { manifest: unknown } | null) {
   const { db } = ports, { id: moduleId, activeHash } = moduleRow;
   const activation = activeHash ? await latestModuleEvolution(db, workspaceId, moduleId, activeHash) : null;
-  const policy = activeHash ? await moduleFailurePolicy(db, { workspaceId, moduleId, hash: activeHash, activationId: activation?.activationId ?? null }) : null;
+  const policy = activeHash ? await moduleFailurePolicy(db, {
+    workspaceId, moduleId, hash: activeHash, activationId: activation?.activationId ?? null,
+  }) : null;
   let current: ModuleIncident | undefined, contractFailureCount = 0, truncated = false;
   if (activation) {
-    const incident = await currentIncident(db, workspaceId, moduleId, activeHash, activation.activationId);
+    const [incident, failures] = await Promise.all([
+      currentIncident(db, workspaceId, moduleId, activeHash, activation.activationId),
+      currentContractFailures(db, workspaceId, moduleId, activation.activationId),
+    ]);
     current = incident.incident;
-    const failures = await currentContractFailures(db, workspaceId, moduleId, activation.activationId);
     contractFailureCount = failures.count;
     truncated = incident.truncated || failures.truncated;
   }
-  const version = activeVersion !== undefined ? activeVersion : activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: activeHash } }, select: { manifest: true } }) : null;
+  const version = activeVersion !== undefined ? activeVersion : activeHash ? await db.moduleVersion.findUnique({
+    where: { moduleId_hash: { moduleId, hash: activeHash } }, select: { manifest: true },
+  }) : null;
   const summary = incidentSummary(current);
   return moduleHealthSummarySchema.parse({ module: moduleRow.name, moduleId, activeHash, configuredStatus: moduleRow.status, observedAt: ports.now().toISOString(),
     ...runtimeOf(ports, moduleRow, version),
@@ -89,21 +97,21 @@ export async function moduleHealthSummary(ports: StewardPorts, workspaceId: stri
 }
 
 /** Apps as Chrona records them: description from the active manifest, versions with why they were rejected, recent runs. */
-async function list(context: ModuleContext) {
+async function list(context: ModuleContext, position?: { after?: string; limit: number }) {
   const { db, workspaceId } = context;
-  const rows = await db.module.findMany({ where: { workspaceId }, select: {
+  const rows = await db.module.findMany({ where: { workspaceId, ...(position?.after ? { id: { gt: position.after } } : {}) }, ...(position ? { take: position.limit + 1 } : {}), orderBy: { id: "asc" }, select: {
     id: true, name: true, builtin: true, status: true, activeHash: true,
-    versions: { take: 5, select: { hash: true, status: true, createdAt: true, report: true }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] },
-    runs: { take: 5, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { id: true, hash: true, triggerId: true, firedAt: true, exitCode: true, error: true, createdAt: true } },
   } });
-  const pointers = rows.filter(row => row.activeHash).map(row => ({ moduleId: row.id, hash: row.activeHash! }));
-  const activeVersions = [];
-  for (let offset = 0; offset < pointers.length; offset += 200) {
-    activeVersions.push(...await db.moduleVersion.findMany({ where: { OR: pointers.slice(offset, offset + 200) }, select: { moduleId: true, manifest: true } }));
-  }
-  const byModule = new Map(activeVersions.map(version => [version.moduleId, version]));
-  return Promise.all(rows.map(async ({ versions, runs, ...row }) => {
-    const active = byModule.get(row.id) ?? null;
+  // Nested relation take is applied by Prisma after reading all parents' history.
+  // Query each parent's indexed tail so LIMIT is enforced by SQLite.
+  return Promise.all(rows.map(async row => {
+    const [versions, runs, active] = await Promise.all([
+      db.moduleVersion.findMany({ where: { moduleId: row.id }, take: 5,
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { hash: true, status: true, createdAt: true, report: true } }),
+      db.moduleRun.findMany({ where: { moduleId: row.id }, take: 5, orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        select: { id: true, hash: true, triggerId: true, firedAt: true, exitCode: true, error: true, createdAt: true } }),
+      row.activeHash ? db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: row.id, hash: row.activeHash } }, select: { manifest: true } }) : null,
+    ]);
     const manifest = moduleManifestSchema.safeParse(active?.manifest).data;
     return { id: row.id, name: row.name, builtin: row.builtin, status: row.status, activeHash: row.activeHash, ...moduleIdentity(row), description: manifest?.description ?? null,
       health: await moduleHealthSummary(context.ports, workspaceId, row, active),
@@ -161,7 +169,7 @@ export function createModules(ports: StewardPorts, workspaceId: string) {
       const status = name === "disable" ? "paused" : "active";
       return asUser ? reconcile((async () => { if (status === "paused") await fenceExecutionModule(ports, workspaceId, moduleId); return ports.db.$transaction(tx => setStatusIn(context, tx, moduleId, status, { source: "owner", reason: String(args.reason ?? "owner") })); })()) : requestStatus(context, moduleId, status, String(args.reason ?? ""));
     },
-    list: () => list(context),
+    list: (position?: { after?: string; limit: number }) => list(context, position),
     health: async (input: { open?: boolean; cursor?: string } = {}, targets?: string[]) => {
       const rows = await ports.db.module.findMany({ where: { workspaceId, ...(targets ? { name: { in: targets, ...(input.cursor ? { gt: input.cursor } : {}) } } : input.cursor ? { name: { gt: input.cursor } } : {}) }, orderBy: { name: "asc" } });
       // Small personal workspaces (<~200 apps): compute once, then filter before paging.

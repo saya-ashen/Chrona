@@ -2,7 +2,7 @@
 CREATE TABLE "Workspace" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
-    "settings" JSONB NOT NULL DEFAULT '{"notifications":{"dailyCap":5,"quietHours":{"start":"23:00","end":"08:00"},"timezone":"Asia/Shanghai","digestAt":"09:00"}}',
+    "settings" JSONB NOT NULL DEFAULT '{}',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );
@@ -46,7 +46,6 @@ CREATE TABLE "Module" (
 
 -- CreateTable
 CREATE TABLE "ModuleVersion" (
-    "buildSessionId" TEXT,
     "id" TEXT NOT NULL PRIMARY KEY,
     "moduleId" TEXT NOT NULL,
     "hash" TEXT NOT NULL,
@@ -56,7 +55,6 @@ CREATE TABLE "ModuleVersion" (
     "report" JSONB NOT NULL,
     "status" TEXT NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "ModuleVersion_buildSessionId_fkey" FOREIGN KEY ("buildSessionId") REFERENCES "Session" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT "ModuleVersion_moduleId_fkey" FOREIGN KEY ("moduleId") REFERENCES "Module" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -146,28 +144,20 @@ CREATE TABLE "ModuleInvocation" (
 );
 
 -- CreateTable
-CREATE TABLE "Schedule" (
+CREATE TABLE "Timer" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "workspaceId" TEXT NOT NULL,
-    "originSessionId" TEXT,
-    "mode" TEXT NOT NULL,
+    "moduleId" TEXT NOT NULL,
+    "timerId" TEXT NOT NULL,
     "rule" JSONB NOT NULL,
-    "text" TEXT NOT NULL,
-    "moduleId" TEXT,
-    "triggerId" TEXT,
     "payload" JSONB,
-    "until" DATETIME,
     "status" TEXT NOT NULL DEFAULT 'active',
     "nextAt" DATETIME,
     "lastAt" DATETIME,
     "lastResult" TEXT,
-    "failures" INTEGER NOT NULL DEFAULT 0,
-    "label" TEXT,
-    "createdBy" TEXT NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "Schedule_moduleId_fkey" FOREIGN KEY ("moduleId") REFERENCES "Module" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "Schedule_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "Schedule_originSessionId_fkey" FOREIGN KEY ("originSessionId") REFERENCES "Session" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    CONSTRAINT "Timer_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "Timer_moduleId_fkey" FOREIGN KEY ("moduleId") REFERENCES "Module" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -353,23 +343,6 @@ CREATE TABLE "ExecutionCommand" (
 );
 
 -- CreateTable
-CREATE TABLE "Message" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "workspaceId" TEXT NOT NULL,
-    "direction" TEXT NOT NULL,
-    "channel" TEXT NOT NULL,
-    "text" TEXT NOT NULL,
-    "sessionId" TEXT NOT NULL,
-    "attachments" JSONB NOT NULL DEFAULT '[]',
-    "quotedMessageId" TEXT,
-    "externalId" TEXT,
-    "at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "Message_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "Message_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "Session" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "Message_quotedMessageId_fkey" FOREIGN KEY ("quotedMessageId") REFERENCES "Message" ("id") ON DELETE SET NULL ON UPDATE CASCADE
-);
-
--- CreateTable
 CREATE TABLE "Approval" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "workspaceId" TEXT NOT NULL,
@@ -379,41 +352,11 @@ CREATE TABLE "Approval" (
     "detail" TEXT NOT NULL,
     "preview" TEXT NOT NULL,
     "payload" JSONB NOT NULL,
-    "scope" TEXT NOT NULL DEFAULT 'once',
-    "grantId" TEXT,
     "status" TEXT NOT NULL DEFAULT 'open',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "resolvedAt" DATETIME,
     CONSTRAINT "Approval_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "Approval_moduleId_fkey" FOREIGN KEY ("moduleId") REFERENCES "Module" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "Approval_grantId_fkey" FOREIGN KEY ("grantId") REFERENCES "Grant" ("id") ON DELETE SET NULL ON UPDATE CASCADE
-);
-
--- CreateTable
-CREATE TABLE "Grant" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "workspaceId" TEXT NOT NULL,
-    "action" TEXT NOT NULL,
-    "mode" TEXT NOT NULL,
-    "scope" JSONB NOT NULL,
-    "once" BOOLEAN NOT NULL DEFAULT false,
-    "consumedAt" DATETIME,
-    "expiresAt" DATETIME,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "revokedAt" DATETIME,
-    CONSTRAINT "Grant_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE CASCADE ON UPDATE CASCADE
-);
-
--- CreateTable
-CREATE TABLE "Preference" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "workspaceId" TEXT NOT NULL,
-    "text" TEXT NOT NULL,
-    "origin" TEXT NOT NULL,
-    "topic" TEXT NOT NULL DEFAULT 'general',
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "lastUsedAt" DATETIME,
-    CONSTRAINT "Preference_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    CONSTRAINT "Approval_moduleId_fkey" FOREIGN KEY ("moduleId") REFERENCES "Module" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -432,12 +375,6 @@ CREATE TABLE "Audit" (
 CREATE TABLE "StewardState" (
     "workspaceId" TEXT NOT NULL PRIMARY KEY,
     "lastTickAt" DATETIME,
-    "leaseUntil" DATETIME,
-    "leaseToken" TEXT,
-    "providerName" TEXT NOT NULL DEFAULT 'unconfigured',
-    "providerAvailable" BOOLEAN NOT NULL DEFAULT false,
-    "providerSandboxed" BOOLEAN NOT NULL DEFAULT false,
-    "providerLastError" TEXT,
     CONSTRAINT "StewardState_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -450,6 +387,35 @@ CREATE TABLE "AgentContext" (
     "providerId" TEXT,
     "providerRevision" TEXT,
     CONSTRAINT "AgentContext_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "Session" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "AgentProvider" (
+    "workspaceId" TEXT NOT NULL,
+    "id" TEXT NOT NULL,
+    "moduleId" TEXT NOT NULL,
+    "hash" TEXT NOT NULL,
+    "revision" TEXT NOT NULL,
+    "declaration" JSONB NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+
+    PRIMARY KEY ("workspaceId", "id"),
+    CONSTRAINT "AgentProvider_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "AgentRunProvider" (
+    "runId" TEXT NOT NULL PRIMARY KEY,
+    "providerId" TEXT NOT NULL,
+    "moduleId" TEXT NOT NULL,
+    "hash" TEXT NOT NULL,
+    "revision" TEXT NOT NULL,
+    "declaration" JSONB NOT NULL,
+    "providerOptions" JSONB NOT NULL,
+    "completion" JSONB,
+    "kind" TEXT NOT NULL DEFAULT 'conversation',
+    CONSTRAINT "AgentRunProvider_runId_fkey" FOREIGN KEY ("runId") REFERENCES "Run" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -672,26 +638,6 @@ CREATE TABLE "ModuleRemoval" (
 );
 
 -- CreateTable
-CREATE TABLE "BuildTargets" (
-    "sessionId" TEXT NOT NULL PRIMARY KEY,
-    "name" TEXT NOT NULL,
-    "modules" JSONB NOT NULL,
-    CONSTRAINT "BuildTargets_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "Session" ("id") ON DELETE CASCADE ON UPDATE CASCADE
-);
-
--- CreateTable
-CREATE TABLE "BuildRequest" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "workspaceId" TEXT NOT NULL,
-    "sessionId" TEXT NOT NULL,
-    "fingerprint" TEXT,
-    "cause" JSONB,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "BuildRequest_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "BuildRequest_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "Session" ("id") ON DELETE CASCADE ON UPDATE CASCADE
-);
-
--- CreateTable
 CREATE TABLE "ModuleReview" (
     "versionId" TEXT NOT NULL PRIMARY KEY,
     "prefix" TEXT NOT NULL,
@@ -729,13 +675,16 @@ CREATE UNIQUE INDEX "Module_workspaceId_name_key" ON "Module"("workspaceId", "na
 CREATE INDEX "ModuleVersion_moduleId_status_createdAt_idx" ON "ModuleVersion"("moduleId", "status", "createdAt");
 
 -- CreateIndex
+CREATE INDEX "ModuleVersion_moduleId_createdAt_id_idx" ON "ModuleVersion"("moduleId", "createdAt", "id");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "ModuleVersion_moduleId_hash_key" ON "ModuleVersion"("moduleId", "hash");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Generation_workspaceId_seq_key" ON "Generation"("workspaceId", "seq");
 
 -- CreateIndex
-CREATE INDEX "ModuleRun_moduleId_createdAt_idx" ON "ModuleRun"("moduleId", "createdAt");
+CREATE INDEX "ModuleRun_moduleId_createdAt_id_idx" ON "ModuleRun"("moduleId", "createdAt", "id");
 
 -- CreateIndex
 CREATE INDEX "ModuleRun_moduleId_hash_firedAt_idx" ON "ModuleRun"("moduleId", "hash", "firedAt");
@@ -762,10 +711,13 @@ CREATE INDEX "ModuleInvocation_runId_status_idx" ON "ModuleInvocation"("runId", 
 CREATE UNIQUE INDEX "ModuleInvocation_workspaceId_caller_targetIdentity_tool_key_key" ON "ModuleInvocation"("workspaceId", "caller", "targetIdentity", "tool", "key");
 
 -- CreateIndex
-CREATE INDEX "Schedule_workspaceId_status_nextAt_idx" ON "Schedule"("workspaceId", "status", "nextAt");
+CREATE INDEX "Timer_workspaceId_status_nextAt_idx" ON "Timer"("workspaceId", "status", "nextAt");
 
 -- CreateIndex
-CREATE INDEX "Schedule_moduleId_status_idx" ON "Schedule"("moduleId", "status");
+CREATE INDEX "Timer_moduleId_status_idx" ON "Timer"("moduleId", "status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Timer_moduleId_timerId_key" ON "Timer"("moduleId", "timerId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Run_tokenHash_key" ON "Run"("tokenHash");
@@ -837,22 +789,10 @@ CREATE INDEX "ExecutionDetail_expiresAt_idx" ON "ExecutionDetail"("expiresAt");
 CREATE INDEX "ExecutionSnapshot_expiresAt_idx" ON "ExecutionSnapshot"("expiresAt");
 
 -- CreateIndex
-CREATE INDEX "Message_sessionId_at_idx" ON "Message"("sessionId", "at");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Message_workspaceId_externalId_key" ON "Message"("workspaceId", "externalId");
-
--- CreateIndex
 CREATE INDEX "Approval_workspaceId_status_createdAt_idx" ON "Approval"("workspaceId", "status", "createdAt");
 
 -- CreateIndex
 CREATE INDEX "Approval_moduleId_status_idx" ON "Approval"("moduleId", "status");
-
--- CreateIndex
-CREATE INDEX "Grant_workspaceId_action_revokedAt_expiresAt_idx" ON "Grant"("workspaceId", "action", "revokedAt", "expiresAt");
-
--- CreateIndex
-CREATE INDEX "Preference_workspaceId_createdAt_idx" ON "Preference"("workspaceId", "createdAt");
 
 -- CreateIndex
 CREATE INDEX "Audit_workspaceId_createdAt_idx" ON "Audit"("workspaceId", "createdAt");
@@ -862,6 +802,12 @@ CREATE INDEX "Audit_workspaceId_subjectId_createdAt_idx" ON "Audit"("workspaceId
 
 -- CreateIndex
 CREATE INDEX "AgentContext_workspaceId_moduleId_idx" ON "AgentContext"("workspaceId", "moduleId");
+
+-- CreateIndex
+CREATE INDEX "AgentProvider_workspaceId_moduleId_idx" ON "AgentProvider"("workspaceId", "moduleId");
+
+-- CreateIndex
+CREATE INDEX "AgentRunProvider_moduleId_hash_idx" ON "AgentRunProvider"("moduleId", "hash");
 
 -- CreateIndex
 CREATE INDEX "AgentCommand_workspaceId_moduleId_idx" ON "AgentCommand"("workspaceId", "moduleId");
@@ -879,7 +825,7 @@ CREATE UNIQUE INDEX "CandidateReceipt_admissionId_key" ON "CandidateReceipt"("ad
 CREATE INDEX "CandidateMember_receiptId_idx" ON "CandidateMember"("receiptId");
 
 -- CreateIndex
-CREATE INDEX "ModuleExecutionResult_moduleId_activationId_createdAt_idx" ON "ModuleExecutionResult"("moduleId", "activationId", "createdAt");
+CREATE INDEX "ModuleExecutionResult_moduleId_activationId_createdAt_id_idx" ON "ModuleExecutionResult"("moduleId", "activationId", "createdAt", "id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ModuleExecutionResult_activationId_resultId_key" ON "ModuleExecutionResult"("activationId", "resultId");
@@ -901,34 +847,3 @@ CREATE UNIQUE INDEX "ModuleInstallationSubmission_installationId_key" ON "Module
 
 -- CreateIndex
 CREATE INDEX "ModuleRemoval_workspaceId_name_hash_createdAt_idx" ON "ModuleRemoval"("workspaceId", "name", "hash", "createdAt");
-
--- CreateIndex
-CREATE INDEX "BuildRequest_workspaceId_sessionId_idx" ON "BuildRequest"("workspaceId", "sessionId");
-
--- Workspace-owned Provider registrations and immutable per-Run selections.
-CREATE TABLE "AgentProvider" (
-    "workspaceId" TEXT NOT NULL,
-    "id" TEXT NOT NULL,
-    "moduleId" TEXT NOT NULL,
-    "hash" TEXT NOT NULL,
-    "revision" TEXT NOT NULL,
-    "declaration" JSONB NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    PRIMARY KEY ("workspaceId", "id"),
-    CONSTRAINT "AgentProvider_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE CASCADE ON UPDATE CASCADE
-);
-CREATE INDEX "AgentProvider_workspaceId_moduleId_idx" ON "AgentProvider"("workspaceId", "moduleId");
-CREATE TABLE "AgentRunProvider" (
-    "runId" TEXT NOT NULL PRIMARY KEY,
-    "providerId" TEXT NOT NULL,
-    "moduleId" TEXT NOT NULL,
-    "hash" TEXT NOT NULL,
-    "revision" TEXT NOT NULL,
-    "declaration" JSONB NOT NULL,
-    "providerOptions" JSONB NOT NULL,
-    "completion" JSONB,
-    "kind" TEXT NOT NULL DEFAULT 'conversation',
-    CONSTRAINT "AgentRunProvider_runId_fkey" FOREIGN KEY ("runId") REFERENCES "Run" ("id") ON DELETE CASCADE ON UPDATE CASCADE
-);
-CREATE INDEX "AgentRunProvider_moduleId_hash_idx" ON "AgentRunProvider"("moduleId", "hash");

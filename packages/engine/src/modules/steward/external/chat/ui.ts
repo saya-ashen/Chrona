@@ -406,21 +406,26 @@ export default function mount(element: HTMLElement, { call }: { call(name:string
   const reconnect = () => { lock(); task(refresh); }; window.addEventListener('online', reconnect); window.addEventListener('offline', offline);
   lock();
   task(async () => {
-    catalog = await api<Catalog>('catalog'); await refreshList();
+    const url = new URL(window.location.href);
+    const catalogRead = api<Catalog>('catalog').then(value => { catalog = value; });
+    const conversationsRead = (async () => {
+      await refreshList();
+      if (url.searchParams.get('new') === '1') return;
+      const selected = list.find(x => x.id === url.searchParams.get('conversation')) ?? list.find(x => !x.archived);
+      if (selected) await select(selected.id);
+      else messages.textContent = '点击“新对话”开始。';
+    })();
+    await Promise.all([catalogRead, conversationsRead]);
     const availableCount = catalog.tools.filter((t) => t.available !== false).length;
     $('[data-action="new-empty"]').hidden = availableCount <= (catalog.toolLimit ?? 100);
-    const url = new URL(window.location.href);
     if (url.searchParams.get('new') === '1') {
       if (!url.searchParams.has('createKey') && availableCount > (catalog.toolLimit ?? 100)) {
         ready = true; lock(); throw Error(`已发现 ${availableCount} 个可委派工具，内核每轮最多100个。请点击“新对话（关闭工具后手动选择）”，再选择最多100个工具。`);
       }
       try { await createConversation(); }
       finally { if (!dead) { ready = true; lock(); } }
-    } else {
-      const selected = list.find(x => x.id === url.searchParams.get('conversation')) ?? list.find(x => !x.archived);
-      if (selected) await select(selected.id);
-      else messages.textContent = '点击“新对话”开始。';
     }
+    if (c) configOptions();
     ready = true; lock();
     await taskViews.refresh();
     if (url.searchParams.has('task')) await taskViews.select(url.searchParams.get('task')!);

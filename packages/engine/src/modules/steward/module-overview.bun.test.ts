@@ -54,5 +54,5 @@ test("permissions stay workspace scoped and tolerate an installed module without
   await expect(modulePermissions(f.ports, other.id, f.module.id)).rejects.toMatchObject({ code: "not_found" });
   await expect(modulePermissions(f.ports, f.workspaceId, "missing")).rejects.toMatchObject({ code: "not_found" });
   await f.db.module.update({ where: { id: f.module.id }, data: { activeHash: null } });
-  expect(await modulePermissions(f.ports, f.workspaceId, f.module.name)).toMatchObject({ activeHash: null, capabilities: [], secrets: [], model: null, grants: [], approvals: [] });
+  expect(await modulePermissions(f.ports, f.workspaceId, f.module.name)).toMatchObject({ activeHash: null, capabilities: [], secrets: [], model: null, approvals: [] });
 });

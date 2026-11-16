@@ -30,7 +30,7 @@ export async function dispatchTimer(ports: StewardPorts, workspaceId: string, in
     try {
       await ports.db.$transaction(async tx => {
         await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${workspaceId}`;
-        const timer = await tx.schedule.findUniqueOrThrow({ where: { id: input.timerId } });
+        const timer = await tx.timer.findUniqueOrThrow({ where: { id: input.timerId } });
         const rule = storedTimerRule.parse(timer.rule);
         if (timer.status !== "running" || rule.revision !== input.revision) throw new CallError("conflict", "Timer cancelled or replaced");
         const module = await tx.module.findFirst({ where: { id: timer.moduleId!, workspaceId, status: "active", activeHash: rule.hash } });
@@ -38,7 +38,7 @@ export async function dispatchTimer(ports: StewardPorts, workspaceId: string, in
         const now = ports.now();
         if (!(await wakeAllowance(tx, workspaceId, now, input.eventId))(module.id)) throw Object.assign(new CallError("conflict", "Timer wake budget exhausted"), { timerDeferred: true });
         await tx.moduleInvocation.update({ where: { id: input.eventId }, data: { createdAt: now } });
-        await tx.schedule.update({ where: { id: timer.id }, data: { lastAt: now, nextAt: nextTimerAt(rule.schedule, input.scheduledAt, now) } });
+        await tx.timer.update({ where: { id: timer.id }, data: { lastAt: now, nextAt: nextTimerAt(rule.schedule, input.scheduledAt, now) } });
       });
       send();
     } catch (cause) {
@@ -59,8 +59,8 @@ export async function recoverTimers(ports: StewardPorts, workspaceId: string) {
     const succeeded = delivered.length === 1 && delivered[0]!.exitCode === 0;
     const changed = await tx.moduleInvocation.updateMany({ where: { id: invocation.id, status: "running" }, data: { status: succeeded ? "succeeded" : "unknown", error: succeeded ? null : "Timer delivery interrupted", finishedAt: ports.now() } });
     if (!changed.count) return;
-    const timer = await tx.schedule.findUnique({ where: { id: args.timerId } });
+    const timer = await tx.timer.findUnique({ where: { id: args.timerId } });
     if (timer?.status !== "running" || storedTimerRule.parse(timer.rule).revision !== args.revision) return;
-    await tx.schedule.update({ where: { id: timer.id }, data: succeeded ? { status: timer.nextAt ? "active" : "done", lastResult: "delivered" } : { status: "unknown", nextAt: null, lastResult: "Timer delivery interrupted; outcome unknown" } });
+    await tx.timer.update({ where: { id: timer.id }, data: succeeded ? { status: timer.nextAt ? "active" : "done", lastResult: "delivered" } : { status: "unknown", nextAt: null, lastResult: "Timer delivery interrupted; outcome unknown" } });
   });
 }

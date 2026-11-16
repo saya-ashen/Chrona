@@ -618,6 +618,11 @@
               "minLength": 1,
               "maxLength": 64
             },
+            "eventId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
             "method": {
               "type": "string",
               "const": "call"
@@ -719,6 +724,11 @@
           "type": "object",
           "properties": {
             "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "eventId": {
               "type": "string",
               "minLength": 1,
               "maxLength": 64

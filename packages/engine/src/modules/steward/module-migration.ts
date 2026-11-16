@@ -92,6 +92,8 @@ export async function migrateData(context: ModuleContext, prepared: PreparedMigr
       }
     });
   } catch (error) {
+    console.error(JSON.stringify({ component: "module-migration", event: "migration_failed", moduleId,
+      hash: prepared.version.hash, error: error instanceof Error ? error.message : String(error) }));
     if (state.recoveryFailed) throw error;
     // A callback can succeed and its commit fail. Reacquire ownership before compensating that case.
     await withMigrationOwner(context, prepared, reason, async () => {

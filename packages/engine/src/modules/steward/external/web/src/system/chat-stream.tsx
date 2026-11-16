@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { Subscribe } from "./adapter";
-import { openMessages, continueRequest, type ApplicationDelivery, type Execution, type Message } from "./chat";
+import { openMessages, continueRequest, type ApplicationDelivery, type Execution, type Message } from "./chat-messages";
 import { Transcript } from "./detail-components";
 import { useAction } from "./action";
 

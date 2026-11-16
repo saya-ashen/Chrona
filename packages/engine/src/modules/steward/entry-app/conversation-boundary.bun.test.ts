@@ -1,5 +1,6 @@
+import { readFile, writeFile } from "./journal-test-storage";
 import { afterEach, expect, test } from "bun:test";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAgentConversations } from "./conversations";
@@ -14,7 +15,7 @@ const directories: string[] = [];
 afterEach(async () => { await Promise.all(directories.splice(0).map(path => rm(path, { recursive: true, force: true }))); });
 async function fixture(source: "web" | "mcp" | "qq" = "web", discovered?: string[], memory = false, create = createAgentConversations) {
   const dataDir = await mkdtemp(join(tmpdir(), "chrona-conversation-boundary-")); directories.push(dataDir);
-  const path = join(dataDir, "conversations/state.json");
+  const path = join(dataDir, "conversations/sessions.sqlite");
   const journal = async () => JSON.parse(await readFile(path, "utf8"));
   const calls: { target: string; args: Args; options: { key?: string } }[] = [], runs = new Map<string, Run>(), replies: Args[] = [];
   const admitted = new Map<string, string>();
@@ -376,7 +377,7 @@ test("ordinary lost admission exposes only explicit reconciliation of the frozen
   await f.restart().poll();
   expect(f.calls.filter(item => item.target === "agent.run")).toHaveLength(1);
   await expect(f.restart().reconcile(session.id, { requestKey: "foreign" })).rejects.toMatchObject({ code: "not_found" });
-  const app = createAgentConversations({ source: "web", dataDir: f.path.replace("/conversations/state.json", ""), tools: ["source.changed"], call: async (target, args) => {
+  const app = createAgentConversations({ source: "web", dataDir: f.path.replace("/conversations/sessions.sqlite", ""), tools: ["source.changed"], call: async (target, args) => {
     if (target !== "agent.run") throw new Error(`Unexpected reconcile call ${target}`);
     expect(args).toEqual(f.calls.find(item => item.target === "agent.run")!.args);
     return { contextId: "context-1", runId: "run-1", status: "running", active: true };

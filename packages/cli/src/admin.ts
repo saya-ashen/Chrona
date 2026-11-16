@@ -35,7 +35,7 @@ function adminLocation(options: { dataDir?: string; databaseUrl?: string }) {
 }
 const readOnlyAdmin = (command: AdminCommand) => ["modules", "approvals", "diagnostics", "catalog"].includes(command);
 function adminPorts(db: PrismaClient, dataDir: string, command: AdminCommand): StewardPorts {
-  if (!["install", "catalog"].includes(command)) return { db, dataDir, now: () => new Date(), publicUrl: null };
+  if (!["install", "catalog", "approve", "rollback"].includes(command)) return { db, dataDir, now: () => new Date(), publicUrl: null };
   return createModuleRuntimePorts(db, { dataDir });
 }
 /** Local filesystem ownership, never API_KEY or Provider credentials, authorizes administration. */

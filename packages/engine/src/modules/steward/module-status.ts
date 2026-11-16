@@ -27,17 +27,12 @@ async function recordStatus(context: ModuleContext, tx: Prisma.TransactionClient
   await tx.audit.create({ data: { workspaceId: context.workspaceId, subjectId: moduleId, actorKey: details.source === "automatic" || details.source === "chrona" ? "chrona" : "user", kind, details, createdAt } });
 }
 export async function pauseIn(context: ModuleContext, tx: Prisma.TransactionClient, moduleId: string, { source, reason = source, incidentId }: PauseCause) {
-  const { workspaceId } = context, module = await requireModule(context, tx, moduleId), result = { moduleId, status: "paused" as const };
+  const module = await requireModule(context, tx, moduleId), result = { moduleId, status: "paused" as const };
   if (module.status === "paused") return result;
   if (module.status === "migrating") throw new StewardError("conflict", "Module is migrating");
   await assertExecutionModuleIdle(tx, moduleId);
-  // The public scheduler is removed. Retire remaining calendar work instead of reviving it on enable.
-  // A running delivery keeps its lease and outcome evidence; only undelivered occurrences can be cancelled.
-  const schedules = (await tx.schedule.findMany({ where: { workspaceId, moduleId, mode: { not: "timer" }, status: { in: ["active", "paused"] } }, select: { id: true } })).map(row => row.id);
-  await tx.moduleInvocation.updateMany({ where: { workspaceId, target: module.name, mode: "schedule", status: "queued" }, data: { status: "cancelled", finishedAt: context.now(), error: "Module paused before delivery" } });
   await tx.module.update({ where: { id: moduleId }, data: { status: "paused" } });
-  await tx.schedule.updateMany({ where: { workspaceId, moduleId, id: { in: schedules } }, data: { status: "cancelled", nextAt: null } });
-  await recordStatus(context, tx, moduleId, "module_disabled", { source, reason, schedules, ...(incidentId ? { incidentId } : {}) });
+  await recordStatus(context, tx, moduleId, "module_disabled", { source, reason, ...(incidentId ? { incidentId } : {}) });
   return result;
 }
 async function resumeIn(context: ModuleContext, tx: Prisma.TransactionClient, moduleId: string, source: string) {

@@ -55,7 +55,7 @@ Pi 1.3 还可显式选择 `builtin:mcp`、`builtin:codemode`、`builtin:tool-sea
 
 ## 待答复请求
 
-内置网页在“今天”页显示待答复请求与运行停止入口；选择和确认需要用户明确操作，文本/编辑请求使用独立输入框，不填入聊天框。原文和自由文本答复不存请求审计，不在重启后回放。系统页面规格与 adapter 位于 `packages/engine/src/modules/steward/builtin/web/src/system/`，由共享 json-render renderer 渲染；`app.js` 负责认证、路由与连接 shell。
+内置网页在“今天”页显示待答复请求与运行停止入口；选择和确认需要用户明确操作，文本/编辑请求使用独立输入框，不填入聊天框。原文和自由文本答复不存请求审计，不在重启后回放。系统 React 页面与 adapter 位于 `packages/engine/src/modules/steward/external/web/src/system/`，由共享 React runtime 渲染；`app.js` 负责认证、路由与连接 shell。
 
 请求绑定 owner 工作区、运行和新的独立请求 id；选项用序号校验并在适配器中还原为原选项。重复答复只接收一次。timeout、运行 deadline、取消、暂停/结束、进程退出或重启会使旧请求失效，不能跨运行沿用。请求最长 5 分钟；这不是可跨日恢复的 Provider 原生权限会话。失败时可在会话中由用户明确继续，执行端需要重新请求授权。
 

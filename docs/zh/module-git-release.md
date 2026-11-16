@@ -60,7 +60,7 @@ bun scripts/module-git-release.ts verify-published /absolute/path/to/seeds
 CHRONA_MODULE_GIT_SEEDS=/absolute/path/to/seeds bun run build
 ```
 
-构建逐项核对 bundle SHA256、完整性、main commit 和源码 tree；源码或生成契约不符时失败，不能静默创建另一条初始历史。以后官方更新先在真实独立仓库提交、更新固定种子，再交付主发行。修改生成 bundle 时，用相同 Bun 版本与参数的 metafile 核对实际依赖，更新第三方通知；第三方原始许可证和版权通知应完整保留。仍分发模块的第三方通知需覆盖其实际依赖，包括 Web 的 React/React DOM/scheduler、json-render 和 zod；各依赖保留原许可证。退役 Editor 的历史通知不构成继续打包该应用的理由。
+构建逐项核对 bundle SHA256、完整性、main commit 和源码 tree；源码或生成契约不符时失败，不能静默创建另一条初始历史。以后官方更新先在真实独立仓库提交、更新固定种子，再交付主发行。修改生成 bundle 时，用相同 Bun 版本与参数的 metafile 核对实际依赖，更新第三方通知；第三方原始许可证和版权通知应完整保留。仍分发模块的第三方通知需覆盖其实际依赖，包括 Web 的 React/React DOM/scheduler；各依赖保留原许可证。退役 Editor 的历史通知不构成继续打包该应用的理由。
 
 归档包含 `resources/module-git/{name}.bundle` 与 `lock.json`，bundle 在源码根之外，不混入 `.git`、依赖或数据。运行构建产物、安装依赖与数据备份仍按现有机制保留；Git 只替代重复源码副本。
 

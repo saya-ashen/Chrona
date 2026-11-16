@@ -4,10 +4,9 @@ import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import puppeteer, { type BrowserContext, type Page as BrowserPage } from "puppeteer-core";
-import { expandComponents } from "./composition";
 
 const directory = import.meta.dir;
-const csp = "default-src 'self'; img-src 'self' blob: data:; frame-src blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
+const csp = "default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; frame-src blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
 const read = (path: string) => Bun.file(join(directory, path)).text();
 const bundle = await Bun.build({ entrypoints: [join(directory, "src/pages.tsx")], target: "browser", minify: true });
 assert(bundle.success, bundle.logs.map(String).join("\n"));
@@ -25,23 +24,10 @@ const links: { module: string; moduleId: string; id: string; title: string; purp
   { module: "fixture", moduleId: "fixture-id", id: "preferences", title: "应用偏好", purpose: "settings" },
 ];
 function registered(id: string) {
-  if (id === "chat") return { module: "chat", moduleId: "chat-id", id: "main", title: "Chat", revision: 1, layout: "document", data: {}, spec: { root: "chat", elements: { chat: { type: "Text", props: { text: "Chat 应用内容" } } } } };
-  const documentSpec = { root: "doc", elements: {
-    doc: { type: "fixture:Document", props: { title: "文档应用内容" }, children: ["body", "action"] },
-    body: { type: "Text", props: { text: "模块注册的普通文档页" } },
-    action: { type: "Button", props: { label: "调用应用操作" }, on: { press: { action: "call", params: { tool: "ping", reload: false } } } },
-  } };
-  const workspaceSpec = { root: "workspace", state: { draft: "" }, elements: {
-    workspace: { type: "Workspace", props: { title: "编码工作台", description: "把想法交代清楚，把成果带回来。", mobileSidebarOpen: false }, slots: { sidebar: ["side"] }, children: ["title", "scroll", "composer"] },
-    side: { type: "Heading", props: { text: "最近工作" } },
-    title: { type: "WorkspaceHeader", props: { title: "工作区内容", status: "进行中" } },
-    scroll: { type: "ScrollArea", props: { label: "工作进展" }, children: ["message"] },
-    message: { type: "Message", props: { author: "助手" }, children: ["body"] },
-    body: { type: "Markdown", props: { content: "当前工作已准备好。\n\n" + "响应式工作区内容。\n\n".repeat(30) } },
-    composer: { type: "Composer", props: { hint: "继续补充" }, children: ["draft"] },
-    draft: { type: "Textarea", props: { name: "draft", label: "继续补充", rows: 2, value: { $bindState: "/draft" } } },
-  } };
-  return { module: "fixture", moduleId: "fixture-id", ...(id === "preferences" ? { purpose: "settings" } : {}), id, title: id, revision: 1, layout: id === "workspace" ? "workspace" : "document", data: {}, spec: expandComponents(id === "workspace" ? workspaceSpec : documentSpec, { "fixture:Document": { props: { type: "object", properties: { title: { type: "string" } }, required: ["title"], additionalProperties: false }, slots: ["default"], spec: { root: "doc", elements: { doc: { type: "Stack", props: {}, children: ["title", "$slot:default"] }, title: { type: "Heading", props: { text: { $prop: "title" } } } } } } }, "fixture") };
+  const javascript = `import {React,ui} from '/pages.js';const h=React.createElement;
+  export default function mount(element,host){return host.render(id === 'chat' ? h('p',null,'Chat 应用内容') : id === 'workspace' ? h(ui.Workspace,{title:'编码工作台',description:'把想法交代清楚，把成果带回来。',mobileSidebarOpen:false,sidebar:h('h3',null,'最近工作')},h(ui.WorkspaceHeader,{title:'工作区内容',status:'进行中'}),h(ui.ScrollArea,{label:'工作进展'},h(ui.Message,{author:'助手'},h(ui.Markdown,{content:'当前工作已准备好。\\n\\n'+'响应式工作区内容。\\n\\n'.repeat(30)}))),h(ui.Composer,{hint:'继续补充',onSubmit:()=>{}},h('label',null,'继续补充',h('textarea',{name:'draft',rows:2})))) : h(ui.Stack,null,h('h2',null,'文档应用内容'),h('p',null,'模块注册的普通文档页'),h(ui.Button,{onClick:()=>host.call('ping').then(()=>host.toast('已完成'))},'调用应用操作')));}`;
+  const source = javascript.replaceAll("id ===", `${JSON.stringify(id)} ===`);
+  return { module: id === "chat" ? "chat" : "fixture", moduleId: id === "chat" ? "chat-id" : "fixture-id", id: id === "chat" ? "main" : id, title: id, hash: "active", revision: "1", layout: id === "workspace" ? "workspace" : "document", ...(id === "preferences" ? { purpose: "settings" } : {}), tools: ["ping"], keyed: [], props: {}, javascript: source };
 }
 const initialPassword = "fixture-password", changedPassword = "changed-password";
 let password: string | null = initialPassword, canSetup = true, statusFailure = false;
@@ -50,7 +36,7 @@ const sessions = new Set<string>();
 const authRequests: { endpoint: string; body: Record<string, unknown>; authorization: string | null }[] = [];
 const webRequests: { endpoint: string; cookie: string | null; authorization: string | null }[] = [];
 let expired = false, delayed: (() => void) | undefined, delayedUnauthorized: (() => void) | undefined;
-type ScopedCall = { target: string; page?: { module: string; id: string; revision: number } };
+type ScopedCall = { target: string; page?: { module: string; id: string; revision: string } };
 const calls: ScopedCall[] = [];
 const unexpected: string[] = [];
 const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
@@ -96,12 +82,14 @@ const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
   if (!authenticated) return json({ message: "Unauthorized" }, 401);
   if (endpoint === "/events") return new Response(new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode(": connected\n\n")); } }), { headers: { "content-type": "text/event-stream" } });
   if (endpoint === "/pages") return json(links);
+  if (endpoint.endsWith("/source")) return new Response(registered(endpoint.split("/")[2] === "chat" ? "chat" : endpoint.split("/")[3]!).javascript, { headers: { "content-type": "text/javascript" } });
   if (endpoint === "/pages/chat/main") return json(registered("chat"));
   if (endpoint === "/pages/fixture/slow") { await new Promise<void>(resolve => { delayed = resolve; }); return json(registered("workspace")); }
   if (endpoint === "/pages/fixture/broken") return json({ message: "受控页面故障" }, 500);
   if (endpoint === "/pages/fixture/old-session") { await new Promise<void>(resolve => { delayedUnauthorized = resolve; }); return json({ message: "old session expired" }, 401); }
   if (endpoint.startsWith("/pages/fixture/")) return json(registered(endpoint.split("/").at(-1)!));
-  if (endpoint === "/today") return json(emptyToday);
+  if (["/today", "/today-content"].includes(endpoint)) return json(emptyToday);
+  if (endpoint === "/runtime") return json({provider:{available:true,name:"fixture"}});
   if (endpoint === "/modules") return json([fixtureApp, { ...fixtureApp, id: "paused", name: "已暂停的应用", status: "paused" }, { ...fixtureApp, id: "unregistered", name: "未登记的应用" }]);
   if (["/runs", "/system-apps", "/catalog", "/credentials", "/sessions", "/tools"].includes(endpoint)) return json([]);
   if (endpoint === "/settings") return json(settings);
@@ -348,7 +336,7 @@ async function chatRouting() {
       await navigate(page, path, "Chat 应用内容"); await call;
       await page.waitForFunction(() => !new URL(location.href).searchParams.has("new"));
       assert.equal(delegated.length, before + 1, "Chat owns one new-session delegation");
-      assert.deepEqual(delegated.at(-1), { target: "chat.new", args: { url: "/p/chat/main?keep=two&new=1#draft" }, page: { module: "chat", id: "main", revision: 1 } });
+      assert.deepEqual(delegated.at(-1), { target: "chat.new", args: { url: "/p/chat/main?keep=two&new=1#draft" }, page: { module: "chat", id: "main", revision: "1" } });
       await navigate(page, "/today?from=chat", '"name":"today"');
       await page.goBack(); await text(page, "Chat 应用内容");
       assert.equal(new URL(page.url()).search, "?keep=two");
@@ -445,7 +433,7 @@ try {
     await page.click('main nav[aria-label="应用标签"] a[href="/apps/fixture-id?tab=settings"]');
     await text(page, "文档应用内容");
     await page.waitForSelector('main nav[aria-label="应用标签"] a[aria-current="page"][href="/apps/fixture-id?tab=settings"]');
-    assert.equal(await page.$$('main .registered-page .registered-page').then(nodes => nodes.length), 1);
+    assert.equal(await page.$$('main .system-page .registered-page').then(nodes => nodes.length), 1);
     assert.equal(await page.$$('main iframe').then(nodes => nodes.length), 0);
     await geometry(page, false, `${width}: app settings`);
     assert.equal(new URL(page.url()).pathname + new URL(page.url()).search, "/apps/fixture-id?tab=settings");
@@ -519,7 +507,7 @@ try {
   assert(await page.$eval("body", body => body.classList.contains("web-shell-app")));
   assert.equal(await page.evaluate(() => localStorage.getItem("chrona.accessKey")), null);
   await text(page, "没有待处理的事项"); checks.push("old session 401 cannot clear a new login");
-  assert(calls.some(call => call.target === "fixture.ping" && call.page?.module === "fixture" && call.page.id === "document" && call.page.revision === 1), "registered calls retain module/page scope");
+  assert(calls.some(call => call.target === "fixture.ping" && call.page?.module === "fixture" && call.page.id === "document" && call.page.revision === "1"), "registered calls retain module/page scope");
   assert(webRequests.some(request => request.endpoint === "/events" && request.cookie), "SSE uses the session cookie");
   assert(webRequests.every(request => request.authorization === null), "normal Web API and SSE never send bootstrap bearer credentials");
   assert(authRequests.every(request => !request.authorization || ["/status", "/setup"].includes(request.endpoint)), "bootstrap bearer is limited to status/setup");

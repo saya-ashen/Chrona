@@ -89,11 +89,35 @@ async function probe(config: PiLaunchConfig): Promise<{ ok: boolean; version: st
   } catch (error) { return { ok: false, version: "", error: error instanceof Error ? error.message : "Pi process supervision unavailable" }; }
   finally { clearTimeout(timer); }
 }
-export async function inspectPiLaunch(config: PiLaunchConfig): Promise<string | null> {
+type VersionProbe = Awaited<ReturnType<typeof probe>>;
+const healthVersions = new WeakMap<NonNullable<PiProviderOptions["launch"]>, {
+  key: string; expires: number; result: Promise<VersionProbe>;
+}>();
+async function healthVersion(config: PiLaunchConfig): Promise<VersionProbe> {
+  const launch = config.options.launch ?? launchPiProcess;
+  let file;
+  try { file = statSync(config.command, { bigint: true, throwIfNoEntry: false }); }
+  catch (error) {
+    console.error(JSON.stringify({ component: "pi", event: "health_version_stat_failed", error: String(error) }));
+    return probe(config);
+  }
+  if (!file) return probe(config);
+  const key = JSON.stringify([config.command, config.agentDir, config.agentDirSource, config.version,
+    String(file.dev), String(file.ino), String(file.mode), String(file.size), String(file.mtimeNs), String(file.ctimeNs)]);
+  const cached = healthVersions.get(launch);
+  if (cached?.key === key && cached.expires > Date.now()) return cached.result;
+  // Health is an observation; launch admission still probes afresh. Bound wrapper/dependency staleness to 30 seconds.
+  const entry = { key, expires: Date.now() + 30_000, result: probe(config) };
+  healthVersions.set(launch, entry);
+  const result = await entry.result;
+  if ((!result.ok || result.version !== config.version) && healthVersions.get(launch) === entry) healthVersions.delete(launch);
+  return result;
+}
+export async function inspectPiLaunch(config: PiLaunchConfig, reuseHealthVersion = false): Promise<string | null> {
   if (config.options.executionMode === "required-isolation") return isolationError;
   const invalid = configurationError(config);
   if (invalid) return invalid;
-  const pi = await probe(config);
+  const pi = await (reuseHealthVersion ? healthVersion(config) : probe(config));
   if (!pi.ok) return pi.error ?? "Pi binary unavailable or version probe timed out";
   if (pi.version !== config.version) return "Pi version does not match the configured pin";
   return null;

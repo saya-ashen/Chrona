@@ -5,6 +5,7 @@ import {
   lstatSync,
   readdirSync,
   readFileSync,
+  readlinkSync,
   renameSync,
   rmSync,
   writeFileSync,
@@ -98,6 +99,24 @@ function assertOutsideDataRoots(dataDir: string, ...paths: string[]): void {
   }
 }
 
+/** The runtime lock covers the service. On Linux, also refuse orphaned app/Agent
+ * processes whose launch directory is still inside the data roots. */
+function assertPrivateProcessesStopped(dataDir: string) {
+  if (process.platform !== "linux") return;
+  const roots = [resolve(dataDir, "platform"), resolve(dataDir, "sessions")];
+  for (const name of readdirSync("/proc")) {
+    if (!/^\d+$/.test(name) || Number(name) === process.pid) continue;
+    let cwd: string;
+    try { cwd = readlinkSync(`/proc/${name}/cwd`); }
+    catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ENOENT" || code === "ESRCH" || code === "EACCES" || code === "EPERM") continue;
+      throw error;
+    }
+    if (roots.some(root => cwd === root || cwd.startsWith(`${root}${sep}`))) throw new Error(`Backup requires stopped application processes (pid ${name}).`);
+  }
+}
+
 export function backupSqliteDatabase(databaseUrl: string, outputPath: string, dataDir?: string): SqliteBackupResult {
   const sourcePath = requireFilePath(databaseUrl);
   const backupPath = resolve(outputPath);
@@ -112,6 +131,7 @@ export function backupSqliteDatabase(databaseUrl: string, outputPath: string, da
   createPrivateDirectory(dirname(backupPath));
   const lock = dataDir ? acquireSqliteRuntimeLock(databaseUrl) : null;
   try {
+    if (dataDir) assertPrivateProcessesStopped(dataDir);
     if (dataDir && existsSync(`${backupPath}.tar`)) throw new Error("Backup archive already exists.");
     vacuumInto(sourcePath, backupPath);
     const omitted = dataDir ? backupDataFiles(dataDir, `${backupPath}.tar`) : [];

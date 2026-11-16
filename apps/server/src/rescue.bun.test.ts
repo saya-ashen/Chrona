@@ -56,7 +56,7 @@ test("rescue approvals and kernel tick work with both web and notify disabled", 
     expect(result.status).toBe(200);
     expect((await result.json()).status).toBe("approved");
   }
-  expect(await f.db.grant.count()).toBe(0);
+  
   expect(await f.db.kernelFact.count({ where: { workspaceId: "ws_default" } })).toBeGreaterThanOrEqual(4);
   expect(await f.db.moduleInvocation.count({ where: { workspaceId: "ws_default", target: { in: ["web", "notify"] } } })).toBe(0);
 });

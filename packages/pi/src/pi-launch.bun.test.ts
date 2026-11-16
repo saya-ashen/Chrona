@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { chmod, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
@@ -59,6 +59,55 @@ function controlledProbe(closed: PiProcess["closed"]): PiProcess {
   const drained = closed.then(async result => { await new Promise<void>(resolve => setImmediate(resolve)); return result; });
   return { stdin: new PassThrough(), stdout, stderr: new PassThrough(), closed: drained, kill() {} };
 }
+
+test("health shares a successful version probe while launch admission and changed inputs probe afresh", async () => {
+  const f = await fixture();
+  let probes = 0;
+  const launch = () => { probes++; return controlledProbe(Promise.resolve({ code: 0, signal: null })); };
+  const options = { ...f.options, launch };
+  try {
+    const config = piLaunchConfig(options);
+    expect(await Promise.all([inspectPiLaunch(config, true), inspectPiLaunch(config, true)])).toEqual([null, null]);
+    // Health constructs a new adapter each time; reuse must survive a new config object.
+    expect(await inspectPiLaunch(piLaunchConfig(options), true)).toBeNull();
+    expect(probes).toBe(1);
+    expect(await inspectPiLaunch(config)).toBeNull();
+    expect(probes).toBe(2);
+    expect(await inspectPiLaunch(piLaunchConfig({ ...options, chronaExtension: join(f.dir, "missing") }), true)).toContain("extension missing");
+    expect(probes).toBe(2);
+    await writeFile(f.options.command!, "changed executable");
+    expect(await inspectPiLaunch(config, true)).toBeNull();
+    expect(probes).toBe(3);
+    expect(await inspectPiLaunch(piLaunchConfig({ ...options, expectedVersion: "1.3.8" }), true)).toContain("version does not match");
+    expect(probes).toBe(4);
+  } finally { await f.cleanup(); }
+});
+
+test.skipIf(process.platform === "win32")("health reports an unavailable executable for a symlink loop", async () => {
+  const f = await fixture();
+  try {
+    const command = join(f.dir, "loop"); await symlink(command, command);
+    expect(await inspectPiLaunch(piLaunchConfig({ ...f.options, command }), true)).not.toBeNull();
+  } finally { await f.cleanup(); }
+});
+
+test("health version success expires and failures are immediately retried", async () => {
+  const f = await fixture();
+  let probes = 0, available = true;
+  const launch = () => { probes++; return controlledProbe(Promise.resolve({ code: available ? 0 : 1, signal: null })); };
+  const config = piLaunchConfig({ ...f.options, launch });
+  const clock = spyOn(Date, "now");
+  const now = Date.now(); clock.mockReturnValue(now);
+  try {
+    expect(await inspectPiLaunch(config, true)).toBeNull();
+    clock.mockReturnValue(now + 30_001); available = false;
+    expect(await inspectPiLaunch(config, true)).toContain("unavailable");
+    expect(await inspectPiLaunch(config, true)).toContain("unavailable");
+    available = true;
+    expect(await inspectPiLaunch(config, true)).toBeNull();
+    expect(probes).toBe(4);
+  } finally { clock.mockRestore(); await f.cleanup(); }
+});
 
 test("health uses the trusted custom launcher and waits for its closure proof even without a local helper", async () => {
   const f = await fixture();

@@ -47,8 +47,6 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
       if (checks.some((check) => check.status === "error")) process.exitCode = 1;
     });
   const admin = program.command("admin").description("Local recovery administration");
-  admin.command("legacy <request-file>").description("Export, verify or explicitly delete selected legacy conversations while the service is stopped")
-    .action(async (file: string) => { const { adminLegacy } = await import("./admin-legacy"); await adminLegacy(file); });
   admin.command("git-status <module>").description("Read saved module Git association and local commits without contacting the remote")
     .action(async (module: string) => { await (await import("./admin-module-git")).runAdminModuleGit({ action: "status", module }); });
   admin.command("git-associate <module> <repository>").description("Associate an existing module with a GitHub HTTPS repository while the service is stopped")

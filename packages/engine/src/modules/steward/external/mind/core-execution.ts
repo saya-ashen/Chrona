@@ -37,14 +37,16 @@ function runView(raw: unknown) {
 /** This journal stores command identities and observations; all execution remains in kernel's unique queue. */
 export class CoreExecutionJournal {
  readonly db: Database;
- constructor(directory: string, private readonly modelSelection?: () => {providerId?: string; model?: string}) {
-  mkdirSync(directory, {recursive:true,mode:0o700}); const path=join(directory,'mind-execution.sqlite');
+ private readonly table: string;
+ constructor(directory: string, private readonly modelSelection?: () => {providerId?: string; model?: string}, scope: 'main'|'admission'|'verification' = 'main') {
+  this.table = scope === 'main' ? 'executions' : `${scope}_executions`;
+  mkdirSync(directory, {recursive:true,mode:0o700}); const path=join(directory,'mind.sqlite');
   this.db=new Database(path,{create:true}); chmodSync(path,0o600);
-  this.db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA secure_delete=ON; CREATE TABLE IF NOT EXISTS executions(id TEXT PRIMARY KEY, created_at TEXT NOT NULL, json TEXT NOT NULL);');
+  this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA secure_delete=ON; CREATE TABLE IF NOT EXISTS ${this.table}(id TEXT PRIMARY KEY, created_at TEXT NOT NULL, json TEXT NOT NULL);`);
  }
- all():Execution[] { return (this.db.query('SELECT json FROM executions ORDER BY created_at,id').all() as {json:string}[]).map(r=>JSON.parse(r.json) as Execution); }
- save(e:Execution) { this.db.query('INSERT INTO executions(id,created_at,json) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET json=excluded.json').run(e.id,e.createdAt,JSON.stringify(e)); return structuredClone(e); }
- get(id:string):Execution { const row=this.db.query('SELECT json FROM executions WHERE id=?').get(id) as {json:string}|null; if(!row)throw Error('Execution not found'); return JSON.parse(row.json) as Execution; }
+ all():Execution[] { return (this.db.query(`SELECT json FROM ${this.table} ORDER BY created_at,id`).all() as {json:string}[]).map(r=>JSON.parse(r.json) as Execution); }
+ save(e:Execution) { this.db.query(`INSERT INTO ${this.table}(id,created_at,json) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET json=excluded.json`).run(e.id,e.createdAt,JSON.stringify(e)); return structuredClone(e); }
+ get(id:string):Execution { const row=this.db.query(`SELECT json FROM ${this.table} WHERE id=?`).get(id) as {json:string}|null; if(!row)throw Error('Execution not found'); return JSON.parse(row.json) as Execution; }
  outstanding() { return this.all().find(e=>!e.settled); }
  prepare(input:{purpose:Execution['purpose'];subject:string;basis?:string;evidenceRefs?:string[];revision:number;visibilityRevision:number;prompt:string;tools:Target[];selection?:{providerId?:string;model?:string};principal?:{moduleId:string;hash:string}}, now:string, budget=24, opportunityBudget=8) {
   return this.db.transaction(()=>{
@@ -70,7 +72,7 @@ export class CoreExecutionJournal {
   return {deferred};}
  prune(now:string) { // Keep unresolved identities; finite recovery receipts rather than a lifetime cap.
   const floor=new Date(Date.parse(now)-30*86400000).toISOString();
-  for(const e of this.all())if(e.settled&&e.createdAt<floor)this.db.query('DELETE FROM executions WHERE id=?').run(e.id);
+  for(const e of this.all())if(e.settled&&e.createdAt<floor)this.db.query(`DELETE FROM ${this.table} WHERE id=?`).run(e.id);
  }
  close(){this.db.close();}
 }

@@ -51,15 +51,6 @@ test.each(["foreground", "background"] as const)("%s uses the setting at claim; 
   expect(await runs.expireLeases()).toBe(0);
   expect((await runs.authenticate(unlimited.token)).run.id).toBe(unlimited.id);
 });
-test("build keeps its explicit sixty minute budget when ordinary timeout is cleared", async () => {
-  const runs = createRuns(ports, workspaceId);
-  await db.session.update({ where: { id: sessionId }, data: { source: "build" } });
-  await db.buildTargets.create({ data: { sessionId, name: "sample", modules: ["sample"] } });
-  await runs.enqueue({ sessionId, lane: "build", trigger: "build", prompt: "Bounded work" });
-  const run = (await runs.claimNext("build"))!;
-  expect(run.deadlineAt!.getTime() - ports.now().getTime()).toBe(60 * 60_000);
-  expect(run.leaseUntil).toEqual(run.deadlineAt);
-});
 test("one session never runs two lanes concurrently; other sessions remain independent", async () => {
   const runs = createRuns(ports, workspaceId);
   await runs.enqueue({ sessionId, lane: "foreground", trigger: "message", prompt: "One" });

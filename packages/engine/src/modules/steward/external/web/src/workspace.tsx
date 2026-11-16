@@ -1,38 +1,36 @@
-// Generic page primitives. Application state and operations remain in page specs/actions.
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { useBoundProp, type ComponentRenderProps } from "@json-render/react";
+// Shared React primitives; applications own their state and operations.
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Time } from "./display";
 
-type Props<P> = ComponentRenderProps<P> & { props: P; bindings?: Record<string, string> };
+type Props<P> = P & { children?: ReactNode };
 export type WorkspaceProps = { sidebarLabel?: string; mainLabel?: string; sidebarOpen?: boolean; mobileSidebarOpen?: boolean; breadcrumb?: string; title?: string; description?: string };
 function WorkspaceBrand({ title, description }: Pick<WorkspaceProps, "title" | "description">) {
   if (!title && !description) return null;
   return <div className="workspace-brand">{title ? <div className="workspace-brand-title">{title}</div> : null}{description ? <p>{description}</p> : null}</div>;
 }
-function useSidebarOpen(value?: boolean, binding?: string) {
-  const [bound, setBound] = useBoundProp<boolean>(value, binding);
+function useSidebarOpen(value?: boolean) {
   const [local, setLocal] = useState(value ?? true);
   useEffect(() => { setLocal(value ?? true); }, [value]);
-  return binding ? [bound ?? true, setBound] as const : [local, setLocal] as const;
+  return [local, setLocal] as const;
 }
-function useWorkspaceSidebar(props: WorkspaceProps, bindings?: Record<string, string>) {
-  const [desktop, setDesktop] = useSidebarOpen(props.sidebarOpen, bindings?.sidebarOpen);
-  const [mobile, setMobile] = useSidebarOpen(props.mobileSidebarOpen, bindings?.mobileSidebarOpen);
+function useWorkspaceSidebar(props: WorkspaceProps) {
+  const [desktop, setDesktop] = useSidebarOpen(props.sidebarOpen);
+  const [mobile, setMobile] = useSidebarOpen(props.mobileSidebarOpen);
   const [narrow, setNarrow] = useState(false);
   useEffect(() => {
     const media = window.matchMedia("(max-width: 700px)"), update = () => setNarrow(media.matches);
     update(); media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
   }, []);
-  const separateMobile = narrow && (props.mobileSidebarOpen !== undefined || !!bindings?.mobileSidebarOpen);
+  const separateMobile = narrow && props.mobileSidebarOpen !== undefined;
   const open = separateMobile ? mobile : desktop;
   const change = separateMobile ? setMobile : setDesktop;
   return { open, toggle: () => change(!open) };
 }
-export function Workspace({ props, children, slots, bindings }: Props<WorkspaceProps>) {
+export function Workspace({ children, sidebar, ...props }: Props<WorkspaceProps> & { sidebar?: ReactNode }) {
   const { sidebarLabel = "列表", mainLabel = "内容" } = props;
   const id = useId(), root = useRef<HTMLDivElement>(null), main = useRef<HTMLDivElement>(null), toggle = useRef<HTMLButtonElement>(null);
-  const { open, toggle: toggleSidebar } = useWorkspaceSidebar(props, bindings);
+  const { open, toggle: toggleSidebar } = useWorkspaceSidebar(props);
   useLayoutEffect(() => {
     const element = root.current!;
     const resize = () => element.style.setProperty("--workspace-height", `${Math.max(240, (window.visualViewport?.height ?? window.innerHeight) - element.getBoundingClientRect().top)}px`);
@@ -56,7 +54,7 @@ export function Workspace({ props, children, slots, bindings }: Props<WorkspaceP
     <div className="workspace-panes">
       <aside id={id} className="workspace-sidebar" aria-label={sidebarLabel} hidden={!open}>
         <WorkspaceBrand title={props.title} description={props.description} />
-        {slots?.sidebar}
+        {sidebar}
       </aside>
       <div ref={main} className="workspace-main" role="region" aria-label={mainLabel} tabIndex={-1}>{children}</div>
     </div>
@@ -64,7 +62,7 @@ export function Workspace({ props, children, slots, bindings }: Props<WorkspaceP
 }
 
 export type WorkspaceHeaderProps = { title: string; subtitle?: string; status?: string; statusTone?: "neutral" | "success" | "warning" | "danger" };
-export function WorkspaceHeader({ props, children }: Props<WorkspaceHeaderProps>) {
+export function WorkspaceHeader({ children, ...props }: Props<WorkspaceHeaderProps>) {
   return <div className="renderer-workspace-header">
     <h1>{props.title}</h1>
     {props.status || props.subtitle ? <div className="workspace-summary">{props.status ? <span className={`workspace-status status-${props.statusTone ?? "neutral"}`}>{props.status}</span> : null}{props.subtitle ? <span>{props.subtitle}</span> : null}</div> : null}
@@ -72,13 +70,11 @@ export function WorkspaceHeader({ props, children }: Props<WorkspaceHeaderProps>
   </div>;
 }
 
-export type ViewTabsProps = { items: { value: string; label: string }[]; value?: string };
-export function ViewTabs({ props, bindings }: Props<ViewTabsProps>) {
-  const [bound, setBound] = useBoundProp<string>(props.value, bindings?.value);
+export type ViewTabsProps = { items: { value: string; label: string }[]; value?: string; onChange?: (value: string) => void };
+export function ViewTabs(props: Props<ViewTabsProps>) {
   const [local, setLocal] = useState(props.value);
-  useEffect(() => { setLocal(props.value); }, [props.value]);
-  const value = (bindings?.value ? bound : local) ?? props.items[0]?.value;
-  const select = bindings?.value ? setBound : setLocal;
+  const value = props.value ?? local ?? props.items[0]?.value;
+  const select = (next: string) => { setLocal(next); props.onChange?.(next); };
   const list = useRef<HTMLDivElement>(null);
   return <div className="renderer-view-tabs" role="tablist" aria-label="内容视图" ref={list}>
     {props.items.map((item, index) => <button key={item.value} type="button" role="tab" aria-selected={value === item.value} tabIndex={value === item.value ? 0 : -1} onClick={() => select(item.value)} onKeyDown={event => {
@@ -91,24 +87,24 @@ export function ViewTabs({ props, bindings }: Props<ViewTabsProps>) {
   </div>;
 }
 
-export type ComposerProps = { hint?: string; footnote?: string; disabled?: boolean };
-export function Composer({ props, children, slots, emit }: Props<ComposerProps>) {
+export type ComposerProps = { hint?: string; footnote?: string; disabled?: boolean; onSubmit: () => void; actions?: ReactNode };
+export function Composer({ children, ...props }: Props<ComposerProps>) {
   return <div className="renderer-composer-wrap"><div className="renderer-composer" onKeyDown={event => {
     if (props.disabled || event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing || !(event.target instanceof HTMLTextAreaElement)) return;
-    event.preventDefault(); emit("submit");
+    event.preventDefault(); props.onSubmit();
   }}>
     <div className="composer-input">{children}</div>
-    <div className="composer-tools">{props.hint ? <span className="composer-hint">{props.hint}</span> : null}<div className="composer-actions">{slots?.actions}</div></div>
+    <div className="composer-tools">{props.hint ? <span className="composer-hint">{props.hint}</span> : null}<div className="composer-actions">{props.actions}</div></div>
   </div>{props.footnote ? <div className="composer-footnote">{props.footnote}</div> : null}</div>;
 }
 
 export type PanelProps = { tone?: "default" | "question" | "muted" };
-export function Panel({ props, children }: Props<PanelProps>) {
+export function Panel({ children, ...props }: Props<PanelProps>) {
   return <div className={`renderer-panel panel-${props.tone ?? "default"}`}>{children}</div>;
 }
 
 export type ScrollAreaProps = { label?: string; follow?: boolean };
-export function ScrollArea({ props, children }: Props<ScrollAreaProps>) {
+export function ScrollArea({ children, ...props }: Props<ScrollAreaProps>) {
   const viewport = useRef<HTMLDivElement>(null), content = useRef<HTMLDivElement>(null);
   const saved = useRef({ top: 0, pinned: !!props.follow, height: 0 });
   const [unread, setUnread] = useState(false);
@@ -145,7 +141,7 @@ export function ScrollArea({ props, children }: Props<ScrollAreaProps>) {
 }
 
 export type MessageProps = { author: string; time?: string; tone?: "default" | "user" | "notice" };
-export function Message({ props, children }: Props<MessageProps>) {
+export function Message({ children, ...props }: Props<MessageProps>) {
   return <article className={`renderer-message message-${props.tone ?? "default"}`} aria-label={props.author}>
     <div className="message-meta"><span className="message-avatar" aria-hidden="true" hidden>{Array.from(props.author)[0]}</span><strong>{props.author}</strong>{props.time ? <Time value={props.time} /> : null}</div>
     <div className="message-content">{children}</div>
@@ -168,7 +164,7 @@ function diffNumbers(line: string, kind: DiffKind, range: DiffRange | null) {
   return { before, after };
 }
 export type CodeDiffProps = { filename?: string; diff: string };
-export function CodeDiff({ props }: Props<CodeDiffProps>) {
+export function CodeDiff(props: Props<CodeDiffProps>) {
   // A dynamic prop is empty until its data source resolves.
   const diff = props.diff || "";
   let range: DiffRange | null = null, added = 0, removed = 0;
@@ -188,8 +184,8 @@ export function CodeDiff({ props }: Props<CodeDiffProps>) {
 }
 
 export type ActionOptionProps = { label: string; description?: string; selected?: boolean; disabled?: boolean; compact?: boolean };
-export function ActionOption({ props, emit }: Props<ActionOptionProps>) {
-  return <button type="button" className={`renderer-action-option${props.compact ? " option-compact" : ""}`} aria-pressed={props.selected} disabled={!!props.disabled} onClick={() => emit("press")}>
+export function ActionOption(props: Props<ActionOptionProps> & { onClick?: () => void }) {
+  return <button type="button" className={`renderer-action-option${props.compact ? " option-compact" : ""}`} aria-pressed={props.selected} disabled={!!props.disabled} onClick={props.onClick}>
     <span className="option-label">{props.label}</span>{props.description ? <span className="option-description">{props.description}</span> : null}
     {props.selected ? <span className="option-selected" aria-hidden="true">✓</span> : null}
   </button>;

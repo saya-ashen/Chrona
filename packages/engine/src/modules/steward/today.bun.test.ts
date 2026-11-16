@@ -75,3 +75,11 @@ test("web bounds private conversations and propagates private journal failures",
   expect(f.calls.some(([target]) => target.startsWith("history."))).toBe(false);
   await expect(todayView(f.call, async () => { throw new Error("journal unavailable"); })).rejects.toThrow("journal unavailable");
 });
+
+test("Today content does not wait for runtime probing or fetch unused health counters", async () => {
+  const f = fixture({ "activity.runtime": new Error("runtime must be read independently"), "notify.counts": new Error("unused counter") });
+  const result = await todayView(f.call, async () => [], false);
+  expect(result).toMatchObject({ approvals: [], updates: [], apps: [], sessions: [] });
+  expect(result).not.toHaveProperty("health");
+  expect(f.calls.some(([target]) => target === "activity.runtime" || target === "notify.counts")).toBe(false);
+});

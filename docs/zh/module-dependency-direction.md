@@ -1,5 +1,7 @@
 # 模块依赖方向审查
 
+当前 Web 已改为普通 React / TSX 可执行页面，`page-set` 直接接收 JavaScript/CSS；不再使用 json-render 或独立组件登记。第 4 节为 2026-11-02 的历史试验，不能作为当前开发合同。当前入口见 [页面与外壳](web-components-and-shell.md) 和 [开发指南](../../packages/engine/src/modules/steward/external/web/UI-DEVELOPMENT.md)。
+
 2026-11-08 阅读提示：本页“M1 当前规则”也是阶段快照；Agent 原语及会话迁移后的边界见[应用编排](agent-module-orchestration.md)。§5 的旧应用名单不作为当前待办；实际生产转换见[统一路线](development-roadmap.md)。用户于同日确认五个内置应用允许受检定制，Agent 保持不可动态替换；下节 M1 的全部不可变条款仅保留为历史。
 
 文档性质：依赖方向原则 + 有日期的历史审查记录。§2–§5 保留 2026-11-02/03 的问题、试验、旧生产处置和当时部署结论；其中旧 `rollback <module> builtin`、定制内置双轨、旧迁移编号与“待迁移”名单不再是当前操作指引，不批量改写历史。M1 的当前事实见下节与[当前架构](architecture.md)，开发证据、协调者 M1 验收签署及环境边界见 M1 验收记录（已从工作树删除，见 git 历史 docs/zh/chrona-workbench-m1-acceptance.md）。

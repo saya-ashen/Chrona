@@ -28,7 +28,7 @@
 | --- | --- |
 | 运行与恢复 | [Agent](zh/agent-builtin-application.md)、[Provider](zh/provider-runtime.md)、[应用恢复](zh/module-recovery.md)、[任务时限](zh/task-timeout.md) |
 | 应用开发与材料 | [依赖方向](zh/module-dependency-direction.md)、[版本材料](zh/author-version-materials.md)、[当前对话创作](zh/author-current-conversation.md)、[Git 发行](zh/module-git-release.md) |
-| Web 与设置 | [外壳与组合](zh/web-components-and-shell.md)、[可执行组件](zh/web-executable-components.md)、[应用设置](zh/application-settings.md) |
+| Web 与设置 | [外壳与组合](zh/web-components-and-shell.md)、[可执行页面](zh/web-executable-components.md)、[应用设置](zh/application-settings.md) |
 | 通知与自动化 | [有限内核事实](zh/kernel-notification-facts.md)、[Mind](zh/mind-implementation.md)、[应用迁移](zh/application-migration.md) |
 | 源码验收证据 | [内核/Agent 迁移](zh/kernel-agent-migration.md)、[普通应用迁移](zh/application-migration.md)、[边界实施](zh/kernel-permanent-boundary-implementation.md) |
 | 退役与历史证据 | [Coding 退役](zh/coding-retirement.md)、[Editor 退役](zh/editor-retirement.md)；旧 Coding 协议、实施与工作台验证从 Git 历史查阅 |

@@ -2,7 +2,6 @@ import { drainTimers, timersSettled } from "./timers";
 import { join } from "node:path";
 import { mkdir } from "node:fs/promises";
 import type { StewardPorts } from "./ports";
-import { drainSchedules, schedulesSettled } from "./schedule-delivery";
 import { createModules } from "./modules";
 import { registerBuiltins } from "./module-builtin";
 import { reconcileAgentStops } from "./agent-recovery";
@@ -13,7 +12,6 @@ import { createProviderChannel } from "./provider-channel";
 import { providerStartGate } from "./provider-start";
 import { startLocalProvider, runtimeCall } from "./local-runtime";
 import { registerWorkspaceModule } from "./local-workspace";
-import { BUILD_MODULE_TOOLS, BUILD_REFERENCE_PROMPT } from "./module-reference";
 import { KERNEL_EXECUTION_LIMITS, type ProviderAdapter } from "@chrona/contracts/steward";
 import { refreshInstallationReceipts } from "./module-install";
 import { ensureWorkspaceInitialized } from "./module-initialization";
@@ -23,15 +21,8 @@ import { collectStore } from "./store-gc";
 
 import { contextRunTools } from "./agent-context-tools";
 import { contextRunImages } from "./agent-context-read";
-import { STEWARD_PROMPT } from "./run-instructions";
 
 type ClaimedRun = NonNullable<Awaited<ReturnType<ReturnType<typeof createRuns>["claimNext"]>>>;
-/** Build runs: their whole instruction was written when queued; they find app tools like a conversation. */
-function closedInput(run: ClaimedRun, sessionId: string | null) {
-  const base = { inbound: null, searchTools: false, sessionId, hostPaths: [], content: [] };
-  if (run.session?.source === "build") return { ...base, searchTools: true, prompt: `${run.prompt}\n\n${BUILD_REFERENCE_PROMPT}`, extraTools: BUILD_MODULE_TOOLS };
-  return null;
-}
 type PendingFinalization = { run: ClaimedRun; outcome: Awaited<ReturnType<ProviderAdapter["start"]>["done"]>; stopEvidence?: "provider_exited" };
 async function finishProvider(ports: StewardPorts, pending: Map<string, PendingFinalization>, entry: PendingFinalization) {
   const { run, outcome, stopEvidence } = entry;
@@ -87,9 +78,7 @@ export function createTick(ports: StewardPorts) {
         const sessionId = run.session?.providerSessionId ?? null;
         const context = await genericInput(ports, run, sessionId);
         if (context) return context;
-        const closed = closedInput(run, sessionId);
-        if (closed) return { ...closed, systemPrompt: STEWARD_PROMPT, resources: "configured" as const, images: [] };
-        throw new Error("Run requires an application-owned Agent context or authorized build session");
+        throw new Error("Run requires an application-owned Agent context");
       }
       function providerInput(run: ClaimedRun, lane: "foreground" | "background" | "build", sessionDir: string, execution: Awaited<ReturnType<typeof executionRunInput>>, ordinary: Awaited<ReturnType<typeof runInput>> | null) {
         if (execution) return (({ onInteraction: _observer, ...input }) => input)(execution);
@@ -143,9 +132,6 @@ export function createTick(ports: StewardPorts) {
         ["initialization", async () => { await refreshInstallationReceipts(ports, workspaceId); await ensureWorkspaceInitialized(ports, workspaceId); }],
         ["modules", async () => { await createModules(ports, workspaceId).recoverMigrations(now); startBuild(ports, builds, buildFailures, workspaceId, now); }],
         ["timers", async () => { void drainTimers(ports, workspaceId, now).catch(error => { buildFailures.set(workspaceId, error); }); }],
-        ["schedules", async () => {
-          void drainSchedules(ports, workspaceId, now).catch(error => { buildFailures.set(workspaceId, error); });
-        }],
         ["finalize", async () => {
           // Retry only persistence, even for unlimited Runs; close/capture already ran once.
           for (const entry of [...pendingFinalizations.values()]) if (entry.run.workspaceId === workspaceId) {
@@ -166,7 +152,7 @@ export function createTick(ports: StewardPorts) {
     return { failures };
   }
   return Object.assign(tick, { settled: async ({ includeRuns = false } = {}) => {
-    await Promise.all([...builds.values(), ...(includeRuns ? finalizers : []), schedulesSettled(ports), timersSettled(ports)]);
+    await Promise.all([...builds.values(), ...(includeRuns ? finalizers : []), timersSettled(ports)]);
     await callsSettled(ports);
   } });
 }

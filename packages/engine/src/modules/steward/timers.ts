@@ -19,15 +19,15 @@ async function owner(db: Prisma.TransactionClient, workspaceId: string, caller: 
   if (!module || version?.status !== "approved" || moduleManifestSchema.parse(version.manifest).name !== caller.module) throw new CallError("forbidden", "Timer caller changed");
   return module;
 }
-const view = (row: { text: string; rule: Prisma.JsonValue; status: string; nextAt: Date | null; lastResult: string | null }) => {
+const view = (row: { timerId: string; rule: Prisma.JsonValue; status: string; nextAt: Date | null; lastResult: string | null }) => {
   const rule = storedRule.parse(row.rule);
-  return { id: row.text, revision: rule.revision, schedule: rule.schedule, status: row.status, nextAt: row.nextAt?.toISOString() ?? null, lastResult: row.lastResult };
+  return { id: row.timerId, revision: rule.revision, schedule: rule.schedule, status: row.status, nextAt: row.nextAt?.toISOString() ?? null, lastResult: row.lastResult };
 };
 async function listTimers(tx: Prisma.TransactionClient, workspaceId: string, moduleId: string, hash: string, args: Record<string, unknown>) {
-  const rows = await tx.schedule.findMany({ where: { workspaceId, moduleId, mode: "timer" } });
+  const rows = await tx.timer.findMany({ where: { workspaceId, moduleId } });
   for (const row of rows) {
     if (storedRule.parse(row.rule).hash === hash || row.status === "stale") continue;
-    await tx.schedule.update({ where: { id: row.id }, data: { status: "stale", nextAt: null } });
+    await tx.timer.update({ where: { id: row.id }, data: { status: "stale", nextAt: null } });
     row.status = "stale"; row.nextAt = null;
   }
   return apiPage(rows.map(row => view(row)), args, `timers:${workspaceId}:${moduleId}`, row => row.id);
@@ -39,18 +39,18 @@ export async function timerTool(ports: StewardPorts, workspaceId: string, caller
     if (name === "list") return listTimers(tx, workspaceId, module.id, module.activeHash!, args);
     const id = timerIdentity(workspaceId, module.id, String(args.id)), now = ports.now();
     if (name === "cancel") {
-      await tx.schedule.updateMany({ where: { id, workspaceId, moduleId: module.id, mode: "timer" }, data: { status: "cancelled", nextAt: null } });
+      await tx.timer.updateMany({ where: { id, workspaceId, moduleId: module.id }, data: { status: "cancelled", nextAt: null } });
       return { id: String(args.id), status: "cancelled" };
     }
     const input = timerSetInput.parse(args), workspace = await tx.workspace.findUniqueOrThrow({ where: { id: workspaceId } });
     const wake = wakeBudgetSchema.parse((workspace.settings as { wake?: unknown } | null)?.wake ?? {});
     if (input.schedule.kind === "every" && input.schedule.milliseconds < wake.minIntervalMs) throw new CallError("invalid", "Timer interval is below the kernel minimum");
-    const existing = await tx.schedule.findUnique({ where: { id } });
-    if (!existing && await tx.schedule.count({ where: { workspaceId, moduleId: module.id, mode: "timer" } }) >= 100) throw new CallError("conflict", "An application may hold at most 100 timers");
+    const existing = await tx.timer.findUnique({ where: { id } });
+    if (!existing && await tx.timer.count({ where: { workspaceId, moduleId: module.id } }) >= 100) throw new CallError("conflict", "An application may hold at most 100 timers");
     const nextAt = input.schedule.kind === "at" ? new Date(input.schedule.at) : new Date(now.getTime() + input.schedule.milliseconds);
     if (nextAt <= now) throw new CallError("invalid", "Timer time must be in the future");
     const data = { rule: { revision: randomUUID(), hash: module.activeHash!, schedule: input.schedule }, payload: input.payload ?? Prisma.JsonNull, status: "active", nextAt, lastResult: null };
-    const row = await tx.schedule.upsert({ where: { id }, create: { id, workspaceId, moduleId: module.id, mode: "timer", text: input.id, createdBy: "module", ...data }, update: data });
+    const row = await tx.timer.upsert({ where: { id }, create: { id, workspaceId, moduleId: module.id, timerId: input.id, ...data }, update: data });
     return view(row);
   }));
 }
@@ -59,20 +59,20 @@ export async function timerTool(ports: StewardPorts, workspaceId: string, caller
 async function claimTimer(ports: StewardPorts, workspaceId: string, timerId: string, now: Date) {
   return ports.db.$transaction(async tx => {
     await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${workspaceId}`;
-    const row = await tx.schedule.findFirst({ where: { id: timerId, workspaceId, mode: "timer", status: "active", nextAt: { lte: now } } });
+    const row = await tx.timer.findFirst({ where: { id: timerId, workspaceId, status: "active", nextAt: { lte: now } } });
     if (!row?.moduleId || !row.nextAt) return null;
     const module = await tx.module.findFirst({ where: { id: row.moduleId, workspaceId, status: "active" } });
     if (!module?.activeHash || isModulePaused(module.name)) return null;
     const rule = storedRule.parse(row.rule);
     if (rule.hash !== module.activeHash) {
-      await tx.schedule.update({ where: { id: row.id }, data: { status: "stale", nextAt: null } });
+      await tx.timer.update({ where: { id: row.id }, data: { status: "stale", nextAt: null } });
       return null;
     }
     if (!(await wakeAllowance(tx, workspaceId, now))(module.id)) return null;
     const eventId = `timer-event:${createHash("sha256").update(JSON.stringify([row.id, rule.revision, row.nextAt.toISOString()])).digest("hex")}`;
     const nextAt = nextTimerAt(rule.schedule, row.nextAt, now);
-    const event: ModuleEvent = { trigger: { kind: "timer", id: row.text, timerId: row.text, timerRevision: rule.revision, eventId, scheduledAt: row.nextAt.toISOString(), firedAt: now.toISOString(), payload: z.json().parse(row.payload) }, now: now.toISOString(), params: {} };
-    await tx.schedule.update({ where: { id: row.id }, data: { nextAt, lastAt: now, status: "running" } });
+    const event: ModuleEvent = { trigger: { kind: "timer", id: row.timerId, timerId: row.timerId, timerRevision: rule.revision, eventId, scheduledAt: row.nextAt.toISOString(), firedAt: now.toISOString(), payload: z.json().parse(row.payload) }, now: now.toISOString(), params: {} };
+    await tx.timer.update({ where: { id: row.id }, data: { nextAt, lastAt: now, status: "running" } });
     await tx.moduleInvocation.upsert({ where: { id: eventId }, create: { id: eventId, workspaceId, caller: "kernel", target: module.name, targetIdentity: module.id, targetBound: true, targetModuleId: module.id, targetHash: module.activeHash, tool: "timer", args: { timerId: row.id, revision: rule.revision }, key: eventId, mode: "timer", status: "running", attempts: 1, createdAt: now }, update: { status: "running", error: null, finishedAt: null, createdAt: now, attempts: { increment: 1 } } });
     return { row, module, event, eventId, nextAt };
   });
@@ -93,7 +93,7 @@ export function drainTimers(ports: StewardPorts, workspaceId: string, now = port
     const allowed = await wakeAllowance(ports.db, workspaceId, now);
     const active = await ports.db.module.findMany({ where: { workspaceId, status: "active", activeHash: { not: null } }, select: { id: true, name: true } });
     const eligible = active.filter(module => !isModulePaused(module.name) && allowed(module.id)).map(module => module.id);
-    const due = await ports.db.schedule.findMany({ where: { workspaceId, moduleId: { in: eligible }, mode: "timer", status: "active", nextAt: { lte: now } }, orderBy: [{ nextAt: "asc" }, { id: "asc" }], take: 100 });
+    const due = await ports.db.timer.findMany({ where: { workspaceId, moduleId: { in: eligible }, status: "active", nextAt: { lte: now } }, orderBy: [{ nextAt: "asc" }, { id: "asc" }], take: 100 });
     for (const timer of due) {
       const claim = await claimTimer(ports, workspaceId, timer.id, ports.now());
       if (!claim) continue;
@@ -108,10 +108,10 @@ export function drainTimers(ports: StewardPorts, workspaceId: string, now = port
       }
       await ports.db.$transaction(async tx => {
         await tx.moduleInvocation.update({ where: { id: claim.eventId }, data: { status: deferred ? "deferred" : status, error, finishedAt: ports.now() } });
-        const current = await tx.schedule.findUnique({ where: { id: timer.id } });
+        const current = await tx.timer.findUnique({ where: { id: timer.id } });
         if (current?.status !== "running" || storedRule.parse(current.rule).revision !== storedRule.parse(claim.row.rule).revision) return;
         if (deferred) return deferTimer(tx, timer.id, claim.module.id, claim.module.activeHash!, claim.row.nextAt, error);
-        await tx.schedule.update({ where: { id: timer.id }, data: { status: status === "succeeded" ? current.nextAt ? "active" : "done" : status, nextAt: status === "succeeded" ? current.nextAt : null, lastResult: error ?? "delivered" } });
+        await tx.timer.update({ where: { id: timer.id }, data: { status: status === "succeeded" ? current.nextAt ? "active" : "done" : status, nextAt: status === "succeeded" ? current.nextAt : null, lastResult: error ?? "delivered" } });
       });
     }
   })().catch(error => { timerRecovered.get(ports.db)?.delete(workspaceId); throw error; }).finally(() => workspaceDrains.delete(workspaceId));
@@ -125,5 +125,5 @@ export async function timersSettled(ports: StewardPorts) { await Promise.all(dra
 async function deferTimer(tx: Prisma.TransactionClient, timerId: string, moduleId: string, hash: string, nextAt: Date | null, error: string | null) {
   const module = await tx.module.findUnique({ where: { id: moduleId } });
   const stale = module?.activeHash !== hash;
-  await tx.schedule.update({ where: { id: timerId }, data: { status: stale ? "stale" : "active", nextAt: stale ? null : nextAt, lastResult: error } });
+  await tx.timer.update({ where: { id: timerId }, data: { status: stale ? "stale" : "active", nextAt: stale ? null : nextAt, lastResult: error } });
 }

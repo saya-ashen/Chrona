@@ -29,6 +29,8 @@ node_modules/
 !/build/agent-declaration-bundle.ts
 !/build/portable-elf.ts
 !/build/entry-conversations.ts
+!/build/application-pages.ts
+!/build/application-ui.ts
 !/build/manifest.ts
 !/build/manifest.bun.test.ts
 !/build/release-smoke.ts

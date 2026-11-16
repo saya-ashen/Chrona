@@ -21,7 +21,7 @@ export class CoreActions {
  private lastApplicationCleanup:ReturnType<ApplicationActionAdapter['cleanupWithdrawn']>|undefined;
  get applicationCleanup(){return this.lastApplicationCleanup?{...this.lastApplicationCleanup}:undefined;}
  constructor(directory:string,private readonly service:CoreMindService,private readonly application?:()=>ApplicationActionAdapter){
-  mkdirSync(directory,{recursive:true,mode:0o700});const path=join(directory,'mind-artifacts.sqlite');this.db=new Database(path,{create:true});chmodSync(path,0o600);
+  mkdirSync(directory,{recursive:true,mode:0o700});const path=join(directory,'mind.sqlite');this.db=new Database(path,{create:true});chmodSync(path,0o600);
   this.db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA secure_delete=ON; CREATE TABLE IF NOT EXISTS documents(ref TEXT PRIMARY KEY, action_key TEXT UNIQUE NOT NULL, input_digest TEXT NOT NULL, json TEXT NOT NULL); CREATE TABLE IF NOT EXISTS application_reads(ref TEXT PRIMARY KEY, pursuit_id TEXT NOT NULL, goal_digest TEXT);');
   if(!(this.db.query('PRAGMA table_info(application_reads)').all() as {name:string}[]).some(c=>c.name==='goal_digest'))this.db.exec('ALTER TABLE application_reads ADD COLUMN goal_digest TEXT;');
  }

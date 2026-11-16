@@ -61,7 +61,7 @@ Chrona 是随用户需求生长的个人工具。默认中文，代码、命令�
 | 合同／kernel | `packages/contracts/src/steward`、`packages/engine/src/modules/steward`；[实现现状](docs/zh/kernel-api-implementation.md) |
 | 应用 | `steward/external/`（含普通 Provider 应用 `pi`）；[普通应用迁移](docs/zh/application-migration.md) |
 | 宿主／SDK／Pi | `packages/integrations/src/steward`、`packages/pi`；[Agent](docs/zh/agent-builtin-application.md) |
-| Web | `external/web/src/pages.tsx`、`src/system/`、`app.js`；[组合与外壳](docs/zh/web-components-and-shell.md)、[可执行组件](docs/zh/web-executable-components.md) |
+| Web | `external/web/src/pages.tsx`、`src/system/`、`app.js`；[组合与外壳](docs/zh/web-components-and-shell.md)、[可执行页面](docs/zh/web-executable-components.md) |
 | 设置／材料 | [应用设置](docs/zh/application-settings.md)、[版本材料](docs/zh/author-version-materials.md)、[当前对话创作](docs/zh/author-current-conversation.md) |
 | 通知／恢复 | [有限事实](docs/zh/kernel-notification-facts.md)、[运维](docs/zh/operations.md) |
 | 可选工具 | 当前会话有 context-mode / CodeGraph 时，按需读[工具手册](docs/agents/tooling.md)；没有则用原生工具，不臆造可用性 |
@@ -80,9 +80,9 @@ Chrona 是随用户需求生长的个人工具。默认中文，代码、命令�
 
 ## Web
 
-- 中文优先，共用 React/json-render 渲染器；静态页不带数据，数据经用户鉴权后的 `/api/web` 获取。
+- 中文优先，共用 React runtime 与 UI 组件，应用通过 `page-set` 直接登记可执行页面；静态页不带数据，数据经用户鉴权后的 `/api/web` 获取。
 - Web 负责 shell、主题和导航；页面显式声明 `layout: document|workspace`。应用设置由应用页面和工具保存，不由 Web 从工具名推断。
 - 可信可执行组件直接在同页运行，无浏览器安全隔离；保留真实版本、页面与回调合同检查，卸载时清理资源。
-- 使用显式 `Composer.on.submit` 和应用提供的 `WorkspaceHeader.statusTone`；详情按需读组合合同。
+- 使用显式 `Composer.onSubmit` 和应用提供的 `WorkspaceHeader.statusTone`；详情按需读组合合同。
 - 页面改动用真实浏览器验证 `1440×900`、`1024×768`、`390×844`，手机不得横向滚动。
 - 主操作和待决定事项明显；文案使用应用、文件、会话、通知，不暴露不必要的 Run、grant、token 术语。

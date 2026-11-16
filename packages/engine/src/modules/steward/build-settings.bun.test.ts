@@ -100,29 +100,6 @@ for (const c of [
   expect((await f.builds().get()).buildUsage.remaining).toBe(0);
 });
 
-test("build claim snapshots owner budgets, leaves running work unchanged and informs the model", async () => {
-  const f = await fixture();
-  const session = await f.db.session.create({ data: { workspaceId: f.workspaceId, key: "build:one", source: "build" } });
-  await f.db.buildTargets.create({ data: { sessionId: session.id, name: "sample", modules: ["sample"] } });
-  const runs = createRuns(f.ports, f.workspaceId);
-  await runs.enqueue({ sessionId: session.id, lane: "build", trigger: "build", prompt: "Build" });
-  await f.builds().update({ timeoutMinutes: 17, maxSubmissions: 3 });
-  const first = (await runs.claimNext("build"))!;
-  expect(first.deadlineAt!.getTime() - f.ports.now().getTime()).toBe(17 * 60_000);
-  expect(first.leaseUntil).toEqual(first.deadlineAt);
-  expect(first.prompt).toContain("at most 3 candidate submissions");
-  const snapshot = await f.db.audit.findFirstOrThrow({ where: { kind: "run_claimed", subjectId: first.id } });
-  expect(snapshot.details).toMatchObject({ builds: { timeoutMinutes: 17, maxSubmissions: 3 } });
-  await f.builds().update({ timeoutMinutes: 90, maxSubmissions: 7 });
-  expect((await f.db.run.findUniqueOrThrow({ where: { id: first.id } })).deadlineAt).toEqual(first.deadlineAt);
-  expect((await f.db.audit.findUniqueOrThrow({ where: { id: snapshot.id } })).details).toEqual(snapshot.details);
-  await f.db.run.update({ where: { id: first.id }, data: { status: "finished" } });
-  await runs.enqueue({ sessionId: session.id, lane: "build", trigger: "build", prompt: "Continue" });
-  const next = (await runs.claimNext("build"))!;
-  expect(next.deadlineAt!.getTime() - f.ports.now().getTime()).toBe(90 * 60_000);
-  expect(next.prompt).toContain("at most 7 candidate submissions");
-});
-
 for (const lane of ["foreground", "background"] as const) test(`build settings do not impose a timeout on ${lane}`, async () => {
   const f = await fixture();
   await f.builds().update({ timeoutMinutes: 120 });

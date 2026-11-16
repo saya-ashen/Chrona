@@ -15,11 +15,10 @@ test(`${app} settings page validates and registers against real own tool schemas
     expect(manifest.activated).toBe(true);
     expect(manifest.uses).toContain("web.page-set");
     expect(manifest.tools.find(tool => tool.name === "ui-settings")?.visibility).toEqual(["owner"]);
-    const schemas = new Map(manifest.tools.map(tool => [tool.name, tool.parameters]));
-    expect(pageErrors(SETTINGS_PAGE, schemas, app)).toEqual([]);
+    expect(pageErrors(SETTINGS_PAGE)).toEqual([]);
     const tools = new Map(manifest.tools.map(tool => [tool.name, { inputSchema: tool.parameters, moduleId: app }]));
     const pages = createPages({ dataDir: root, modules: async () => [{ id: app, name: app, activeHash: "approved", status: "active" }], tools: async () => tools });
-    await pages.tool("page-set", SETTINGS_PAGE, { kind: "module", module: app, moduleId: app });
+    await pages.tool("page-set", SETTINGS_PAGE, { kind: "module", module: app, moduleId: app, hash: "approved" });
     const registered = await pages.list();
     expect(registered).toHaveLength(1);
     expect(registered[0]).toMatchObject({ id: "settings", purpose: "settings", title: SETTINGS_PAGE.title });

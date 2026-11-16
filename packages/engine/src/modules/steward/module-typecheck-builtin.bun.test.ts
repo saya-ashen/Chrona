@@ -69,7 +69,7 @@ test("detached Pi uses staged ordinary dependencies for candidate checking", asy
 
 test("ordinary Pi dependencies retain Pi options, missing imports and candidate output diagnostics", async () => {
   const f = await fixture(), entry = join(f.pi, "index.ts"), original = await readFile(entry, "utf8");
-  const caller = `${original}\nimport { chrona, type ChronaCalls } from "chrona";\nconst registered: string = (await chrona.call<ChronaCalls["web.page-set"]["output"]>({ moduleId: chrona.dependencies.web!, tool: "page-set" }, { id: "probe", title: "Probe", spec: {} })).id;\nvoid registered;\n`;
+  const caller = `${original}\nimport { chrona, type ChronaCalls } from "chrona";\nconst registered: string = (await chrona.call<ChronaCalls["web.page-set"]["output"]>({ moduleId: chrona.dependencies.web!, tool: "page-set" }, { id: "probe", title: "Probe", javascript: "export default () => () => {}" })).id;\nvoid registered;\n`;
   await writeFile(entry, caller);
   const candidate = { moduleName: "web", manifest: f.web };
   const good = await typecheckBuild(f.context, f.pi, f.manifest, candidate);
@@ -130,4 +130,18 @@ console.log(JSON.stringify(await typecheckBuild({ ports, workspaceId: "fixture" 
   expect(stderr).toBe("");
   expect(code).toBe(0);
   expect(JSON.parse(stdout)).toEqual({ status: "passed" });
+}, 60_000);
+
+test("Chat entry checks against generated kernel and Web contracts before packaging", async () => {
+  registerSystemModules();
+  const db = testDb({ injectedAgent: false }), root = await mkdtemp(join(tmpdir(), "chrona-chat-contracts-"));
+  cleanups.push(async () => { await db.$disconnect(); await rm(root, { recursive: true, force: true }); });
+  const workspace = await db.workspace.create({ data: { name: "Chat contract check" } });
+  const ports = { db, dataDir: root, publicUrl: null, now: () => new Date(), moduleRuntimes: await Bun.file(join(integrations, "runtimes.json")).json(),
+    moduleSdk: join(integrations, "module-sdk"), moduleTypecheck: join(integrations, "module-typecheck") } as StewardPorts;
+  const code = join(import.meta.dir, "external/chat");
+  const manifest = moduleManifestSchema.parse(await Bun.file(join(code, "module.json")).json());
+  const web = moduleManifestSchema.parse(await Bun.file(join(import.meta.dir, "external/web/module.json")).json());
+  const checked = await typecheckBuild(moduleContext(ports, workspace.id), code, manifest, { moduleName: "web", manifest: web });
+  expect(checked, JSON.stringify(checked)).toEqual({ status: "passed" });
 }, 60_000);

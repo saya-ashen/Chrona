@@ -30,7 +30,7 @@ function clock() {
     pending: () => [...tasks.values()].map(task => task.at - time),
     advance(ms: number) { time += ms; for (const [id, task] of [...tasks]) if (task.at <= time) { tasks.delete(id); task.fn(); } } };
 }
-async function fixture({ shared = false, keepAlive = false, listen, uses = ["notify.send", "provider.wake"], handler = async () => ({}) }: { shared?: boolean; keepAlive?: boolean; listen?: string; uses?: string[]; handler?: Parameters<typeof testModuleProcess>[0] } = {}) {
+async function fixture({ shared = false, keepAlive = false, idleMs, listen, uses = ["notify.send", "provider.wake"], handler = async () => ({}) }: { shared?: boolean; keepAlive?: boolean; idleMs?: number; listen?: string; uses?: string[]; handler?: Parameters<typeof testModuleProcess>[0] } = {}) {
   const db = testDb({ injectedAgent: false }), dataDir = await mkdtemp("/tmp/cms-test-");
   const workspace = await db.workspace.create({ data: { name: "supervisor" } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "v1" } });
@@ -42,7 +42,7 @@ async function fixture({ shared = false, keepAlive = false, listen, uses = ["not
   let now = 0;
   const ports: StewardPorts = { db, dataDir, now: () => new Date(Date.UTC(2026, 9, 21) + now++), publicUrl: null, sandbox: { available: true, isolated: true, startModule: peer.startModule } };
   const activation = await db.$transaction(tx => recordModuleActivation(moduleContext(ports, workspace.id), tx, { moduleId: module.id, previousHash: null, hash: "v1", generationId: "fixture" }));
-  const supervisor = shared ? moduleSupervisor(ports) : createModuleSupervisor(ports, { timers: fakeClock.timers });
+  const supervisor = shared ? moduleSupervisor(ports) : createModuleSupervisor(ports, { timers: fakeClock.timers, idleMs });
   let stopErrors: Error[] | undefined;
   cleanups.push(async () => {
     try {
@@ -211,9 +211,37 @@ test("lazy start uses per-instance loopback credentials, idle stop and restart",
   expect(ipcEndpoint).toMatch(/^tcp:\/\/127\.0\.0\.1:\d+$/);
   expect(ipcToken).toMatch(/^[a-f0-9]{64}$/);
   f.advance(600_000);
-  await until(() => f.processes[0]!.socket.destroyed);
+  await until(() => f.supervisor.status(f.module.id, "v1", false).state === "idle");
   await f.deliver(); expect(f.processes).toHaveLength(2);
 });
+test("lifecycle barriers drain tools and cannot leave an idle timer closing later work", async () => {
+  const gates: (() => void)[] = [], entered: string[] = [];
+  const f = await fixture({ idleMs: 1000, handler: async event => {
+    entered.push(event.trigger.kind);
+    await new Promise<void>(resolve => { gates.push(resolve); }); return {};
+  } });
+  const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.module.id, hash: "v1" } } });
+  await f.db.moduleVersion.update({ where: { id: version.id }, data: { manifest: { ...f.manifest, activated: true } } });
+  const first = f.deliver();
+  await until(() => gates.length === 1);
+  const lifecycle = f.supervisor.deliver(f.module.id, "v1", {
+    ...event, trigger: { kind: "activated", id: "activated", firedAt: event.now },
+  });
+  gates[0]!(); await first;
+  await until(() => gates.length === 2);
+  expect(entered).toEqual(["tool", "activated"]);
+  f.advance(500);
+  gates[1]!(); await lifecycle;
+  f.advance(100);
+  const third = f.deliver();
+  await until(() => gates.length === 3);
+  f.advance(1000);
+  expect(f.processes[0]!.socket.destroyed).toBe(false);
+  gates[2]!(); await third;
+  f.advance(1000);
+  await until(() => f.processes[0]!.socket.destroyed);
+});
+
 test("reconciliation polls every thirty seconds", async () => {
   const f = await fixture();
   let polls = 0;
@@ -450,7 +478,7 @@ test("stop aggregates every unknown owner while still stopping healthy modules",
   expect(f.pending()).toEqual([]);
 });
 
-test("events are serial and calls without uses retain their delivery receipts", async () => {
+test("tool events overlap and calls without uses retain their delivery receipts", async () => {
   let active = 0, maximum = 0;
   const f = await fixture({ uses: [], handler: async (_event, call) => {
     maximum = Math.max(maximum, ++active);
@@ -459,7 +487,7 @@ test("events are serial and calls without uses retain their delivery receipts", 
   } });
   await installNotifyTarget(f.ports, f.module.workspaceId, true);
   const replies = await Promise.all([f.deliver(), f.deliver()]);
-  expect(maximum).toBe(1); expect(f.processes).toHaveLength(1);
+  expect(maximum).toBe(2); expect(f.processes).toHaveLength(1);
   expect(replies[0]).toMatchObject({ result: { result: { result: { status: "queued", duplicate: false } } } });
   expect(await f.db.moduleCall.count({ where: { method: "call", status: { not: "rejected" } } })).toBe(0);
 });

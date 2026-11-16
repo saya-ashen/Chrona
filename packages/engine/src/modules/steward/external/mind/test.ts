@@ -58,8 +58,7 @@ try {
   module = await startModule("offline-entry.ts", { stubs: {
     "modules.list": () => ({ items: Object.entries(ids).map(([name, id]) => ({ id, name, activeHash: hash })), nextCursor: null }),
     "modules.describe": () => ({ items: [], nextCursor: null }),
-    "web.component-set": () => ({ name: "MindWorkspace", type: `${ids.mind}:MindWorkspace`, revision: "sdk-component" }),
-    "web.page-set": (args: Record<string, unknown>) => ({ id: args.id, catalog: "sdk-catalog" }),
+    "web.page-set": (args: Record<string, unknown>) => ({ id: args.id, revision: "sdk-page" }),
     "timers.list": () => ({ items: scheduled ? [scheduled] : [], nextCursor: null }),
     "timers.set": (args: Record<string, unknown>, options: { key?: string }) => {
       assert.ok(options.key, "Timer writes require a call key");
@@ -85,10 +84,9 @@ try {
   // The harness starts with symbolic bindings; directory results reach the child on its next event.
   const activated = await module.send({ trigger: { kind: "activated", id: "activated", firedAt: now }, now, params: {} });
   assert.equal(activated.error, undefined);
-  assert.equal(callsFor("web.component-set").length, 2);
   assert.equal(callsFor("web.page-set").length, 4, "Activation registers both executable pages again");
-  const registration = callsFor("web.component-set")[1].params;
-  assert.deepEqual(registration.target, { moduleId: ids.web, tool: "component-set" });
+  const registration = callsFor("web.page-set")[2].params;
+  assert.deepEqual(registration.target, { moduleId: ids.web, tool: "page-set" });
   assert.ok(typeof registration.args.javascript === "string" && registration.args.javascript.length > 0);
   assert.ok(typeof registration.args.css === "string" && registration.args.css.length > 0);
   assert.ok((registration.args.tools as string[]).includes("overview"));
@@ -101,8 +99,8 @@ try {
     assert.deepEqual(page.params.target, { moduleId: ids.web, tool: "page-set" });
     assert.equal(page.params.args.layout, "workspace");
     assert.equal(page.params.args.purpose, page.params.args.id === "settings" ? "settings" : undefined);
-    const spec = page.params.args.spec as { root: string; elements: Record<string, { type: string }> };
-    assert.equal(spec.elements[spec.root].type, `${ids.mind}:MindWorkspace`);
+    assert.ok(typeof page.params.args.javascript === "string");
+    assert.deepEqual(page.params.args.props, { view: page.params.args.id === "settings" ? "settings" : "overview" });
   }
   assert.ok(scheduled);
   assert.equal(scheduled.id, "mind-core");

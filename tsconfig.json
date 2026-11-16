@@ -82,6 +82,9 @@
       ],
       "chrona": [
         "./packages/integrations/src/steward/module-sdk/sdk.ts"
+      ],
+      "/pages.js": [
+        "./packages/engine/src/modules/steward/external/web/src/pages.tsx"
       ]
     }
   },

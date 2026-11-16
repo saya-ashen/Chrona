@@ -90,9 +90,9 @@ function fixture() {
   const other = await f.app.grant({ ...f.grantInput, params: { query: 'different' } }, owner);
   await expect(f.app.invoke({ ...input, adapterId: other.id, params: other.params }, runtime)).rejects.toThrow();
   expect(f.calls).toHaveLength(1);
-  expect(readFileSync(join(f.directory, 'mind-application.sqlite')).subarray(0, 15).toString()).toBe('SQLite format 3');
+  expect(readFileSync(join(f.directory, 'mind.sqlite')).subarray(0, 15).toString()).toBe('SQLite format 3');
   for (const suffix of ['', '-wal']) {
-    const bytes = readFileSync(join(f.directory, `mind-application.sqlite${suffix}`)); expect(bytes.includes(Buffer.from('very-private'))).toBe(false);
+    const bytes = readFileSync(join(f.directory, `mind.sqlite${suffix}`)); expect(bytes.includes(Buffer.from('very-private'))).toBe(false);
   }
   expect(() => f.app.readReceipt(first.ref, { subject: 'other-app', role: 'application', scopes: [{ sessionId: 's2' }] })).toThrow('scope');
  });

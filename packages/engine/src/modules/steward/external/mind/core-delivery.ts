@@ -71,7 +71,7 @@ export class CoreDelivery {
  constructor(directory: string, private service: CoreMindService, private call: CoreCall, private options: DeliveryOptions) {
   const dir = resolve(directory); if (existsSync(dir) && (!lstatSync(dir).isDirectory() || lstatSync(dir).isSymbolicLink())) throw Error('Unsafe delivery directory');
   mkdirSync(dir,{recursive:true,mode:0o700}); chmodSync(dir,0o700);
-  const path=join(dir,'mind-delivery.sqlite'); if(existsSync(path)&&(!lstatSync(path).isFile()||lstatSync(path).isSymbolicLink()))throw Error('Unsafe delivery database');
+  const path=join(dir,'mind.sqlite'); if(existsSync(path)&&(!lstatSync(path).isFile()||lstatSync(path).isSymbolicLink()))throw Error('Unsafe delivery database');
   this.db=new Database(path,{create:true}); chmodSync(path,0o600);
   this.db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA secure_delete=ON; CREATE TABLE IF NOT EXISTS delivery (id TEXT PRIMARY KEY, command_key TEXT UNIQUE NOT NULL, body TEXT NOT NULL)');
  }

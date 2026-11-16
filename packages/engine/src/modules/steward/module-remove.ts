@@ -50,12 +50,6 @@ async function removalSessions(db: Db, module: Row) {
 async function assertNoPendingWork(db: Db, module: Row) {
   const sessions = await removalSessions(db, module);
   if (await db.run.count({ where: { workspaceId: module.workspaceId, sessionId: { in: sessions.map(session => session.id) }, status: { in: ["queued", "running"] } } })) throw new StewardError("conflict", "关联会话仍有排队或运行中的工作，请先停止并核对结果");
-  const builds = await db.buildTargets.findMany({ where: { session: { workspaceId: module.workspaceId } }, select: { sessionId: true, name: true, modules: true } });
-  const targets = builds.filter(row => {
-    const request = row;
-    return request.name === module.name || Array.isArray(request.modules) && request.modules.includes(module.name);
-  }).map(row => row.sessionId);
-  if (await db.run.count({ where: { workspaceId: module.workspaceId, sessionId: { in: targets }, lane: "build", status: { in: ["queued", "running"] } } })) throw new StewardError("conflict", "应用仍有排队或运行中的构建，请先停止构建");
   if (await db.moduleInvocation.count({ where: { workspaceId: module.workspaceId, AND: [
     { OR: [{ callerModuleId: module.id }, { target: module.name }] },
     { OR: [{ status: { in: ["queued", "running", "waiting", "unknown"] } }, { reply: true, repliedAt: null }] },
@@ -102,9 +96,6 @@ export async function removeApproved(context: ModuleContext, action: ApprovedAct
     const current = await requireModule(context, tx, moduleId);
     if (current.activeHash !== hash || current.name !== name || current.status !== "paused") throw new StewardError("conflict", "应用在备份期间发生变化，请重新申请删除");
     await assertRemovable(tx, current);
-    for (const grant of await tx.grant.findMany({ where: { workspaceId, revokedAt: null } })) {
-      if ((grant.scope as { moduleId?: unknown } | null)?.moduleId === moduleId) await tx.grant.update({ where: { id: grant.id }, data: { revokedAt: ports.now() } });
-    }
     const workspace = await tx.workspace.findUniqueOrThrow({ where: { id: workspaceId } });
     const settings = (workspace.settings ?? {}) as { moduleSettings?: Record<string, unknown> };
     if (settings.moduleSettings && name in settings.moduleSettings) {

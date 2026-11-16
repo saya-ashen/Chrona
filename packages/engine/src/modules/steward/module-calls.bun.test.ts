@@ -13,6 +13,7 @@ import { moduleIncidents, recordModuleFailure } from "./module-diagnostics";
 import { registerSystemModules } from "./system-modules";
 import { PAUSED_MODULE_NAMES } from "./module-availability";
 import type { StewardPorts } from "./ports";
+import { pruneHistory } from "./retention";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -28,7 +29,7 @@ async function fixture(handlers: { alpha: Handler; beta: Handler }) {
     alpha: { name: "alpha", entry: "index.ts", tests: ["test.ts"], effects: [],
       uses: ["beta.echo", "beta.look", "beta.private", "beta.hidden", "beta.bounce", "beta.crash", "beta.again", "modules.contributions"], tools: [tool("pong"), tool("start")] },
     beta: { name: "beta", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["alpha.pong"],
-      tools: [tool("echo", { visibility: ["modules", "kernel"] }), tool("look", { idempotent: true }), tool("private", { visibility: ["kernel"] }), tool("hidden", { visibility: ["owner"] }), tool("bounce", { visibility: ["modules", "kernel"] }), tool("crash", { visibility: ["modules", "kernel"] }), tool("again", { idempotent: true, visibility: ["modules", "kernel"] }), tool("unlisted")],
+      tools: [tool("echo", { visibility: ["modules", "kernel"] }), tool("look", { idempotent: true, readOnly: true }), tool("private", { visibility: ["kernel"] }), tool("hidden", { visibility: ["owner"] }), tool("bounce", { visibility: ["modules", "kernel"] }), tool("crash", { visibility: ["modules", "kernel"] }), tool("again", { idempotent: true, visibility: ["modules", "kernel"] }), tool("unlisted")],
     },
   };
   const modules: Record<string, { id: string }> = {};
@@ -74,6 +75,19 @@ test("keyed unrecorded system reads retain finished receipts and deduplicate", a
   expect(await callSync(f.ports, origin, "modules.list", {}, { key: "read-once" })).toEqual(first);
   await expect(callSync(f.ports, origin, "modules.list", { limit: 1 }, { key: "read-once" })).rejects.toMatchObject({ code: "conflict" });
   expect(await f.db.moduleInvocation.count()).toBe(1);
+});
+
+test("expired application receipt refuses original and changed requests without another dispatch", async () => {
+  let deliveries = 0;
+  const f = await fixture({ alpha: async () => ({}), beta: async () => { deliveries++; return { result: { text: "exact first reply" } }; } });
+  const origin = kernelOrigin(f.workspace.id), args = { text: "old request" }, options = { key: "consumed-forever" };
+  const first = await callSync(f.ports, origin, "beta.echo", args, options);
+  expect(await callSync(f.ports, origin, "beta.echo", args, options)).toEqual(first);
+  f.advance(91 * 86400_000);
+  await pruneHistory(f.db, f.ports.now());
+  for (const request of [args, { text: "changed request" }]) await expect(callSync(f.ports, origin, "beta.echo", request, options)).rejects.toMatchObject({ code: "conflict" });
+  expect(deliveries).toBe(1);
+  expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: first.callId } })).toMatchObject({ key: options.key, output: null, status: "failed" });
 });
 
 test("shipped files capability examples match its input and output contracts", async () => {
@@ -211,13 +225,17 @@ test("claimed activation conflicts stay unmarked on failure and replay", async (
   let release!: () => void, entered!: () => void, calls = 0;
   const blocked = new Promise<void>(resolve => { release = resolve; }), started = new Promise<void>(resolve => { entered = resolve; });
   const f = await fixture({ alpha: async () => ({}), beta: async () => { calls++; entered(); await blocked; return { result: 42 }; } });
-  const origin = kernelOrigin(f.workspace.id);
-  const first = callSync(f.ports, origin, "beta.echo", {});
+  const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.beta.id, hash: "beta-v1" } } });
+  await f.db.moduleVersion.update({ where: { id: version.id }, data: { manifest: { ...moduleManifestSchema.parse(version.manifest), activated: true } } });
+  const origin = kernelOrigin(f.workspace.id), now = f.ports.now().toISOString();
+  const first = moduleSupervisor(f.ports).deliver(f.beta.id, "beta-v1", {
+    trigger: { kind: "activated", id: "activated", firedAt: now }, now, params: {},
+  });
   await started;
   const second = callSync(f.ports, origin, "beta.echo", {}, { key: "activation-conflict" }).then(value => ({ value }), error => ({ error }));
   try {
-    for (let i = 0; i < 100 && await f.db.moduleInvocation.count() < 2; i++) await Bun.sleep(1);
-    expect(await f.db.moduleInvocation.count()).toBe(2);
+    for (let i = 0; i < 100 && await f.db.moduleInvocation.count() < 1; i++) await Bun.sleep(1);
+    expect(await f.db.moduleInvocation.count()).toBe(1);
     await f.db.module.update({ where: { id: f.beta.id }, data: { activeHash: "beta-v2" } });
   } finally { release(); }
   await first;
@@ -444,21 +462,22 @@ test("A calls B through Chrona: B sees the real caller and the call is recorded"
   expect(await f.db.moduleCall.count({ where: { method: "call", status: { not: "rejected" } } })).toBe(0);
 });
 
-test("keyless app-to-app reads keep the call and run status but not the result; keyed reads keep it for replay", async () => {
+test("keyless app observations write no invocation or run history; keyed observations retain exact replies", async () => {
   const body = "x".repeat(4096);
+  let reads = 0;
   const f = await fixture({
     alpha: async (event, call) => ({ result: await call("call", { target: "beta.look", args: { text: "page" }, ...(event.trigger.id === "start" ? { key: "read-k1" } : {}) } as never) }),
-    beta: async () => ({ result: { body } }),
+    beta: async () => { reads++; return { result: { body } }; },
   });
   expect(output(await f.fire("pong"))).toMatchObject({ result: { output: { body } } });
   expect(output(await f.fire("start"))).toMatchObject({ result: { output: { body } } });
-  const [keyless, keyed] = await f.db.moduleInvocation.findMany({ where: { tool: "look" }, orderBy: { createdAt: "asc" } });
-  expect(keyless).toMatchObject({ status: "succeeded", output: null });
-  expect(keyed).toMatchObject({ status: "succeeded", key: "read-k1", output: { body } });
-  const runs = await f.db.moduleRun.findMany({ where: { moduleId: f.beta.id, triggerId: "tool:look" }, orderBy: { createdAt: "asc" } });
-  expect(runs).toHaveLength(2);
-  expect(runs[0]).toMatchObject({ exitCode: 0, output: null });
-  expect(runs[1]).toMatchObject({ exitCode: 0, output: { result: { body } } });
+  const calls = await f.db.moduleInvocation.findMany({ where: { tool: "look" } });
+  expect(calls).toHaveLength(1);
+  expect(calls[0]).toMatchObject({ status: "succeeded", key: "read-k1", output: { body } });
+  expect(await f.db.moduleRun.count({ where: { moduleId: f.beta.id } })).toBe(0);
+  expect(await f.db.moduleExecutionResult.count({ where: { moduleId: f.beta.id } })).toBe(0);
+  await f.fire("start");
+  expect(reads).toBe(2);
 });
 test("declared app outputs fail synchronously with callee diagnostics and no lifecycle incident", async () => {
   const f = await fixture({ alpha: async (_event, call) => ({ result: await call("call", { target: "beta.echo", args: {} } as never) }), beta: async () => ({ result: { wrong: "secret payload" } }) });
@@ -561,7 +580,7 @@ test("a sync call back into a module that is waiting is refused as a cycle, not 
   expect(Date.now() - started).toBeLessThan(5000);
 });
 
-test("a sync call into a module that waits on the caller in another event is refused (cross-event deadlock)", async () => {
+test("independent concurrent events can call in opposite directions", async () => {
   let release!: () => void;
   const gate = new Promise<void>(resolve => { release = resolve; });
   let betaEntered!: () => void, echoQueued!: () => void;
@@ -590,7 +609,44 @@ test("a sync call into a module that waits on the caller in another event is ref
   await echoReady;
   release(); await delivering;
   expect(output(await alpha)).toMatchObject({ result: { output: "echo" } });
-  expect(betaReply).toMatchObject({ error: { code: "cycle" } });
+  expect(betaReply).toMatchObject({ result: { output: "pong" } });
+});
+
+test("lifecycle barriers reject an actual cross-event wait cycle", async () => {
+  let release!: () => void, entered!: () => void, queued!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  const echo = new Promise<void>(resolve => { queued = resolve; });
+  let nested: unknown;
+  const f = await fixture({
+    alpha: async (event, call) => event.trigger.id === "pong" ? { result: "pong" }
+      : { result: await call("call", { target: "beta.echo", args: {} } as never) },
+    beta: async (event, call) => {
+      if (event.trigger.kind !== "activated") return { result: "echo" };
+      entered(); await gate;
+      nested = await call("call", { target: "alpha.pong", args: {} } as never);
+      return { result: nested };
+    },
+  });
+  for (const module of [f.alpha, f.beta]) {
+    const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: module.id, hash: module.id === f.alpha.id ? "alpha-v1" : "beta-v1" } } });
+    await f.db.moduleVersion.update({ where: { id: version.id }, data: { manifest: { ...moduleManifestSchema.parse(version.manifest), activated: true } } });
+  }
+  const supervisor = moduleSupervisor(f.ports), deliver = supervisor.deliver.bind(supervisor);
+  const observed = spyOn(supervisor, "deliver").mockImplementation((moduleId, hash, event, options) => {
+    if (moduleId === f.beta.id && event.trigger.id === "echo") queued();
+    return deliver(moduleId, hash, event, options);
+  });
+  cleanups.push(async () => { observed.mockRestore(); });
+  const now = f.ports.now().toISOString();
+  const activated: ModuleEvent = { trigger: { kind: "activated", id: "activated", firedAt: now }, now, params: {} };
+  const beta = deliver(f.beta.id, "beta-v1", activated);
+  await started;
+  const alpha = deliver(f.alpha.id, "alpha-v1", activated);
+  await echo;
+  release();
+  await Promise.all([alpha, beta]);
+  expect(nested).toMatchObject({ error: { code: "cycle" } });
 });
 
 test("async calls are stored under the caller's key, delivered once and answered with call_result and callStatus", async () => {

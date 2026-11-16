@@ -180,7 +180,8 @@ export class Store {
       return this.save(c);
     }
   }
-  private async perform(id: string, key: string, kind: string, input: any) {
+  private async perform(id: string, key: string, kind: string, input: any,
+    providers?: Awaited<ReturnType<Call>>): Promise<ReturnType<Store['get']>> {
     let c = this.get(id);
     if (!key || key.length > 128) throw Error('需要稳定调用 key');
     const prior = c.operations.find((o: any) => o.key === key);
@@ -207,7 +208,8 @@ export class Store {
     const sending = { ...c, ...snapshot, settings: input.snapshot?.settings ?? c.settings };
     if (kind === 'send') {
       if (!sending.draft.trim() && !sending.attachments.length) throw Error('请输入消息');
-      const providers = await this.call('agent.providers', {});
+      // Provider discovery yields. Re-enter against current conversation state before reserving a send.
+      if (!providers) return this.perform(id, key, kind, input, await this.call('agent.providers', {}));
       const p = providers.items.find((p: any) => p.id === sending.settings.providerId);
       if (!p?.available || !p.capabilities.conversation) throw Error('请先选择可用的对话提供方');
       if (c.context && (c.context.providerId !== p.id || c.context.hash !== p.hash || c.context.revision !== p.revision)) throw Error('提供方或版本已改变，请新建会话');

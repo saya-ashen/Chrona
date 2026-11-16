@@ -3,19 +3,19 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { createPages, pageErrors, type ModuleState } from "./pages";
 const dirs: string[] = [];
 afterEach(async () => { for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true }); });
-const spec = { root: "text", elements: { text: { type: "Text", props: { text: "设置内容" }, children: [] } } };
+const javascript = "export default function mount() { return () => {}; }";
 async function fixture() {
   const dataDir = await mkdtemp("/tmp/chrona-settings-pages-"); dirs.push(dataDir);
   const modules: ModuleState[] = [{ id: "owner-id", name: "fixture", status: "active", activeHash: "active" }];
   const tools = new Map([["read", { inputSchema: {}, moduleId: "owner-id" }]]);
   const deps = { dataDir, modules: async () => modules, tools: async () => tools };
-  return { deps, modules, tools, caller: { kind: "module", module: "fixture", moduleId: "owner-id" }, input: { id: "preferences", title: "偏好设置", purpose: "settings", data: { view: { tool: "read" } }, spec } };
+  return { deps, modules, tools, caller: { kind: "module", module: "fixture", moduleId: "owner-id", hash: "active" }, input: { id: "preferences", title: "偏好设置", purpose: "settings", tools: ["read"], javascript } };
 }
 test("settings purpose survives restart and is exposed through both page lists", async () => {
   const { deps, caller, input } = await fixture();
   await createPages(deps).tool("page-set", input, caller);
   const pages = createPages(deps), page = await pages.get("fixture", "preferences");
-  expect(page).toMatchObject({ moduleId: "owner-id", purpose: "settings", data: { view: { tool: "read" } } });
+  expect(page).toMatchObject({ moduleId: "owner-id", purpose: "settings", tools: ["read"] });
   expect(await pages.list()).toEqual([{ module: "fixture", moduleId: "owner-id", id: "preferences", title: "偏好设置", purpose: "settings" }]);
   expect(await pages.tool("pages", {}, caller)).toMatchObject({ items: [{ id: "preferences", purpose: "settings" }] });
   const revision = page!.revision;
@@ -34,7 +34,7 @@ test("concurrent conflicting registrations cannot create a second settings page;
 });
 test.each([null, "general", "Settings", {}, false])("invalid purpose %j is rejected without changing the registry", async purpose => {
   const { deps, caller, input } = await fixture(), pages = createPages(deps);
-  expect(pageErrors({ spec, purpose }, new Map(), "fixture").join()).toContain("purpose");
+  expect(pageErrors({ ...input, purpose }).join()).toContain("purpose");
   await expect(pages.tool("page-set", { ...input, purpose }, caller)).rejects.toMatchObject({ code: "invalid" });
   expect(await pages.list()).toEqual([]);
 });
@@ -46,7 +46,7 @@ test.each([
   const registry = createPages(deps);
   tools.set("stable", { ...tools.get("read")! });
   await registry.tool("page-set", input, caller);
-  await registry.tool("page-set", { ...input, id: "stable", title: "有效页面", purpose: undefined, data: { view: { tool: "stable" } } }, caller);
+  await registry.tool("page-set", { ...input, id: "stable", title: "有效页面", purpose: undefined, tools: ["stable"] }, caller);
   tools.set("read", { moduleId, inputSchema: { description: "Updated read description" } });
   const pages = createPages(deps);
   const settings = { module: "fixture", moduleId: "owner-id", id: input.id, title: input.title, purpose: "settings" };
@@ -54,7 +54,7 @@ test.each([
   expect(await pages.list()).toEqual(visible ? [settings, stable] : [stable]);
   if (visible) expect(await pages.get("fixture", input.id)).toMatchObject({ moduleId: "owner-id", purpose: "settings" });
   else await expect(pages.get("fixture", input.id)).rejects.toMatchObject({ code: "conflict" });
-  expect(await pages.get("fixture", "stable")).toMatchObject({ data: { view: { tool: "stable" } } });
+  expect(await pages.get("fixture", "stable")).toMatchObject({ tools: ["stable"] });
   // Listing preserves registrations so restoring the original tool identity restores navigation.
   tools.set("read", { moduleId: "owner-id", inputSchema: {} });
   expect(await pages.list()).toEqual([settings, stable]);

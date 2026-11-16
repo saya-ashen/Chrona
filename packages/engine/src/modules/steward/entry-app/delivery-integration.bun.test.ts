@@ -1,5 +1,6 @@
+import { readFile } from "./journal-test-storage";
 import { afterEach, expect, test } from "bun:test";
-import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { agentReadOutput, runtimeTranscriptSchema } from "@chrona/contracts/steward";
@@ -60,7 +61,7 @@ async function conversationFixture() {
     throw new Error(`Unexpected delivery call ${target}`);
   };
   const restart = () => createAgentConversations({ dataDir, call, tools: [{ moduleId: "author-id", tool: "submit" }], now: () => new Date(clock), reply: event => { replies.push(event); }, deliveryPages: async () => state.pages });
-  const journal = async () => JSON.parse(await readFile(join(dataDir, "conversations/state.json"), "utf8"));
+  const journal = async () => JSON.parse(await readFile(join(dataDir, "conversations/sessions.sqlite"), "utf8"));
   return { restart, journal, calls, replies, runs, state, advance: () => { clock += 2000; } };
 }
 
@@ -117,8 +118,7 @@ test("Web private list/get reader proves only the full current page identity", a
   const inventory = [{ id: "music-id", name: "music", status: "active", activeHash: hash }];
   const pages = createPages({ dataDir, modules: async () => inventory, tools: async () => new Map() });
   const owner = { kind: "module", module: "music", moduleId: "music-id", hash };
-  await pages.tool("component-set", { name: "Player", javascript: "export default function mount(element) { element.textContent = 'Music'; }", props: { type: "object", properties: {}, additionalProperties: false }, tools: [], events: [], slots: [] }, owner);
-  const page = { id: "home", title: "音乐", spec: { root: "text", elements: { text: { type: "music:Player", props: {}, children: [] } } } };
+  const page = { id: "home", title: "音乐", javascript: "export default function mount(element) { element.textContent = 'Music'; return () => element.replaceChildren(); }" };
   await pages.tool("page-set", page, owner);
   expect((await pages.list())[0]).not.toHaveProperty("hash");
   expect(await readDeliveryPages(pages)).toEqual([{ module: "music", moduleId: "music-id", hash, id: "home", title: "音乐" }]);
@@ -133,13 +133,13 @@ test("Web private list/get reader proves only the full current page identity", a
   expect(turn.applicationDelivery[0]!.targets[0]).toMatchObject({ pages: [], pagesCheck: "unknown" });
 });
 
-test("declarative pages retain the real registering version; legacy callers remain unknown", async () => {
+test("executable pages retain the real registering version and reject callers without a version", async () => {
   const hash = "b".repeat(40), dataDir = await directory();
   const inventory = [{ id: "music-id", name: "music", status: "active", activeHash: hash }];
   const dependencies = { dataDir, modules: async () => inventory, tools: async () => new Map() };
   const pages = createPages(dependencies), caller = { kind: "module", module: "music", moduleId: "music-id", hash };
-  const page = { id: "home", title: "Music", spec: { root: "text", elements: { text: { type: "Text", props: { text: "Music" }, children: [] } } } };
-  await expect(pages.tool("page-set", page, { ...caller, hash: "c".repeat(40) })).rejects.toThrow("版本已变化");
+  const page = { id: "home", title: "Music", javascript: "export default function mount() { return () => {}; }" };
+  await expect(pages.tool("page-set", page, { ...caller, hash: "c".repeat(40) })).rejects.toMatchObject({ code: "conflict" });
   await pages.tool("page-set", page, caller);
   const evidence = [{ module: "music", moduleId: "music-id", hash, id: "home", title: "Music" }];
   expect(await readDeliveryPages(createPages(dependencies))).toEqual(evidence);
@@ -149,7 +149,7 @@ test("declarative pages retain the real registering version; legacy callers rema
   await reconcileApplicationDelivery(async (name: string) => name === "modules.health" ? { items: [{ ...healthFixture(), activeHash: inventory[0]!.activeHash }], nextCursor: null } : receiptFixture(), turn.applicationDelivery, "2026-11-09T00:00:07.000Z", () => readDeliveryPages(pages));
   expect(turn.applicationDelivery[0]!.targets[0]).toMatchObject({ activation: "different", pages: [], pagesCheck: "unknown" });
   const { hash: _hash, ...legacyCaller } = caller;
-  await pages.tool("page-set", page, legacyCaller);
+  await expect(pages.tool("page-set", page, legacyCaller)).rejects.toMatchObject({ code: "forbidden" });
   expect(await readDeliveryPages(pages)).toEqual([]);
 });
 

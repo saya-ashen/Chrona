@@ -3,6 +3,7 @@ import { existsSync, promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID, timingSafeEqual } from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { connectLoopbackChannel } from "./transport";
 import type { ChronaCalls } from "./calls";
 export type { ChronaCalls } from "./calls";
@@ -46,7 +47,8 @@ export class ModelError extends Error {
   constructor(public readonly code: string, message: string, public readonly reason?: string) { super(message); this.name = "ModelError"; }
 }
 const pending = new Map<string, { resolve(result: unknown): void; reject(error: Error): void }>();
-let stopped = false, queue = Promise.resolve();
+let stopped = false;
+const eventContext = new AsyncLocalStorage<{ id: string; active: boolean; bindings: Record<string, string> }>();
 const disconnectHandlers = new Set<() => void>();
 /** Release module-owned resources when the kernel connection is lost; this does not prove cleanup to the kernel. */
 export function onDisconnect(handler: () => void) { disconnectHandlers.add(handler); }
@@ -69,15 +71,21 @@ async function event(message: { id: string; event: { trigger: WireTrigger; now: 
     // Results of async calls are optional to handle (callStatus reads them too), and so is `activated`.
     if (!handler && (message.event.trigger.kind === "call_result" || message.event.trigger.kind === "activated")) { send({ id: message.id, result: {} }); return; }
     if (!handler) throw new Error("No handler for " + message.event.trigger.kind);
-    const result = await handler({ ...message.event.trigger, now: message.event.now, params: message.event.params });
-    send({ id: message.id, result: result ?? {} });
+    const context = { id: message.id, active: true, bindings: { ...dependencies } };
+    try {
+      const result = await eventContext.run(context, () => handler({ ...message.event.trigger, now: message.event.now, params: message.event.params }));
+      send({ id: message.id, result: result ?? {} });
+    } finally { context.active = false; }
   } catch (error) { send({ id: message.id, error: (error instanceof Error ? error.message : String(error)).slice(0, 2000), ...(error instanceof ModelError ? { errorCode: error.code, ...(error.reason ? { errorReason: error.reason } : {}) } : {}) }); }
 }
 function receive(value: unknown) {
   if (typeof value !== "object" || value === null || !("id" in value) || typeof value.id !== "string") throw new Error("Invalid Chrona message");
   const message = value as { id: string; ping?: boolean; event?: Parameters<typeof event>[0]["event"]; error?: { code: string; reason?: string; message?: string }; result?: unknown };
   if (message.ping === true) send({ id: message.id, result: {} });
-  else if (message.event) queue = queue.then(() => event({ id: message.id, event: message.event! })).catch(() => { void channel.close(); });
+  else if (message.event) void event({ id: message.id, event: message.event }).catch(error => {
+    console.error(JSON.stringify({ component: "module-sdk", event: "event_reply_failed", error: String(error) }));
+    void channel.close();
+  });
   else {
     const call = pending.get(message.id);
     if (!call) return;
@@ -94,7 +102,8 @@ function call<T = unknown>(method: string, params: unknown): Promise<T> {
   const id = randomUUID();
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve: result => resolve(result as T), reject });
-    try { send({ id, method, params }); } catch (error) { pending.delete(id); reject(error); }
+    const context = eventContext.getStore();
+    try { send({ id, method, params, ...(context?.active ? { eventId: context.id } : {}) }); } catch (error) { pending.delete(id); reject(error); }
   });
 }
 /** Where this module's directories are; set by Chrona with or without a sandbox. */
@@ -107,7 +116,10 @@ export const paths = {
 export const chrona = {
   paths,
   /** Symbolic build dependencies bind to actual application IDs supplied with each event. */
-  dependencies,
+  get dependencies() {
+    const context = eventContext.getStore();
+    return context?.active ? context.bindings : dependencies;
+  },
   /**
    * Calls an application tool through Chrona (`target` = {moduleId, tool}); `uses` declares its contract, not runtime admission.
    * sync (default): resolves to the tool's result; a timeout or crash after delivery rejects with code "unknown".

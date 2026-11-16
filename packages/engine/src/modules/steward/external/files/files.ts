@@ -16,6 +16,7 @@ type ToolArgs = Record<string, unknown>;
 class FilesRuntime {
   private readonly root: string;
   private readonly historyRoot: string;
+  private mutation: Promise<void> = Promise.resolve();
   constructor(content: string, data: string) {
     this.root = resolve(content);
     this.historyRoot = join(data, "history");
@@ -161,8 +162,17 @@ class FilesRuntime {
         delete: () => this.remove(this.relative(args.path), at),
       };
       if (!Object.hasOwn(handlers, id)) { this.relative(args.path); throw new Error("Unknown files tool"); }
-      return await handlers[id]!();
-    } catch (error) { return { error: (error instanceof Error ? error.message : String(error)).slice(0, 1000) }; }
+      if (!['write', 'restore', 'move', 'delete'].includes(id)) return await handlers[id]!();
+      // A mutation owns both the file bytes and the shared history index until completion.
+      const result = this.mutation.then(handlers[id]!);
+      this.mutation = result.then(() => undefined, error => {
+        console.error(JSON.stringify({ component: 'files', event: 'mutation_failed', error: String(error) }));
+      });
+      return await result;
+    } catch (error) {
+      console.error(JSON.stringify({ component: 'files', event: 'tool_failed', tool: id, error: String(error) }));
+      return { error: (error instanceof Error ? error.message : String(error)).slice(0, 1000) };
+    }
   }
 }
 

@@ -1,3 +1,4 @@
+import { tableBytes } from "./test-support/storage";
 import { afterEach, expect, test } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -42,7 +43,7 @@ function fixture() {
   const input = (adapterId: string, actionKey = 'original-command') => ({ actionKey, pursuitId: pursuit.id,
     expectedRevision: pursuit.revision, expectedVisibilityRevision: 0, adapterId, params });
   const ref = `mind-application:${coreDigest('original-command')}`;
-  const path = join(directory, 'mind-application.sqlite');
+  const path = join(directory, 'mind.sqlite');
   const inspect = () => {
     const db = new Database(path, { readonly: true });
     try { return JSON.parse((db.query('SELECT json FROM invocations WHERE ref=?').get(ref) as { json: string }).json); }
@@ -96,8 +97,8 @@ for (const withdrawal of ['session', 'evidence', 'understanding', 'restore'] as 
     f.restart(); expectScrubbed(f.inspect(), original);
     expect(() => f.app.readReceipt(f.ref, owner)).toThrow('visibility');
     // secure_delete + a successful checkpoint removes these particular test bytes; not a forensic guarantee.
-    expect(readFileSync(f.path).includes(Buffer.from('PRIVATE-RESULT-PAYLOAD'))).toBe(false);
-    expect(readFileSync(f.path).includes(Buffer.from('PRIVATE-CALLER-PAYLOAD'))).toBe(false);
+    expect(tableBytes(f.path, "invocations").includes(Buffer.from('PRIVATE-RESULT-PAYLOAD'))).toBe(false);
+    expect(tableBytes(f.path, "invocations").includes(Buffer.from('PRIVATE-CALLER-PAYLOAD'))).toBe(false);
     const persistedGrant = (await f.app.list(owner)).find(a => a.id === adapter.id)!;
     expect(persistedGrant.params).toEqual(f.params); // Owner configuration has its own lifecycle.
   });

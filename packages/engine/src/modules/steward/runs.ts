@@ -13,8 +13,6 @@ import { buildSettings, budgetTimezone, runTimeoutMinutes } from "./settings";
 import { audit } from "./audit";
 import { StewardError } from "./errors";
 import { authenticateRun } from "./run-auth";
-import { assertExternalName } from "./module-identity";
-import { declaredModules } from "./module-build-targets";
 import { executionPrincipal, executionNeverOfferedIn } from "./execution-state";
 import { claimExecutionIn, prepareServerClaim } from "./execution-claim";
 import { assertExecutionPrincipal } from "./execution-principal";
@@ -100,22 +98,7 @@ class RunService {
     }
     return "ready";
   }
-  private async checkBuildTargets(tx: Prisma.TransactionClient, run: RunRow, now: Date) {
-      try {
-        const targets = run.sessionId ? await declaredModules(tx, this.workspaceId, run.sessionId) : null;
-        if (!targets?.length) throw new StewardError("forbidden", "Build target authority is missing or malformed; authorize a new build");
-        for (const name of targets) await assertExternalName(tx, this.workspaceId, name, "build");
-      } catch (error) {
-        if (!(error instanceof StewardError)) throw error;
-        const reason = `Build refused before Provider start: ${error.message}`.slice(0, 1000);
-        await tx.run.update({ where: { id: run.id }, data: { status: "failed", endedAt: now, leaseUntil: null, error: reason } });
-        await audit(tx, { workspaceId: this.workspaceId, actor: "chrona", kind: "run_finished", subjectId: run.id, details: { status: "failed", reason } });
-        return false;
-      }
-    return true;
-  }
   private async claimQueued(tx: Prisma.TransactionClient, run: RunRow, now: Date, builds: ReturnType<typeof buildSettings> | null, ordinaryTimeoutMinutes: number | null) {
-    if (run.lane === "build" && !await this.checkBuildTargets(tx, run, now)) return null;
     const requestedTimeout = await this.claimTimeout(tx, run, builds, ordinaryTimeoutMinutes);
     if (requestedTimeout === undefined) return null;
     const timeoutMs = await completionTimeout(tx, run.id, requestedTimeout);

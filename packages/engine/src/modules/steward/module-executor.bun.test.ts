@@ -62,7 +62,7 @@ test("approved module executes a routed tool without a Provider Run and scopes n
   expect(f.calls).toHaveLength(1);
   expect(f.calls[0]).toMatchObject({ codeDir: join(f.dataDir, "platform/store", f.hash), dataDir: join(f.dataDir, "platform/data", f.moduleId), entry: "index.ts", input: { trigger: { id: "inspect", kind: "tool", args: {}, caller: { kind: "owner" } }, params: { threshold: 42 } }, network: true, timeoutMs: 60_000, maxOutputBytes: 64 * 1024 });
   expect(await f.db.run.count()).toBe(0);
-  expect(await f.db.schedule.count()).toBe(0);
+  expect(await f.db.timer.count()).toBe(0);
   const records = await f.db.moduleRun.findMany({ where: { moduleId: f.moduleId } });
   expect(records).toHaveLength(1);
   expect(records[0]).toMatchObject({ hash: f.hash, triggerId: "tool:inspect", exitCode: 0, output: {}, error: null });
@@ -97,7 +97,7 @@ test("rolling back a paused module restores routed execution without recreating 
   await f.service.modules.rollback(f.moduleId, f.hash);
   f.setResult({ status: "succeeded", exitCode: 0, output: '{"result":{"restored":true}}', error: null });
   expect(await f.fire()).toEqual({ result: { restored: true } });
-  expect(await f.db.schedule.count()).toBe(0);
+  expect(await f.db.timer.count()).toBe(0);
 });
 
 test("successful routed execution resets consecutive failures", async () => {

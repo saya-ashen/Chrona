@@ -1,5 +1,6 @@
 import { moduleRuntimeParams, RUN_LIMITS } from "@chrona/contracts/steward";
 import { moduleModelSettings } from "./settings";
+import { CallError } from "./module-call-error";
 import type { ModuleCall, moduleCallReplySchema, ModuleEvent, ModuleManifest, moduleEventReplySchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import type { createModuleChannel } from "./module-channel";
@@ -23,17 +24,49 @@ export function isHandlerRejection(error: unknown) {
 export type Process = ReturnType<NonNullable<NonNullable<StewardPorts["sandbox"]>["startModule"]>>;
 export type Timers = Pick<typeof globalThis, "setTimeout" | "clearTimeout">;
 export type Options = { timers?: Timers; idleMs?: number; backoffMs?: number };
-export type DeliveryOptions = { private?: boolean; /** false: record the run, not its result. */ retainOutput?: boolean; chain?: string[]; path?: string[]; timeoutMs?: number; activationId?: string | null; beforeDelivery?: () => Promise<void>; dispatch?: (send: () => void) => Promise<void>; validateResult?: (result: unknown) => string | null };
+export type DeliveryOptions = { private?: boolean; /** Observations keep only in-memory delivery identity. */ retainHistory?: boolean; /** false: record the run, not its result. */ retainOutput?: boolean; chain?: string[]; path?: string[]; timeoutMs?: number; activationId?: string | null; beforeDelivery?: () => Promise<void>; dispatch?: (send: () => void) => Promise<void>; validateResult?: (result: unknown) => string | null; callerRunId?: string };
+export type Delivery = { promise: Promise<Reply>; waits: Set<Delivery>; runId?: string };
 export type Instance = {
   moduleId: string; hash: string; activationId: string | null; manifest: ModuleManifest; scope: CallScope;
-  queue: Promise<unknown>; start?: Promise<void>; httpReady?: ReturnType<typeof moduleHttpReady>;
+  barrier?: Delivery; deliveries: Map<Promise<Reply>, Delivery>; start?: Promise<void>; httpReady?: ReturnType<typeof moduleHttpReady>;
   process?: Process; channel?: Awaited<ReturnType<typeof createModuleChannel>>;
-  idle?: ReturnType<typeof setTimeout>; retiring: boolean; closing: boolean; busy: boolean; connected?: boolean;
+  idle?: ReturnType<typeof setTimeout>; retiring: boolean; closing: boolean; busy: boolean; activeEvents: number; connected?: boolean;
   exit?: { code: number | null; signal: string | null };
   failureEvidence?: ModuleFailureEvidence; failureRecorded?: boolean;
   privateTransport?: boolean;
   stopUnknown?: Error; closePromise?: Promise<void>; retirement?: Promise<void>;
 };
+/** Lifecycle events drain prior calls; later tools wait for that lifecycle barrier. */
+export function trackDelivery(instance: Instance, event: ModuleEvent, runs: Map<string, Delivery>,
+  callerRunId: string | undefined, work: (delivery: Delivery) => Promise<Reply>): Promise<Reply> {
+  const prior = event.trigger.kind === "tool" ? (instance.barrier ? [instance.barrier] : []) : [...instance.deliveries.values()];
+  const parent = callerRunId ? runs.get(callerRunId) : undefined;
+  if (parent && prior.some(delivery => waitsFor(delivery, parent))) {
+    throw staged(new CallError("cycle", "Call would wait on its own lifecycle barrier"), "unavailable");
+  }
+  const delivery: Delivery = { promise: undefined!, waits: new Set(prior) };
+  const result = Promise.allSettled(prior.map(item => item.promise)).then(() => {
+    delivery.waits.clear();
+    if (instance.closing) throw staged(new Error("Module is closing"), "unavailable");
+    return work(delivery);
+  });
+  delivery.promise = result;
+  parent?.waits.add(delivery);
+  instance.deliveries.set(result, delivery);
+  if (event.trigger.kind !== "tool") instance.barrier = delivery;
+  return result.finally(() => {
+    instance.deliveries.delete(result);
+    parent?.waits.delete(delivery);
+    if (delivery.runId) runs.delete(delivery.runId);
+    if (instance.barrier === delivery) delete instance.barrier;
+  });
+}
+function waitsFor(from: Delivery, target: Delivery, seen = new Set<Delivery>()): boolean {
+  if (from === target) return true;
+  if (seen.has(from)) return false;
+  seen.add(from);
+  return [...from.waits].some(next => waitsFor(next, target, seen));
+}
 export function triggerKey({ trigger }: ModuleEvent) {
   switch (trigger.kind) {
     case "tool": return `tool:${trigger.id}`;

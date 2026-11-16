@@ -1,4 +1,4 @@
-import { on, onDisconnect, chrona, ModelError } from 'chrona';
+import { on, onDisconnect, chrona, ModelError, type CallTarget, type CallOptions } from 'chrona';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Store } from './state';
@@ -12,45 +12,61 @@ type ToolArgs = { id: string; requestKey: string; emptyTools?: boolean; observe?
  key: string; kind: string; input: string; confirmed: boolean; revision: number; attachmentId: string; type: string; receiptId?: string };
 const store=new Store(chrona.paths.data,chrona.paths.content,chrona.call);
 const dep=(name:string,tool:string)=>{const moduleId=chrona.dependencies[name];if(!moduleId)throw Error(name+' 未安装或未绑定');return {moduleId,tool};};
-async function catalog(){
- const providers=await chrona.call('agent.providers',{}) as ProviderList;const tools=await discoverTools(chrona.call);
+async function catalog(callId?:string){
+ const started=performance.now(),startedAt=new Date().toISOString();
+ const spans:{target:string;startMs:number;durationMs:number}[]=[];
+ const call=async<T=unknown>(target:CallTarget,args?:Record<string,unknown>,options?:CallOptions):Promise<T>=>{
+  const start=performance.now();
+  try{return await chrona.call<T>(target,args,options);}
+  finally{spans.push({target:typeof target==='string'?target:`${target.moduleId}.${target.tool}`,startMs:start-started,durationMs:performance.now()-start});}
+ };
+ try{
+ const [providers,tools]=await Promise.all([call('agent.providers',{}) as Promise<ProviderList>,discoverTools(call)]);
  const configs:Record<string,ProviderConfig>={};
- for(const p of providers.items){
+ await Promise.all(providers.items.map(async p=>{
   const cfg:ProviderConfig={models:[],thinking:[],warning:''};configs[p.id]=cfg;
+  const warnings:string[]=[];
+  await Promise.all([(async()=>{
   if(p.configuration){
-   try{const target={moduleId:p.moduleId,tool:p.configuration.tool};const contract=await chrona.call<{inputSchema?:InputSchema}>('modules.describe',{target});const schema=contract.inputSchema;cfg.thinking=schema?.properties?.config?.properties?.thinking?.enum??schema?.properties?.form?.properties?.thinking?.enum??[];
+   try{const target={moduleId:p.moduleId,tool:p.configuration.tool};const contract=await call('modules.describe',{target});const schema=(contract as {inputSchema?:InputSchema}).inputSchema;cfg.thinking=schema?.properties?.config?.properties?.thinking?.enum??schema?.properties?.form?.properties?.thinking?.enum??[];
     // This is a read-only view of the discovered configuration contract.
-    if(schema?.properties?.view){const view=await chrona.call(target,{view:true});cfg.view=view;}
-   }catch(e){cfg.warning=(e as Error).message;}
+    if(schema?.properties?.view){const view=await call(target,{view:true});cfg.view=view;}
+   }catch(e){warnings.push((e as Error).message);console.error(JSON.stringify({component:'chat',event:'configuration_read_failed',provider:p.id,error:String(e)}));}
   }
+  })(),(async()=>{
   if(p.name==='Pi'||p.id==='pi'){
-   try{const target={moduleId:p.moduleId,tool:'models'};await chrona.call('modules.describe',{target});const models=await chrona.call<{options:ProviderConfig['models'];warnings:string[]}>(target,{});cfg.models=models.options;cfg.warning=[cfg.warning,...models.warnings].filter(Boolean).join('；');}catch(e){cfg.warning=(e as Error).message;}
+   try{const target={moduleId:p.moduleId,tool:'models'};const models=await call<{options:ProviderConfig['models'];warnings:string[]}>(target,{});cfg.models=models.options;warnings.push(...models.warnings);}catch(e){warnings.push((e as Error).message);console.error(JSON.stringify({component:'chat',event:'models_read_failed',provider:p.id,error:String(e)}));}
   }
- }
+  })()]);cfg.warning=warnings.filter(Boolean).join('；');
+ }));
  return {providers:providers.items,tools,configs,limited:false,toolLimit:TOOL_LIMIT};
+ }finally{console.error(JSON.stringify({component:'chat',event:'catalog_timing',callId,startedAt,durationMs:performance.now()-started,spans}));}
 }
 async function deliveries(c:Conversation){
  const receipts=submittedReceipts(c) as Delivery[];
  for(const d of receipts){try{
-  d.receipt=await chrona.call<NonNullable<Delivery['receipt']>>('modules.receipt',{receiptId:d.receiptId});const r=d.receipt;
+  d.receipt=await chrona.call('modules.receipt',{receiptId:d.receiptId}) as NonNullable<Delivery['receipt']>;const r=d.receipt;
   d.requestKey=r.requestKey;d.approvalId=r.approvalId;d.state=({submitted:'候选已提交',pending_approval:'待批准',approved:'候选已批准',rejected:'候选已拒绝'} as Record<string,string>)[r.state]??'未知';
-  const installed=await chrona.call<ModuleDirectory>('modules.list',{limit:100});
+  const installed=await chrona.call('modules.list',{limit:100}) as ModuleDirectory;
   d.members=[];for(const member of r.members){const m=installed.items.find(m=>m.id===member.moduleId);const activated=m?.activeHash===member.hash&&m.health?.activation?.hash===member.hash&&m.health.activation.status==='verified';d.members.push({...member,implementationCheck:member.status,activation:activated?'已安装激活':'未知或尚未激活',health:m?.health??null,pageIdentity:'未知：公开 web.pages 只返回调用应用自己的页面，未提供其他应用的版本绑定页面查询',browserAcceptance:'未知，需要独立浏览器证据'});
   }
  }catch(e){d.error=(e as Error).message;d.state='回执核对未知';}}
- c.deliveries=receipts;return store.save(c);
+ const current=store.get(c.id) as Conversation;
+ const updates=new Map(receipts.map(receipt=>[receipt.receiptId,receipt]));
+ current.deliveries=[...current.deliveries.filter(receipt=>!updates.has(receipt.receiptId)),...receipts];
+ return store.save(current);
 }
 on('tool',async event=>{
  const a=event.args as ToolArgs;let result:unknown;
  try{
   if (['read','execute','new-context','observations','snapshot','observation-inventory','observation-scope'].includes(event.id) && !store.version) {
-   const modules=await chrona.call<ModuleDirectory>('modules.list',{limit:100});
+   const modules=await chrona.call('modules.list',{limit:100}) as ModuleDirectory;
    const self=modules.items.find(m=>m.name==='chat');
    store.version=self?.activeHash??''; store.moduleId=self?.id??'';
    if (!store.version) throw Error('无法核对 Chat 当前版本');
   }
   switch(event.id){
-   case 'catalog':result=await catalog();break;
+   case 'catalog':result=await catalog(event.call?.id);break;
    case 'list':result={items:store.list()};break;
    case 'task-view':case 'task-control':result=await mindTaskCall((target,args)=>chrona.call(target,args),chrona.dependencies,event.caller,event.id,a);break;
    case 'create':{result=store.created(a.requestKey,a.emptyTools===true);if(result)break;const p=await chrona.call('agent.providers',{}) as ProviderList;const available=p.items.filter(p=>p.available&&p.capabilities.conversation);result=store.create(available.length===1?available[0].id:'',a.emptyTools === true ? [] : defaultTools(await discoverTools(chrona.call)),a.requestKey,a.emptyTools===true);break;}
@@ -84,8 +100,7 @@ on('tool',async event=>{
 on('activated',async()=>{
  // The approved integration observes future sent facts by default; any explicit scope choice wins.
  const learning=store.observations.scopeTool();if(learning.revision===0&&!learning.enabled)store.observations.scopeTool({expectedRevision:0,enabled:true});
- const component=await chrona.call<{ type: string }>(dep('web','component-set'),{name:'Workbench',javascript:readFileSync(join(chrona.paths.module,'dist/ui.js'),'utf8'),css:readFileSync(join(chrona.paths.module,'ui.css'),'utf8'),props:{type:'object',properties:{},additionalProperties:false},tools:['catalog','list','create','read','draft','edit','delete','upload','detach','image','execute','native','delivery','new-context','observation-scope','task-view','task-control']});
- await chrona.call(dep('web','page-set'),{id:'main',title:'Chat',layout:'workspace',spec:{root:'chat',elements:{chat:{type:component.type,props:{},children:[]}}}});
+ await chrona.call(dep('web','page-set'),{id:'main',title:'Chat',layout:'workspace',javascript:readFileSync(join(chrona.paths.module,'dist/ui.js'),'utf8'),css:readFileSync(join(chrona.paths.module,'ui.css'),'utf8'),tools:['catalog','list','create','read','draft','edit','delete','upload','detach','image','execute','native','delivery','new-context','observation-scope','task-view','task-control']});
 });
 
 // Chat remains responsible for observing its own foreground Run after the browser closes.
@@ -94,7 +109,7 @@ let observing=false;
 const observationTimer=setInterval(()=>{if(observing)return;observing=true;void(async()=>{
  try{
   const active=(store.list() as Pick<Conversation,'id'|'active'>[]).filter(c=>c.active?.runId).slice(0,20);if(!active.length)return;
-  if(!store.version){const directory=await chrona.call<ModuleDirectory>('modules.list',{limit:100});const self=directory.items.find(m=>m.name==='chat');if(!self?.activeHash)throw Error('Chat active identity unavailable');store.version=self.activeHash;store.moduleId=self.id;}
+  if(!store.version){const directory=await chrona.call('modules.list',{limit:100}) as ModuleDirectory;const self=directory.items.find(m=>m.name==='chat');if(!self?.activeHash)throw Error('Chat active identity unavailable');store.version=self.activeHash;store.moduleId=self.id;}
   for(const row of active)await store.reconcile(row.id,false);
  }catch(error){console.error(JSON.stringify({component:'chat',event:'foreground_observation_failed',error:error instanceof Error?error.message.slice(0,500):'unknown'}));}
  finally{observing=false;}

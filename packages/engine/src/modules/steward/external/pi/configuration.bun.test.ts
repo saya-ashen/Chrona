@@ -68,9 +68,9 @@ test("settings page registers ordinary owner tools and retries rejected registra
   await registration.refresh(); expect(attempts).toHaveLength(0);
   await registration.activate(); await registration.refresh(); await registration.refresh();
   expect(attempts).toHaveLength(2); expect(attempts[1]).toEqual({ target: "web.page-set", args: SETTINGS_PAGE });
-  expect(SETTINGS_PAGE.data.policy.tool).toBe("configure"); expect(SETTINGS_PAGE.data.models.tool).toBe("models");
-  expect(JSON.stringify(SETTINGS_PAGE)).not.toMatch(/fast|balanced|deep|tier/);
-  expect(SETTINGS_PAGE.spec.elements.failed.props).toMatchObject({ title: "保存失败" });
+  expect(SETTINGS_PAGE.tools[0]).toBe("configure"); expect(SETTINGS_PAGE.tools[1]).toBe("models");
+  expect(SETTINGS_PAGE.tools).toEqual(["configure", "models"]);
+  expect(SETTINGS_PAGE.javascript).toContain("settings_save_failed");
 });
 test("advertised revision archives survive settings changes, source mutations and restart without secrets", async () => {
   const f = await setup(), original = await f.configuration.archive();

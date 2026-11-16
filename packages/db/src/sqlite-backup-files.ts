@@ -1,5 +1,6 @@
 import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, readSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { Database } from "bun:sqlite";
 import { ensurePrivateDirectory, secureGeneratedPrivateFile } from "./sqlite-url";
 
 export const backupDataRoots = ["platform", "sessions", "secrets", "qq-bot"] as const;
@@ -58,8 +59,8 @@ function archiveHeader(path: string, directory: boolean, size: number, executabl
   return header;
 }
 
-function writeArchiveEntry(output: number, dataDir: string, path: string, buffer: Buffer): void {
-  const source = join(dataDir, path), stat = lstatSync(source);
+function writeArchiveEntry(output: number, dataDir: string, path: string, buffer: Buffer, snapshot?: string): void {
+  const source = snapshot ?? join(dataDir, path), stat = lstatSync(source);
   if (stat.isDirectory()) {
     writeFileSync(output, archiveHeader(path, true, 0, false));
     return;
@@ -85,6 +86,27 @@ function writeArchiveEntry(output: number, dataDir: string, path: string, buffer
   } finally { closeSync(input); }
 }
 
+/** Private databases may still have committed WAL pages after process exit. Archive a
+ * checked SQLite snapshot instead of copying a main file separately from its WAL. */
+function snapshotDatabases(dataDir: string, files: string[], stage: string) {
+  const snapshots = new Map<string, string>();
+  for (const path of files) {
+    const source = join(dataDir, path);
+    if (!lstatSync(source).isFile() || !path.startsWith("platform/data/") || !/\.(db|sqlite|sqlite3)$/i.test(path)) continue;
+    const destination = join(stage, String(snapshots.size));
+    const db = new Database(source, { readonly: true });
+    try { db.exec(`VACUUM INTO '${destination.replaceAll("'", "''")}'`); }
+    finally { db.close(); }
+    const snapshot = new Database(destination, { readonly: true });
+    try {
+      const checks = snapshot.query("PRAGMA quick_check").all() as { quick_check: string }[];
+      if (checks.length !== 1 || checks[0]?.quick_check !== "ok") throw new Error(`SQLite backup integrity check failed: ${path}`);
+    } finally { snapshot.close(); }
+    snapshots.set(path, destination);
+  }
+  return snapshots;
+}
+
 /** Returns the links and special files left out of the archive. */
 export function backupDataFiles(dataDir: string, archivePath: string): string[] {
   if (existsSync(archivePath)) throw new Error("Backup archive already exists.");
@@ -102,16 +124,24 @@ export function backupDataFiles(dataDir: string, archivePath: string): string[] 
   }
   // Secure the exclusively created output before writing any content, including on Windows.
   const output = openSync(archivePath, "wx", 0o600);
+  let stage: string | undefined;
   try {
-    try {
-      secureGeneratedPrivateFile(archivePath);
-      const buffer = Buffer.alloc(64 * 1024);
-      for (const path of files) writeArchiveEntry(output, dataDir, path, buffer);
-      writeFileSync(output, Buffer.alloc(1024));
-    } finally { closeSync(output); }
+    secureGeneratedPrivateFile(archivePath);
+    const buffer = Buffer.alloc(64 * 1024);
+    stage = mkdtempSync(join(dirname(archivePath), ".sqlite-snapshots-"));
+    const snapshots = snapshotDatabases(dataDir, files, stage);
+    for (const path of files) {
+      const main = path.replace(/-(wal|shm|journal)$/, "");
+      if (main !== path && snapshots.has(main)) continue;
+      writeArchiveEntry(output, dataDir, path, buffer, snapshots.get(path));
+    }
+    writeFileSync(output, Buffer.alloc(1024));
   } catch (error) {
     rmSync(archivePath, { force: true });
     throw error;
+  } finally {
+    closeSync(output);
+    if (stage) rmSync(stage, { recursive: true, force: true });
   }
   return omitted;
 }

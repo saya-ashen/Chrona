@@ -1,4 +1,5 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
+import { BunSqliteAdapter } from "prisma-adapter-bun-sqlite";
 import { mkdir, mkdtemp, readFile, readdir, rename, rm, stat, symlink, truncate, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -205,7 +206,7 @@ test("activation exposes declared tools without producing calendar rows", async 
   const result = await f.propose();
   expect(f.calls.filter(call => call.entry === "test.ts")).toMatchObject([{ network: false, timeoutMs: RUN_LIMITS.jobTimeoutMs }]);
   await f.approve(result.approvalId!);
-  const schedules = await f.db.schedule.findMany({ where: { moduleId: result.moduleId! } });
+  const schedules = await f.db.timer.findMany({ where: { moduleId: result.moduleId! } });
   expect(schedules).toEqual([]);
   expect((await f.service.modules.tools()).tools.map(tool => tool.name)).toContain("m_price_watch_inspect");
   expect(await f.db.module.findUniqueOrThrow({ where: { id: result.moduleId! } })).toMatchObject({ status: "active", activeHash: result.hash });
@@ -281,7 +282,7 @@ async function rollbackFixture() {
 test("cross-schema rollback fences execution while awaiting approval, restores data, and can roll forward again", async () => {
   const f = await rollbackFixture();
   await writeFile(join(f.live, "nested/state"), "new writes");
-  const before = await f.db.module.findFirstOrThrow(), schedules = await f.db.schedule.findMany(), generations = await f.db.generation.count();
+  const before = await f.db.module.findFirstOrThrow(), schedules = await f.db.timer.findMany(), generations = await f.db.generation.count();
   expect(before.executionFenceAt).toBeNull();
   const request = () => f.service.modules.rollback(f.moduleId, f.first.hash);
   const firstFenceAt = new Date(f.ports.now().getTime() + 60_000);
@@ -296,7 +297,7 @@ test("cross-schema rollback fences execution while awaiting approval, restores d
   expect(await f.db.approval.findUniqueOrThrow({ where: { id: older.approvalId } })).toMatchObject({ status: "expired" });
   // Requesting approval commits only the execution fence; version, data and generation stay intact.
   expect(await f.db.module.findFirstOrThrow()).toEqual({ ...before, executionFenceAt: renewedFenceAt });
-  expect(await f.db.schedule.findMany()).toEqual(schedules);
+  expect(await f.db.timer.findMany()).toEqual(schedules);
   expect(await f.db.generation.count()).toBe(generations);
   expect(await readFile(join(f.live, "nested/state"), "utf8")).toBe("new writes");
   expect(await readdir(f.snapshots)).toEqual(["schema-1"]);
@@ -345,7 +346,7 @@ test.each(["no snapshot", "migrating", "missing snapshot", "changed snapshot", "
   const f = await rollbackFixture();
   if (kind === "no snapshot") await rm(join(f.snapshots, "schema-1"), { recursive: true });
   if (kind === "migrating") await f.db.module.update({ where: { id: f.moduleId }, data: { status: "migrating" } });
-  const before = await f.db.module.findFirstOrThrow(), schedules = await f.db.schedule.findMany(), generations = await f.db.generation.count();
+  const before = await f.db.module.findFirstOrThrow(), schedules = await f.db.timer.findMany(), generations = await f.db.generation.count();
   expect(before.executionFenceAt).toBeNull();
   const fenceAt = new Date(f.ports.now().getTime() + 60_000);
   f.ports.now = () => fenceAt;
@@ -368,7 +369,7 @@ test.each(["no snapshot", "migrating", "missing snapshot", "changed snapshot", "
     if (["copy failure", "forward failure"].includes(kind)) {
       await f.approve(result.approvalId);
       if (kind === "forward failure") {
-        const restored = await f.db.module.findFirstOrThrow(), restoredSchedules = await f.db.schedule.findMany(), restoredGenerations = await f.db.generation.count();
+        const restored = await f.db.module.findFirstOrThrow(), restoredSchedules = await f.db.timer.findMany(), restoredGenerations = await f.db.generation.count();
         expect(restored.executionFenceAt).toBeNull();
         const forwardFenceAt = new Date(fenceAt.getTime() + 60_000);
         f.ports.now = () => forwardFenceAt;
@@ -381,7 +382,7 @@ test.each(["no snapshot", "migrating", "missing snapshot", "changed snapshot", "
         await expect(f.service.modules.rollback(f.moduleId, f.second.hash)).rejects.toThrow("数据迁移失败");
         expect(duringMigration).toEqual({ ...restored, status: "migrating", executionFenceAt: forwardFenceAt });
         expect(await f.db.module.findFirstOrThrow()).toEqual({ ...restored, executionFenceAt: forwardFenceAt });
-        expect(await f.db.schedule.findMany()).toEqual(restoredSchedules);
+        expect(await f.db.timer.findMany()).toEqual(restoredSchedules);
         expect(await f.db.generation.count()).toBe(restoredGenerations);
         expect(await f.db.moduleVersion.findFirstOrThrow({ where: { hash: f.second.hash } })).toMatchObject({ status: "approved" });
         expect((await notices(f.db)).length).toBe(0);
@@ -393,7 +394,7 @@ test.each(["no snapshot", "migrating", "missing snapshot", "changed snapshot", "
   }
   // Lifecycle failure preserves the committed fence and every other module field.
   expect(await f.db.module.findFirstOrThrow()).toEqual({ ...before, executionFenceAt: fenceAt });
-  expect(await f.db.schedule.findMany()).toEqual(schedules);
+  expect(await f.db.timer.findMany()).toEqual(schedules);
   expect(await f.db.generation.count()).toBe(generations);
   expect(await readFile(join(f.live, "nested/state"), "utf8")).toBe("schema 2");
 });
@@ -474,7 +475,7 @@ test.each(["failed", "timeout", "unavailable", "throw", "output", "bytes", "syml
     return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null };
   };
   const result = await f.propose();
-  const schedules = await f.db.schedule.findMany(), generations = await f.db.generation.count();
+  const schedules = await f.db.timer.findMany(), generations = await f.db.generation.count();
   await writeFile(join(f.live, "nested/state"), "changed after build");
   if (kind === "bytes") { await writeFile(join(f.live, "large"), ""); await truncate(join(f.live, "large"), 50 * 1024 * 1024 + 1); }
   if (kind === "symlink") await symlink(join(f.live, "nested/state"), join(f.live, "link"));
@@ -482,7 +483,7 @@ test.each(["failed", "timeout", "unavailable", "throw", "output", "bytes", "syml
   activation = true;
   await f.approve(result.approvalId!);
   expect(await f.db.module.findFirstOrThrow()).toMatchObject({ activeHash: f.first.hash, dataSchema: 1, status: "active" });
-  expect(await f.db.schedule.findMany()).toEqual(schedules);
+  expect(await f.db.timer.findMany()).toEqual(schedules);
   expect(await f.db.generation.count()).toBe(generations);
   expect(await readFile(join(f.live, "nested/state"), "utf8")).toBe("changed after build");
   const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.first.moduleId!, hash: result.hash } } });
@@ -860,7 +861,7 @@ test("proposal tests a private snapshot and creates a hash-bound plain-text appr
   expect(approval.preview).toContain("+++ proposed");
   const raw = await f.db.approval.findUniqueOrThrow({ where: { id: result.approvalId! } });
   expect(raw.payload).toEqual({ kind: "activate_module", moduleId: result.moduleId, hash: result.hash });
-  expect(await f.db.schedule.count()).toBe(0);
+  expect(await f.db.timer.count()).toBe(0);
   expect((await f.service.modules.list())[0]!.activeHash).toBeNull();
 });
 
@@ -876,23 +877,23 @@ test("approval switches approved hashes atomically and rollback records full gen
   expect((await f.service.modules.list())[0]!.activeHash).toBe(second.hash);
   await f.service.modules.rollback(first.moduleId!, first.hash);
   expect((await f.service.modules.list())[0]!.activeHash).toBe(first.hash);
-  expect(await f.db.schedule.count()).toBe(0);
+  expect(await f.db.timer.count()).toBe(0);
   const generations = await f.db.generation.findMany({ orderBy: { seq: "asc" } });
   expect(generations.map(row => [row.seq, row.reason, row.modules])).toEqual([
     [1, "activate", { [first.moduleId!]: first.hash }], [2, "activate", { [first.moduleId!]: second.hash }], [3, "rollback", { [first.moduleId!]: first.hash }],
   ]);
   expect(f.forwarded).toEqual([]);
-  expect(await f.db.grant.count({ where: { action: "activate_module" } })).toBe(0);
+
   expect(await f.db.audit.count({ where: { kind: "module_rollback" } })).toBe(1);
 });
 
 test.each(["list", "update", "create"])("removed public schedules.%s cannot change private legacy rows", async tool => {
   const f = await fixture(), first = await f.propose();
   await f.approve(first.approvalId!);
-  const row = await f.db.schedule.create({ data: { workspaceId: f.workspace.id, moduleId: first.moduleId!, mode: "module", rule: { kind: "every", minutes: 5 }, text: "inert legacy fixture", createdBy: "chrona", nextAt: f.ports.now() } });
+  const row = await f.db.timer.create({ data: { workspaceId: f.workspace.id, moduleId: first.moduleId!, rule: { kind: "every", minutes: 5 }, timerId: "inert legacy fixture", nextAt: f.ports.now() } });
   expect(f.service).not.toHaveProperty("schedules");
   await expect(callSync(f.ports, { workspaceId: f.workspace.id, caller: { kind: "owner", via: null }, chain: [], path: [] }, `schedules.${tool}`, { schedule: row.id, status: "active" })).rejects.toMatchObject({ code: "not_found" });
-  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: row.id } })).toEqual(row);
+  expect(await f.db.timer.findUniqueOrThrow({ where: { id: row.id } })).toEqual(row);
   expect((await f.service.modules.list())[0]!.activeHash).toBe(first.hash);
 });
 
@@ -1004,15 +1005,6 @@ test.each(["symlink", "bytes", "files"])("reject unsafe module contents: %s", as
   expect(await f.db.module.count()).toBe(0);
 });
 
-test.each(["activate_module", "modify_external"] as const)("ask policy for %s does not gate module activation", async action => {
-  const f = await fixture();
-  await f.service.grants.create({ action, mode: "ask", scope: { kind: "global" } });
-  const proposal = await f.propose();
-  await f.approve(proposal.approvalId!);
-  expect((await f.service.modules.list())[0]!.activeHash).toBe(proposal.hash);
-  expect(await f.db.grant.count()).toBe(1);
-});
-
 test("all tests run independently even after a failure; declared network never enables build networking", async () => {
   const f = await fixture();
   const manifest = JSON.parse(await readFile(join(f.dir, "module.json"), "utf8"));
@@ -1060,8 +1052,8 @@ test("pending versions cannot activate directly", async () => {
   expect((await f.db.moduleVersion.findFirstOrThrow()).status).toBe("pending_review");
   expect((await f.db.module.findFirstOrThrow()).activeHash).toBeNull();
   expect(await f.db.generation.count()).toBe(0);
-  expect(await f.db.schedule.count()).toBe(0);
-  expect(await f.db.grant.count({ where: { consumedAt: { not: null } } })).toBe(0);
+  expect(await f.db.timer.count()).toBe(0);
+
 });
 
 test("workspace isolation, full snapshots, last five run summaries and nonmodule approval forwarding", async () => {
@@ -1082,6 +1074,28 @@ test("workspace isolation, full snapshots, last five run summaries and nonmodule
   await f.approve(approval.id);
   expect(f.forwarded).toHaveLength(1);
   expect(f.forwarded[0]!.payload).toEqual({ kind: "email", value: 1 });
+});
+
+test("application summaries bound actual SQLite history rows for every parent", async () => {
+  const original = BunSqliteAdapter.prototype.queryRaw, rows: number[] = [];
+  let measuring = false;
+  const capture = spyOn(BunSqliteAdapter.prototype, "queryRaw").mockImplementation(async function(this: BunSqliteAdapter, query) {
+    const result = await original.call(this, query);
+    if (measuring && /\bModuleRun\b/.test(query.sql)) rows.push(result.rows.length);
+    return result;
+  });
+  const f = await fixture(), first = await f.propose();
+  await f.approve(first.approvalId!);
+  const second = await f.db.module.create({ data: { workspaceId: f.workspace.id, name: "second-history" } });
+  for (const moduleId of [first.moduleId!, second.id]) await f.db.moduleRun.createMany({ data: Array.from({ length: 200 }, (_, i) => ({
+    moduleId, hash: first.hash, triggerId: "fixture", firedAt: f.ports.now(), exitCode: 0, createdAt: new Date(i * 1000),
+  })) });
+  measuring = true;
+  try {
+    const result = await f.service.modules.list();
+    expect(result.filter(row => [first.moduleId, second.id].includes(row.id)).map(row => row.runs.length)).toEqual([5, 5]);
+    expect(rows).toEqual([5, 5]);
+  } finally { capture.mockRestore(); }
 });
 
 test("tick starts builds without waiting for them and reports build errors on the next tick", async () => {
@@ -1108,20 +1122,20 @@ test("tick starts builds without waiting for them and reports build errors on th
   expect((await tick()).failures).toContainEqual({ workspaceId: f.workspace.id, stage: "modules", error: expect.any(Error) });
 });
 
-test("Chrona pauses and resumes an app directly, cancelling private legacy rows without reviving them", async () => {
+test("Chrona pauses and resumes an app while preserving its timer state", async () => {
   const f = await fixture(), result = await f.propose();
   await f.approve(result.approvalId!);
   const moduleId = result.moduleId!;
-  const legacy = await f.db.schedule.create({ data: { workspaceId: f.workspace.id, moduleId, mode: "module", triggerId: "daily", rule: { kind: "every", minutes: 5 }, text: "inert legacy fixture", createdBy: "chrona", nextAt: f.ports.now() } });
+  const legacy = await f.db.timer.create({ data: { workspaceId: f.workspace.id, moduleId, rule: { kind: "every", minutes: 5 }, timerId: "inert legacy fixture", nextAt: f.ports.now() } });
   const request = await f.service.modules.lifecycle("disable", moduleId, { reason: "连续三天抓取失败" }, false);
   expect(request).toMatchObject({ status: "paused" });
   expect(await f.db.approval.count({ where: { status: "open" } })).toBe(0);
   expect((await f.db.module.findUniqueOrThrow({ where: { id: moduleId } })).status).toBe("paused");
-  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: legacy.id } })).toMatchObject({ status: "cancelled", nextAt: null });
-  expect(await f.db.grant.count({ where: { action: "activate_module", once: true, consumedAt: null } })).toBe(0);
+  expect(await f.db.timer.findUniqueOrThrow({ where: { id: legacy.id } })).toMatchObject({ status: "active", nextAt: f.ports.now() });
+
   await f.service.modules.lifecycle("enable", moduleId, {}, true);
   expect((await f.db.module.findUniqueOrThrow({ where: { id: moduleId } })).status).toBe("active");
-  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: legacy.id } })).toMatchObject({ status: "cancelled", nextAt: null });
+  expect(await f.db.timer.findUniqueOrThrow({ where: { id: legacy.id } })).toMatchObject({ status: "active", nextAt: f.ports.now() });
   expect((await f.db.audit.findMany({ where: { subjectId: moduleId, kind: { in: ["module_disabled", "module_enabled"] } }, orderBy: { createdAt: "asc" } })).map(row => row.kind)).toEqual(["module_disabled", "module_enabled"]);
 });
 
@@ -1140,14 +1154,14 @@ test("removing an app asks once from any entry; built-ins are refused; data and 
   expect(await f.db.approval.findUniqueOrThrow({ where: { id: approvalId } })).toMatchObject({ action: "delete_data", moduleId: null });
   await f.service.approvals.resolve(approvalId, { decision: "approve", scope: "once" }, "qq");
   expect(await f.db.module.findUnique({ where: { id: moduleId } })).toBeNull();
-  expect(await f.db.schedule.count({ where: { moduleId } })).toBe(0);
+  expect(await f.db.timer.count({ where: { moduleId } })).toBe(0);
   expect(await stat(data).catch(() => null)).toBeNull();
   const removed = await f.db.audit.findFirstOrThrow({ where: { kind: "module_removed", subjectId: moduleId } });
   const backup = (removed.details as { backup: string }).backup;
   expect(await readFile(join(backup, "data", "prices.json"), "utf8")).toBe("[1]");
   expect(await readFile(join(backup, "code", "module.json"), "utf8")).toContain("price-watch");
-  expect(await f.db.grant.count({ where: { action: "delete_data" } })).toBe(0);
-  expect(await f.db.approval.findUniqueOrThrow({ where: { id: approvalId } })).toMatchObject({ status: "approved", grantId: null });
+
+  expect(await f.db.approval.findUniqueOrThrow({ where: { id: approvalId } })).toMatchObject({ status: "approved" });
 });
 
 test("the review shows output contracts and examples as digests, and every authority field in full", () => {

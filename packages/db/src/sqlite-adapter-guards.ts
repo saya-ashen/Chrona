@@ -58,6 +58,7 @@ export function guardSqliteAdapter(factory: PrismaBunSqlite): PrismaBunSqlite {
     if (property === "connect") return async () => {
       const adapter = await target.connect();
       if (!(adapter instanceof BunSqliteAdapter)) throw new Error("Unsupported Bun SQLite adapter implementation");
+      adapter.getDatabase().exec("PRAGMA foreign_keys = ON");
       return guardConnection(adapter);
     };
     const value = Reflect.get(target, property);

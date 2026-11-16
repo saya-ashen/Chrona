@@ -2,7 +2,6 @@
 export { createQqBotState } from "./modules/steward/external/qq/bot";
 export { createSecrets } from "./modules/steward/secrets";
 // Stopped-service CLI maintenance uses the engine's checked export and bounded file reader.
-export { exportLegacyConversations, verifyLegacyConversationExport, deleteExportedLegacyConversations } from "./modules/steward/legacy-conversation-export";
 export { readBoundedFile } from "./modules/steward/workspace-files";
 export { completeOAuth, OAUTH_CALLBACK_PATH } from "./modules/steward/oauth";
 export { createRegisteredProviderClient, stopAgentRuns, createStewardService, createTools, StewardError, CallError } from "./modules/steward";

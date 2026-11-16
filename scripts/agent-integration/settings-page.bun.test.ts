@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { agentFixture } from "./agent-application.fixtures";
 import { callSync, kernelOrigin } from "../../packages/engine/src/modules/steward/module-calls";
-import { normalizedToolInputSchema } from "../../packages/engine/src/modules/steward/module-tool-contract";
 import { pageErrors } from "../../packages/engine/src/modules/steward/external/web/pages";
 import { manifest } from "../../packages/engine/src/modules/steward/external/pi/build";
 import { SETTINGS_PAGE, settingsRegistration } from "../../packages/engine/src/modules/steward/external/pi/settings-page";
@@ -12,8 +11,7 @@ import type { ConfigurationView as SettingsView } from "../../packages/engine/sr
 
 const parsed = moduleManifestSchema.parse(manifest());
 test("Pi settings page validates against its actual generated tools", () => {
-  const tools = new Map(parsed.tools.map(tool => [tool.name, normalizedToolInputSchema(tool)]));
-  expect(pageErrors(SETTINGS_PAGE, tools, "pi")).toEqual([]);
+  expect(pageErrors(SETTINGS_PAGE)).toEqual([]);
   expect(parsed.uses).toContain("web.page-set");
   expect(parsed.activated).toBe(true);
   expect(parsed.tools.find(tool => tool.name === "configure")!.visibility).toEqual(["owner"]);

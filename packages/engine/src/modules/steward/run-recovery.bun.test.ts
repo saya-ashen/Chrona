@@ -56,29 +56,6 @@ test("unknown Agent stop holds the context until actual Provider exit, without a
   await queueContext("confirmed-retry");
   expect(await runs.claimNext("foreground")).not.toBeNull();
 });
-test.each(["failed", "timed_out", "unavailable", "cancelled", "finished"] as const)("build %s preserves work and never resumes the originating Agent context", async outcome => {
-  const runs = createRuns(ports, workspaceId);
-  const build = await db.session.create({ data: { workspaceId, key: "build:sample", source: "build", originSessionId: sessionId } });
-  await db.buildTargets.create({ data: { sessionId: build.id, name: "sample", modules: ["sample"] } });
-  await runs.enqueue({ sessionId: build.id, lane: "build", trigger: "build", prompt: "Keep this draft" });
-  const run = (await runs.claimNext("build"))!;
-  await writeFile(join(run.cwd, "draft.txt"), "kept");
-  if (outcome === "timed_out") time = new Date(run.deadlineAt!.getTime() + 1);
-  if (outcome === "cancelled") await db.run.update({ where: { id: run.id }, data: { cancelRequestedAt: new Date() } });
-  await runs.finish(run.id, { outcome: outcome === "cancelled" ? "failed" : outcome, sessionId: "provider-context", error: outcome === "finished" ? null : "Synthetic" }, { stopEvidence: "provider_exited" });
-  const status = outcome === "unavailable" ? "provider_unavailable" : outcome;
-  expect(await db.run.findUniqueOrThrow({ where: { id: run.id } })).toMatchObject({ status });
-  expect(await db.run.count({ where: { status: "queued" } })).toBe(0);
-  expect(await db.audit.count({ where: { kind: "run_continuation" } })).toBe(0);
-  expect(await db.message.count({ where: { sessionId } })).toBe(0);
-  expect(await readFile(join(run.cwd, "draft.txt"), "utf8")).toBe("kept");
-  const facts = await db.kernelFact.findMany({ where: { consumedAt: null } });
-  if (["failed", "timed_out", "unavailable"].includes(outcome)) {
-    expect(facts).toHaveLength(1);
-    expect(facts[0]!.payload).toMatchObject({ type: "lifecycle", data: { key: `build-paused:${run.id}`, session: build.id, fact: { kind: "build-paused", status } } });
-  } else expect(facts).toHaveLength(0);
-  await expect(runs.authenticate(run.token)).rejects.toMatchObject({ code: "forbidden" });
-});
 test("expired Agent lease aborts and revokes capability but retains unknown stop until Provider exit", async () => {
   await db.workspace.update({ where: { id: workspaceId }, data: { settings: { runTimeoutMinutes: 1 } } });
   const runs = createRuns(ports, workspaceId);

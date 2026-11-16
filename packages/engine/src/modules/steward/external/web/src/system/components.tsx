@@ -1,15 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useStateStore, type ComponentRenderProps } from "@json-render/react";
-import type { ActivityPage } from "./activity";
-import { ToolForm, ToolContract } from "./forms";
-import { Credentials } from "./credentials";
-import { DiagnosticRefresh, MemoryPanel, SessionWork } from "./detail-components";
+import { useEffect, useRef, useState } from "react";
 import { Time } from "../display";
-import type { Approval as ApprovalData, Interaction } from "./today";
+import type { Approval as ApprovalData, Interaction } from "./types";
 import { useAction } from "./action";
-import { NotificationSettings, ModuleModelSettings, RunTimeoutSettings } from "./settings-forms";
-import { ChatStream } from "./chat-stream";
-import { LoginForm, LoginPasswordSettings } from "./password-forms";
 
 type Args = Record<string, unknown>;
 export function SystemAction({ props }: { props: { label: string; tool: string; args: Args; confirm?: string } }) {
@@ -51,7 +43,7 @@ export function Approval({ props: { approval, destructive = false } }: { props: 
         const apps = await action.call("modules", {}) as { id: string; name: string; activeHash?: string }[];
         const app = apps.find(item => item.id === approval.moduleId);
         if (app) running = ` · ${app.name} 当前版本 ${String(app.activeHash ?? "").slice(0, 8)}`;
-      } catch { running = " · 当前版本读取失败，请刷新查看"; }
+      } catch (error) { console.error(JSON.stringify({ component: "web", event: "approval_version_failed", error: String(error) })); running = " · 当前版本读取失败，请刷新查看"; }
     }
     setResult(`${resolved.status === "denied" ? "已拒绝" : "已批准"}：${approval.title}${running}`);
     timer.current = setTimeout(action.refresh, 4000);
@@ -77,16 +69,3 @@ export function Question({ props: { interaction } }: { props: { interaction: Int
     <div className="row">{choices}<button type="button" disabled={action.pending} onClick={() => send({ decision: "cancel" })}>不回答</button></div>
     {action.error ? <p role="alert" className="error">{action.error}</p> : null}</div>;
 }
-export function ActivityMore({ props }: { props: { module: string } }) {
-  const action = useAction(), store = useStateStore();
-  return <div><button type="button" disabled={action.pending} onClick={() => void action.act(async () => {
-    const current = store.get("/activity") as ActivityPage;
-    const page = await action.call("activity", { module: props.module, before: current.before }) as ActivityPage;
-    store.set("/activity", { items: [...current.items, ...page.items], before: page.before });
-  })}>更早的</button>{action.error ? <p role="alert" className="error">{action.error}</p> : null}</div>;
-}
-function component<P>(Render: (value: { props: P }) => ReactNode) {
-  return ({ element }: ComponentRenderProps<P>) => <Render props={element.props} />;
-}
-export const systemComponents = { AppRemoval: component(AppRemoval), ChatStream: component(ChatStream), NotificationSettings: component(NotificationSettings), ModuleModelSettings: component(ModuleModelSettings), RunTimeoutSettings: component(RunTimeoutSettings), Approval: component(Approval), Question: component(Question), SystemAction: component(SystemAction), ActivityMore: component(ActivityMore), LoginForm: component(LoginForm), LoginPasswordSettings,
-  ToolForm: component(ToolForm), ToolContract: component(ToolContract), Credentials: component(Credentials), DiagnosticRefresh: component(DiagnosticRefresh), MemoryPanel, SessionWork: component(SessionWork) };

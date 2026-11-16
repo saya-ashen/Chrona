@@ -47,16 +47,17 @@ Agent 是唯一不可变内置应用；Web、Notify、QQ、Author 是普通默�
 - OAuth 清单必须声明 HTTPS 授权/令牌端点。改变定义需要审批；没有定义绑定的旧凭据须重新授权，不能把旧 refresh token 自动发给新端点。
 - `agent-workbench.nvim` 本轮未修改，旧客户端依赖的 `content.read` 不再可用。Chrona 提供 `coding.read-result`，但不能据此声称旧客户端成果界面已兼容。
 
-### 旧会话归档与旧定时器交接
+### 当前存储与旧数据边界
 
-先停服并取得数据库运行锁，再使用 `chrona admin legacy <请求文件>`。请求文件严格校验，所有路径必须明确；不会自动选择整个数据库，也不会启动模型或发送通知。请求的 `workspaceId` 必填。
+当前源码已删除 `admin legacy` 及旧 kernel 消息、Grant、构建会话存储；旧版本的归档工具只能从对应发行或 Git 历史取用。`Timer` 只保存应用定时唤醒，暂停应用保留定时器，投递仍核对当前版本与生命周期。
 
-1. `operation: "export"`：明确 `sessionIds` 和 `outputDir`，归档消息、引用附件与 SHA-256 清单。
-2. `operation: "verify"`：使用归档返回的 `manifestSha256` 校验；不要把未验证目录当成可恢复备份。
-3. `operation: "delete"`：相同范围、归档和散列，且显式 `authorizeDelete: true`。重新确认源快照、停止证据与全部归档散列后才删除业务消息和选中旧附件；共用附件、Agent 上下文、Run/执行证据不删除。旧 Session 只保留关联和审计所需元数据，清空标题并改为归档标识，不再作为在线会话服务。
-4. `operation: "migrate-wake"`：显式 `offline: true`、有界 `limit` 与 `owners: [{ moduleId, hash }]`，把旧 wake 交给真实已批准应用的私有后台会话。保留日程身份、规则、状态与下次时间；不从旧会话推断 QQ 收件人，也不即时启动任务。
+本轮初始 schema 默认用于全新开发数据。旧库继续由 migration checksum 守卫拒绝；一次性[离线转换工具](../../scripts/one-off/storage-20261116/README.md)仅放在仓库中，不随程序打包，也不会自动操作真实数据。它从停服旧目录生成独立的新目录与转换前完整备份，不替换源数据。Mind 改用单个 `mind.sqlite`，入口会话改用 `conversations/sessions.sqlite`；发现旧存储且新库不存在时明确拒绝启动，避免静默显示空数据。实际转换、版本切换和恢复验收另行授权。
 
-导出/校验/删除的 CLI 在取得独占锁后内部传入离线状态，请求文件不要额外添加 `offline` 字段。删除不是部署步骤，不得因升级自动执行。当前自动化验证只使用隔离临时数据库；部署真实本地实例时先完整备份、保留旧发行包，不修改迁移校验和绕过旧库拒绝。
+普通应用同步工具显式声明 `readOnly: true` 后，无 key 的读取不保存调用与执行历史；有 key 的读取保留精确回执。声明模型预算的应用保留预算需要的最小事件行，省略只读结果正文。故障、恢复转换、审批、未知效果与异步交付继续保留其实际消费者需要的事实。
+
+每小时清理七天以上的已结算诊断记录，每表每次最多 40 批、每批 500 行。已确认停止且交付结清的 Run 在 90 天后清空 prompt、summary、error、toolCalls；已完成应用调用的请求/结果正文同期过期，保留 key、请求摘要及目标绑定，原 key 返回过期冲突，不能重新执行旧动作。未知结果、未确认停止、未交付回复和待审批调用不按年龄清理。系统生命周期回执、Agent completion 回执和当前 activation 的去重事实仍保留；这不是整个数据库容量的硬上限。
+
+备份先取得服务运行锁；Linux 还拒绝 cwd 位于 platform/sessions 数据树下的遗留进程。私有 SQLite（platform/data 下 `.db/.sqlite/.sqlite3`）通过 `VACUUM INTO` 和 `quick_check` 归档包含已提交 WAL 页的快照。cwd 检查不覆盖已经换目录的任意进程；进程停止证据仍须结合服务及 process guardian 核对。自动测试只操作全新临时数据。
 
 ## M1 历史开发集成边界（2026-11-05）
 

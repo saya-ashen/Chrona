@@ -1,6 +1,9 @@
 // Bundle this entry with Bun, serve with the web shell's style.css, then call workspaceTest.run().
 // Uses the production PageView, renderer registry, bound state, existing actions and polling lifecycle.
-import { mount, type Page } from "./pages";
+import { useState } from "react";
+import { createRoot } from "react-dom/client";
+import { Workspace, WorkspaceHeader, ScrollArea, Message, Composer, ViewTabs, Panel, ActionOption, CodeDiff } from "./workspace";
+import { Markdown } from "./ui";
 
 const frame = () => new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
 async function until(check: () => boolean) {
@@ -9,57 +12,39 @@ async function until(check: () => boolean) {
 }
 const messages = Array.from({ length: 24 }, (_, i) => ({ id: `message-${i}`, author: i % 4 === 0 ? "用户" : "助手", body: `记录 ${i + 1}：保持阅读位置与输入。\n\n这里是可以继续阅读的执行进展。` }));
 const initial = { revision: 1, messages };
-const page: Page = {
-  module: "fixture", id: "workspace", title: "通用工作区", data: { feed: { tool: "feed", refresh: .2 } },
-  spec: { root: "workspace", state: { draft: "", tab: "chat", sidebarOpen: true, feed: initial, answer: false, composerDisabled: false }, elements: {
-    workspace: { type: "Workspace", props: { title: "编码工作台", description: "把想法交代清楚，把成果带回来。", breadcrumb: "项目 / Chrona", sidebarLabel: "工作列表", mainLabel: "内容", mobileSidebarOpen: { $bindState: "/sidebarOpen" } }, slots: { sidebar: ["list-title", "search", "list-scroll"] }, children: ["title", "tabs", "feed-scroll", "composer"] },
-    "list-title": { type: "Heading", props: { text: "最近工作" }, children: [] },
-    search: { type: "Input", props: { label: "搜索", name: "search", placeholder: "搜索工作" }, children: [] },
-    "list-scroll": { type: "ScrollArea", props: { label: "最近工作" }, children: ["select-work", "empty-list"] },
-    "select-work": { type: "ActionOption", props: { label: "继续当前工作", description: "等待你的选择", selected: true, compact: true }, on: { press: { action: "setState", params: { statePath: "/sidebarOpen", value: false } } }, children: [] },
-    "empty-list": { type: "Text", props: { text: "没有更多工作", variant: "muted" }, children: [] },
-    title: { type: "WorkspaceHeader", props: { title: "检查响应式工作区", status: "正在执行", subtitle: "保留草稿和阅读位置" }, children: ["revision"] },
-    tabs: { type: "ViewTabs", props: { items: [{ value: "chat", label: "交流" }, { value: "result", label: "成果" }], value: { $bindState: "/tab" } }, children: [] },
-    revision: { type: "Text", props: { text: { $state: "/feed/revision" }, variant: "caption" }, children: [] },
-    "feed-scroll": { type: "ScrollArea", props: { label: "进展", follow: true }, children: ["feed-items", "question", "diff-details", "empty-diff"] },
-    "feed-items": { type: "Stack", props: { gap: "none" }, repeat: { statePath: "/feed/messages", key: "id" }, children: ["message"] },
-    message: { type: "Message", props: { author: { $item: "author" } }, children: ["message-body"] },
-    "message-body": { type: "Markdown", props: { content: { $item: "body" } }, children: [] },
-    question: { type: "Panel", props: { tone: "question" }, children: ["question-title", "option", "disabled", "answer"] },
-    "question-title": { type: "Heading", props: { text: "需要你的决定", level: "h3" }, children: [] },
-    option: { type: "ActionOption", props: { label: "使用当前方案", description: "保留原有行为并修复布局", selected: { $state: "/answer" } }, on: { press: { action: "call", params: { tool: "choose", args: { answer: "current" }, result: "/answer", reload: false } } }, children: [] },
-    disabled: { type: "ActionOption", props: { label: "暂不可用", disabled: true }, on: { press: { action: "call", params: { tool: "disabled" } } }, children: [] },
-    answer: { type: "Text", props: { text: "已选择", variant: "muted" }, visible: { $state: "/answer", eq: true }, children: [] },
-    "diff-details": { type: "Collapsible", props: { title: "查看变更", defaultOpen: true }, children: ["diff"] },
-    diff: { type: "CodeDiff", props: { filename: "src/example.ts", diff: `--- a/src/example.ts\n+++ b/src/example.ts\n@@ -1,2 +1,2 @@\n-const value = 'before';\n+const value = '${"a".repeat(180)}';\n export { value };` }, children: [] },
-    "empty-diff": { type: "CodeDiff", props: { filename: "empty.ts", diff: "" }, children: [] },
-    composer: { type: "Composer", props: { hint: "补充到当前工作", footnote: "输入不会新建工作", disabled: { $state: "/composerDisabled" } }, on: { submit: { action: "call", params: { tool: "send", args: { text: { $state: "/draft" } }, reload: false } } }, slots: { actions: ["pause-submit", "resume-submit", "submit"] }, children: ["draft"] },
-    "pause-submit": { type: "Button", props: { label: "暂停发送" }, visible: { $state: "/composerDisabled", eq: false }, on: { press: { action: "setState", params: { statePath: "/composerDisabled", value: true } } }, children: [] },
-    "resume-submit": { type: "Button", props: { label: "允许发送" }, visible: { $state: "/composerDisabled", eq: true }, on: { press: { action: "setState", params: { statePath: "/composerDisabled", value: false } } }, children: [] },
-    draft: { type: "Textarea", props: { name: "draft", label: "继续补充", rows: 2, value: { $bindState: "/draft" } }, children: [] },
-    submit: { type: "Button", props: { label: "发送补充", variant: "secondary", disabled: { $state: "/composerDisabled" } }, on: { press: { action: "call", params: { tool: "send", args: { text: { $state: "/draft" } }, reload: false } } }, children: [] },
-  } },
-};
-
-export function setupWorkspaceTest(element: HTMLElement) {
-  let snapshot = initial;
-  const pending: { resolve: (value: unknown) => void; reject: (error: Error) => void }[] = [];
-  const calls: { target: string; args: Record<string, unknown> }[] = [];
-  const stop = mount(element, page, { call: async (target, args) => {
-    if (target === "fixture.feed") return new Promise((resolve, reject) => pending.push({ resolve, reject }));
-    calls.push({ target, args }); return target === "fixture.choose" ? true : {};
-  }, navigate: () => {}, content: async () => new Blob() });
+function assertions() {
   const checks: string[] = [];
   const assert = (value: unknown, label: string) => { if (!value) throw new Error(label); checks.push(label); };
   const settle = async () => { await frame(); await frame(); await frame(); };
-  const poll = async (failure?: string) => {
-    await until(() => pending.length > 0);
-    const requests = pending.splice(0);
-    requests.forEach(request => failure ? request.reject(new Error(failure)) : request.resolve(snapshot));
-    await settle();
-  };
+  const poll = async (work: () => void) => { work(); await settle(); };
+  return { checks, assert, settle, poll };
+}
+export function setupWorkspaceTest(element: HTMLElement) {
+  const { checks, assert, settle, poll: update } = assertions();
+  let snapshot = initial;
+  const calls: { target: string; args: Record<string, unknown> }[] = [];
+  let setFeed!: (value: typeof initial) => void, setFailure!: (value: string) => void;
+  function Page() {
+    const [feed, update] = useState(initial), [draft, setDraft] = useState(""), [tab, setTab] = useState("chat"), [sidebar, setSidebar] = useState(true), [answer, choose] = useState(false), [disabled, pause] = useState(false), [error, fail] = useState("");
+    setFeed = update; setFailure = fail;
+    const send = () => calls.push({ target: "fixture.send", args: { text: draft } });
+    return <Workspace title="编码工作台" description="把想法交代清楚，把成果带回来。" breadcrumb="项目 / Chrona" sidebarLabel="工作列表" mainLabel="内容" mobileSidebarOpen={sidebar} sidebar={<><h3>最近工作</h3><label>搜索<input name="search" /></label><ScrollArea label="最近工作"><ActionOption label="继续当前工作" description="等待你的选择" selected compact onClick={() => setSidebar(false)} /><p>没有更多工作</p></ScrollArea></>}>
+      <WorkspaceHeader title="检查响应式工作区" status="正在执行" subtitle="保留草稿和阅读位置"><p>{feed.revision}</p></WorkspaceHeader>
+      <ViewTabs items={[{ value: "chat", label: "交流" }, { value: "result", label: "成果" }]} value={tab} onChange={setTab} />
+      {error ? <p role="alert">{error}</p> : null}
+      <ScrollArea label="进展" follow>{feed.messages.map(message => <Message key={message.id} author={message.author}><Markdown content={message.body} /></Message>)}
+        <Panel tone="question"><h3>需要你的决定</h3><ActionOption label="使用当前方案" description="保留原有行为并修复布局" selected={answer} onClick={() => { calls.push({ target: "fixture.choose", args: {} }); choose(true); }} /><ActionOption label="暂不可用" disabled onClick={() => calls.push({ target: "fixture.disabled", args: {} })} />{answer ? <p>已选择</p> : null}</Panel>
+        <details open><summary>查看变更</summary><CodeDiff filename="src/example.ts" diff={"--- a/src/example.ts\n+++ b/src/example.ts\n@@ -1,2 +1,2 @@\n-const value = 'before';\n+const value = '" + "a".repeat(180) + "';\n export { value };"} /></details><CodeDiff filename="empty.ts" diff="" />
+      </ScrollArea>
+      <Composer hint="补充到当前工作" footnote="输入不会新建工作" disabled={disabled} onSubmit={send} actions={<>{disabled ? <button onClick={() => pause(false)}>允许发送</button> : <button onClick={() => pause(true)}>暂停发送</button>}<button disabled={disabled} onClick={send}>发送补充</button></>}><label>继续补充<textarea name="draft" rows={2} value={draft} onChange={event => setDraft(event.target.value)} /></label></Composer>
+    </Workspace>;
+  }
+  const root = createRoot(element); root.render(<Page />);
+  const poll = (failure?: string) => update(() => {
+    if (failure) setFailure(failure); else { setFeed(snapshot); setFailure(""); }
+  });
   return {
-    checks, calls, stop,
+    checks, calls, stop: () => root.unmount(),
     // eslint-disable-next-line max-statements -- Keep this browser scenario's sequential interactions and assertions together.
     async run() {
       await until(() => !!element.querySelector(".renderer-workspace"));

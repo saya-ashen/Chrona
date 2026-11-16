@@ -86,16 +86,15 @@ export function createApprovals(context: RecordContext & { ports?: StewardPorts 
         if (row.status !== status) throw new StewardError("conflict", "Approval already resolved differently");
         const replay = input.decision === "approve" && await pendingModuleEffect(tx, workspaceId, row);
         if (replay) await audit(tx, { workspaceId, actor: "user", kind: "approval_replayed", subjectId: id, details: { source } });
-        return { approval: toApproval(row), grantId: null, payload: replay ? row.payload : null, request: isModuleRequest(row.payload) };
+        return { approval: toApproval(row), payload: replay ? row.payload : null, request: isModuleRequest(row.payload) };
       }
       if (input.decision === "approve") await approve(tx, workspaceId, row);
-      const grantId = null;
-      const changed = await tx.approval.updateMany({ where: { workspaceId, id, status: "open" }, data: { status, scope: input.scope, grantId, resolvedAt: now() } });
+      const changed = await tx.approval.updateMany({ where: { workspaceId, id, status: "open" }, data: { status, resolvedAt: now() } });
       if (!changed.count) throw new StewardError("conflict", "Approval already resolved");
       await recordWithdrawal(tx, workspaceId, `approval:${id}`, now());
-      await audit(tx, { workspaceId, actor: "user", kind: "approval_resolved", subjectId: id, details: { ...input, grantId, source } });
+      await audit(tx, { workspaceId, actor: "user", kind: "approval_resolved", subjectId: id, details: { ...input, source } });
       if (isModuleRequest(row.payload)) await settleWaiting(tx, row.payload.call, { approval: id, decision: status }, now());
-      return { approval: toApproval(await tx.approval.findUniqueOrThrow({ where: { id } })), grantId, payload: input.decision === "approve" ? row.payload : null, request: isModuleRequest(row.payload) };
+      return { approval: toApproval(await tx.approval.findUniqueOrThrow({ where: { id } })), payload: input.decision === "approve" ? row.payload : null, request: isModuleRequest(row.payload) };
     }).then(result => afterResolve(result, id, workspaceId, ports, onApproved)),
   };
 }

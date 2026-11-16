@@ -15,7 +15,6 @@ export async function modulePermissions(ports: StewardPorts, workspaceId: string
   const version = module.activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } }) : null;
   const manifest = moduleManifestSchema.safeParse(version?.manifest).data ?? null;
   const saved = new Map((await createSecrets(ports.dataDir).list()).map(row => [row.name, row.updatedAt]));
-  const grants = (await db.grant.findMany({ where: { workspaceId, revokedAt: null } })).filter(grant => (grant.scope as { moduleId?: string }).moduleId === module.id && !(grant.once && grant.consumedAt));
   return json({
     module: module.name, activeHash: module.activeHash,
     capabilities: manifest ? addedCapabilities(null, manifest) : [],
@@ -26,7 +25,6 @@ export async function modulePermissions(ports: StewardPorts, workspaceId: string
       return { name, configured: saved.has(name) || await ports.secretConfigured?.(name) === true, updatedAt: saved.get(name) ?? null, ...secretView(declared, value) };
     })),
     model: manifest?.model ? await moduleModelView(ports, workspaceId, module.name, manifest.model) : null,
-    grants: grants.map(grant => ({ id: grant.id, action: grant.action, mode: grant.mode, once: grant.once, createdAt: grant.createdAt.toISOString() })),
     approvals: (await db.approval.findMany({ where: { workspaceId, moduleId: module.id }, orderBy: { createdAt: "desc" }, take: 10 }))
       .map(row => ({ id: row.id, title: row.title, status: row.status, createdAt: row.createdAt.toISOString(), resolvedAt: row.resolvedAt?.toISOString() ?? null })),
   });

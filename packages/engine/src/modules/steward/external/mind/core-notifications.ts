@@ -6,7 +6,7 @@ import { scopeCovers } from "./core-service";
 import type { CoreCall } from "./core-execution";
 import type { CoreState, Pursuit } from "./core-types";
 
-export const CORE_NOTIFICATIONS_FILE = "mind-notifications.sqlite";
+export const CORE_NOTIFICATIONS_FILE = "mind.sqlite";
 export type ResolveNotify = () => string | undefined | Promise<string | undefined>;
 type Pin = { pursuitId: string; revision: number; visibility: number; digest: string; releaseDigest: string; owned: boolean };
 type Event = { key: string; pin: string; intent: string | null; digest_only: number };
@@ -74,7 +74,7 @@ export class CoreNotifications {
     if (existsSync(this.path) && (!lstatSync(this.path).isFile() || lstatSync(this.path).isSymbolicLink())) throw new Error("Mind notification database must be a regular file");
     this.db = new Database(this.path, { create: true, strict: true });
     chmodSync(this.path, 0o600);
-    this.db.exec(`PRAGMA busy_timeout=5000; PRAGMA journal_mode=DELETE; PRAGMA synchronous=FULL; PRAGMA secure_delete=ON;
+    this.db.exec(`PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA secure_delete=ON;
       CREATE TABLE IF NOT EXISTS notification_events(key TEXT PRIMARY KEY, pin TEXT NOT NULL, intent TEXT, digest_only INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS notification_intents(key TEXT PRIMARY KEY, members TEXT NOT NULL, level TEXT NOT NULL, module_id TEXT NOT NULL, receipt TEXT, notify_status TEXT, created_at TEXT NOT NULL, request_digest TEXT);
       CREATE TABLE IF NOT EXISTS notification_budget(day TEXT NOT NULL, key TEXT NOT NULL, level TEXT NOT NULL, PRIMARY KEY(day,key));`);

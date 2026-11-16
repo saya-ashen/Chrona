@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { agentFixture } from "../../../../../../../scripts/agent-integration/agent-application.fixtures";
 import { callSync, kernelOrigin } from "../../module-calls";
-import { normalizedToolInputSchema } from "../../module-tool-contract";
 import { pageErrors } from "../web/pages";
 import manifest from "./module.json";
 import { SETTINGS_PAGE, settingsRegistration, type settingsForm } from "./settings-page";
@@ -13,8 +12,7 @@ type SettingsView = { settings: Settings; form: ReturnType<typeof settingsForm> 
 
 const parsed = moduleManifestSchema.parse(manifest);
 test("Notify settings page validates against its real owner tools", () => {
-  const tools = new Map(parsed.tools.map(tool => [tool.name, normalizedToolInputSchema(tool)]));
-  expect(pageErrors(SETTINGS_PAGE, tools, "notify")).toEqual([]);
+  expect(pageErrors(SETTINGS_PAGE)).toEqual([]);
   expect(parsed.uses).toContain("web.page-set");
   expect(parsed.activated).toBe(true);
   for (const name of ["settings", "ui-settings", "counts"]) expect(parsed.tools.find(tool => tool.name === name)!.visibility).toEqual(["owner"]);

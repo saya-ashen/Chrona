@@ -50,3 +50,6 @@ yarn-error.log*
 .pnpm-debug.log*
 Dockerfile*
 .dockerignore
+
+!build/application-pages.ts
+!build/application-ui.ts

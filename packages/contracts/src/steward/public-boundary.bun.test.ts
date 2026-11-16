@@ -31,13 +31,3 @@ test("retired request contracts are absent from the package exports", () => {
   expect(contracts.candidateSubmitInputSchema).toBeDefined();
   expect(contracts.candidateCheckInputSchema).toBeDefined();
 });
-
-test("retained private schedule records still parse without publishing timer CRUD", () => {
-  expect(contracts.scheduleRuleSchema.parse({ kind: "every", minutes: 5 })).toEqual({ kind: "every", minutes: 5 });
-  expect(contracts.scheduleRuleSchema.safeParse({ kind: "every", minutes: 1 }).success).toBe(false);
-  for (const mode of ["module", "wake"] as const) expect(contracts.scheduleSchema.parse({
-    id: "stored-schedule", mode, rule: { kind: "daily", time: "08:00" }, text: "Stored instruction",
-    originSessionId: null, moduleId: null, until: null, status: "paused", nextAt: null,
-    lastAt: null, lastResult: null, label: "Stored schedule", createdBy: "chrona", createdAt: "2026-10-20T00:00:00Z",
-  }).mode).toBe(mode);
-});

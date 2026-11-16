@@ -1,5 +1,6 @@
+import { readFile } from "../../entry-app/journal-test-storage";
 import { afterEach, expect, test } from "bun:test";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAgentConversations } from "./agent-conversations";
@@ -16,7 +17,7 @@ function gate() {
 }
 async function fixture() {
   const dataDir = await mkdtemp(join(tmpdir(), "chrona-web-conversation-")); directories.push(dataDir);
-  const journal = async () => JSON.parse(await readFile(join(dataDir, "conversations/state.json"), "utf8"));
+  const journal = async () => JSON.parse(await readFile(join(dataDir, "conversations/sessions.sqlite"), "utf8"));
   const calls: { target: string; args: Args }[] = [];
   const runs = new Map<string, { runId: string; contextId: string; status: string; active: boolean }>();
   const delivery = {

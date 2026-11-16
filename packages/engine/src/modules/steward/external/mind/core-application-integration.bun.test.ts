@@ -1,3 +1,4 @@
+import { tableBytes } from "./test-support/storage";
 import { expect, test } from 'bun:test';
 import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -121,7 +122,7 @@ test('persisted read replay/reopen ignores changed gateway reply and never store
     expect(await f.actions.applicationRead(f.input, workerAccess)).toEqual(original); expect(f.appCalls).toBe(1);
     expect(f.actions.list('p', owner)[0].digest).toBe(original.digest);
     f.actions.db.exec('PRAGMA wal_checkpoint(TRUNCATE);');
-    expect(readFileSync(join(f.directory, 'mind-artifacts.sqlite')).includes(Buffer.from('published timetable'))).toBe(false);
+    expect(tableBytes(join(f.directory, "mind.sqlite"), "documents").includes(Buffer.from('published timetable'))).toBe(false);
   } finally { f.close(); }
 });
 
@@ -204,7 +205,7 @@ test('forget cleanup removes all succeeded and unknown derived response bodies f
     expect(f.actions.applicationCleanup).toMatchObject({ scrubbed: 2, deferred: 1, checkpoint: 'complete' });
     expect(f.actions.list('p')).toEqual([]);
     for (const suffix of ['', '-wal']) {
-      const path = join(f.directory, `mind-application.sqlite${suffix}`);
+      const path = join(f.directory, `mind.sqlite${suffix}`);
       if (existsSync(path)) { const bytes = readFileSync(path); expect(bytes.includes(Buffer.from('forget-derived-fixture-marker'))).toBe(false); expect(bytes.includes(Buffer.from('forget-unknown-fixture-marker'))).toBe(false); }
     }
   } finally { f.close(); }
@@ -276,7 +277,7 @@ test('focused reviewed overview retains target records, errors and original prov
     await expect(f.actions.applicationRead({ ...input, focus: { name: 'qq' } }, workerAccess)).rejects.toThrow();
     expect(JSON.parse(f.actions.read(document.ref, owner, { full: true }).body).response).toEqual(reply);
     f.actions.db.exec('PRAGMA wal_checkpoint(TRUNCATE);');
-    expect(readFileSync(join(f.directory, 'mind-artifacts.sqlite')).includes(Buffer.from('desktop-source'))).toBe(false);
+    expect(tableBytes(join(f.directory, "mind.sqlite"), "documents").includes(Buffer.from('desktop-source'))).toBe(false);
   } finally { f.close(); }
 });
 
