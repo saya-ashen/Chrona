@@ -1,10 +1,10 @@
 # 执行进度
 
-- 当前阶段：0、1 已完成；下一步阶段 2 事实与消费者盘点。
+- 当前阶段：0–2 已完成；阶段 1 提交 `48f1626`；下一步阶段 3 生成与发行。
 - 基准：6966a5c3；任务分支 refactor/cleanup-and-reorg；隔离目录 /home/saya/workspace/Chrona-cleanup-and-reorg。
 - 原工作区未修改。依赖使用本机既有 node_modules 的独立 reflink/copy，未安装或启用任何插件；正式隔离发行仍需证明不依赖此开发副本。
 - 完整执行方案：plan.md。
-- 阶段 2–9 尚未实施源码改动；阶段 1 的可信验证基线现已通过，可以进入阶段 2。
+- 阶段 2 已保存 `application-inventory.json`（13 应用/426 文件、102 路径候选文件/244 行）与 `application-boundaries.md`（动态消费者、构建/测试、材料、Nix/Docker 和历史部署来源）。架构文档纠正会话查询已按摘要/身份筛选的现状。只改文档，复用同一源码阶段 1 门禁；清单计数、JSON、链接与 diff whitespace 检查通过。阶段 3–9 尚未实施。
 - 初始门禁日志保留在 `.tmp/cleanup-and-reorg/baseline/`。首次 systemd 环境丢失 Nix PATH 的结果不作为源码结论；继承正确环境后已通过 check all 和 verify:slice，全库 lint 存量 195 errors / 1036 warnings，ratchet 通过。
 - 第二轮完整基线已结束：`.tmp/cleanup-and-reorg/baseline-r2/results.json`。check all、verify:slice --no-tests 通过；Bun 7 文件失败、API 1 文件失败，build 因固定种子与当前源码不符拒绝，未执行 smoke。日志 stdout/stderr 曾使用两个独立句柄，文本可能覆盖；退出码独立保存，正式入口已修复合流。
 - 测试修复依据当前生产合同与实际历史：大 JSON 结果没有旧 256 KiB 限制；transcript 使用字节偏移稳定 ID；Author 输入是对象；分页返回按消费者读取；memory journal 使用 SQLite；unconfirmed activation 不自动重放；后台 Provider callback 不携带已结束 eventId；Mind 未确认停止仍占用。

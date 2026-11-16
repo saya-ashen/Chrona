@@ -39,7 +39,7 @@ kernel 不保存业务消息或通用偏好，Workspace 默认设置为 `{}`。�
 
 应用摘要按应用分别执行最近五条版本及执行查询；SQLite 执行 LIMIT，使用确定的 `createdAt/id` 排序。主库连接建立时同步开启外键；共享连接保留事务全程 gate 和同步 `changes()` 处理。暂未新增专用只读连接：先消除已证实的历史全量读取，另开连接需要明确快照一致性及事务内读取路由，当前没有第二个连接的收益测量。
 
-Mind 的组件和三类执行日志共用 `mind.sqlite`，执行预算与恢复按各自表读取；entry-app 会话按会话一行保存到 SQLite，只更新发生变更的行，加载仍读取全部会话。留存及旧数据拒绝边界见[运维](operations.md#当前存储与旧数据边界)。这些源码改动未部署或转换真实数据。
+Mind 的组件和三类执行日志共用 `mind.sqlite`，执行预算与恢复按各自表读取；entry-app 会话按会话一行保存到 SQLite，只更新发生变更的行；列表查询只取摘要，详情及附件按会话或身份筛选读取，后台轮询先列摘要再逐会话恢复。留存及旧数据拒绝边界见[运维](operations.md#当前存储与旧数据边界)。这些源码改动未部署或转换真实数据。
 
 ## 5. 代码地图
 
@@ -48,7 +48,7 @@ Mind 的组件和三类执行日志共用 `mind.sqlite`，执行预算与恢复�
 | `apps/server` | Bun/Hono HTTP、运行时 tick、Provider 桥、鉴权代理及救援入口 |
 | `packages/contracts/src/steward` | zod、工具与 wire 合同 |
 | `packages/domain/src/steward` | 无 I/O 的纯策略 |
-| `packages/engine/src/modules/steward` | kernel Agent API、Provider 登记与 external 应用 |
+| `packages/engine/src/modules/steward` | kernel Agent API、Provider 登记；`external/` 仍暂存 13 个普通应用源码，尚未完成独立仓库剥离 |
 | `packages/integrations/src/steward`、`packages/pi` | 宿主、SDK、进程监管与 Pi Provider |
 | `packages/db`、`packages/cli` | SQLite/Prisma、迁移与备份恢复、启动和诊断 |
 
@@ -59,5 +59,7 @@ Mind 的组件和三类执行日志共用 `mind.sqlite`，执行预算与恢复�
 数据为 SQLite 加 dataDir 下的 platform、sessions 和 secrets；停机完整备份，不能只复制数据库。开发及验收使用全新临时数据，初始迁移不兼容旧库。实际操作见[运维](operations.md)。
 
 内核/Agent 和普通应用的当前阶段证据分别见[内核迁移](kernel-agent-migration.md)、[应用迁移](application-migration.md)。源码、离线测试、隔离验收、部署及真实使用分开判断；文档中的完成不自动覆盖后续代码或既有实例。
+
+当前源码归属、生成副本与发行消费者见[工程清理盘点](../tasks/cleanup-and-reorg/application-boundaries.md)。阶段验证记录见[阶段 1 基线](../tasks/cleanup-and-reorg/stage-1-summary.md)；其中的隔离发行包未部署，不能替代现有实例取证。
 
 旧系统接口、构建和健康自报机制的正文从本文件的 Git 历史查阅，不再作为当前开发规则。
