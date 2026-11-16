@@ -31,7 +31,7 @@ function fixture(){
   if(target==='modules.list'){state.directory?.();return {items:[{id:author.moduleId,name:'author',status:'active',activeHash:author.hash}],nextCursor:null};}
   if(typeof target==='object'&&target.moduleId===author.moduleId){
    if(target.tool==='submit'){state.submits++;if(state.lost)throw Error('original reply lost');return structuredClone(receipt);}
-   if(target.tool==='receipt'){state.queries.push(JSON.parse(args.input as string));return structuredClone(receipt);}
+   if(target.tool==='receipt'){state.queries.push(args.input);return structuredClone(receipt);}
   }throw Error('Unexpected gateway call');
  };
  const options={worker:(run:string)=>journal.all().find(e=>e.runId===run),verifyAdmission:async()=>{state.admission?.();}};

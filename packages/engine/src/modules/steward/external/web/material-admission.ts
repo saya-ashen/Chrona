@@ -1,3 +1,4 @@
+import { readItems } from "./pagination";
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
@@ -23,7 +24,7 @@ export function createMaterialAdmission(dataDir: string, call: Call, overview: (
   const parsed = request.safeParse(input);
   if (!parsed.success) return fail('精确材料准入参数无效；必须明确确认，不接受浏览器提供的身份或目标', 'invalid');
   const args = parsed.data;
-  const modules = await call('modules.list');
+  const modules = { items: await readItems<{id: string; name: string; status: string; activeHash: string | null}>(call, "modules.list") };
   const apps = modules.items.find((x: any) => x.id === args.appsModuleId && x.name === 'apps' && x.status === 'active' && x.activeHash);
   if (!apps) return fail('应用中心已变化，请刷新页面');
   const raw = await overview(apps.id);
@@ -33,7 +34,7 @@ export function createMaterialAdmission(dataDir: string, call: Call, overview: (
   const m = checked.data;
   if (m.name !== m.target.name || m.fingerprint !== args.fingerprint || m.submitter.moduleId !== apps.id || m.submitter.hash !== apps.activeHash) return fail('材料指纹或真实提交方已变化；不能继承旧准入');
   const current = modules.items.find((x: any) => x.name === m.name);
-  if (m.target.moduleId ? current?.id !== m.target.moduleId || current?.activeHash !== m.target.expectedActiveHash : !!current || m.target.expectedActiveHash !== null) return fail('目标基线已变化；禁止覆盖');
+  if (m.target.moduleId ? current?.id !== m.target.moduleId || current.activeHash !== m.target.expectedActiveHash : !!current || m.target.expectedActiveHash !== null) return fail('目标基线已变化；禁止覆盖');
   const draft = {submitter: m.submitter, targets: [m.target]};
   const binding = JSON.stringify({fingerprint: m.fingerprint, ...draft});
   const dir = join(dataDir, 'material-admissions');

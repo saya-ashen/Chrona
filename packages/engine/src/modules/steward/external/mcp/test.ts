@@ -38,10 +38,10 @@ const module = await startModule("index.ts", { stubs: Object.fromEntries([
   routed("agent.read", () => ({ run: { runId: "run-mcp", contextId: "context-mcp", status: "finished", active: false }, items: [], nextCursor: null, ended: true, transcript: [{ at: "2026-11-08T00:00:00Z", kind: "text", text: "done" }], interactions: [{ id: "i1", status: "pending" }] })),
   routed("agent.write", () => ({ accepted: true })), routed("agent.stop", () => ({ runId: "run-mcp", contextId: "context-mcp", status: "finished", active: false, stopConfirmed: true })), routed("approvals.resolve"), routed("approvals.list", () => ({ items: [], nextCursor: null })), routed("activity.records", () => ({ items: [], before: null })),
   routed("planning.search", args => args), routed("files.list", () => ["file"]), routed("web.today", () => ({ approvals: [] })), routed("notify.list", () => ({ items: [] })),
-  routed("author.prepare", args => ({ kind: "material-only", execution: { supported: false }, admission: { requestKey: JSON.parse(String(args.input)).requestKey, submitter: { moduleId: "author-id", hash: "a".repeat(64) }, targets: [{ name: "example", moduleId: null, expectedActiveHash: null }] } })),
+  routed("author.prepare", args => ({ kind: "material-only", execution: { supported: false }, admission: { requestKey: (args.input as Args).requestKey, submitter: { moduleId: "author-id", hash: "a".repeat(64) }, targets: [{ name: "example", moduleId: null, expectedActiveHash: null }] } })),
   routed("modules.admit", args => ({ ...args, admissionId: "fixed-admission" })),
   routed("author.write"), routed("author.read", () => ({ content: "material" })), routed("author.list", () => ({ items: [] })), routed("author.stage"), routed("author.source"),
-  routed("author.submit", args => ({ requestKey: JSON.parse(String(args.input)).requestKey, receiptId: "fixed-receipt", state: "submitted" })),
+  routed("author.submit", args => ({ requestKey: (args.input as Args).requestKey, receiptId: "fixed-receipt", state: "submitted" })),
   routed("author.receipt", () => ({ receiptId: "fixed-receipt", state: "submitted" })),
   routed("memory-local.recall", args => ({ items: [{ text: `Memory: ${args.query}` }] })),
   routed("memory-local.conversation-context", () => ({ text: "Selected memory", recalled: true })),
@@ -124,7 +124,7 @@ try {
   assert.equal(calls.filter(([target]) => target === "approvals.resolve").length, decisions);
 
   assert.equal((await json("chrona_module_tools", { query: "author" })).length, 8);
-  const author = (name: string, input: Args) => json("chrona_module_call", { name: `author.${name}`, arguments: { input: JSON.stringify(input) } });
+  const author = (name: string, input: Args) => json("chrona_module_call", { name: `author.${name}`, arguments: { input } });
   const prepared = await author("prepare", { requestKey: "material-one", submitter: { moduleId: "author-id", hash: "a".repeat(64) }, targets: [{ name: "example", moduleId: null, expectedActiveHash: null }], goal: "Use supplied material", intent: { changes: ["Add example"] } });
   assert.equal(prepared.kind, "material-only"); assert.equal(prepared.execution.supported, false);
   assert.deepEqual(forwarded().at(-1)!.params.expectedTarget, { moduleId: "author-id" });

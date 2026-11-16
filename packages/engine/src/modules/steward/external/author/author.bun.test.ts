@@ -14,7 +14,7 @@ test("prepare guides the current Agent without touching files or calling other t
     get files(): never { throw new Error("prepare must not access files"); },
     async call() { throw new Error("prepare must not make routed calls"); },
   };
-  const output = await authorTool(context, "prepare", { input: JSON.stringify(input) }, { kind: "module" });
+  const output = await authorTool(context, "prepare", { input }, { kind: "module" });
   expect(output).toMatchObject({ kind: "material-preparation", request: { goal: input.goal, targets: input.targets, intent: input.intent },
     admission: { requestKey: input.requestKey, submitter: input.submitter, targets: input.targets } });
   expect(output).not.toHaveProperty("execution");

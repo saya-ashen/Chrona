@@ -1,3 +1,4 @@
+import { readItems } from "./pagination";
 type Call = (target: string, args?: Record<string, unknown>) => Promise<unknown>;
 type App = { id: string; name: string; description: string | null; status: string; builtin: boolean; activeHash: string | null; origin: string; capabilities: unknown; health: Health };
 type Health = { module: string; moduleId: string; open: boolean; incident: { status: string; lastAt: string } | null; contractFailureCount: number; nextAction: string | null; truncated: boolean };
@@ -21,8 +22,8 @@ async function optionalNotify(call: Call, target: string, args?: Record<string, 
 /** Web owns ordering and presentation; upcoming is an empty private page field without a schedule source. */
 export async function todayView(call: Call, sessionsView: () => Promise<unknown[]>, includeRuntime = true) {
   const [runtime, approvals, notifications, sessions, apps, notificationStatus] = await Promise.all([
-    includeRuntime ? call("activity.runtime") : null, call("approvals.list").then(page => (page as { items: unknown }).items), optionalNotify(call, "notify.list", { limit: 20 }),
-    sessionsView().then(items => items.slice(0, 20)), call("modules.list").then(page => (page as { items: unknown }).items), includeRuntime ? optionalNotify(call, "notify.counts") : null,
+    includeRuntime ? call("activity.runtime") : null, readItems(call, "approvals.list"), optionalNotify(call, "notify.list", { limit: 20 }),
+    sessionsView().then(items => items.slice(0, 20)), readItems(call, "modules.list"), includeRuntime ? optionalNotify(call, "notify.counts") : null,
   ]) as [{ at: string; [key: string]: unknown } | null, unknown[], { items: { format?: string; [key: string]: unknown }[] } | null, unknown[], App[], { queued: number; failed: number } | null];
   const { at, ...health } = runtime ?? { at: new Date().toISOString() };
   return { generatedAt: at, approvals, upcoming: [], updates: (notifications?.items ?? []).map(({ format: _format, ...item }) => item),

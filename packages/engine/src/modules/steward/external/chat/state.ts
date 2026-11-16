@@ -11,47 +11,31 @@ const now = () => new Date().toISOString();
 const stable = (x: any): string => JSON.stringify(x);
 const pending = (op: any) => !['succeeded', 'rejected', 'failed'].includes(op.status);
 const refusalCodes = new Set(['invalid', 'forbidden', 'conflict', 'not_found', 'unavailable', 'failed']);
-export function mergeTranscript(run: any, incoming: any[]) {
-  const signature = (x: any) => stable(x);
-  let tail = incoming;
-  if (run.baseline?.length) {
-    let overlap = Math.min(run.baseline.length, tail.length);
-    while (overlap && stable(run.baseline.slice(-overlap)) !== stable(tail.slice(0, overlap))) overlap--;
-    tail = tail.slice(overlap);
-  }
-  const saved = run.transcript ??= [];
-  if (!tail.length) { run.rawTail = incoming; return; }
-  let overlap = Math.min(saved.length, tail.length);
-  // Match ordered blocks, allowing only the final aligned block to grow.
-  // A timestamp belongs to a message and is not a unique block identity.
-  while (overlap) {
-    const start = saved.length - overlap;
-    const prefixMatches = stable(saved.slice(start, -1)) === stable(tail.slice(0, overlap - 1));
-    const old = saved.at(-1), next = tail[overlap - 1];
-    if (prefixMatches && (stable(old) === stable(next) || (old.kind === 'text' && next.kind === 'text' && old.at === next.at && next.text.startsWith(old.text)))) {
-      saved[saved.length - 1] = next; break;
+type TranscriptRecord = { id?: string; [field: string]: unknown };
+type TranscriptSnapshot = {
+  baseline?: TranscriptRecord[]; transcript?: TranscriptRecord[]; rawTail?: TranscriptRecord[];
+  gaps?: { reason: string; message: string }[];
+};
+export function mergeTranscript(run: TranscriptSnapshot, incoming: TranscriptRecord[]) {
+  if (incoming.every(item => typeof item.id === 'string')) {
+    const baseline = new Set((run.baseline ?? []).map(item => item.id));
+    const saved = run.transcript ??= [];
+    const positions = new Map(saved.map((item, index) => [item.id, index]));
+    for (const item of incoming) {
+      if (baseline.has(item.id)) continue;
+      const index = positions.get(item.id);
+      if (typeof index === 'number') saved[index] = item;
+      else { positions.set(item.id, saved.length); saved.push(item); }
     }
-    overlap--;
+    run.rawTail = incoming;
+    return;
   }
-  // Providers can replace the latest partial text with a longer version.
-  if (!overlap && saved.length) {
-    const last = saved.at(-1), first = tail[0];
-    if (last.kind === 'text' && first.kind === 'text' && last.at === first.at && first.text.startsWith(last.text)) {
-      saved[saved.length - 1] = first;
-      overlap = 1;
-    }
-  }
-  if (!overlap && saved.length && tail.length) {
-    run.gaps ??= [];
-    if (!run.gaps.some((g: any) => g.from === signature(tail[0]))) run.gaps.push({ from: signature(tail[0]), message: 'Provider 返回的有界记录与已保存内容不相接；中间可能存在缺口。' });
-  }
-  const seen = new Set(saved.map(signature));
-  for (const item of tail.slice(overlap)) if (!seen.has(signature(item))) { saved.push(item); seen.add(signature(item)); }
-  run.transcriptStarted = true;
+  // Without stable IDs, a Provider snapshot cannot establish identity across reads.
+  run.transcript = incoming;
   run.rawTail = incoming;
-  if (!run.baseline?.length && !run.initialTailChecked) {
-    run.initialTailChecked = true;
-    if (incoming.length >= 100) (run.gaps ??= []).push({ message: '首次读取达到 Provider 尾部上限，早期输出可能未保留。' });
+  run.gaps ??= [];
+  if (!run.gaps.some(gap => gap.reason === 'missing_record_ids')) {
+    run.gaps.push({ reason: 'missing_record_ids', message: 'Provider 未提供稳定记录标识，显示最近一次完整快照；无法确认跨次读取的历史连续性。' });
   }
 }
 export class Store {
@@ -109,7 +93,7 @@ export class Store {
   draft(id: string, patch: any, revision: number) {
     const c = this.get(id);
     if (!Number.isInteger(revision) || c.revision !== revision) throw Error('草稿已在其他窗口更新，请核对后编辑');
-    if (typeof patch.draft === 'string') c.draft = patch.draft.slice(0, 200000);
+    if (typeof patch.draft === 'string') c.draft = patch.draft;
     if (patch.settings) {
       const s = patch.settings;
       if (!['providerId', 'model', 'thinking'].every(k => typeof s[k] === 'string') || !Array.isArray(s.tools)) throw Error('无效的会话设置');
@@ -347,18 +331,19 @@ export class Store {
         for (const item of r.items) if (!seen.has(item.sequence)) { seen.add(item.sequence); (a.events ??= []).push(item); }
         a.seen = [...seen]; if (r.nextCursor) a.cursor = r.nextCursor; a.interactions = r.interactions;
         if (r.transcript) mergeTranscript(a, r.transcript);
+        a.transcriptState = r.transcriptState ?? { status: r.transcript ? 'available' : 'pending', reason: '执行已结束，回复仍待读取。' };
         a.ended = r.ended; a.runActive = r.run.active; a.observedStatus = r.run.status; a.drained = r.ended && !r.nextCursor;
         a.status = a.stopRequested ? (a.stopConfirmed ? '已停止' : '停止未确认') : r.run.status;
-        a.error = null;
+        a.error = a.transcriptState.status === 'available' ? null : a.transcriptState.reason;
         if (!r.ended || !r.nextCursor) break;
         if (page < 4) this.save(c);
       }
       const uncertain = c.operations.some((op: any) => pending(op) && (op.args?.runId === a.runId || op.key === a.key));
-      if (a.ended && !a.runActive && a.drained && (!a.stopRequested || a.stopConfirmed) && !uncertain) {
+      if (a.ended && !a.runActive && a.drained && a.transcriptState?.status !== 'pending' && (!a.stopRequested || a.stopConfirmed) && !uncertain) {
         c.context.transcript = a.rawTail ?? [];
         c.messages.push({ id: a.runId, role: 'assistant', text: '', at: now(), run: structuredClone(a) });
         c.active = null;
-      } else if (a.ended && !a.drained && !a.stopRequested) a.status = '正在读取剩余记录';
+      } else if (a.ended && !a.stopRequested) a.status = a.drained ? '执行已结束，正在读取回复' : '正在读取剩余记录';
     } catch (e: any) {
       c = this.get(id);
       if (c.active?.runId !== runId || c.active.key !== key || (c.active.cursor ?? '') !== cursor) return c;

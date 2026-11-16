@@ -1,3 +1,4 @@
+import { readItems } from "./pagination";
 import { applicationCall } from "./kernel-client";
 import { chrona, on } from "chrona";
 import { readFile } from "node:fs/promises";
@@ -17,13 +18,15 @@ import { createMaterialAdmission } from "./material-admission";
 // "/" serves the static page (no data). "/api/web/*" is the page's data API: Chrona checks the user's key before it
 // forwards a request here; other applications are reached through routed calls (v2-8).
 type Args = Record<string, unknown>;
-type UserTool = { target: string; moduleId?: string; inputSchema: Record<string, unknown>; outputSchema: Record<string, unknown> | null };
+type UserTool = { target: string | { moduleId: string; tool: string }; 
+  label?: string; moduleId?: string; inputSchema: Record<string, unknown>; outputSchema: Record<string, unknown> | null };
 type TargetPin = { moduleId: string };
 const files: Record<string, string> = { "/app.js": "text/javascript; charset=utf-8", "/pages.js": "text/javascript; charset=utf-8", "/style.css": "text/css; charset=utf-8" };
 const headers = { "cache-control": "no-cache", "x-content-type-options": "nosniff", "referrer-policy": "same-origin",
   "content-security-policy": "default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob:; frame-src blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'" };
 const preferences = createPreferences(chrona.paths.data);
-const call = (target: string, args: Args = {}, options: { key?: string } = {}) => target === "web.settings" ? preferences.tool(args) : applicationCall(target, Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined)), /^modules\.(enable|disable|rollback|remove)$/.test(target) ? { key: typeof args.requestKey === "string" ? args.requestKey : crypto.randomUUID() } : options);
+const call = (target: string, args: Args = {}, options: { key?: string } = {}) => target === "web.settings" ? preferences.tool(args)
+  : applicationCall(target, Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined)), options);
 const admitMaterial = createMaterialAdmission(chrona.paths.data, call, moduleId => applicationCall('apps.overview', {}, {expectedTarget: {moduleId}}));
 const ownSettings = new Map<string, (args: Args) => Promise<unknown>>([
   ["web.ui-settings", args => webSettings(call, preferences, args)],
@@ -65,11 +68,11 @@ function events() {
   return new Response(body, { headers: { "content-type": "text/event-stream", "cache-control": "no-cache" } });
 }
 // Pages apps register (module-dependency-direction §4); `tools` is what this page may call of that app.
-const pages = createPages({ dataDir: chrona.paths.data, modules: () => call("modules.list").then(page => (page as { items: unknown }).items) as Promise<ModuleState[]>,
-  toolInventory: () => call("modules.describe", { audience: "user" }).then(page => (page as { items: (PageTool & { target: string })[] }).items),
+const pages = createPages({ dataDir: chrona.paths.data, modules: () => readItems(call, "modules.list") as Promise<ModuleState[]>,
+  toolInventory: () => readItems<PageTool & { target: string | { moduleId: string; tool: string }; label?: string }>(call, "modules.describe", { audience: "user" }),
   tools: async module => {
-  const tools = await call("modules.describe", { query: module, audience: "user" }).then(page => (page as { items: unknown }).items) as (PageTool & { target: string })[];
-  return new Map(tools.filter(tool => tool.target.startsWith(`${module}.`)).map(tool => [tool.target.slice(module.length + 1), tool]));
+  const tools = await readItems(call, "modules.describe", { query: module, audience: "user" }) as (PageTool & { target: string | { moduleId: string; tool: string }; label?: string })[];
+  return new Map(tools.filter(tool => (tool.label ?? (typeof tool.target === "string" ? tool.target : "")).startsWith(`${module}.`)).map(tool => [(tool.label ?? (typeof tool.target === "string" ? tool.target : "")).slice(module.length + 1), tool]));
 } });
 on("tool", async (event: { id: string; args: Args; caller?: Caller }) => {
   // Chrona records the caller of every routed call; only the build's smoke start sends a tool event without one.
@@ -84,7 +87,7 @@ on("tool", async (event: { id: string; args: Args; caller?: Caller }) => {
 });
 
 on("activated", async () => {
-  const modules = await call("modules.list").then(page => (page as { items: unknown }).items) as ModuleState[];
+  const modules = await readItems(call, "modules.list") as ModuleState[];
   const own = modules.find(module => module.name === "web" && module.status === "active" && module.activeHash);
   if (own) await pages.tool("page-set", WEB_SETTINGS_PAGE, { kind: "module", module: "web", moduleId: own.id, hash: own.activeHash ?? undefined });
 });
@@ -95,7 +98,7 @@ async function getSettings() {
 }
 async function sessionRoute({ request, path, body }: ApiContext): Promise<ApiResult> {
   if (path[0] !== "sessions" || path.length !== 3) return NO_ROUTE;
-  if (request.method === "GET") return readConversation(path[1]!, path[2]!);
+  if (request.method === "GET") return readConversation(path[1]!, path[2]!, new URL(request.url));
   if (request.method !== "POST") return NO_ROUTE;
   if (path[2] === "reconcile") {
     const parsed = z.object({ requestKey: z.string().min(1) }).strict().safeParse(body);
@@ -108,11 +111,12 @@ async function sessionRoute({ request, path, body }: ApiContext): Promise<ApiRes
   }
   return NO_ROUTE;
 }
-function readConversation(session: string, part: string): Promise<ApiResult> | typeof NO_ROUTE {
+function readConversation(session: string, part: string, url: URL): Promise<ApiResult> | typeof NO_ROUTE {
+  const history = { cursor: url.searchParams.get("cursor") ?? undefined, limit: url.searchParams.has("limit") ? Number(url.searchParams.get("limit")) : undefined };
   if (!isAgentConversation(session)) return NO_ROUTE;
-  if (part === "snapshot") return conversations.snapshot(session);
+  if (part === "snapshot") return conversations.snapshot(session, history);
   if (part === "transcript") return conversations.transcript(session);
-  if (part === "messages") return conversations.messages(session);
+  if (part === "messages") return conversations.messages(session, history);
   if (part === "execution") return conversations.execution(session);
   return NO_ROUTE;
 }
@@ -148,12 +152,12 @@ async function runRoute({ request, path, body }: ApiContext): Promise<ApiResult>
 }
 // /modules/<module>/<view>: read-only views, and (v2-23) one app's page in one read and its own settings.
 const MODULE_ROUTES: Record<string, (module: string, body: Args) => Promise<unknown>> = {
-  "GET diagnostics": module => call("modules.health", { moduleId: chrona.dependencies[module] ?? module, detail: true }).then(page => (page as { items: unknown }).items),
+  "GET diagnostics": module => readItems(call, "modules.health", { moduleId: chrona.dependencies[module] ?? module, detail: true }),
   "GET overview": module => appOverview(call, module),
-  "POST disable": module => call("modules.disable", { moduleId: module, reason: "用户在网页操作" }),
-  "POST enable": module => call("modules.enable", { moduleId: module, reason: "用户在网页操作" }),
-  "POST remove": module => call("modules.remove", { moduleId: module, reason: "用户在网页申请删除应用" }),
-  "POST rollback": (module, body) => call("modules.rollback", { moduleId: module, hash: body.hash, reason: "用户在网页回滚应用" }),
+  "POST disable": module => call("modules.disable", { moduleId: module, reason: "用户在网页操作" }, { key: crypto.randomUUID() }),
+  "POST enable": module => call("modules.enable", { moduleId: module, reason: "用户在网页操作" }, { key: crypto.randomUUID() }),
+  "POST remove": module => call("modules.remove", { moduleId: module, reason: "用户在网页申请删除应用" }, { key: crypto.randomUUID() }),
+  "POST rollback": (module, body) => call("modules.rollback", { moduleId: module, hash: body.hash, reason: "用户在网页回滚应用" }, { key: crypto.randomUUID() }),
 };
 async function moduleRoute({ request, path, body }: ApiContext): Promise<ApiResult> {
   const route = `${request.method} ${path[2]}`;
@@ -185,17 +189,17 @@ async function api(request: Request, path: string[]) {
     },
     "GET /settings": () => getSettings(),
     "POST /settings": () => updateSettings(call, body),
-    "GET /runs": async () => [...await conversations.runs(), ...await call("activity.runs").then(page => (page as { items: unknown }).items) as unknown[]],
+    "GET /runs": async () => [...await conversations.runs(), ...await readItems(call, "activity.runs")],
     // v2-18: the kernel's activity trail, worded by the kernel; the page only shows it.
     "GET /activity": () => call("notify.activity", { ...(url.searchParams.get("module") ? { module: url.searchParams.get("module") } : {}), ...(url.searchParams.get("before") ? { before: url.searchParams.get("before") } : {}) }),
-    "GET /modules": () => call("modules.list").then(page => (page as { items: unknown }).items),
-    "GET /credentials": () => call("secrets.list").then(page => (page as { items: unknown }).items),
+    "GET /modules": () => readItems(call, "modules.list"),
+    "GET /credentials": () => readItems(call, "secrets.list"),
     "GET /pages": () => listPages(),
     // Memory discovery and selection belong to this entry application.
     "GET /memory": () => memoryView(call, "web", url.searchParams.get("query") ?? undefined),
     "POST /memory/forget": () => memoryForget(call, "web", body.id),
     "GET /system-apps": () => systemApps(call, url.searchParams.get("module") ?? undefined),
-    "GET /tools": () => call("modules.describe", { query: url.searchParams.get("query") ?? undefined, audience: "user" }).then(page => (page as { items: unknown }).items),
+    "GET /tools": () => readItems(call, "modules.describe", { query: url.searchParams.get("query") ?? undefined, audience: "user" }),
     "POST /call": () => moduleCall(body),
     // Authenticated owner HTTP entry only; no app tool can invoke this grant.
     "POST /material-admission": () => admitMaterial(body),
@@ -209,6 +213,11 @@ async function api(request: Request, path: string[]) {
 }
 async function moduleCall(body: Args) {
   // Conversations, approvals and app records have their own routes above.
+  if (typeof body.target === "object" && body.target !== null) {
+    const target = z.object({ moduleId: z.string().min(1), tool: z.string().regex(/^[a-z][a-z0-9-]{1,40}$/) }).strict().parse(body.target);
+    const tool = await userTool(target);
+    return invokeUserTool(tool.label!, (body.args ?? {}) as Args, tool, { moduleId: target.moduleId });
+  }
   const target = String(body.target), args = (body.args ?? {}) as Args;
   if (!/^[a-z][a-z0-9-]{1,40}\.[a-z][a-z0-9-]{1,40}$/.test(target) || /^(approvals|modules|settings|schedules|secrets)\./.test(target)) throw Object.assign(new Error(`Unknown module tool ${target}`), { code: "not_found" });
   const started = performance.now(), startedAt = new Date().toISOString();
@@ -236,7 +245,7 @@ async function pageCall(target: string, args: Args, expectedTarget: TargetPin,
 }
 async function invokeUserTool(target: string, args: Args, tool: UserTool, expectedTarget?: TargetPin) {
   const own = ownSettings.get(target);
-  if (!own) return applicationCall(target, args, expectedTarget ? { expectedTarget } : undefined);
+  if (!own) return applicationCall(tool.target, args, expectedTarget ? { expectedTarget } : undefined);
   // Discovery admits the actual SDK caller against its current approved owner authority.
   // Own business dispatch avoids a routed self-call, retaining the page's module identity.
   if (!expectedTarget || tool.moduleId !== expectedTarget.moduleId) throw Object.assign(new Error("页面或工具已变化，请重新打开页面"), { code: "conflict" });
@@ -246,9 +255,12 @@ async function invokeUserTool(target: string, args: Args, tool: UserTool, expect
   if (tool.outputSchema && !z.fromJSONSchema(tool.outputSchema).safeParse(output).success) throw Object.assign(new Error(`${target}: output contract mismatch`), { code: "failed" });
   return output;
 }
-async function userTool(target: string) {
-  const tools = await call("modules.describe", { query: target, audience: "user" }).then(page => (page as { items: unknown }).items) as UserTool[];
-  const tool = tools.find(tool => tool.target === target);
+async function userTool(target: UserTool["target"]) {
+  const query = typeof target === "string" ? target : target.tool;
+  const tools = await readItems(call, "modules.describe", { query, audience: "user" }) as UserTool[];
+  const tool = tools.find(tool => typeof target === "string"
+    ? (tool.label ?? (typeof tool.target === "string" ? tool.target : "")) === target
+    : typeof tool.target === "object" && tool.target.moduleId === target.moduleId && tool.target.tool === target.tool);
   if (!tool) throw Object.assign(new Error(`Unknown user tool ${target}`), { code: "not_found" });
   return tool;
 }

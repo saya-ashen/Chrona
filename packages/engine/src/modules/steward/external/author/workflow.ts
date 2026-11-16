@@ -1,4 +1,4 @@
-import { AuthorError, integer, jsonInput, object, parsePrepare, parseReceipt, parseSource, parseStage, parseSubmit, parseValidate, text, type Prepare } from "./contracts";
+import { AuthorError, integer, structuredInput, object, parsePrepare, parseReceipt, parseSource, parseStage, parseSubmit, parseValidate, text, type Prepare } from "./contracts";
 import { stagePackage } from "./distribution";
 import type { SourceFiles } from "./files";
 import { digest, MATERIAL_LIMITS, parseExport, parseImport } from "./material";
@@ -50,7 +50,7 @@ export function prepareMaterial(input: Prepare) {
     acceptance: acceptanceWorksheet(input),
   };
 }
-export type AuthorContext = { files: SourceFiles; call(target: string, args: Record<string, unknown>): Promise<unknown> };
+export type AuthorContext = { files: SourceFiles; call(target: string, args: Record<string, unknown>, options?: { key?: string }): Promise<unknown> };
 export type AuthorCaller = { kind: string } | undefined;
 const editing = new Set(["write", "read", "list"]);
 /** Kernel routing enforces tool visibility and standing grants. Here a provider cannot invoke owner UI actions.
@@ -66,7 +66,7 @@ function writeSource(context: AuthorContext, args: Record<string, unknown>) {
 export async function authorTool(context: AuthorContext, id: string, args: Record<string, unknown>, caller: AuthorCaller): Promise<unknown> {
   authorizeAuthorTool(id, caller);
   switch (id) {
-    case "prepare": return prepareMaterial(parsePrepare(jsonInput(args)));
+    case "prepare": return prepareMaterial(parsePrepare(structuredInput(args)));
     case "write": return writeSource(context, args);
     case "read": {
       object(args, ["path", "offset", "limit"], ["path"]);
@@ -76,27 +76,28 @@ export async function authorTool(context: AuthorContext, id: string, args: Recor
       object(args, ["path"]);
       return context.files.list(args.path === "" ? "" : text(args.path, 1000));
     }
-    case "import": return context.files.import(parseImport(jsonInput(args, MATERIAL_LIMITS.recordBytes)));
+    case "import": return context.files.import(parseImport(structuredInput(args, MATERIAL_LIMITS.recordBytes)));
     case "export": {
-      const input = parseExport(jsonInput(args));
+      const input = parseExport(structuredInput(args));
       return context.files.export(input.path, input.to, input.overwrite);
     }
-    case "validate": return validateWorkspace(context.files, parseValidate(jsonInput(args)));
-    case "stage": return stagePackage(context.files, parseStage(jsonInput(args)));
+    case "validate": return validateWorkspace(context.files, parseValidate(structuredInput(args)));
+    case "stage": return stagePackage(context.files, parseStage(structuredInput(args)));
     case "source": {
-      const input = parseSource(jsonInput(args));
+      const input = parseSource(structuredInput(args));
       // Kernel resolves this relative destination using the actual routed module identity.
       return context.call("modules.source", input);
     }
     case "submit": {
-      const input = parseSubmit(jsonInput(args));
+      const input = parseSubmit(structuredInput(args));
       // Do not re-read mutable files before a replay. Kernel snapshots once and owns key conflicts.
-      return context.call("modules.submit", input);
+      const { requestKey, ...request } = input;
+      return context.call("modules.submit", request, { key: requestKey });
     }
     case "receipt": {
-      const input = parseReceipt(jsonInput(args));
+      const input = parseReceipt(structuredInput(args));
       // Preserve pending, unknown, error and future receipt fields without retrying or inventing status.
-      return context.call("modules.receipt", input);
+      return context.call("modules.receipt", "receiptId" in input ? input : { admissionId: input.admissionId, key: input.requestKey });
     }
     default: throw new AuthorError("invalid", "Unknown author tool.");
   }

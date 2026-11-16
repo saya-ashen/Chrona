@@ -5,7 +5,7 @@ import { openPublishers, parseRegistration, type Schema } from "./declarations";
 
 export type Caller = { kind: "module"; module: string; moduleId: string; hash: string } | { kind: string };
 export type Subscription = { event: string; module: string; tool: string; moduleId: string; publisherId: string; revision: string; invalid?: boolean };
-export type Directory = { modules: { id: string; name: string; status: string; activeHash: string | null }[]; tools: { target: string; moduleId?: string; hash?: string; inputSchema: Record<string, unknown> }[] };
+export type Directory = { modules: { id: string; name: string; status: string; activeHash: string | null }[]; tools: { target: string | { moduleId: string; tool: string }; label?: string; moduleId?: string; hash?: string; inputSchema: Record<string, unknown> }[] };
 export type CallResult = { callId: string; status: "succeeded" | "failed" | "unknown"; error?: string };
 type Ports = {
   dataDir: string;
@@ -102,7 +102,7 @@ export function createEvents(ports: Ports) {
   const owner = (id: string, name: string) => directory.modules.find(module => module.id === id && module.name === name);
   const reference = (moduleId: string, module: string, tool: string) => {
     const current = owner(moduleId, module);
-    return current?.status === "active" && current.activeHash ? directory.tools.find(candidate => candidate.moduleId === moduleId && candidate.hash === current.activeHash && candidate.target === `${module}.${tool}`) : undefined;
+    return current?.status === "active" && current.activeHash ? directory.tools.find(candidate => candidate.moduleId === moduleId && candidate.hash === current.activeHash && (candidate.label ?? (typeof candidate.target === "string" ? candidate.target : "")) === `${module}.${tool}`) : undefined;
   };
 
   async function refresh() {

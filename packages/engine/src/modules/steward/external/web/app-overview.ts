@@ -1,6 +1,7 @@
+import { readItems } from "./pagination";
 type Row = Record<string, unknown>;
 type Call = (target: string, args?: Row) => Promise<unknown>;
-type Tool = Row & { target: string; moduleId?: string };
+type Tool = Row & { target: string | { moduleId: string; tool: string }; label?: string; moduleId?: string };
 type App = Row & { id: string; name: string };
 type Diagnostic = Row & { moduleId: string };
 
@@ -17,7 +18,7 @@ const kernelDescriptions = {
 /** Only known kernel namespaces without an application identity belong in this projection. */
 function kernelEntries(tools: Tool[]) {
   return Object.entries(kernelDescriptions).flatMap(([name, description]) => {
-    const contracts = tools.filter(tool => tool.moduleId === undefined && tool.target.startsWith(`${name}.`));
+    const contracts = tools.filter(tool => tool.moduleId === undefined && (tool.label ?? (typeof tool.target === "string" ? tool.target : "")).startsWith(`${name}.`));
     return contracts.length ? [{ name, origin: "kernel" as const, description, tools: contracts }] : [];
   });
 }
@@ -27,7 +28,7 @@ function notFound(module: string) {
 
 /** Web owns the page projection; discovery returns only currently reachable contracts. */
 export async function systemApps(call: Call, module?: string) {
-  const entries = kernelEntries(await call("modules.describe").then(page => (page as { items: unknown }).items) as Tool[]);
+  const entries = kernelEntries(await readItems(call, "modules.describe") as Tool[]);
   if (module === undefined) return entries;
   const entry = entries.find(item => item.name === module);
   if (!entry) throw notFound(module);
@@ -36,25 +37,25 @@ export async function systemApps(call: Call, module?: string) {
 
 /** null means activity is undiscovered; a discovered source's errors must remain visible. */
 async function recentActivity(call: Call, tools: Tool[], module: string) {
-  if (!tools.some(tool => tool.target === "notify.activity")) return null;
+  if (!tools.some(tool => (tool.label ?? (typeof tool.target === "string" ? tool.target : "")) === "notify.activity")) return null;
   return (await call("notify.activity", { module, limit: 30 }) as { items: unknown[] }).items;
 }
 
 export async function appOverview(call: Call, module: string) {
-  const tools = await call("modules.describe").then(page => (page as { items: unknown }).items) as Tool[];
+  const tools = await readItems(call, "modules.describe") as Tool[];
   const system = kernelEntries(tools).find(item => item.name === module);
   if (system) return { kind: "system" as const, ...system, activity: await recentActivity(call, tools, module) };
 
-  const apps = await call("modules.list").then(page => (page as { items: unknown }).items) as App[];
+  const apps = await readItems(call, "modules.list") as App[];
   const app = apps.find(item => item.id === module || item.name === module);
   if (!app) throw notFound(module);
   const [diagnostics, activity] = await Promise.all([
-    call("modules.health", { moduleId: app.id, detail: true }).then(page => (page as { items: unknown }).items) as Promise<Diagnostic[]>,
+    readItems(call, "modules.health", { moduleId: app.id, detail: true }) as Promise<Diagnostic[]>,
     recentActivity(call, tools, app.name),
   ]);
   return {
     kind: "app" as const, app,
-    tools: tools.filter(tool => tool.moduleId === app.id && tool.target.startsWith(`${app.name}.`)),
+    tools: tools.filter(tool => tool.moduleId === app.id && (tool.label ?? (typeof tool.target === "string" ? tool.target : "")).startsWith(`${app.name}.`)),
     diagnostics: diagnostics.find(item => item.moduleId === app.id) ?? null,
     activity,
   };

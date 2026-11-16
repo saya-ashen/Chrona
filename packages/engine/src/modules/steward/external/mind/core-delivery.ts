@@ -219,7 +219,7 @@ export class CoreDelivery {
    if('error'in prepared)throw prepared.error;
    let raw:unknown;
    try{
-    raw=await this.call(target(r,'submit'),{input:JSON.stringify(prepared.original)},{key:r.requestKey,expectedTarget:{moduleId:r.author.moduleId,hash:r.author.hash}});
+    raw=await this.call(target(r,'submit'),{input:prepared.original},{key:r.requestKey,expectedTarget:{moduleId:r.author.moduleId,hash:r.author.hash}});
    }catch(error){
     const failure=error as {code?:string;reason?:string}|null;
     const refused=failure?.reason==='not_dispatched'&&failure.code==='unavailable'

@@ -21,7 +21,6 @@
   "tools": [
     {
       "name": "health",
-      "readOnly": true,
       "description": "Pi health: kernel-bound provider endpoint",
       "visibility": [
         "kernel"
@@ -275,7 +274,6 @@
     },
     {
       "name": "status",
-      "readOnly": true,
       "description": "Pi status: kernel-bound provider endpoint",
       "visibility": [
         "kernel"
@@ -508,7 +506,6 @@
     },
     {
       "name": "transcript",
-      "readOnly": true,
       "description": "Pi transcript: kernel-bound provider endpoint",
       "visibility": [
         "kernel"
@@ -586,7 +583,8 @@
                       "type": "string",
                       "enum": [
                         "record_too_large",
-                        "item_too_large"
+                        "item_too_large",
+                        "malformed_record"
                       ]
                     },
                     "item": {
@@ -935,7 +933,6 @@
     },
     {
       "name": "models",
-      "readOnly": true,
       "description": "从所选本地 Pi 配置发现模型选项，不调用模型",
       "visibility": [
         "owner"

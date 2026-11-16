@@ -1,3 +1,4 @@
+import { readItems } from "./pagination";
 import { javascript } from "./settings-bundle.js";
 import { memoryForget, memoryPreferences } from "./memory";
 import type { createPreferences } from "./settings-store";
@@ -11,7 +12,7 @@ const hardCaps = new Set(["maxCallsPerEvent", "maxOutputTokens", "dailyCalls", "
 /** Global Settings reads and writes kernel governance only. Applications own their pages and saves. */
 export async function settingsView(call: Call) {
   const kernel = await call("settings.get") as Args;
-  const usage = await call("activity.usage", { limit: 100 }) as { items: unknown[] };
+  const usage = { items: await readItems(call, "activity.usage", { limit: 100 }) };
   return { settings: { timezone: kernel.timezone, runTimeoutMinutes: kernel.runTimeoutMinutes, moduleModel: kernel.moduleModel, wake: kernel.wake, modelUsage: usage.items } };
 }
 export async function updateSettings(call: Call, body: unknown) {

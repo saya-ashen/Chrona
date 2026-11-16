@@ -1,8 +1,8 @@
+import { readItems } from "./pagination";
 import { applicationCall } from "./kernel-client";
 import { chrona, on } from "chrona";
 import { openStore } from "./store";
 import { createNotify, type Caller, type CallResult } from "./notify";
-import type { ModuleIdentity, Callback } from "./registry";
 import { activityView } from "./activity";
 import { tickNotify } from "./facts";
 import { settingsRegistration } from "./settings-page";
@@ -10,8 +10,8 @@ import { settingsRegistration } from "./settings-page";
 const store = openStore(chrona.paths.data);
 const notify = createNotify({ store, publicUrl: process.env.CHRONA_PUBLIC_URL ?? null,
   call: (target, args, options) => applicationCall(target, args, options), status: callId => chrona.callStatus(callId),
-  listModules: () => applicationCall("modules.list", {}).then(page => (page as { items: unknown }).items as ModuleIdentity[]),
-  describeTools: () => applicationCall("modules.describe", {}).then(page => (page as { items: unknown }).items as Callback[]) });
+  listModules: () => readItems(applicationCall, "modules.list", {}),
+  describeTools: () => readItems(applicationCall, "modules.describe", {}) });
 
 const settingsPage = settingsRegistration((target, args) => applicationCall(target, args));
 on("activated", async () => { await settingsPage.activate(); return {}; });

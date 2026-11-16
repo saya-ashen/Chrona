@@ -109,7 +109,8 @@
     "today.bun.test.ts",
     "today.ts",
     "tsconfig.json",
-    "UI-DEVELOPMENT.md"
+    "UI-DEVELOPMENT.md",
+    "pagination.ts"
   ],
   "artifacts": [
     {

@@ -58,13 +58,13 @@ class Gateway {
   if(typeof target==='object'&&target.moduleId===author.moduleId){
    if(target.tool==='stage')return {name:args.name,dir:material.dir,materialDigest:material.materialDigest,files:3,bytes:123};
    if(target.tool==='submit'){
-    const command=parseSubmit(JSON.parse(String(args.input)));
+    const command=parseSubmit(args.input);
     expect(command).toEqual({admissionId:this.receipt.admissionId,requestKey:this.receipt.requestKey,items:[{name:material.name,dir:material.dir,intent:material.intent}]});expect(options?.key).toBe(command.requestKey);
     if(this.submitRefusal)throw this.submitRefusal;
     this.db.query('INSERT INTO receipts(id,admission,key,json) VALUES(?,?,?,?)').run(this.receipt.receiptId,command.admissionId,command.requestKey,JSON.stringify(this.receipt));
     if(this.lostSubmit)throw Error('Lost submit reply');return structuredClone(this.receipt);
    }
-   if(target.tool==='receipt'){const selector=parseReceipt(JSON.parse(String(args.input)));return this.readReceipt('receiptId'in selector?selector:{admissionId:selector.admissionId,key:selector.requestKey});}
+   if(target.tool==='receipt'){const selector=parseReceipt(args.input);return this.readReceipt('receiptId'in selector?selector:{admissionId:selector.admissionId,key:selector.requestKey});}
   }
   if(typeof target==='object'&&target.moduleId==='new-timetable'&&target.tool==='lookup')return {departure:'09:00',arrival:'11:30',source:'published timetable'};
   if(typeof target==='object'&&target.moduleId==='chat-current'){this.sourceCalls++;throw Error('Source offline');}
@@ -137,7 +137,7 @@ test('autoSubmit defaults off; enabling submits once with the prepared key, even
   expect(f.runtime.view().autonomousPublishing.enabled).toBe(false);expect(f.gateway.commands('submit')).toHaveLength(0);
   autoSubmit(f);expect(f.runtime.view().autonomousPublishing.enabled).toBe(true);
   await f.runtime.tick(false,false);expect(f.gateway.commands('submit')).toHaveLength(1);
-  expect(JSON.parse(String(f.gateway.commands('submit')[0].args.input)).requestKey).toBe(r.input.requestKey);
+  expect((f.gateway.commands('submit')[0].args.input as {requestKey: string}).requestKey).toBe(r.input.requestKey);
   await f.runtime.tick(false,false);f.restart();await f.runtime.reconcileOriginals();await f.runtime.tick(false,false);
   expect(f.gateway.commands('submit')).toHaveLength(1);expect(f.gateway.commands('modules.receipt').length).toBeGreaterThan(0);
  }finally{f.close();}

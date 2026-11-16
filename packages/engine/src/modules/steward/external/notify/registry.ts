@@ -1,5 +1,6 @@
 export type ModuleIdentity = { id: string; name: string; status: string; activeHash: string | null };
-export type Callback = { target: string; moduleId?: string; hash?: string; inputSchema: Record<string, unknown>; outputSchema?: unknown };
+export type Callback = { target: string | { moduleId: string; tool: string }; 
+  label?: string; moduleId?: string; hash?: string; inputSchema: Record<string, unknown>; outputSchema?: unknown };
 export type Directory = { modules: ModuleIdentity[]; tools: Callback[] };
 
 type OutcomeSchema = { type?: unknown; anyOf?: OutcomeSchema[]; properties?: Partial<Record<string, { type?: unknown; const?: unknown }>>; required?: string[] };
@@ -30,7 +31,7 @@ function receiptType(type: unknown) {
 export function callbackReady(directory: Directory, id: string, name: string, tool: string) {
   const owner = directory.modules.find(module => module.id === id && module.name === name);
   if (owner?.status !== "active" || !owner.activeHash) return false;
-  const reference = directory.tools.find(candidate => candidate.target === `${name}.${tool}` && candidate.moduleId === id);
+  const reference = directory.tools.find(candidate => (candidate.label ?? (typeof candidate.target === "string" ? candidate.target : "")) === `${name}.${tool}` && candidate.moduleId === id);
   if (!reference || !deliveryContract(reference.outputSchema)) return false;
   return deliveryInput(reference.inputSchema);
 }

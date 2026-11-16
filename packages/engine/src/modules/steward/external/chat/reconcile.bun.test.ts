@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Store } from './state';
+import { Store, mergeTranscript } from './state';
 
 function deferred<T>() {
   let resolve!: (value: T) => void, reject!: (error: Error) => void;
@@ -215,3 +215,44 @@ for (const failure of [false, true]) {
     });
   });
 }
+
+for (const status of ['pending', 'missing', 'unavailable']) {
+  test(`terminal read preserves transcript availability: ${status}`, async () => {
+    await fixture(async ({ store, id, reads }: any) => {
+      reads.push(async () => {
+        const r: any = readResult('r1', true);
+        delete r.transcript;
+        if (status !== 'missing') r.transcriptState = { status, reason: 'reply unavailable' };
+        return r;
+      });
+      const c = await store.reconcile(id, false);
+      if (status === 'unavailable') {
+        expect(c.active).toBeNull();
+        expect(c.messages.at(-1).run.transcriptState).toEqual({ status, reason: 'reply unavailable' });
+      } else {
+        expect(c.active.runId).toBe('r1');
+        expect(c.messages.filter((m: any) => m.role === 'assistant')).toHaveLength(0);
+        reads.push(async () => readResult('r1', true));
+        expect((await store.reconcile(id, false)).messages.at(-1).run.transcript).toHaveLength(1);
+      }
+    });
+  });
+}
+
+test('draft saves the complete user text', async () => {
+  await fixture(async ({ store, id }: any) => {
+    const draft = 'x'.repeat(200001);
+    store.draft(id, { draft }, store.get(id).revision);
+    expect(store.get(id).draft).toBe(draft);
+  });
+});
+
+test('transcript record identities retain identical operations and update only their own blocks', () => {
+  const item = { kind: 'tool', at: 'same', tool: 'bash', args: '{}' };
+  const run: any = { baseline: [{ ...item, id: 'old' }], transcript: [] };
+  mergeTranscript(run, [{ ...item, id: 'old' }, { ...item, id: 'a' }, { ...item, id: 'b' }]);
+  expect(run.transcript.map((x: any) => x.id)).toEqual(['a', 'b']);
+  mergeTranscript(run, [{ ...item, id: 'b', args: '{"done":true}' }, { ...item, id: 'c' }]);
+  expect(run.transcript.map((x: any) => x.id)).toEqual(['a', 'b', 'c']);
+  expect(run.transcript[1].args).toBe('{"done":true}');
+});

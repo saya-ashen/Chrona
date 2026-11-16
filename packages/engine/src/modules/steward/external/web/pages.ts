@@ -7,7 +7,7 @@ export type Caller = { kind: string; module?: string; moduleId?: string; hash?: 
 export type ModuleState = { id: string; name: string; status: string; activeHash: string | null };
 type Schema = { properties?: Record<string, unknown>; required?: string[]; [key: string]: unknown };
 export type PageTool = { inputSchema: Schema; moduleId: string };
-export type Deps = { dataDir: string; modules: () => Promise<ModuleState[]>; tools: (module: string) => Promise<Map<string, PageTool>>; toolInventory?: () => Promise<(PageTool & { target: string })[]>; now?: () => Date };
+export type Deps = { dataDir: string; modules: () => Promise<ModuleState[]>; tools: (module: string) => Promise<Map<string, PageTool>>; toolInventory?: () => Promise<(PageTool & { target: string | { moduleId: string; tool: string }; label?: string })[]>; now?: () => Date };
 const slug = z.string().regex(/^[a-z][a-z0-9-]{0,40}$/);
 export const pageDefinition = z.object({
   id: slug, title: z.string().trim().min(1).max(80), purpose: z.literal("settings").optional(),
@@ -66,10 +66,10 @@ function toolContracts(page: Pick<Page, "moduleId" | "tools" | "content">, tools
 /** One inventory per navigation, including when multiple pages belong to the same app. */
 function listTools(deps: Deps): Deps["tools"] {
   const cache = new Map<string, ReturnType<Deps["tools"]>>();
-  let inventory: Promise<(PageTool & { target: string })[]> | undefined;
+  let inventory: Promise<(PageTool & { target: string | { moduleId: string; tool: string }; label?: string })[]> | undefined;
   return module => {
     if (!cache.has(module)) cache.set(module, deps.toolInventory
-      ? (inventory ??= deps.toolInventory()).then(items => new Map(items.filter(item => item.target.startsWith(`${module}.`)).map(item => [item.target.slice(module.length + 1), item])), error => {
+      ? (inventory ??= deps.toolInventory()).then(items => new Map(items.filter(item => (item.label ?? (typeof item.target === "string" ? item.target : "")).startsWith(`${module}.`)).map(item => [(item.label ?? (typeof item.target === "string" ? item.target : "")).slice(module.length + 1), item])), error => {
         console.error(JSON.stringify({ component: "web", event: "page_inventory_failed", error: String(error) }));
         return deps.tools(module);
       }) : deps.tools(module));

@@ -69,9 +69,9 @@ export async function runStateChecks() {
     assert.ok(c.active); c = await f.store.reconcile(f.id); assert.equal(c.active, null); assert.equal(c.messages.at(-1).run.events.length, 705);
   });
   await check('transcript tail accumulates and declares gaps', async () => {
-    const r: any = { transcript: [] }; const items = (a: number, b: number) => Array.from({ length: b-a }, (_, i) => ({ at: String(a+i), kind: 'text', text: String(a+i) }));
+    const r: any = { transcript: [] }; const items = (a: number, b: number) => Array.from({ length: b-a }, (_, i) => ({ id: String(a+i), at: String(a+i), kind: 'text', text: String(a+i) }));
     mergeTranscript(r, items(0,100)); mergeTranscript(r, items(1,101)); assert.equal(r.transcript.length,101); assert.equal(r.transcript[0].text,'0');
-    mergeTranscript(r, items(200,205)); assert.equal(r.transcript.length,106); assert.ok(r.gaps.length);
+    mergeTranscript(r, items(200,205)); assert.equal(r.transcript.length,106); assert.deepEqual(r.rawTail,items(200,205));
   });
   await check('legacy async data is retained without replay', async f => {
     const c = f.store.get(f.id); c.active = { key: 'old' }; c.operations.push({ key: 'old', kind: 'send', status: 'unknown', args: { prompt: 'old' }, error: 'Call not found' }); f.store.save(c);
@@ -96,7 +96,7 @@ export async function runStateChecks() {
     assert.equal(c.draft,'B');assert.equal(c.operations.at(-1).snapshot.draft,'A');
   });
   await check('baseline removed from every transcript snapshot', async()=>{
-    const old={kind:'text',at:'0',text:'old'},n1={kind:'text',at:'1',text:'new1'},n2={kind:'text',at:'2',text:'new2'};
+    const old={id:'old',kind:'text',at:'0',text:'old'},n1={id:'n1',kind:'text',at:'1',text:'new1'},n2={id:'n2',kind:'text',at:'2',text:'new2'};
     const run:any={baseline:[old],transcript:[]};mergeTranscript(run,[old,n1]);mergeTranscript(run,[old,n1,n2]);
     assert.deepEqual(run.transcript,[n1,n2]);assert.equal(run.gaps?.length??0,0);
     mergeTranscript(run,[old,n1,{...n2,text:'new2 extended'}]);assert.equal(run.transcript.length,2);assert.equal(run.transcript[1].text,'new2 extended');
@@ -108,7 +108,7 @@ export async function runStateChecks() {
     c=f.store.newContext(f.id,true);assert.equal(c.context,null);assert.equal(c.messages.length,2);
   });
   await check('Pi blocks sharing timestamp retain ordered identity',async()=>{
-    const first={kind:'text',at:'same',text:'First block'},second={kind:'text',at:'same',text:'First block extended'};
+    const first={id:'first',kind:'text',at:'same',text:'First block'},second={id:'second',kind:'text',at:'same',text:'First block extended'};
     const run:any={transcript:[]};mergeTranscript(run,[first,second]);mergeTranscript(run,[first,second]);
     assert.deepEqual(run.transcript,[first,second]);
     const longer={...second,text:second.text+' again'};mergeTranscript(run,[first,longer]);

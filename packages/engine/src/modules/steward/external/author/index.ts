@@ -3,7 +3,7 @@ import { chrona, ModelError, on } from "chrona";
 import { AuthorError } from "./contracts";
 import { createSourceFiles } from "./files";
 import { authorTool } from "./workflow";
-const context = { files: createSourceFiles(chrona.paths.content, [chrona.paths.data, chrona.paths.module]), call: (target: string, args: Record<string, unknown>) => applicationCall(target, args) };
+const context = { files: createSourceFiles(chrona.paths.content, [chrona.paths.data, chrona.paths.module]), call: (target: string, args: Record<string, unknown>, options?: { key?: string }) => applicationCall(target, args, options) };
 on("tool", async event => {
   try { return { result: await authorTool(context, event.id, event.args, event.caller) }; }
   catch (error) {

@@ -17,7 +17,7 @@ const source = { admissionId: "admission-1", moduleId: "fixture-id", hash: versi
 const stage = { name: "fixture", from: "sources/work", to: "packages/release", provenance: { kind: "local", label: "Offline fixture" } };
 const manifestText = JSON.stringify({ name: "fixture", entry: "index.ts", tools: [], keepAlive: true, effects: [] });
 const owner = { kind: "owner" as const, via: null }, provider = { kind: "provider" as const, runId: "r" };
-const input = (value: unknown) => ({ input: JSON.stringify(value) });
+const input = (value: unknown) => ({ input: value });
 const root = await mkdtemp(join(tmpdir(), "author-source-"));
 try {
   const content = join(root, "content"), outside = join(root, "outside");
@@ -149,7 +149,8 @@ try {
   assert.deepEqual(calls, [], "validation runs locally without kernel calls");
   await assert.rejects(authorTool(context, "validate", input({ path: "sources/work", runTests: "no" }), owner), AuthorError);
   await assert.rejects(authorTool(context, "submit", input(submission), owner), error => error === upstreamError);
-  assert.deepEqual(calls, [{ target: "modules.submit", args: submission }]);
+  const { requestKey: _requestKey, ...submittedArgs } = submission;
+  assert.deepEqual(calls, [{ target: "modules.submit", args: submittedArgs }]);
   await assert.rejects(authorTool(context, "submit", input(submission), provider), { code: "forbidden" });
   await assert.rejects(authorTool(context, "write", { path: "sources/work/new.ts", content: "x" }, undefined), { code: "forbidden" });
   assert.equal(calls.length, 1, "unknown delivery never retries");

@@ -27,7 +27,8 @@
     "settings.bun.test.ts",
     "test.ts",
     "ui-settings.ts",
-    "unconfigured-harness.ts"
+    "unconfigured-harness.ts",
+    "pagination.ts"
   ],
   "artifacts": [],
   "build": {

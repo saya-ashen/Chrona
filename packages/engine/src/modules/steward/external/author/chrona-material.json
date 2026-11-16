@@ -15,7 +15,8 @@
     "publish.ts",
     "test.ts",
     "validate.ts",
-    "workflow.ts"
+    "workflow.ts",
+    "pagination.ts"
   ],
   "artifacts": [],
   "build": {

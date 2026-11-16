@@ -28,7 +28,8 @@
     "store.ts",
     "test-directory.ts",
     "test-storage.ts",
-    "test.ts"
+    "test.ts",
+    "pagination.ts"
   ],
   "artifacts": [],
   "build": {

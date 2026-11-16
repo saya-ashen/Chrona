@@ -28,8 +28,89 @@
         "type": "object",
         "properties": {
           "input": {
-            "type": "string",
-            "description": "JSON {requestKey,submitter:{moduleId,hash},targets:[{name,moduleId,expectedActiveHash}],goal,intent:{changes,preserves?}}. New targets use null/null. The real owner-entry principal must discover and verify the current approved Author identity via modules.list before issuing admission."
+            "type": "object",
+            "properties": {
+              "requestKey": {
+                "type": "string"
+              },
+              "submitter": {
+                "type": "object",
+                "properties": {
+                  "moduleId": {
+                    "type": "string"
+                  },
+                  "hash": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "moduleId",
+                  "hash"
+                ],
+                "additionalProperties": false
+              },
+              "targets": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "moduleId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "expectedActiveHash": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "moduleId",
+                    "expectedActiveHash"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "goal": {
+                "type": "string"
+              },
+              "intent": {
+                "type": "object",
+                "properties": {
+                  "changes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "preserves": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "changes"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "requestKey",
+              "submitter",
+              "targets",
+              "goal",
+              "intent"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -239,7 +320,7 @@
     },
     {
       "name": "read",
-      "description": "Read a UTF-8 source or staged file in a bounded range. Offsets and limit count UTF-16 code units; limit is 1\u20132000. Rejects files over 64 KiB.",
+      "description": "Read a UTF-8 source or staged file in a bounded range. Offsets and limit count UTF-16 code units; limit is 1–2000. Rejects files over 64 KiB.",
       "visibility": [
         "provider",
         "modules",
@@ -363,8 +444,79 @@
         "type": "object",
         "properties": {
           "input": {
-            "type": "string",
-            "description": "JSON {name,from:\"sources/workspace\"|\"packages/stage/source\",to:\"packages/new-stage\",provenance:{kind:\"local\",label}|{kind:\"kernel-source\",moduleId,hash,ref,materialDigest}}. Provenance is caller-declared."
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "from": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              },
+              "provenance": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "local"
+                        ]
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "label"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "kernel-source"
+                        ]
+                      },
+                      "moduleId": {
+                        "type": "string"
+                      },
+                      "hash": {
+                        "type": "string"
+                      },
+                      "ref": {
+                        "type": "string"
+                      },
+                      "materialDigest": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "moduleId",
+                      "hash",
+                      "ref",
+                      "materialDigest"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "from",
+              "to",
+              "provenance"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -438,8 +590,28 @@
         "type": "object",
         "properties": {
           "input": {
-            "type": "string",
-            "description": "JSON {admissionId,moduleId,hash,to:\"sources/workspace\"}. Kernel binds caller and authorized source."
+            "type": "object",
+            "properties": {
+              "admissionId": {
+                "type": "string"
+              },
+              "moduleId": {
+                "type": "string"
+              },
+              "hash": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "admissionId",
+              "moduleId",
+              "hash",
+              "to"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -462,8 +634,62 @@
         "type": "object",
         "properties": {
           "input": {
-            "type": "string",
-            "description": "JSON {admissionId,requestKey,items:[{name,dir,intent:{changes,preserves?}}]}. dir is sources/workspace or packages/stage/source. Use original admission and request key after a lost reply."
+            "type": "object",
+            "properties": {
+              "admissionId": {
+                "type": "string"
+              },
+              "requestKey": {
+                "type": "string"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "dir": {
+                      "type": "string"
+                    },
+                    "intent": {
+                      "type": "object",
+                      "properties": {
+                        "changes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "preserves": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "changes"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "dir",
+                    "intent"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "admissionId",
+              "requestKey",
+              "items"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -486,8 +712,36 @@
         "type": "object",
         "properties": {
           "input": {
-            "type": "string",
-            "description": "JSON {receiptId} OR {admissionId,requestKey}, exactly one selector."
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "receiptId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "receiptId"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "admissionId": {
+                    "type": "string"
+                  },
+                  "requestKey": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "admissionId",
+                  "requestKey"
+                ],
+                "additionalProperties": false
+              }
+            ]
           }
         },
         "required": [
@@ -510,8 +764,73 @@
         "type": "object",
         "properties": {
           "input": {
-            "type": "string",
-            "description": "JSON {from:\"/absolute/workspace\",to:\"sources/work\",source:[\"module.json\",\"index.ts\"],artifacts:[],build:{commands:[],toolchain:\"host tools\",target:\"host\"},overwrite?:boolean}. Lists and build are required. Artifact: {path,executable?:boolean}. Replacement is opt-in."
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              },
+              "source": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "artifacts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "executable": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "path"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "build": {
+                "type": "object",
+                "properties": {
+                  "commands": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "toolchain": {
+                    "type": "string"
+                  },
+                  "target": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "commands",
+                  "toolchain",
+                  "target"
+                ],
+                "additionalProperties": false
+              },
+              "overwrite": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "from",
+              "to",
+              "source",
+              "artifacts",
+              "build"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -558,8 +877,23 @@
         "type": "object",
         "properties": {
           "input": {
-            "type": "string",
-            "description": "JSON: {path,to,overwrite?:boolean}."
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              },
+              "overwrite": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "path",
+              "to"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -606,8 +940,19 @@
         "type": "object",
         "properties": {
           "input": {
-            "type": "string",
-            "description": "JSON {path:\"sources/workspace\"|\"packages/stage/source\",runTests?:boolean}. Defaults true; false checks structure only. Run dependency/SDK tests in the prepared external workspace or kernel harness and retain that evidence."
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "runTests": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "path"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [

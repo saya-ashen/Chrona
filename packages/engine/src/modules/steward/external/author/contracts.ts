@@ -115,10 +115,11 @@ export function parseStage(value: unknown): Stage {
   }
   return { name: name(row.name), from: submitDir(row.from), to, provenance };
 }
-export function jsonInput(args: Record<string, unknown>, max = 24000): unknown {
+export function structuredInput(args: Record<string, unknown>, max = 24000): unknown {
   object(args, ["input"]);
-  const input = text(args.input, max);
-  try { return JSON.parse(input); } catch { return fail("Expected JSON input."); }
+  if (!args.input || typeof args.input !== "object" || Array.isArray(args.input)) return fail("Expected structured input.");
+  if (Buffer.byteLength(JSON.stringify(args.input)) > max) return fail("Input exceeds its byte budget.");
+  return args.input;
 }
 export function integer(value: unknown, fallback: number, max: number): number {
   if (value === undefined) return fallback;

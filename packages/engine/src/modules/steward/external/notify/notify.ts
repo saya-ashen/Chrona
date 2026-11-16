@@ -31,8 +31,8 @@ function formatOf(value: unknown): Format | null {
 function formatError(args: Args) {
   const format = formatOf(args.format);
   if (!format) return { error: "invalid", message: "format must be text or markdown" };
-  if (format === "markdown" && (String(args.body ?? "").length > 4000 || String(args.title ?? "").length > 200))
-    return { error: "invalid", message: "Markdown exceeds storage limit (body 4000, title 200 UTF-16 code units); send a complete shorter message" };
+  if (String(args.body ?? "").length > 4000 || String(args.title ?? "").length > 200)
+    return { error: "invalid", message: "Notification exceeds storage limit (body 4000, title 200 UTF-16 code units); send a complete shorter message" };
   return null;
 }
 
@@ -129,7 +129,7 @@ class NotifyRuntime {
     const row = this.store.db.transaction(() => {
       const inserted = this.store.insert({ key, module_id: moduleId, app, session_id: session, approval_id: trusted ? text(args.approval) : null, scoped: args.scoped === true ? 1 : 0,
         level: requested, web: route === "web" ? 1 : 0, responds: responds ? 1 : 0, status: route === "fold" ? "folded" : "queued",
-        title: String(args.title).slice(0, 200), body: String(args.body).slice(0, 4000), format: formatOf(args.format)!, recipient: text(args.recipient),
+        title: String(args.title), body: String(args.body), format: formatOf(args.format)!, recipient: text(args.recipient),
         link: session ? `${this.base}/sessions/${session}` : moduleId ? `${this.base}/apps/${moduleId}` : null, created_at: now.getTime() });
       // Subject module_id and key prefixes do not establish who originated a notice.
       this.store.set(`source:${inserted.id}`, caller.kind === "module" ? "module" : "kernel");

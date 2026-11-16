@@ -67,7 +67,7 @@ try {
     assert.equal(store.byKey("plain")!.status, "uncertain"); assert.equal(h.calls.length, 3);
   } finally { store.close(); }
 
-  // Strict format handling (including duplicate keys), no Markdown slicing, old text truncation.
+  // Strict format handling (including duplicate keys), no silent truncation for either format.
   store = openStore(await fresh("validation")); h = harness(store);
   try {
     for (const format of ["html", "Markdown", "", null, 2, false, {}, []]) {
@@ -82,7 +82,7 @@ try {
     assert.equal(store.byId(exact.id)!.body.length, 4000);
     assert.equal(h.handle("send", message("exact", { format: "html" })).error, "invalid");
     const text = h.handle("send", message("long-text", { body: "x".repeat(5000), title: "x".repeat(300) }));
-    assert.equal(store.byId(text.id)!.body.length, 4000); assert.equal(store.byId(text.id)!.title.length, 200); assert.equal(store.byId(text.id)!.format, "text");
+    assert.equal(text.error, "invalid"); assert.equal(store.byKey("long-text"), null);
   } finally { store.close(); }
 
   // Budget/quiet/web routing is identical, digest always explicitly text for mixed sources.

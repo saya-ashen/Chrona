@@ -9,7 +9,7 @@ export const completionInput = z.object({
 export const runOptionsSchema = z.object({ model: modelSchema.optional(), thinking: z.enum(THINKING_LEVELS).optional() }).strict();
 export const transcriptPageSchema = z.object({
   items: runtimeTranscriptSchema, nextCursor: z.string().max(16384).nullable(),
-  gaps: z.array(z.object({ file: z.string().max(8192), offset: z.number().int().nonnegative(), bytes: z.number().int().nonnegative(), reason: z.enum(["record_too_large", "item_too_large"]), item: z.number().int().nonnegative().optional() }).strict()).max(300),
+  gaps: z.array(z.object({ file: z.string().max(8192), offset: z.number().int().nonnegative(), bytes: z.number().int().nonnegative(), reason: z.enum(["record_too_large", "item_too_large", "malformed_record"]), item: z.number().int().nonnegative().optional() }).strict()).max(300),
 }).strict();
 export const toolSchemas = {
   health: [z.object({}).strict(), runtimeHealthSchema],

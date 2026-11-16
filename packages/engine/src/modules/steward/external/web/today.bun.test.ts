@@ -27,7 +27,7 @@ test("Today composes app facts and foreground sessions without a schedule API or
     problems: [{ module: "example", incidentStatus: "unresolved", contractFailures: 2 }], health: { queuedRuns: 2, queuedNotifications: 3, failedNotifications: 1 } });
   expect(view.updates[0]).not.toHaveProperty("format");
   expect(view.sessions).toEqual(sessions.slice(0, 20));
-  expect(f.calls.filter(([target]) => target === "modules.list")).toEqual([["modules.list", undefined]]);
+  expect(f.calls.filter(([target]) => target === "modules.list")).toEqual([["modules.list", {}]]);
   expect(f.calls.some(([target]) => target === "modules.health")).toBe(false);
   expect(f.calls.some(([target]) => target.startsWith("schedules.") || target.startsWith("modules.build-"))).toBe(false);
 });

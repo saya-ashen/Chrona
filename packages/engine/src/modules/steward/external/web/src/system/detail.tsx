@@ -11,7 +11,7 @@ import {
 import { runtimeText } from "./text";
 import { DiagnosticsPanel } from "./diagnostics";
 import { ActivityList, type ActivityItem } from "./activity";
-import type { App, Overview, Tool } from "./detail-types";
+import { toolLabel, type App, type Overview, type Tool } from "./detail-types";
 import { runtimeCapabilityText, runtimeCapabilityBoundary } from "./runtime";
 import { ToolForm, ToolContract } from "./forms";
 import { MemoryPanel } from "./detail-components";
@@ -33,11 +33,11 @@ export const selectedTab = (tab: string, system = false, session = "") =>
   session ? "overview" : (system ? SYSTEM_TABS : APP_TABS).some(([key]) => key === tab) ? tab : "overview";
 export type DetailRoute = { id: string; tab: string; session: string };
 export const toolsForModule = (tools: Tool[] | undefined, name: string) =>
-  (tools ?? []).filter((tool) => tool.target.startsWith(`${name}.`));
+  (tools ?? []).filter((tool) => toolLabel(tool).startsWith(`${name}.`));
 function Contracts({ name, system }: { name: string; system: boolean }) {
   const tools = useQuery<Tool[]>("tools", { query: name }),
     user = useQuery<Tool[]>("tools", { query: name, audience: "user" }, 0, !system);
-  const allowed = new Set(toolsForModule(user.data, name).map((tool) => tool.target));
+  const allowed = new Set(toolsForModule(user.data, name).map((tool) => JSON.stringify(tool.target)));
   return (
     <>
       <p className="muted">这里只展示当前可发现的合同；能否执行由调用时的权限和模块状态决定。</p>
@@ -46,9 +46,9 @@ function Contracts({ name, system }: { name: string; system: boolean }) {
       {tools.data ? (
         <List empty="当前没有可发现的工具。">
           {toolsForModule(tools.data, name).map((tool) => (
-            <div key={tool.target}>
+            <div key={JSON.stringify(tool.target)}>
               <ToolContract props={{ tool }} />
-              {allowed.has(tool.target) ? <ToolForm props={{ tool }} /> : null}
+              {allowed.has(JSON.stringify(tool.target)) ? <ToolForm props={{ tool }} /> : null}
             </div>
           ))}
         </List>

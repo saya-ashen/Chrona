@@ -48,7 +48,7 @@ Installation permission is not product acceptance. Before awaiting approval or e
 
 ## Explicit binary transport and shared record
 
-Tools take `{input: JSON.stringify(value)}`. Example import value:
+Tools take `{input: value}`. Example import value:
 
 ```json
 {
@@ -93,7 +93,7 @@ After submission, retain the original receipt and exact candidate hash, check ma
 
 ## Local validation and staging
 
-`validate` takes `{input: JSON.stringify({path:"sources/work",runTests:true})}`; `packages/<stage>/source` is also accepted. `stage` runs the same pure structural checks on the snapshot it publishes, so a separate structural-only validation call is optional. Neither tool performs frozen dependency installation, kernel SDK execution, activation or product acceptance. Reuse external workspace test evidence by saving the exact command, result and material/version identity in the worksheet and using `runTests:false` locally when appropriate.
+`validate` takes `{input: {path:"sources/work",runTests:true}}`; `packages/<stage>/source` is also accepted. `stage` runs the same pure structural checks on the snapshot it publishes, so a separate structural-only validation call is optional. Neither tool performs frozen dependency installation, kernel SDK execution, activation or product acceptance. Reuse external workspace test evidence by saving the exact command, result and material/version identity in the worksheet and using `runTests:false` locally when appropriate.
 
 Local structural checks catch common rejected authoring shapes: obsolete `run`/manifest `pages`, invalid or reserved names, missing entries, malformed native/interpreter entries, duplicate tools, missing tool descriptions/output contracts, invalid parameter envelopes/visibility, and invalid declared test files. `effects` must be `[]` or `["network"]`; an app needs a tool or `keepAlive:true`. Any `package.json` requires `bun.lock`, even with no dependencies; `pyproject.toml` requires `uv.lock`. Local checks cover selected contract fields only. The kernel remains authoritative for complete manifest and recursive schema validation, frozen locks, runtime availability and candidate execution.
 
