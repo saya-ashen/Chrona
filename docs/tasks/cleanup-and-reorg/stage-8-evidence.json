@@ -1,0 +1,346 @@
+{
+  "schema": 2,
+  "stage": 8,
+  "base": "7f067370d1319734f9b64adfe88bedd725c618c8",
+  "status": "implemented-and-checked-locally-pending-independent-review",
+  "scope": {
+    "contractsSchemaApplicationsPinsNixRulesChanged": false,
+    "stagedOrCommitted": false,
+    "realDeploymentOrDataOperation": false
+  },
+  "changes": [
+    {
+      "path": "docs/tasks/cleanup-and-reorg/progress.md",
+      "added": 1,
+      "deleted": 1
+    },
+    {
+      "path": "docs/zh/operations.md",
+      "added": 35,
+      "deleted": 0
+    },
+    {
+      "path": "package.json",
+      "added": 3,
+      "deleted": 0
+    },
+    {
+      "path": "packages/cli/src/start-server.bun.test.ts",
+      "added": 26,
+      "deleted": 2
+    },
+    {
+      "path": "packages/cli/src/start-server.ts",
+      "added": 19,
+      "deleted": 11
+    },
+    {
+      "path": "docs/tasks/cleanup-and-reorg/stage-8-evidence.json",
+      "added": 340,
+      "deleted": 0
+    },
+    {
+      "path": "docs/tasks/cleanup-and-reorg/stage-8-plan.md",
+      "added": 31,
+      "deleted": 0
+    },
+    {
+      "path": "docs/tasks/cleanup-and-reorg/stage-8-summary.md",
+      "added": 33,
+      "deleted": 0
+    },
+    {
+      "path": "scripts/deployment-controls.bun.test.ts",
+      "added": 248,
+      "deleted": 0
+    },
+    {
+      "path": "scripts/deployment-controls.ts",
+      "added": 230,
+      "deleted": 0
+    }
+  ],
+  "behavior": [
+    "Deleted deployment:deliver, verifyAuthorization, authorization/stop JSON and delivery.json generation.",
+    "Preflight requires explicit database URL and live runtime-lock owner PID, reuses startup resource resolution with observed /proc inputs, and emits failed JSON/nonzero for failed checks or exceptions.",
+    "Missing required state tables fail. Pending callbacks, unaccepted outbound receipts, unsettled execution stop/directory and unresolved cleanup block.",
+    "Backup reuses existing snapshot, runtime lock and restore for selected database plus platform/sessions/secrets/qq-bot; external profiles and custom paths require separate archival.",
+    "Accept rejects directories other than the exact target standard directory and delegates to existing smoke. Archive contents were separately extracted and accepted.",
+    "r5 F1: ModuleCall failed with error unknown/internal blocks preflight, aligned with existing module-remove/retention. Ordinary known failures remain settled. F2: recognized source entry resolves implicit package root two levels above entry directory, matching startup; explicit empty override and startup source unchanged."
+  ],
+  "reviewInputs": [
+    "4f2f73fe-4275-4015-91f3-9e6492a092c6_reviewer_output.md",
+    "a7b7c4c1-30f7-4faa-8508-393b09105d08_reviewer_output.md",
+    "/home/saya/.pi/agent/sessions/--home-saya-workspace-Chrona--/subagent-artifacts/outputs/bbb8268c-5f86-46a0-a1a9-b2ba963d6e0b/cleanup-and-reorg/stage-8-close-review.md"
+  ],
+  "reproduction": "Initial remediation used review/source verification only. For the r5 F1/F2 follow-up, new real-schema CLI regressions ran against the unchanged production snapshot before fixing: 33 pass, 3 fail, exit 1. Then the same tests passed after the two-expression fix.",
+  "directedTests": {
+    "deployment": 36,
+    "totalRunThisRound": 36,
+    "logs": [
+      ".tmp/cleanup-and-reorg/stage-8-remediation/r5/r2/deployment-tests.log"
+    ],
+    "reusedUnchangedR4": "Startup 3, doctor 40 and releaseSmoke 4 remain supported by original r4 logs; not rerun this round."
+  },
+  "finalRun": {
+    "unit": "chrona-cleanup-stage8-remediation-r5-r2.service",
+    "pid": 1717489,
+    "memoryMax": "8G",
+    "memorySwapMax": "1G",
+    "nodeHeapMiB": 6144,
+    "testConcurrency": 2,
+    "environment": "Inherited PATH and PRISMA_SCHEMA_ENGINE_BINARY; LINT_RATCHET_BASE=7f067370d1319734f9b64adfe88bedd725c618c8",
+    "startedAt": "2026-11-16T23:01:52.521654+00:00",
+    "completedAt": "2026-11-16T23:05:58.962538+00:00",
+    "steps": [
+      {
+        "name": "deployment-tests",
+        "argv": [
+          "bun",
+          "test",
+          "scripts/deployment-controls.bun.test.ts"
+        ],
+        "exitCode": 0,
+        "log": ".tmp/cleanup-and-reorg/stage-8-remediation/r5/r2/deployment-tests.log"
+      },
+      {
+        "name": "eslint",
+        "argv": [
+          "bunx",
+          "--no-install",
+          "eslint",
+          "scripts/deployment-controls.ts",
+          "scripts/deployment-controls.bun.test.ts"
+        ],
+        "exitCode": 0,
+        "log": ".tmp/cleanup-and-reorg/stage-8-remediation/r5/r2/eslint.log"
+      },
+      {
+        "name": "typecheck",
+        "argv": [
+          "bunx",
+          "--no-install",
+          "tsc",
+          "--noEmit",
+          "--pretty",
+          "false"
+        ],
+        "exitCode": 0,
+        "log": ".tmp/cleanup-and-reorg/stage-8-remediation/r5/r2/typecheck.log"
+      },
+      {
+        "name": "verify-slice",
+        "argv": [
+          "bun",
+          "run",
+          "verify:slice"
+        ],
+        "exitCode": 0,
+        "log": ".tmp/cleanup-and-reorg/stage-8-remediation/r5/r2/verify-slice.log"
+      }
+    ],
+    "sourceHashes": {
+      "scripts/deployment-controls.ts": "35445739e947a57c632d4ec809da61289133ad588d84fe1003a65862a0cc605f",
+      "scripts/deployment-controls.bun.test.ts": "4b38bc8af39817c950cc47d0808f74941a4d942a0c3e515aca5f4f1860909051",
+      "packages/cli/src/start-server.ts": "a9dd26eee2c35b983e00b05bc9af65f71a792a8a8011dcee6934f59549170108",
+      "packages/cli/src/start-server.bun.test.ts": "b078d90877c426b3dd8017c7f49bcec18000a75ee6b039fd0a93c51654237b8a"
+    },
+    "serviceResult": "Result=success\nExecMainCode=0\nExecMainStatus=0",
+    "results": ".tmp/cleanup-and-reorg/stage-8-remediation/r5/r2/results.json",
+    "sliceSummary": "lint ratchet, typecheck, guardrails (including boundaries), 99 related test files passed"
+  },
+  "release": {
+    "argv": [
+      "bun",
+      "/home/saya/workspace/Chrona-cleanup-and-reorg/scripts/deployment-controls.ts",
+      "accept",
+      "--release-dir",
+      "/tmp/chrona-stage8-archive-test-qv8rlnlu/chrona-linux-x64",
+      "--target",
+      "linux-x64"
+    ],
+    "exitCode": 0,
+    "archive": "dist/releases/chrona-linux-x64.tar.gz",
+    "archiveBytes": 47774277,
+    "archiveSha256": "d7094f7ad093e685ff71035c0b22735c78de75dba6379dc6cf581693b61e6ead",
+    "releaseHost": {
+      "commit": "7f067370d1319734f9b64adfe88bedd725c618c8",
+      "workingTree": "modified"
+    },
+    "releaseIdentitySha256": "e323e6887e84f2d73aa2534d4cc536b6a88ca8fb752c68c13d36911782c45d85",
+    "payloadFileCount": 999
+  },
+  "applicationInstructions": {
+    "count": 13,
+    "changed": false,
+    "result": "All clean main; HEAD equals pinned input; DEVELOPMENT.md exists and is listed in restored material",
+    "evidence": ".tmp/cleanup-and-reorg/stage-8-remediation/applications.json"
+  },
+  "historical": [
+    {
+      "run": "original stage8 r1",
+      "result": "failed",
+      "exitCode": 1,
+      "pid": 1526260,
+      "reason": "systemd PATH omitted cc",
+      "log": ".tmp/cleanup-and-reorg/stage-8/verify-slice-r1.log"
+    },
+    {
+      "run": "original stage8 r2",
+      "result": "passed",
+      "exitCode": 0,
+      "pid": 1528380,
+      "relatedFiles": 98,
+      "log": ".tmp/cleanup-and-reorg/stage-8/verify-slice-r2.log",
+      "resultFile": ".tmp/cleanup-and-reorg/stage-8/verify-slice-r2.result"
+    },
+    {
+      "run": "original standalone preflight / backup / acceptance / directed tests / lint / typecheck / guardrails",
+      "result": "unverified",
+      "reason": "No original per-command logs were found. Originally recorded relative release-dir would be rejected by the existing absolute guard; no exact exit code is asserted."
+    },
+    {
+      "run": "prior release artifact",
+      "commit": "694f2d9df1a2877997758258acf06f9cf388124f",
+      "workingTree": "modified",
+      "evidence": ".tmp/cleanup-and-reorg/stage-8-remediation/prior-release-host.json"
+    },
+    {
+      "run": "remediation scope check before shared resolver revision",
+      "result": "passed",
+      "relatedFiles": 98,
+      "reason": "Tool output only; superseded by logged final run, not final source evidence."
+    },
+    {
+      "run": "remediation service r1",
+      "pid": 1622398,
+      "result": "failed",
+      "reason": "Task runner cwd used parents[4] (workspace parent), causing Bun test discovery outside the intended project and OOM. No test completion claim. Cwd corrected to parents[3].",
+      "evidence": ".tmp/cleanup-and-reorg/stage-8-remediation/service-r1.result"
+    },
+    {
+      "run": "remediation service r2",
+      "pid": 1627548,
+      "result": "failed",
+      "reason": "Same runner cwd error persisted before diagnosis; OOM recorded without a fabricated command exit code.",
+      "evidence": ".tmp/cleanup-and-reorg/stage-8-remediation/service-r2.result"
+    },
+    {
+      "run": "remediation service r3",
+      "pid": 1629782,
+      "result": "passed",
+      "relatedFiles": 99,
+      "reason": "Correct project cwd; 78 directed tests, build, acceptance and slice passed. Final run r4 follows empty package override regression and source-entry normalization fixes.",
+      "evidence": ".tmp/cleanup-and-reorg/stage-8-remediation/r3/results.json"
+    },
+    {
+      "run": "default lint:ratchet",
+      "result": "failed",
+      "reason": "Used default origin/platform-v2 baseline. Prescribed 7f067370 baseline passed; do not confuse default rejection with stage baseline result.",
+      "log": ".tmp/cleanup-and-reorg/stage-8-remediation/default-lint.log",
+      "baseLog": ".tmp/cleanup-and-reorg/stage-8-remediation/base-lint.log"
+    },
+    {
+      "run": "remediation service r4",
+      "pid": 1650819,
+      "result": "passed",
+      "relatedFiles": 99,
+      "directedTests": {
+        "deployment": 31,
+        "startup": 3,
+        "doctor": 40,
+        "releaseSmoke": 4,
+        "total": 78,
+        "logs": [
+          ".tmp/cleanup-and-reorg/stage-8-remediation/r4/deployment-tests.log",
+          ".tmp/cleanup-and-reorg/stage-8-remediation/r4/startup-tests.log",
+          ".tmp/cleanup-and-reorg/stage-8-remediation/r4/doctor-tests.log",
+          ".tmp/cleanup-and-reorg/stage-8-remediation/r4/smoke-tests.log"
+        ]
+      },
+      "evidence": ".tmp/cleanup-and-reorg/stage-8-remediation/r4/results.json",
+      "snapshot": ".tmp/cleanup-and-reorg/stage-8-remediation/r5/evidence-before.json",
+      "reason": "Prior checks retained; only non-packaged deployment script/tests changed in r5. No redundant doctor/build/smoke rerun."
+    },
+    {
+      "run": "remediation r5 initial validation",
+      "pid": 1699443,
+      "result": "failed",
+      "reason": "36 CLI regressions and 99 related files passed, but typecheck had two TS2339 diagnostics for deleting environment override keys. Added NodeJS.ProcessEnv annotation; assertions and production fix unchanged. Final r5-r2 checks a new freeze.",
+      "evidence": ".tmp/cleanup-and-reorg/stage-8-remediation/r5/results.json",
+      "log": ".tmp/cleanup-and-reorg/stage-8-remediation/r5/verify-slice.log"
+    }
+  ],
+  "limitations": [
+    "Preflight observes Linux /proc and runtime-lock facts; it does not stop or drain a live instance or grant switching authority.",
+    "Custom wrappers hiding all resource/package inputs fail with a specific unknown-root reason. Startup no-argument fallback remains unchanged.",
+    "No full Bun/API single-round claim. Prior stage6 full Bun failure and historical lint debt remain unchanged.",
+    "Packaged acceptance uses runtime=false; real startup, models, QQ, credentials, external accounts and real service lifecycle were not exercised.",
+    "Independent review remains required."
+  ],
+  "noStagedFiles": true,
+  "lineCounts": {
+    "documentation": {
+      "added": 440,
+      "deleted": 1,
+      "net": 439
+    },
+    "production": {
+      "added": 252,
+      "deleted": 11,
+      "net": 241
+    },
+    "tests": {
+      "added": 274,
+      "deleted": 2,
+      "net": 272
+    }
+  },
+  "followUp": {
+    "findings": [
+      "F1 P1 unknown/internal ModuleCall failed settlement",
+      "F2 P2 source-entry implicit package root"
+    ],
+    "beforeFix": {
+      "argv": [
+        "bun",
+        "test",
+        "scripts/deployment-controls.bun.test.ts"
+      ],
+      "cwd": "/home/saya/workspace/Chrona-cleanup-and-reorg",
+      "exitCode": 1,
+      "productionSha256": "b402c142a9ad3dada3137bcbac15868c11eb50159832a452c5ec300021ed6de6",
+      "log": ".tmp/cleanup-and-reorg/stage-8-remediation/r5/before-fix-tests.log"
+    },
+    "beforeFixSummary": "33 pass, 3 fail: unknown/internal CLI exited 0, implicit source package fallback CLI exited 1",
+    "afterFixSummary": "36 pass, 0 fail; ordinary failed forbidden/null remain accepted",
+    "reusedRelease": {
+      "archiveSha256": "d7094f7ad093e685ff71035c0b22735c78de75dba6379dc6cf581693b61e6ead",
+      "releaseIdentitySha256": "e323e6887e84f2d73aa2534d4cc536b6a88ca8fb752c68c13d36911782c45d85",
+      "releaseHost": {
+        "commit": "7f067370d1319734f9b64adfe88bedd725c618c8",
+        "workingTree": "modified"
+      },
+      "unchangedFromR4": true,
+      "notRebuilt": "Only the non-packaged deployment script and its tests changed; startup/release sources unchanged since r4."
+    },
+    "r5SourceDelta": {
+      "production": {
+        "added": 3,
+        "deleted": 2,
+        "net": 1
+      },
+      "tests": {
+        "added": 41,
+        "deleted": 0,
+        "net": 41
+      }
+    }
+  },
+  "finalIndependentReview": {
+    "run": "36e2a7ee-f33f-4f7c-8605-11f5f23fc785",
+    "verdict": "OK",
+    "closed": "F1/F2; earlier blockers closed by prior review",
+    "status": "accepted-before-local-commit"
+  }
+}

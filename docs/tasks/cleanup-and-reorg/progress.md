@@ -1,6 +1,6 @@
 # 执行进度
 
-- 当前阶段：0–6已完成，阶段6最终复审 `ec7bbcf2` OK、本地提交 `0ec3e2d1`。阶段7深审已修诊断与审批 waiting 前丢决定竞态，定向与必要API已通过，最终完整slice运行中、待父独立review与本地提交；见 stage-7-summary.md / stage-7-evidence.json。阶段6 r3 fullBun exit1仍保留，351通过文件与fixture17测试补验仅构成组合覆盖，不改称单轮全绿。
+- 当前阶段：0–7已完成，阶段7独立复审 `d2d92ad9` OK，最终 `verify:slice` 退出0，本地提交 `7f067370`。阶段8 BLOCK remediation 已完成本地未提交修订：保留预检、备份验证和离线验收，删除 `deployment:deliver` 及自报授权/停机 JSON；r4已通过的构建/验收及启动器/doctor/smoke证据保留；r5最后F1未知失败调用、F2源码package根已最小修复，先复现3失败再通过36项部署回归及最终99关联文件slice（PID1717489），待父独立关闭复审；见 stage-8-summary.md / stage-8-evidence.json。阶段6 r3 fullBun exit1仍保留，351通过文件与fixture17测试补验仅构成组合覆盖，不改称单轮全绿。
 - 基准：6966a5c3；任务分支 refactor/cleanup-and-reorg；隔离目录 /home/saya/workspace/Chrona-cleanup-and-reorg。
 - 原工作区未修改。依赖使用本机既有 node_modules 的独立 reflink/copy，未安装或启用任何插件；正式隔离发行仍需证明不依赖此开发副本。
 - 完整执行方案：plan.md。
@@ -54,3 +54,5 @@
 - 阶段6最终独立复核 ec7bbcf2 OK，原两BLOCK由847c97e5关闭；最后fixture一行真实mapping复制、r4完整slice253关联文件/API21文件131tests/build/smoke/Web60/settings6三尺寸通过。Bun原轮351文件通过+失败fixture17项补验组合覆盖352，保留单轮失败；全库lint193 errors/1033warnings保留。生产净+30、测试净+88、生成0，224文件搬迁单列。阶段6验收关闭，提交后进入阶段7。
 
 - 阶段7独立review d2d92ad9：代码与直接消费者审查OK，仅要求同步文档状态。最终 race-final-r2 verify:slice 于2026-11-16T21:39:21.188Z exit0，lint/type/guardrails/102关联文件通过；生产+40/-14净+26，测试+203/-3净+200，生成/应用/依赖/锁/bundle 0。阶段7验收关闭，待本地提交后进入阶段8。
+
+- 阶段8最终独立复审36e2a7ee OK，F1未知调用结果/F2源码package推导均关闭。最终r5-r2完整slice exit0，99关联文件/type/ratchet/guardrails通过，36部署回归75断言通过；其余同源码构建/归档验收沿用r4，dirty身份不当clean。生产净+241、测试净+272，生成/合同/应用pin/schema/Nix 0；删除自报授权/停止JSON交付包装器。阶段8验收关闭，本地提交后进入阶段9最终验证与受控部署前核对。

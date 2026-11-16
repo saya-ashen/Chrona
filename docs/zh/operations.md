@@ -96,6 +96,41 @@ export CHRONA_STEWARD_AGENT=pi
 
 真实数据归档、切换与恢复应由 owner 明确批准。不要修改迁移记录来绕过拒绝，也不要把旧库恢复到新服务期待的位置。
 
+## 阶段化部署预检与验收
+
+主仓库提供三个本地入口，组合现有 backup、release identity 和 packaged smoke；它们不连接 chino、不调用 SSH/systemd/NixOS，也不替换服务：
+
+```bash
+bun run deployment:preflight -- \
+  --release-dir /absolute/path/to/dist/releases/chrona-linux-x64 \
+  --data-dir /absolute/path/to/chrona-data \
+  --database-url file:/absolute/path/to/chrona-data/chrona.db \
+  --pid <actual-chrona-pid> \
+  --active-resource-root /absolute/path/to/current/resources \
+  --report /absolute/private/path/preflight.json
+bun run deployment:backup -- \
+  --database-url file:/absolute/path/to/chrona-data/chrona.db \
+  --data-dir /absolute/path/to/chrona-data \
+  --output /absolute/private/path/before.db
+bun run deployment:accept -- \
+  --release-dir /absolute/path/to/dist/releases/chrona-linux-x64 \
+  --target linux-x64
+```
+
+`preflight` 只读核对候选发行组合、真实进程 resource root、指定数据库的迁移 checksum、实际 `Module.activeHash`、未知停止和未结算 Run/调用/交付。它要求指定数据库的运行锁由 `--pid` 持有，因此数据库可以位于 `dataDir` 外；缺少必需状态表、未知停止、未结算工作、待回调、未接受的 outbound receipt、未确认停止或未清理 workspace 均输出 `passed: false` 并以非零退出。active hash 差异只列为受控激活输入。
+
+资源根复用启动器 `findResourceDir` 的优先级，以目标 `/proc` 的 cwd、cmdline、exe 和环境为输入；支持显式 `CHRONA_RESOURCE_DIR`（相对目标 cwd）、启动二进制邻接资源、显式 `CHRONA_PACKAGE_DIR`，以及可确定的 `packages/cli/src/bun-entry.ts` 源码入口。隐藏在其他 wrapper 内的 package fallback 若无法观察，会报告具体原因；启动器原有 fallback 保留。预检不是进程排空或停止证据，结果只描述检查时刻。
+
+`deployment:backup` 复用 `chrona backup` 的完整快照，包含 SQLite、`platform`、`sessions`、`secrets` 和 `qq-bot`，并在全新临时目录调用既有 restore 做可读性验证。失败的部分文件不可当作成功备份，重试必须使用新的输出路径。
+
+构建归档的复制和正式切换由现有受控运维流程负责：
+
+1. 使用既有 builder 产出的归档；在全新临时目录解包后，对归档内实际 `chrona-<target>` 目录运行上述 `deployment:accept`。这样 identity、字节、模式、CLI 和资源检查针对实际归档内容；SHA256 仅用于传输前后字节核对，不证明来源授权。
+2. 对同一实例配置执行运行中 preflight；得到本次具体切换授权后排空、停服，观察服务及应用进程实际退出，再以同一 `--database-url`/`--data-dir` 执行 backup，另行归档 Provider profile 等自定义目录。备份的运行锁和 cwd 检查拒绝仍存活的运行者。
+3. 在现有部署目标中切换已核验组合，记录启动后的实际进程、资源根、数据库和应用 active hash，再做本次业务验收。真实切换、恢复、回滚和 NixOS 激活分别受具体任务授权约束。
+
+阶段 8 不生成 `delivery.json`，也不把本地文件复制称为部署。`deployment:accept` 只验证 target 对应标准发行目录的实际制品，改名目录和同级其他 target 目录会明确拒绝。
+
 ## 备份与恢复
 
 先停止服务（完整备份会获取数据库运行锁，服务运行时拒绝操作），确认 `CHRONA_DATA_DIR` 与 `DATABASE_URL` 指向同一实例。归档和恢复在进程内处理，不依赖系统 `tar` 或 Shell。

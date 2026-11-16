@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { existsSync, mkdtempSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { getChronaDataDir, startChronaServer } from "./start-server";
+import { findResourceDir, getChronaDataDir, startChronaServer } from "./start-server";
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -11,6 +11,30 @@ afterEach(() => {
     if (!(key in ORIGINAL_ENV)) delete process.env[key];
   }
   process.env = { ...ORIGINAL_ENV };
+});
+
+describe("findResourceDir", () => {
+  it("uses the observed cwd and preserves environment, argv0, executable and package priority", () => {
+    const root = mkdtempSync(join(tmpdir(), "chrona-resource-path-"));
+    const candidates = ["configured", "launcher/resources", "binary/resources", "package/resources", "package"];
+    for (const candidate of candidates) mkdirSync(join(root, candidate, "prisma/migrations"), { recursive: true });
+    const input = { cwd: root, resourceDir: "configured", argv0: "launcher/chrona", executable: join(root, "binary/chrona"), packageDir: "package" };
+    try {
+      for (const candidate of candidates) {
+        expect(findResourceDir(input)).toBe(candidate === "launcher/resources" || candidate === "binary/resources" ? join(root, candidate) : candidate);
+        rmSync(join(root, candidate, "prisma"), { recursive: true });
+      }
+      expect(findResourceDir(input)).toBe("configured");
+      expect(() => findResourceDir({ ...input, packageDir: undefined })).toThrow("process package path is unavailable");
+      mkdirSync(join(root, "resources/prisma/migrations"), { recursive: true });
+      expect(findResourceDir({ ...input, packageDir: "" })).toBe("resources");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it("preserves no-argument resolution for a relative resource override", () => {
+    process.env.CHRONA_RESOURCE_DIR = "prisma/..";
+    expect(findResourceDir()).toBe("prisma/..");
+  });
 });
 
 describe("startChronaServer", () => {

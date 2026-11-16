@@ -15,25 +15,33 @@ export type BootChronaServer = () => Promise<void>;
 const packageDir = process.env.CHRONA_PACKAGE_DIR
   ?? resolve(dirname(import.meta.dirname), "..");
 
-export function findResourceDir(): string {
-  const binaryPath = Bun.argv[0] ?? process.execPath;
-  const binaryDir = resolve(dirname(binaryPath));
-  const executableDir = resolve(dirname(process.execPath));
+type ResourceDirectoryInput = {
+  cwd: string;
+  argv0: string;
+  executable: string;
+  resourceDir?: string;
+  packageDir?: string;
+};
+
+export function findResourceDir(input: ResourceDirectoryInput = {
+  cwd: process.cwd(), argv0: Bun.argv[0] ?? process.execPath, executable: process.execPath,
+  resourceDir: process.env.CHRONA_RESOURCE_DIR, packageDir,
+}): string {
+  const binaryDir = resolve(input.cwd, dirname(input.argv0));
+  const executableDir = resolve(input.cwd, dirname(input.executable));
   const candidates = [
-    process.env.CHRONA_RESOURCE_DIR,
+    input.resourceDir,
     join(binaryDir, "resources"),
     join(executableDir, "resources"),
-    join(packageDir, "resources"),
-    packageDir,
+    ...(input.packageDir !== undefined ? [join(input.packageDir, "resources"), input.packageDir] : []),
   ].filter((value): value is string => Boolean(value));
 
   for (const candidate of candidates) {
-    if (existsSync(join(candidate, "prisma", "migrations"))) {
-      return candidate;
-    }
+    if (existsSync(resolve(input.cwd, candidate, "prisma", "migrations"))) return candidate;
   }
 
-  return candidates[0] ?? packageDir;
+  if (input.packageDir === undefined) throw new Error("Cannot determine resource root: no observed resource directory contains prisma/migrations and the process package path is unavailable");
+  return candidates[0]!;
 }
 
 function getHome(): string {
