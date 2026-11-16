@@ -60,9 +60,13 @@ class AgentGateway {
     if (target === 'agent.read') {
       expect(args.limit).toBe(100); expect(args.waitMs).toBe(0);
       const run = this.get(String(args.runId));
-      return { run, items: run.items, ended: run.ended, nextCursor: null, interactions: [] };
+      const view = !this.confirmStops && !run.active ? { ...run, status: 'unknown', active: true, ended: false } : run;
+      return { run: view, items: run.items, ended: view.ended, nextCursor: null, interactions: [] };
     }
-    if (target === 'agent.stop') { const run = this.get(String(args.runId)); this.stops.push(run.runId); return { ...run, stopConfirmed: this.confirmStops && !run.active }; }
+    if (target === 'agent.stop') {
+      const run = this.get(String(args.runId)); this.stops.push(run.runId);
+      return { ...run, ...(!this.confirmStops && !run.active ? { status: 'unknown', active: true } : {}), stopConfirmed: this.confirmStops && !run.active };
+    }
     throw Error(`Unexpected integration gateway call ${JSON.stringify(target)}`);
   };
   close() { this.db.close(); }
@@ -295,12 +299,12 @@ test('substantive goal correction invalidates a pending control rather than reba
   } finally { f.cleanup(); }
 });
 
-test('unconfirmed stop retains the original actor and occupancy even after a terminal run observation', async () => {
+test('an internal terminal run with unknown stop retains the original actor and occupancy', async () => {
   const f = new Harness(); try {
     const { worker } = await f.discover(), { receipt } = pauseRequest(f), before = structuredClone(f.pursuit);
     f.gateway.confirmStops = false; f.gateway.finish(worker.runId);
     await f.runtime.tick(true);
-    expect(f.runtime.journal.outstanding()).toMatchObject({ runId: worker.runId, ended: true, active: false, stopRequested: true, stopConfirmed: false, settled: false });
+    expect(f.runtime.journal.outstanding()).toMatchObject({ runId: worker.runId, status: 'unknown', ended: false, active: true, stopRequested: true, stopConfirmed: false, settled: false });
     expect(f.pursuit).toEqual(before);
     expect(f.runtime.admission.outstanding()).toBeUndefined();
     f.restart(); await f.runtime.tick(true);

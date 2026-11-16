@@ -123,7 +123,7 @@ on("tool", event => {
   expect(await tool(3, "chrona_modules")).toEqual(expect.arrayContaining([expect.objectContaining({ id: module.id, name: "mcp", builtin: false })]));
   expect(await tool(4, "chrona_sessions")).toEqual([]);
   const contracts = await tool(5, "chrona_module_tools", { query: "mcp-target.echo" });
-  expect(contracts).toEqual(expect.arrayContaining([expect.objectContaining({ target: "mcp-target.echo", moduleId: target.id, hash: "mcp-target-listener" })]));
+  expect(contracts).toEqual(expect.arrayContaining([expect.objectContaining({ target: { moduleId: target.id, tool: "echo" }, label: "mcp-target.echo", moduleId: target.id, hash: "mcp-target-listener" })]));
   for (const contract of contracts) expect(contract).not.toHaveProperty("contractHash");
   expect(await tool(6, "chrona_module_call", { name: "mcp-target.echo", arguments: { value: "SDK round trip" } })).toEqual({ value: "SDK round trip", caller: "mcp", moduleId: module.id });
   expect(await db.run.count()).toBe(0);

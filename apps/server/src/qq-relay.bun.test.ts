@@ -14,10 +14,13 @@ async function fixture() {
   const call = async (target: string, args: Record<string, unknown> = {}): Promise<unknown> => {
     targets.push(target);
     if (target === "modules.describe" || target === "modules.list") return { items: [], nextCursor: null };
-    if (target === "agent.context") return { contextId: `context:${args["request-key"]}` };
-    if (target === "agent.run") { const runId = `run:${prompts.length}`; prompts.push(args); runs.set(runId, { status: "queued", active: true }); return { runId, ...runs.get(runId) }; }
-    if (target === "agent.get") return runs.get(String(args["run-id"]));
-    if (target === "agent.stream") return { items: [], after: 0, ended: true, transcript: [{ at: now().toISOString(), kind: "text", text: "Stored reply" }], interactions: [] };
+    if (target === "agent.run") { const runId = `run:${prompts.length}`; prompts.push(args); runs.set(runId, { status: "queued", active: true }); return { runId, contextId: `context:${runId}`, ...runs.get(runId) }; }
+    if (target === "agent.read") {
+      const runId = String(args.runId), run = runs.get(runId);
+      if (!run) throw Object.assign(new Error("Run not found"), { code: "not_found" });
+      return { run: { runId, ...run }, items: [], nextCursor: null, ended: !run.active,
+        transcript: run.active ? [] : [{ at: now().toISOString(), kind: "text", text: "Stored reply" }], interactions: [] };
+    }
     throw new Error(`Unexpected call: ${target}`);
   };
   const sends: string[] = [];

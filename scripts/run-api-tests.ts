@@ -13,15 +13,14 @@ import { join, resolve } from "node:path";
 const glob = new Bun.Glob("*.bun.test.{ts,tsx}");
 const rootDir = process.cwd();
 const tempParent = resolve(rootDir, ".tmp");
-mkdirSync(tempParent, { recursive: true });
-const tempDir = mkdtempSync(join(tempParent, "api-tests-"));
-const requestedFiles = process.argv.slice(2).map((p) => p.replace(/^\.\//u, ""));
+const listOnly = process.argv.includes("--list");
+const requestedFiles = process.argv.slice(2).filter(arg => arg !== "--list").map((p) => p.replace(/^\.\//u, ""));
 const concurrency = Math.max(
 	1,
 	Number(process.env.CHRONA_TEST_CONCURRENCY ?? "4"),
 );
 // Every server test, not only the HTTP map walk: the server holds the listen proxy and rescue console.
-const dirs = ["apps/server/src/__tests__/api", "apps/server/src", "apps/server/src/config", "apps/server/src/middleware"];
+const dirs = ["apps/server/src/__tests__/api", "apps/server/src/__tests__", "apps/server/src", "apps/server/src/config", "apps/server/src/middleware"];
 const serialFiles = new Set<string>();
 
 let exitCode = 0;
@@ -88,6 +87,12 @@ if (requestedFiles.length > 0) {
 	}
 }
 
+if (listOnly) {
+	console.log(JSON.stringify(discoveredFiles));
+	process.exit(0);
+}
+mkdirSync(tempParent, { recursive: true });
+const tempDir = mkdtempSync(join(tempParent, "api-tests-"));
 const files: Array<{ file: string; dbPath: string; dataDir: string }> =
 	discoveredFiles.map((fullPath, idx) => ({
 		file: fullPath,

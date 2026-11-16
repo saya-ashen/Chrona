@@ -90,7 +90,9 @@ test("SDK Agent contexts preserve ownership, selected tools, scoped reads, inter
       { type: "message", timestamp: "2026-11-07T00:00:01Z", message: { role: "assistant", content: [{ type: "thinking", text: "private reasoning" }, { type: "text", text: "Visible model reply" }] } },
     ].map(row => JSON.stringify(row)).join("\n"));
     const textPage = (await relay("read", activeTarget)) as Read;
-    expect(textPage.transcript).toEqual([{ at: "2026-11-07T00:00:01Z", kind: "text", text: "Visible model reply" }]);
+    const userRecord = { type: "message", timestamp: "2026-11-07T00:00:00Z", message: { role: "user", content: "private user prompt" } };
+    const offset = Buffer.byteLength(JSON.stringify(userRecord) + "\n");
+    expect(textPage.transcript).toEqual([{ id: `fixture.jsonl:${offset}:0`, at: "2026-11-07T00:00:01Z", kind: "text", text: "Visible model reply" }]);
     for (const privateText of [f.ports.dataDir, "private reasoning", "private user prompt"]) expect(JSON.stringify(textPage)).not.toContain(privateText);
     let questionReady!: (id: string) => void;
     const ready = new Promise<string>(resolve => { questionReady = resolve; });

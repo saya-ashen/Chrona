@@ -211,8 +211,9 @@ test("HTTP stop acknowledgement retains the live Run and blocks lifecycle change
   await refused("run", startInput({ contextId: view.contextId }), "conflict", "before-stop");
   await refused("write", { ...target(view), input: { kind: "message", text: "after stop" } }, "conflict", "after-stop");
   await lifecycleRefused();
-  // A refused pause commits its caller fence, but cannot erase the launched operation or its capacity claim.
-  await expect(direct(caller(), "agent.read", target(view))).rejects.toMatchObject({ code: "forbidden" });
+  // The fence preserves reads needed to drain existing work while rejecting new work.
+  expect((await direct(caller(), "agent.read", target(view))).output).toMatchObject({ run: { runId: view.runId, status: "running", active: true } });
+  await expect(direct(caller(), "agent.run", startInput(), "fenced-new-run")).rejects.toMatchObject({ code: "forbidden" });
   expect(await db.providerLaunch.findUnique({ where: { runId: view.runId } })).not.toBeNull();
   expect(await db.run.findUniqueOrThrow({ where: { id: view.runId } })).toMatchObject({ status: "running", stopStatus: "pending" });
   run.finish({ outcome: "failed", sessionId: null, error: "Process exited after cancellation" });
@@ -236,7 +237,10 @@ test("unknown stop survives a fresh HTTP runtime, retains queue capacity and lif
   await run.input.events!.progress({ phase: "reading", tool: "read" });
   const before = await command("read", { ...target(view), limit: 1 });
   await run.input.events!.progress({ phase: "waiting", tool: null });
-  const stopReceipt = await command("stop", target(view), "stop-before-restart"); run.disconnect();
+  expect(await command("stop", target(view), "stop-before-restart")).toMatchObject({ status: "running", active: true, stopConfirmed: false });
+  const aborted = run.aborted;
+  expect(aborted).toBe(1);
+  run.disconnect();
   await until(() => db.run.findUniqueOrThrow({ where: { id: view.runId } }), row => row.stopStatus === "unknown", "unknown finalization");
   await runtime.service.tick.settled({ includeRuns: true });
   expect((await command("read", target(view))).run).toMatchObject({ status: "unknown", active: true });
@@ -260,7 +264,8 @@ test("unknown stop survives a fresh HTTP runtime, retains queue capacity and lif
   await refused("read", { ...target(queued), cursor: before.nextCursor }, "invalid");
   await refused("run", startInput({ contextId: view.contextId }), "conflict", "retry-unknown");
   expect(await command("run", startInput(), "restart")).toEqual(view);
-  expect(await command("stop", target(view), "stop-before-restart")).toEqual(stopReceipt);
+  expect(await command("stop", target(view), "stop-before-restart")).toEqual({ ...view, status: "unknown", active: true, stopConfirmed: false });
+  expect(run.aborted).toBe(aborted);
   expect((await command("read", target(view))).run).toMatchObject({ status: "unknown", active: true });
   expect(fake.started).toHaveLength(1);
   const oldCaller = caller();
@@ -268,7 +273,7 @@ test("unknown stop survives a fresh HTTP runtime, retains queue capacity and lif
   await expect(direct(oldCaller, "agent.read", target(view))).rejects.toMatchObject({ code: "forbidden" });
   await db.module.update({ where: { id: entry.id }, data: { activeHash: entry.hash } });
   await lifecycleRefused();
-  await expect(direct(caller(), "agent.read", target(view))).rejects.toMatchObject({ code: "forbidden" });
+  expect((await direct(caller(), "agent.read", target(view))).output).toMatchObject({ run: { status: "unknown", active: true } });
   expect(await db.run.findUniqueOrThrow({ where: { id: view.runId } })).toMatchObject({ stopStatus: "unknown", cancelRequestedAt: expect.any(Date) });
   expect(await db.providerLaunch.findUniqueOrThrow({ where: { runId: view.runId } })).toEqual(retainedLaunch);
   expect(fake.started).toHaveLength(1); expect(errors).toEqual([]);

@@ -39,7 +39,7 @@ test("MCP installs from its pinned ordinary release, passes SDK checks and activ
     await buildPending(moduleContext(ports, workspace.id));
     await refreshInstallationReceipts(ports, workspace.id);
     const pending = await installExternal(ports, workspace.id, request);
-    expect(pending.status).toBe("pending_approval");
+    expect(pending.status, JSON.stringify(pending)).toBe("pending_approval");
     await createApprovals({ db, workspaceId: workspace.id, now: ports.now }, action => createModules(ports, workspace.id).onApproved(action)).resolve(pending.approvalId!, { decision: "approve" });
     await refreshInstallationReceipts(ports, workspace.id);
     const installed = await installExternal(ports, workspace.id, request);

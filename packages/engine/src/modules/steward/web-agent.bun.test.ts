@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { Database } from "bun:sqlite";
 import { cp, readFile, mkdir, writeFile, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema, type RoutedTarget } from "@chrona/contracts/steward";
@@ -17,7 +18,11 @@ test("attachment ownership uses the complete private journal, not the recent mes
     const first = { id: "old-message", direction: "in", text: "old", attachments: [file] };
     const messages = [first, ...Array.from({ length: 101 }, (_, index) => ({ id: `later-${index}`, direction: "in", text: "later", attachments: [] }))];
     await mkdir(join(dataDir, "conversations"));
-    await writeFile(join(dataDir, "conversations/state.json"), JSON.stringify({ version: 1, sessions: [{ id: "web-agent:journal", messages, turns: [] }] }));
+    const journal = new Database(join(dataDir, "conversations/sessions.sqlite"));
+    try {
+      journal.exec("CREATE TABLE conversations(id TEXT PRIMARY KEY, data TEXT NOT NULL CHECK(json_valid(data)))");
+      journal.query("INSERT INTO conversations(id, data) VALUES (?, ?)").run("web-agent:journal", JSON.stringify({ id: "web-agent:journal", messages, turns: [] }));
+    } finally { journal.close(); }
     const app = createAgentConversations({ dataDir, call: async () => { throw new Error("No Agent call during file ownership lookup"); }, reply: () => {} });
     expect(await app.messages("web-agent:journal")).toHaveLength(100);
     expect(await app.attachment(first.id, file.ref)).toEqual(file);
@@ -167,7 +172,7 @@ test("structural Author targets survive Web selection, frozen admission, Run cat
     expect(registered.map(tool => tool.name)).toEqual(catalog.map(tool => tool.name));
     for (const name of ["m_author_import", "m_author_submit", "m_author_receipt"]) {
       expect(registered.find(tool => tool.name === name)).toMatchObject({ exposure: "direct", namespace: { name: "module_author" },
-        parameters: { properties: { input: { type: "string" }, timeoutSeconds: { type: "integer" } } } });
+        parameters: manifest.tools.find(tool => `m_author_${tool.name}` === name)!.parameters });
     }
     await runs.finish(run.id, { outcome: "finished", sessionId: null, error: null }, { stopEvidence: "provider_exited" });
 

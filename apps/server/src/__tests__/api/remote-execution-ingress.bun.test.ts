@@ -1,14 +1,14 @@
 import { expect, test } from "bun:test";
-import { z } from "zod";
 import { spawnSync } from "node:child_process";
-import { registerLocalModule } from "../../../../../packages/engine/src/modules/steward/module-registry";
+import { registerAgentProvider } from "../../../../../packages/engine/src/modules/steward/agent-provider";
+import { testProviderManifest } from "../../../../../packages/engine/src/modules/steward/test-provider-process";
 import { generateKeyPairSync, randomBytes, sign, createHash } from "node:crypto";
 import { cp, mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { moduleManifestSchema, type KernelExecutionStart, type ExecutionDeliveryFinal } from "@chrona/contracts/steward";
-import { createExecutionDelivery, callSync, moduleSupervisor } from "@chrona/engine";
+import { createExecutionDelivery, callSync, CallError, moduleSupervisor } from "@chrona/engine";
 import { testDb } from "@chrona/engine/test-support";
 import { createServerApp } from "../../app";
 import { createStewardRuntime } from "../../steward-runtime";
@@ -132,7 +132,7 @@ test("new owner approval fails closed with no actual configured API_KEY", async 
 }, 30_000);
 
 // This mock device uses only loopback HTTP and Ed25519; the application runs in a real SDK
-// process, persists its own outbox, and calls the real generic delivery APIs. No Provider/model.
+// process, persists its own outbox, and calls the real generic delivery APIs with an offline SDK Provider.
 test("production remote app relays native model, lifecycle, signed stop, and owner cleanup", async () => {
   const f = await fixture(ownerKey, true);
   try {
@@ -155,14 +155,57 @@ test("production remote app relays native model, lifecycle, signed stop, and own
     const actualPiCommand = process.env.CHRONA_TEST_PI_COMMAND;
     const modelLimit = actualPiCommand ? 4 : 2;
     const caller = await f.db.module.create({ data: { workspaceId: "ws_default", name: "http-caller", activeHash: "caller-hash" } });
-    const callerManifest = moduleManifestSchema.parse({ name: caller.name, entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], uses: ["agent.complete"], model: { tier: "fake", maxCalls: modelLimit, maxOutputTokens: 400 } });
+    const callerManifest = moduleManifestSchema.parse({ name: caller.name, entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], uses: ["agent.run"], model: { tier: "fake", maxCalls: modelLimit, maxOutputTokens: 400 } });
     await f.db.moduleVersion.create({ data: { moduleId: caller.id, hash: caller.activeHash!, manifest: callerManifest, source: "user", status: "approved", intent: {}, report: {} } });
     const callerCode = join(f.runtime.ports.dataDir, "platform/store", caller.activeHash!); await mkdir(callerCode, { recursive: true }); await writeFile(join(callerCode, "index.ts"), `import {on} from "chrona";on("tool",async()=>({result:null}));`);
     await f.db.workspace.update({ where: { id: "ws_default" }, data: { settings: { timezone: "UTC", moduleModel: { maxCallsPerEvent: modelLimit, maxOutputTokens: 400, dailyCalls: modelLimit, eventTimeoutMs: 20_000 } } } });
-    // Database-scoped deterministic gateway I/O, through the real module router.
-    // The application and carrier still run in a real SDK process.
-    let gatewayCalls = 0;
-    registerLocalModule({ name: "agent", description: "Offline deterministic gateway", unrecorded: ["complete"], tools: [{ name: "complete", description: "Offline completion", idempotent: false, visibility: ["kernel"], parameters: { type: "object", properties: {}, required: [] }, input: z.object({ prompt: z.string(), system: z.string().optional(), maxOutputTokens: z.number(), declaredTier: z.string(), effectiveHardLimits: z.object({ maxCallsPerEvent: z.number(), maxOutputTokens: z.number(), eventTimeoutMs: z.number() }), timeoutMs: z.number() }), output: z.object({ text: z.string(), inputTokens: z.number(), outputTokens: z.number() }) }], async handle(_context, _tool, args) { gatewayCalls++; if (args.prompt === "lost") throw new Error("lost deterministic reply"); const text = typeof args.prompt === "string" && args.prompt.includes('"chrona.remote.text-tools.v1"') ? JSON.stringify(args.prompt.includes("native-tool-through-http") ? { version: 1, content: "HTTP-governed completion verified", tool_calls: [] } : { version: 1, content: null, tool_calls: [{ id: "read_http_fixture", name: "read", arguments: { path: "fixture.txt" } }] }) : "offline completion"; return { text, inputTokens: 3, outputTokens: 4 }; } }, f.db);
+    const provider = await f.db.module.create({ data: { workspaceId: "ws_default", name: "http-model-provider", activeHash: "http-provider-v1" } });
+    const providerManifest = moduleManifestSchema.parse({ ...testProviderManifest, name: provider.name, tools: [...testProviderManifest.tools, {
+      name: "gateway-calls", description: "Read the offline Provider completion count", visibility: ["owner"],
+      parameters: { type: "object", properties: {} }, output: { type: "object", properties: { calls: { type: "number" } }, required: ["calls"] },
+    }] });
+    await f.db.moduleVersion.create({ data: { moduleId: provider.id, hash: provider.activeHash!, manifest: providerManifest, source: "user", status: "approved", intent: {}, report: {} } });
+    const providerCode = join(f.runtime.ports.dataDir, "platform/store", provider.activeHash!);
+    await mkdir(providerCode, { recursive: true });
+    // Persist before throwing so an unknown reply and SDK restarts cannot hide a repeated completion.
+    await writeFile(join(providerCode, "index.ts"), `import { chrona, on, ModelError } from "chrona";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+mkdirSync(chrona.paths.data, { recursive: true });
+const countPath = join(chrona.paths.data, "completion-count.json");
+let calls = existsSync(countPath) ? JSON.parse(readFileSync(countPath, "utf8")) : 0;
+on("tool", async event => {
+  if (event.id === "gateway-calls" && event.caller?.kind === "owner") return { result: { calls } };
+  if (event.caller?.kind !== "kernel") throw new ModelError("forbidden", "Kernel Provider endpoint required");
+  if (event.id === "health") return { result: { available: true, sandboxed: false, error: null } };
+  if (event.id === "release") return { result: { released: true } };
+  if (event.id !== "complete") throw new ModelError("not_found", "Unexpected offline Provider operation: " + event.id);
+  calls++;
+  writeFileSync(countPath, JSON.stringify(calls));
+  const { prompt } = event.args;
+  if (prompt === "lost") throw new Error("lost deterministic reply after completion count persisted");
+  const text = prompt.includes('"chrona.remote.text-tools.v1"') ? JSON.stringify(prompt.includes("native-tool-through-http")
+    ? { version: 1, content: "HTTP-governed completion verified", tool_calls: [] }
+    : { version: 1, content: null, tool_calls: [{ id: "read_http_fixture", name: "read", arguments: { path: "fixture.txt" } }] }) : "offline completion";
+  return { result: { text, inputTokens: 3, outputTokens: 4 } };
+});`);
+    await registerAgentProvider(f.runtime.ports, "ws_default", { kind: "module", module: provider.name, moduleId: provider.id, hash: provider.activeHash! }, {
+      id: "http-model-fixture", name: "Offline HTTP completion Provider", protocolVersion: 1,
+      capabilities: { conversation: true, completion: true, native: false, images: false, interactions: false, resume: false },
+      endpoints: { health: "health", start: "start", status: "status", inject: "inject", abort: "abort", release: "release", complete: "complete" },
+    });
+    async function gatewayCalls() {
+      const deadline = Date.now() + 5_000;
+      for (;;) {
+        try { return (await callSync(f.runtime.ports, { workspaceId: "ws_default", caller: { kind: "owner", via: null }, chain: [], path: [] }, { moduleId: provider.id, tool: "gateway-calls" }, {})).output; }
+        catch (error) {
+          console.error(JSON.stringify({ component: "remote-http-fixture", event: "provider_count_unavailable", error: String(error) }));
+          if (!(error instanceof CallError) || error.code !== "unavailable" || error.reason !== "not_dispatched" || Date.now() >= deadline) throw error;
+          // The deliberately lost completion restarts its SDK process with supervisor backoff.
+          await Bun.sleep(50);
+        }
+      }
+    }
     const service = createExecutionDelivery(f.runtime.ports), principal = { workspaceId: "ws_default", ownerId: "owner", caller: { kind: "module" as const, moduleId: caller.id, hash: caller.activeHash! } };
     const start: KernelExecutionStart = { kind: "execution", workId: "production-work", commandKey: "start", goal: "offline production integration", placement: { kind: "application", applicationId: receiver.moduleId, targetRef: "project", targetRevision: 1, projectRef: "project" }, workspace: { mode: "independent_worktree", baseline }, queueExpiresAt: new Date(Date.now() + 60_000).toISOString(), budget: { timeoutMs: 60_000, maxToolCalls: modelLimit, maxModelCalls: modelLimit, maxOutputTokens: 400 } };
     await expect(service.admit(principal, start)).rejects.toMatchObject({ code: "forbidden" });
@@ -199,7 +242,7 @@ test("production remote app relays native model, lifecycle, signed stop, and own
     expect(await deviceRequest("model", lostRequest)).toMatchObject({ status: "pending" });
     expect(await deviceRequest("model", { ...modelRequest, key: "budget-denied" })).toMatchObject({ status: "rejected", error: "budget_exceeded" });
     expect(await f.db.moduleCall.count({ where: { moduleId: caller.id, method: "model", status: "executed" } })).toBe(actualPiCommand ? 3 : 1);
-    expect(await f.db.moduleCall.count({ where: { moduleId: caller.id, method: "model", status: "pending" } })).toBe(1); expect(gatewayCalls).toBe(modelLimit);
+    expect(await f.db.moduleCall.count({ where: { moduleId: caller.id, method: "model", status: "pending" } })).toBe(1); expect(await gatewayCalls()).toEqual({ calls: modelLimit });
     await service.control(principal, start.workId, "write-command", { operation: "write", text: "offline-input" });
     const controls = (await deviceRequest("poll", { device })).messages;
     expect(controls.some((message: { kind: string }) => message.kind === "control")).toBe(true);
@@ -214,7 +257,7 @@ test("production remote app relays native model, lifecycle, signed stop, and own
     expect(await report("final", final)).toEqual(finalReceipt);
     expect(await deviceRequest("model", modelRequest)).toEqual(model);
     expect(await deviceRequest("model", lostRequest)).toMatchObject({ status: "pending" });
-    expect(gatewayCalls).toBe(modelLimit);
+    expect(await gatewayCalls()).toEqual({ calls: modelLimit });
     const row = await f.db.executionDelivery.findUniqueOrThrow({ where: { id: target.deliveryId } }); expect(row.finalDigest).toBeString();
     expect(await f.db.executionAttempt.findUnique({ where: { id: target.attemptId } })).toMatchObject({ heldDirectory: expect.any(String), stopConfirmedAt: null });
     const statement = { target, kind: "exited", processIdentity, finalDigest: row.finalDigest, sourceThrough: 1, observedAt: new Date().toISOString() };

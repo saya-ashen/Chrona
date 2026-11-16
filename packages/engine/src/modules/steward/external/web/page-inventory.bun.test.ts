@@ -104,7 +104,7 @@ test("Web wiring completes list and user discovery pages through its existing SD
       if (target === "modules.list") return args.cursor ? { items: [f.modules[1]], nextCursor: null } : { items: [f.modules[0]], nextCursor: "modules-next" };
       if (target !== "modules.describe") throw new Error(`Unexpected ${target}`);
       expect(args.audience).toBe("user");
-      const item = (module: string) => ({ target: { moduleId: `${module}-id`, tool: "read" },
+      const item = (module: string) => ({ target: { moduleId: `${module}-id`, tool: "read" }, label: `${module}.read`,
         moduleId: `${module}-id`, inputSchema: {} });
       if (args.query) return { items: [item(String(args.query))], nextCursor: null };
       return args.cursor ? { items: [item("beta")], nextCursor: null } : { items: [item("alpha")], nextCursor: "tools-next" };
@@ -113,16 +113,17 @@ test("Web wiring completes list and user discovery pages through its existing SD
   // Evaluate the real callbacks and private wire adapter without starting Web's server or timers.
   const entry = await Bun.file(new URL("./index.ts", import.meta.url)).text();
   const adapter = (await Bun.file(new URL("./kernel-client.ts", import.meta.url)).text()).replace(/^import .*;$/gm, "").replace("export async function", "async function");
+  const pagination = (await Bun.file(new URL("./pagination.ts", import.meta.url)).text()).replace(/^export /gm, "");
   const call = entry.slice(entry.indexOf("const call ="), entry.indexOf("\nconst ownSettings"));
   const pages = entry.slice(entry.indexOf("const pages = createPages("), entry.indexOf('\non("tool"'));
-  const script = new Bun.Transpiler({ loader: "ts" }).transformSync(`${adapter}\n${call}\n${pages}\nglobalThis.wiredPages = pages;`);
+  const script = new Bun.Transpiler({ loader: "ts" }).transformSync(`${pagination}\n${adapter}\n${call}\n${pages}\nglobalThis.wiredPages = pages;`);
   const wired = runInNewContext(`${script}\nglobalThis.wiredPages;`, { chrona: sdk, createPages, createMaterialAdmission: () => ({}) }) as ReturnType<typeof createPages>;
   for (const module of ["alpha", "beta"]) await wired.tool("page-set", input, { kind: "module", module, moduleId: `${module}-id`, hash: "approved" });
   requests.length = 0;
   expect((await wired.list()).map(page => page.module)).toEqual(["alpha", "beta"]);
   expect(requests.map(request => request.target)).toEqual(["modules.list", "modules.list", "modules.describe", "modules.describe"]);
   expect(requests[3]!.args).toEqual({ audience: "user", cursor: "tools-next" });
-  expect(sdk.dependencies).toEqual({ alpha: "alpha-id", beta: "beta-id" });
+  expect(sdk.dependencies).toEqual({});
   requests.length = 0;
   expect(await wired.get("beta", "main")).toMatchObject({ moduleId: "beta-id" });
   expect(requests.at(-1)).toEqual({ target: "modules.describe", args: { query: "beta", audience: "user" } });

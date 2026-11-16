@@ -47,7 +47,12 @@ try {
   // On activation the documents page is registered with web.
   assert.equal((await module.send({ trigger: { kind: "activated", id: "activated", firedAt: now }, now, params: {} })).error, undefined);
   const registered = module.calls.find((call: { method: string; params: { target: string } }) => targetName(call.params.target) === "web.page-set");
-  assert.equal(registered.params.args.id, "main"); assert.equal(registered.params.args.data.doc.tool, "read");
+  assert.equal(registered.params.args.id, "main");
+  assert.equal(registered.params.args.title, "文档");
+  assert.deepEqual(registered.params.args.tools, ["list", "read", "write", "delete"]);
+  const page = new Bun.Transpiler({ loader: "js" }).scan(registered.params.args.javascript);
+  assert.ok(page.exports.includes("default"));
+  assert.ok(page.imports.every(entry => entry.path === "/pages.js"));
   const activate = () => module.send({ trigger: { kind: "activated", id: "activated", firedAt: now }, now, params: {} });
   assert.equal((await activate()).error, undefined);
   failRegistration = true;

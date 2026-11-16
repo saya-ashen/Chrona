@@ -168,7 +168,8 @@ async function convertConversations(directory: string) {
   } finally { db.close(); }
   // Use the actual application reader to validate turns, receipts and memory without dispatching anything.
   const forbiddenCall = async () => { throw Error("Migration must not dispatch application tools"); };
-  await createAgentConversations({ dataDir: directory, call: forbiddenCall, reply: () => { throw Error("Unexpected reply during migration"); } }).list();
+  const reader = createAgentConversations({ dataDir: directory, call: forbiddenCall, reply: () => { throw Error("Unexpected reply during migration"); } });
+  for (const session of await reader.list()) await reader.session(session.id);
   rmSync(path);
   return sessions.length;
 }

@@ -42,12 +42,13 @@ export function testModuleProcess(handler: (event: ModuleEvent, call: (method: M
     let rejectExit!: (error: Error) => void;
     const exited = new Promise<{ code: number | null; signal: string | null }>((resolve, reject) => { finish = resolve; rejectExit = reject; });
     const pending = new Map<string, (value: unknown) => void>();
+    const activeEvents = new Set<string>();
     const call = (eventId: string, bindings: Record<string, string>) => (method: ModuleCall["method"], params: ModuleCall["params"]) => new Promise(resolve => {
       if (method === "call" && "target" in params && typeof params.target === "string") {
         const [module, tool] = params.target.split(".");
         if (module && tool && bindings[module]) params = { ...params, target: { moduleId: bindings[module], tool } };
       }
-      const id = randomUUID(); pending.set(id, resolve); socket.write(JSON.stringify({ id, eventId, method, params }) + "\n");
+      const id = randomUUID(); pending.set(id, resolve); socket.write(JSON.stringify({ id, ...(activeEvents.has(eventId) ? { eventId } : {}), method, params }) + "\n");
     });
     socket.on("connect", () => socket.write(JSON.stringify({ type: "auth", version: 1, token: input.ipcToken }) + "\n"));
     let buffer = "";
@@ -61,9 +62,11 @@ export function testModuleProcess(handler: (event: ModuleEvent, call: (method: M
         if (message.type === "ready") continue;
         if (message.ping === true) { socket.write(JSON.stringify({ id: message.id, result: {} }) + "\n"); continue; }
         if (message.event) {
+          activeEvents.add(message.id);
           void handler(message.event, call(message.id, message.event.bindings ?? {}), input).then(result => {
+            activeEvents.delete(message.id);
             if (!socket.destroyed) socket.write(JSON.stringify({ id: message.id, result: result ?? {} }) + "\n");
-          }, error => { if (!socket.destroyed) socket.write(JSON.stringify({ id: message.id, error: String(error instanceof Error ? error.message : error).slice(0, 2000), ...(MODULE_CALL_ERRORS.includes(error?.code) ? { errorCode: error.code, ...(error.reason ? { errorReason: error.reason } : {}) } : {}) }) + "\n"); });
+          }, error => { activeEvents.delete(message.id); if (!socket.destroyed) socket.write(JSON.stringify({ id: message.id, error: String(error instanceof Error ? error.message : error).slice(0, 2000), ...(MODULE_CALL_ERRORS.includes(error?.code) ? { errorCode: error.code, ...(error.reason ? { errorReason: error.reason } : {}) } : {}) }) + "\n"); });
         } else { pending.get(message.id)?.(message); pending.delete(message.id); }
       }
     });

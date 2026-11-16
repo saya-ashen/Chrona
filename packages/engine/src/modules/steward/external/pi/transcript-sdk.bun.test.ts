@@ -22,9 +22,16 @@ test("actual SDK keeps the same live Pi host responsive after oversized transcri
     await writeFile(join(profile, "settings.json"), JSON.stringify({ defaultProvider: "fixture", defaultModel: "fixture" }));
     const expected: ProviderTranscriptItem[] = Array.from({ length: 93 }, (_, i) => ({ at: now, kind: "text", text: `${i}:检查🙂` + "转录内容".repeat(260) }));
     expect(Buffer.byteLength(JSON.stringify(expected))).toBeGreaterThan(262144);
-    // Prove the old array reply crosses the actual production contract, not a test-only schema.
-    expect(moduleEventReplySchema.safeParse({ id: "old", result: { result: expected } }).success).toBe(false);
-    await writeFile(join(sessions, "fixture.jsonl"), expected.map(item => JSON.stringify({ type: "message", timestamp: item.at, message: { role: "assistant", content: [{ type: "text", text: item.kind === "text" ? item.text : "" }] } })).join("\n") + "\n");
+    expect(moduleEventReplySchema.parse({ id: "large", result: { result: expected } })).toEqual({ id: "large", result: { result: expected } });
+    let offset = 0;
+    const records = expected.map(item => {
+      const record = JSON.stringify({ type: "message", timestamp: item.at, message: { role: "assistant", content: [{ type: "text", text: item.kind === "text" ? item.text : "" }] } }) + "\n";
+      item.id = `fixture.jsonl:${offset}:0`;
+      offset += Buffer.byteLength(record);
+      return record;
+    });
+    await writeFile(join(sessions, "fixture.jsonl"), records.join(""));
+    recent.id = `oversized.jsonl:${Buffer.byteLength(JSON.stringify({ type: "message", message: { role: "user", content: "🙂".repeat(300000) } }) + "\n")}:0`;
     child = Bun.spawn([process.execPath, "--no-install", join(import.meta.dir, "transcript-sdk.fixture.ts")], {
       cwd: resolve(import.meta.dir, "../../../../../../.."), stdin: "ignore", stdout: "pipe", stderr: "pipe",
       env: { ...process.env, CHRONA_IPC_ENDPOINT: channel.endpoint, CHRONA_IPC_TOKEN: channel.token, CHRONA_DATA: data,

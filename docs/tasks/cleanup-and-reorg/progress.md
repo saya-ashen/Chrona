@@ -1,0 +1,22 @@
+# 执行进度
+
+- 当前阶段：0、1 已完成；下一步阶段 2 事实与消费者盘点。
+- 基准：6966a5c3；任务分支 refactor/cleanup-and-reorg；隔离目录 /home/saya/workspace/Chrona-cleanup-and-reorg。
+- 原工作区未修改。依赖使用本机既有 node_modules 的独立 reflink/copy，未安装或启用任何插件；正式隔离发行仍需证明不依赖此开发副本。
+- 完整执行方案：plan.md。
+- 阶段 2–9 尚未实施源码改动；阶段 1 的可信验证基线现已通过，可以进入阶段 2。
+- 初始门禁日志保留在 `.tmp/cleanup-and-reorg/baseline/`。首次 systemd 环境丢失 Nix PATH 的结果不作为源码结论；继承正确环境后已通过 check all 和 verify:slice，全库 lint 存量 195 errors / 1036 warnings，ratchet 通过。
+- 第二轮完整基线已结束：`.tmp/cleanup-and-reorg/baseline-r2/results.json`。check all、verify:slice --no-tests 通过；Bun 7 文件失败、API 1 文件失败，build 因固定种子与当前源码不符拒绝，未执行 smoke。日志 stdout/stderr 曾使用两个独立句柄，文本可能覆盖；退出码独立保存，正式入口已修复合流。
+- 测试修复依据当前生产合同与实际历史：大 JSON 结果没有旧 256 KiB 限制；transcript 使用字节偏移稳定 ID；Author 输入是对象；分页返回按消费者读取；memory journal 使用 SQLite；unconfirmed activation 不自动重放；后台 Provider callback 不携带已结束 eventId；Mind 未确认停止仍占用。
+- 定向复验：原 12 文件集仅 MCP / Web 失败，修正后针对 MCP、Web、Pi 三文件复验 15 tests 全通过；Mind control 9 tests 已通过。Notify activity 刚修正重复分页替身，尚待本轮全量结果。
+- 独立 reviewer 已完成静态审查，未发现实质缺陷或削弱断言；未代跑任何检查。报告为 `baseline-fixture-review.md`（父会话 subagent artifacts）。发行入口不在其完整验收范围。
+- 新增 `bun run verify:release [report-directory]`，串行现有检查、全库 lint 诊断、Bun/API、构建和 smoke；runner 新增 `--list`。入口两个自测通过，相关脚本 lint 0 errors / 0 新 warnings。新增发现覆盖后 Bun 347 / API 21 文件。
+- 第二轮剩余失败均已定向修复并通过。真实缺陷为 storage converter 用摘要 reader 漏验坏 turn；现改为逐 session 完整读取，9 tests 通过。API 保留 drain read、禁止 fence 后新 Run、重复 stop 不增加 abort，workbench 与数据库安全共 7 tests 通过。其余合同与 fixture、Web 离线重建、Chat 三套件定向通过，见 `verification.md`。
+- 重建 Web 制品并按既有 prepare 追加 7 个固定应用 bundle 历史，未推送。Pi vendor 仅放任务临时目录，不进入源码；保持原 lint 配置。`release-r3` 失败证据保留，`release-r4` 已开始完整正式入口复验，check all 已通过。第二次独立 reviewer 已完成，未发现实质缺陷；确认完整会话校验、drain read 与动作幂等均符合当前实现。阶段 1 尚未提交。
+- `release-r4` 已结束：347 个 Bun 测试文件全量通过；21 个 API 文件中 remote ingress、listen MCP、QQ relay 3 文件失败，正式入口停止，未 build/smoke。日志 `.tmp/cleanup-and-reorg/release-r4/`。
+- 补充验收 worker `3881c9fc-0d15-4380-ba45-960d1a1ecedd` 已完成：Web shell 60 项（含三尺寸）与 desktop build / 3 tests 通过，settings browser 因旧 blob ESM 入口失败。结果 `.tmp/cleanup-and-reorg/extra-checks/results.json`。父已改设置测试为隔离同源 HTTP 源页面，保持真实页面合同与禁止外联；修正旧错误文案预期，并增加非法保存后持久设置不变的断言。复验 `.tmp/cleanup-and-reorg/settings-browser-r7.log`：Pi/Notify 六个三尺寸场景全通过，lint 0。
+- listen 修复结构化 target+label 预期；QQ relay fixture 更新为 agent.read 当前 Run/终态投影，保留原行为断言，尚待全 API 验证。remote worker 已完成单文件 +54/-11：真实 SDK 普通 Provider 替代已退役的内置 agent.complete，私有计数在 lost 前持久化，精确 not_dispatched 计数查询才等待；4 tests / 141 assertions 通过。独立 remote reviewer 已核对 diff/日志，无实质问题，未跑真实 Pi 分支。
+- `.tmp/cleanup-and-reorg/finish-baseline.ts` 正以 systemd 服务 `chrona-cleanup-finish-baseline-r3-20261117` 串行 check all → API 全量 → verify:slice → build → smoke。此前两次在设置浏览器 fixture 新增的 TS 可空 main / purpose 字面量类型处失败，已修复；当前日志目录 `.tmp/cleanup-and-reorg/finish-baseline/`。347 Bun 全量无需重跑，因为之后只修改 API 和套件外设置浏览器测试；有后续相关失败再定向补验。最新 checks 与 21 文件 API 全量已通过；verify:slice 正在进行，build/smoke待后续。依赖检查0 errors/47 warnings（新增Provider测试引用一条）。只读 watcher `b951df6a-601b-458f-9507-ac49a489bdb1` 等该服务实际退出后报告全部退出码，依靠原生通知继续，不轮询。
+- settings/API 与 remote 两份最终 reviewer 均无实质问题；相关报告 `settings-api-fixture-review.md`、`remote-final-review.md` 位于父会话 subagent artifacts。
+- 最终门禁已全部结束且成功：check all、21 文件 API 全量、verify:slice（21 关联文件）、build、packaged smoke 全部 exit 0。此前 347 文件 Bun 全量 exit 0；之后仅 API/浏览器 fixture 变化，未无故重跑相同 Bun 全量。阶段 1 完成。持久证据 `stage-1-evidence.json` 含实际文件清单、包大小/SHA256、种子继承关系、债务及未跑范围；源码净行数待提交时统计。publish-plan 的机器绝对路径已归回原相对路径表示，不改发行 lock/bundle。
+- 未部署、未真实使用验收；原工作区保持原样，未推送。

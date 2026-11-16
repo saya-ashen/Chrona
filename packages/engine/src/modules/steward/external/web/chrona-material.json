@@ -33,6 +33,7 @@
     "page-inventory.bun.test.ts",
     "page-read-sharing.bun.test.ts",
     "pages.ts",
+    "pagination.ts",
     "preferences.ts",
     "react-pages-browser.bun.test.ts",
     "read-concurrency.bun.test.ts",
@@ -109,13 +110,12 @@
     "today.bun.test.ts",
     "today.ts",
     "tsconfig.json",
-    "UI-DEVELOPMENT.md",
-    "pagination.ts"
+    "UI-DEVELOPMENT.md"
   ],
   "artifacts": [
     {
       "path": "pages.js",
-      "sha256": "3b471c47b4d29bcb17858dfb7c7daad49009b9d0c55d9f202ace77497a7463f4",
+      "sha256": "0af6afca6f301b5002d06b00d68b33622020b4feb97aabe1e464b1f9420daedd",
       "executable": false
     },
     {

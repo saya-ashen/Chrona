@@ -21,7 +21,7 @@ async function until(predicate: () => Promise<boolean>) {
 
 for (const persistent of [false, true]) {
   const name = "files";
-  test(`real ${name} SDK activation retries via reconcile and stays bounded (persistent=${persistent})`, async () => {
+  test(`real ${name} SDK activation keeps an unconfirmed delivery without replay (persistent=${persistent})`, async () => {
     const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-registration-"));
     const workspace = await db.workspace.create({ data: { name: "registration" } });
     const externalRoot = join(dataDir, "platform", "external");
@@ -55,21 +55,14 @@ for (const persistent of [false, true]) {
     await cp(release.codeDir, join(dataDir, "platform", "store", release.hash), { recursive: true });
     const app = await db.module.create({ data: { workspaceId: workspace.id, name, builtin: false, activeHash: release.hash } });
     await db.moduleVersion.create({ data: { moduleId: app.id, hash: release.hash, manifest: release.manifest, source: "user", status: "approved", intent: {}, report: {} } });
-    const announced = async () => JSON.parse(await readFile(join(dataDir, "platform", "activated.json"), "utf8").catch(() => "{}")) as Record<string, string>;
-    for (let attempt = 1; attempt <= (persistent ? 3 : 2); attempt++) {
-      await supervisor.reconcile();
-      await until(async () => await db.moduleRun.count({ where: { moduleId: app.id, triggerId: "activated", OR: [{ exitCode: 0 }, { error: { not: null } }] } }) >= attempt);
-      // announce persists only after delivery settles; a later pass must actually be free to retry.
-      await until(async () => persistent || attempt === 1 ? (await db.moduleRun.findFirst({ where: { moduleId: app.id, triggerId: "activated" }, orderBy: { createdAt: "desc" } }))?.error !== null : !!(await announced())[app.id]);
-      await Bun.sleep(30);
-      if (attempt === 1) { expect((await announced())[app.id]).toBeUndefined(); expect(await db.module.findUniqueOrThrow({ where: { id: app.id } })).toMatchObject({ status: "active" }); }
-    }
-    for (let i = 0; i < 2; i++) { await supervisor.reconcile(); await Bun.sleep(30); }
-    expect(calls).toBe(persistent ? 3 : 2);
-    expect(delivered).toBe(persistent ? 0 : 1);
-    expect(await db.moduleRun.count({ where: { moduleId: app.id, triggerId: "activated" } })).toBe(persistent ? 3 : 2);
+    await supervisor.reconcile();
+    await until(async () => !!(await db.moduleRun.findFirst({ where: { moduleId: app.id, triggerId: "activated", error: { not: null } } })));
+    for (let i = 0; i < 3; i++) { await supervisor.reconcile(); await Bun.sleep(30); }
+    expect(calls).toBe(1);
+    expect(delivered).toBe(0);
+    expect(await db.moduleRun.count({ where: { moduleId: app.id, triggerId: "activated" } })).toBe(1);
+    expect(await db.module.findUniqueOrThrow({ where: { id: app.id } })).toMatchObject({ status: "active" });
     expect(await db.module.findUniqueOrThrow({ where: { id: web.id } })).toMatchObject({ status: "active" });
-    expect((await announced())[app.id]).toBeDefined();
   }, 20_000);
 }
 

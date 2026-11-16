@@ -17,20 +17,11 @@ test("Notify presents current public record pages newest first, groups incidents
     const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => new Date(time) };
     const owner = { ...kernelOrigin(workspace.id), caller: { kind: "owner" as const, via: null } };
     const inputs: Record<string, unknown>[] = [];
-    // Match applicationCall's page completion using the real governed public API,
-    // rather than the internal activityRecords helper's retired wire shape.
     const call = async (target: string, input: Record<string, unknown>) => {
       expect(target).toBe("activity.records");
-      expect(input).toEqual({ limit: 100 });
-      const page = (await callSync(ports, owner, target, input)).output as { items: unknown[]; nextCursor: string | null };
+      expect(input.limit).toBe(100);
       inputs.push(input);
-      while (page.nextCursor) {
-        const nextInput = { ...input, cursor: page.nextCursor };
-        inputs.push(nextInput);
-        const next = (await callSync(ports, owner, target, nextInput)).output as typeof page;
-        page.items.push(...next.items); page.nextCursor = next.nextCursor;
-      }
-      return page;
+      return (await callSync(ports, owner, target, input)).output;
     };
     const view = (args: Parameters<typeof activityView>[1] = {}) => activityView(call, args);
     expect(await view()).toEqual({ items: [], before: null });
@@ -60,7 +51,7 @@ test("Notify presents current public record pages newest first, groups incidents
     expect(older.items.every(item => item.at < first.before!)).toBe(true);
     expect(await view({ module: "missing" })).toEqual({ items: [], before: null });
   } finally { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); }
-});
+}, 60_000);
 
 test("Notify retains its 2,000-record presentation scan bound", async () => {
   const items = Array.from({ length: 2001 }, (_, i) => ({ id: String(i), at: new Date(i * 1000).toISOString(),

@@ -3,6 +3,8 @@ import { join, resolve } from "node:path";
 import { buildProcessHelper } from "../packages/process/scripts/build-helper";
 
 const include = new Bun.Glob("**/*.bun.test.{ts,tsx}");
+const additionalTests = ["state.test.ts", "dom.test.ts", "host-agent.integration.test.ts"]
+	.map(file => `packages/engine/src/modules/steward/external/chat/${file}`);
 const ignoredSegments = new Set([
 	"node_modules",
 	".direnv",
@@ -18,7 +20,8 @@ const ignoredSegments = new Set([
 	"coverage",
 ]);
 const rootDir = process.cwd();
-const requestedFiles = process.argv.slice(2).map((p) => p.replace(/^\.\//u, ""));
+const listOnly = process.argv.includes("--list");
+const requestedFiles = process.argv.slice(2).filter(arg => arg !== "--list").map((p) => p.replace(/^\.\//u, ""));
 const retryFlaky = process.env.CHRONA_TEST_RETRY_FLAKY === "1";
 const concurrency = Math.max(
 	1,
@@ -39,7 +42,7 @@ function shouldInclude(path: string) {
 }
 
 function isBunTestFile(path: string) {
-	return path.endsWith(".bun.test.ts") || path.endsWith(".bun.test.tsx");
+	return path.endsWith(".bun.test.ts") || path.endsWith(".bun.test.tsx") || additionalTests.includes(path);
 }
 
 function resolveRequestedFiles(paths: string[]) {
@@ -131,14 +134,17 @@ async function runWithFreshDatabase(
 	return await proc.exited;
 }
 
-async function main(): Promise<number> {
-	const files =
-		requestedFiles.length > 0
+async function discoverTestFiles(): Promise<string[]> {
+	return requestedFiles.length > 0
 			? resolveRequestedFiles(requestedFiles)
-			: (await Array.fromAsync(include.scan(".")))
+			: [...await Array.fromAsync(include.scan(".")), ...additionalTests]
 					.filter(shouldInclude)
 					.sort((a, b) => a.localeCompare(b));
 
+}
+
+async function main(): Promise<number> {
+	const files = await discoverTestFiles();
 	if (files.length === 0) {
 		return 0;
 	}
@@ -204,5 +210,6 @@ async function main(): Promise<number> {
 }
 
 if (import.meta.main) {
-	process.exit(await main());
+	if (listOnly) console.log(JSON.stringify(await discoverTestFiles()));
+	else process.exit(await main());
 }

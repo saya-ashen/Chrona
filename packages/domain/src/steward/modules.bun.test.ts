@@ -60,12 +60,15 @@ describe("module channel contract", () => {
     expect(moduleCallSchema.safeParse({ id: "1", method: "call", params: { target: { moduleId: "agent-id", tool: "complete" }, args: { prompt: "p", maxOutputTokens: 10 } } }).success).toBe(true);
     for (const method of ["notify", "wakeProvider", "model", "secret"]) expect(moduleCallSchema.safeParse({ id: "1", method, params: {} }).success).toBe(false);
   });
-  test("event replies default result and cap it at 256 KiB serialized", () => {
+  test("event replies default result and preserve JSON beyond the retired 256 KiB cap", () => {
     const result = "x".repeat(256 * 1024 - 2);
     expect(moduleEventReplySchema.parse({ id: "1" })).toEqual({ id: "1", result: {} });
     expect(moduleEventReplySchema.parse({ id: "1", result: { handled: true, result } })).toEqual({ id: "1", result: { handled: true, result } });
-    expect(moduleEventReplySchema.safeParse({ id: "1", result: { result: `${result}x` } }).success).toBe(false);
-    expect(moduleEventReplySchema.safeParse({ id: "1", result: { result: "界".repeat(90_000) } }).success).toBe(false);
+    for (const value of [`${result}x`, "界".repeat(90_000)]) {
+      expect(Buffer.byteLength(JSON.stringify(value))).toBeGreaterThan(256 * 1024);
+      expect(moduleEventReplySchema.parse({ id: "1", result: { result: value } })).toEqual({ id: "1", result: { result: value } });
+    }
+    expect(moduleEventReplySchema.safeParse({ id: "1", result: { result: () => "not JSON" } }).success).toBe(false);
   });
   test.each([
     { method: "call", params: { target: "notify.send", mode: "async" } }, { method: "call", params: { target: "bad" } },

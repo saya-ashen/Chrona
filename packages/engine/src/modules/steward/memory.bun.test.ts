@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { Database } from "bun:sqlite";
 import { mkdtemp, readFile, rm, writeFile, access } from "node:fs/promises";
 import { join } from "node:path";
 import { selectedMemory, conversationMemory, memoryView, memoryForget, type MemoryJournal } from "./entry-app/memory";
@@ -136,19 +137,21 @@ test.each(["web", "mcp", "qq"] as const)("%s retains its own journal/context and
   expect(f.calls.filter(call => call.target.endsWith(".conversation-context"))).toHaveLength(1);
   active = false; await app.poll();
   expect(replies).toHaveLength(1);
-  const state = JSON.parse(await readFile(join(dataDir, "conversations/state.json"), "utf8"));
-  expect(state.sessions[0]).toMatchObject({ source, contextId: "private-context", memory: { provider: "memory-local", recalled: true, retainedThrough: state.sessions[0].messages.at(-1).createdAt } });
+  const db = new Database(join(dataDir, "conversations/sessions.sqlite"));
+  const saved = db.query<{ data: string }, [string]>("SELECT data FROM conversations WHERE id=?").get(sent.sessionId)!;
+  const state = JSON.parse(saved.data);
+  expect(state).toMatchObject({ source, contextId: "private-context", memory: { provider: "memory-local", recalled: true, retainedThrough: state.messages.at(-1).createdAt } });
   app = createAgentConversations(options); await app.poll();
   expect(replies).toHaveLength(1);
   await app.update(sent.sessionId, { status: "ended" });
   expect(JSON.parse(String(f.calls.filter(call => call.target.endsWith(".conversation-retain")).at(-1)!.args.snapshot)).ending).toBe(true);
   expect(f.calls.every(call => !call.target.startsWith("memory."))).toBe(true);
-  const persisted = JSON.parse(await readFile(join(dataDir, "conversations/state.json"), "utf8"));
-  for (const memory of [null, { provider: 42, recalled: false, retainedThrough: null }, { provider: "memory-local", recalled: false, retainedThrough: "invalid" }]) {
-    persisted.sessions[0].memory = memory;
-    await writeFile(join(dataDir, "conversations/state.json"), JSON.stringify(persisted));
-    await expect(createAgentConversations(options).list()).rejects.toThrow("Web conversation journal is invalid");
-  }
+  try {
+    for (const memory of [null, { provider: 42, recalled: false, retainedThrough: null }, { provider: "memory-local", recalled: false, retainedThrough: "invalid" }]) {
+      db.query("UPDATE conversations SET data=? WHERE id=?").run(JSON.stringify({ ...state, memory }), sent.sessionId);
+      await expect(createAgentConversations(options).list()).rejects.toThrow("Web conversation journal is invalid");
+    }
+  } finally { db.close(); }
 });
 test("memory-local SDK accepts direct callers and rejects kernel/lifecycle owner calls without opening a memory DB", async () => {
   const dataDir = await directory(), script = join(dataDir, "audiences.ts");

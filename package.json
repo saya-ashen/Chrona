@@ -43,6 +43,7 @@
     "check:boundaries": "bun scripts/chrona.ts check boundaries",
     "check:guardrails": "bun run scripts/check-guardrails.ts",
     "verify:slice": "bun run scripts/verify-slice.ts",
+    "verify:release": "bun run scripts/verify-release.ts",
     "ci:local": "bun run scripts/local-ci.ts",
     "hooks:install": "bun run scripts/install-git-hooks.ts",
     "build:smoke": "bun scripts/chrona.ts build smoke",

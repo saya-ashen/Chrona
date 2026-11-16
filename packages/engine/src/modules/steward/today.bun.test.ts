@@ -41,7 +41,7 @@ test("web uses listed health summaries and excludes closed recovered facts", asy
     { id: "recovered", name: "recovered", health: health("recovered", false, "2026-10-27T06:00:00Z") },
   ], nextCursor: null } });
   expect((await todayView(f.call, async () => [])).problems.map(item => item.module)).toEqual(["second", "first"]);
-  expect(f.calls.filter(([target]) => target.startsWith("modules."))).toEqual([["modules.list", undefined]]);
+  expect(f.calls.filter(([target]) => target.startsWith("modules."))).toEqual([["modules.list", {}]]);
 });
 test.each(["not_found", "unavailable"])("optional Notify %s errors keep Today available", async code => {
   const failure = Object.assign(new Error(`Notify ${code}`), { code });

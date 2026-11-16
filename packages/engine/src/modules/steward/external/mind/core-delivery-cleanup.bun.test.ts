@@ -194,7 +194,7 @@ for(const outcome of ['resolved','rejected'] as const)for(const pinned of [false
    expect(f.delivery.cleanupWithdrawn()).toEqual({deferred:0});
    await f.delivery.submit(id,cleanupOwner);
    const submits=f.calls.filter(c=>typeof c.target==='object'&&c.target.tool==='submit');
-   expect(submits).toEqual([{target:{moduleId:cleanupAuthor.moduleId,tool:'submit'},args:{input:JSON.stringify({admissionId:input.admissionId,requestKey:input.requestKey,items:input.items.map(({name,dir,intent})=>({name,dir,intent}))})},key:input.requestKey}]);
+   expect(submits).toEqual([{target:{moduleId:cleanupAuthor.moduleId,tool:'submit'},args:{input:{admissionId:input.admissionId,requestKey:input.requestKey,items:input.items.map(({name,dir,intent})=>({name,dir,intent}))}},key:input.requestKey}]);
    const queries=f.calls.filter(c=>c.target==='modules.receipt');
    expect(queries).toEqual([{target:'modules.receipt',args:outcome==='rejected'?{admissionId:input.admissionId,key:input.requestKey}:{receiptId:f.receipt.receiptId},key:undefined}]);
    expectErased(f.delivery.detail(id,cleanupOwner),identity);

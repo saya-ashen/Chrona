@@ -72,7 +72,7 @@ console.log(JSON.stringify({ good, bad, installed }));
     expect(await Bun.file(join(cwd, "build/node_modules/chrona/calls.json")).json()).toEqual({});
     const installs = (await readFile(log, "utf8")).trim().split("\n").map(line => JSON.parse(line));
     expect(installs).toEqual([
-      { name: "bun", argv: ["install", "--frozen-lockfile", "--ignore-scripts", "--no-progress"], cwd, secret: null, helper: null, loader: null },
+      { name: "bun", argv: ["install", "--frozen-lockfile", "--ignore-scripts", "--no-progress", "--backend=copyfile"], cwd, secret: null, helper: null, loader: null },
       { name: "uv", argv: ["sync", "--frozen", "--python", join(bin, "python3"), "--no-python-downloads"], cwd, secret: null, helper: null, loader: null },
     ]);
   } finally { await rm(root, { recursive: true, force: true }); }

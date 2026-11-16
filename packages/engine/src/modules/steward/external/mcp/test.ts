@@ -8,12 +8,20 @@ let webAvailable = false;
 const pages: Args[] = [];
 const objectSchema = (properties: Args = {}, required: string[] = []) => ({ type: "object", properties, required, additionalProperties: false });
 const contract = (target: string, inputSchema = objectSchema(), app?: string) => ({ target, description: target, inputSchema, outputSchema: null, ...(app ? { moduleId: `${app}-id`, hash: "a".repeat(64) } : {}) });
-const authorInput = objectSchema({ input: { type: "string" } }, ["input"]);
+const intentInput = objectSchema({ changes: { type: "array", items: { type: "string" }, minItems: 1 }, preserves: { type: "array", items: { type: "string" } } }, ["changes"]);
+const textInput = { type: "string" };
+const authorInputs: Record<string, Args> = {
+  prepare: objectSchema({ requestKey: textInput, submitter: objectSchema({ moduleId: textInput, hash: textInput }, ["moduleId", "hash"]), targets: { type: "array", items: objectSchema({ name: textInput, moduleId: { type: ["string", "null"] }, expectedActiveHash: { type: ["string", "null"] } }, ["name", "moduleId", "expectedActiveHash"]) }, goal: textInput, intent: intentInput }, ["requestKey", "submitter", "targets", "goal", "intent"]),
+  stage: objectSchema({ name: textInput, from: textInput, to: textInput, provenance: objectSchema({ kind: { enum: ["local"] }, label: textInput }, ["kind", "label"]) }, ["name", "from", "to", "provenance"]),
+  source: objectSchema({ admissionId: textInput, moduleId: textInput, hash: textInput, to: textInput }, ["admissionId", "moduleId", "hash", "to"]),
+  submit: objectSchema({ admissionId: textInput, requestKey: textInput, items: { type: "array", items: objectSchema({ name: textInput, dir: textInput, intent: intentInput }, ["name", "dir", "intent"]) } }, ["admissionId", "requestKey", "items"]),
+  receipt: objectSchema({ receiptId: textInput }, ["receiptId"]),
+};
 const admissionInput = objectSchema({ submitter: objectSchema({ moduleId: { type: "string" }, hash: { type: "string", pattern: "^[a-f0-9]{64}$" } }, ["moduleId", "hash"]), targets: { type: "array", minItems: 1, items: objectSchema({ name: { type: "string" }, moduleId: { type: ["string", "null"] }, expectedActiveHash: { type: ["string", "null"] } }, ["name", "moduleId", "expectedActiveHash"]) } }, ["submitter", "targets"]);
 const contracts = [
   contract("modules.list"), contract("approvals.resolve", objectSchema({ approval: { type: "string" }, decision: { enum: ["approve", "deny"] } }, ["approval", "decision"])),
   contract("files.list", objectSchema(), "files"), contract("web.today", objectSchema(), "web"), contract("notify.list", objectSchema(), "notify"),
-  ...["prepare", "stage", "source", "submit", "receipt"].map(name => contract(`author.${name}`, authorInput, "author")),
+  ...["prepare", "stage", "source", "submit", "receipt"].map(name => contract(`author.${name}`, objectSchema({ input: authorInputs[name]! }, ["input"]), "author")),
   contract("author.write", objectSchema({ path: { type: "string" }, content: { type: "string" } }, ["path", "content"]), "author"),
   contract("author.read", objectSchema({ path: { type: "string" }, offset: { type: "number" }, limit: { type: "number" } }, ["path"]), "author"),
   contract("author.list", objectSchema({ path: { type: "string" } }, ["path"]), "author"),
@@ -198,7 +206,7 @@ try {
   assert.equal((await tool("chrona_chat", { text: "changed", key: "one", requestKey: "message-one" })).isError, true);
   assert.equal((await json("chrona_sessions")).length, 1);
   assert.equal((await json("chrona_session", { sessionId: reply.sessionId })).id, reply.sessionId);
-  assert.equal((await json("chrona_session_messages", { sessionId: reply.sessionId, limit: 1 }))[0].text, "done");
+  assert.equal((await json("chrona_session_messages", { sessionId: reply.sessionId, limit: 1 })).items[0].text, "done");
   assert.equal((await json("chrona_session_transcript", { sessionId: reply.sessionId }))[0].text, "done");
   for (const sessionId of ["build-1", "qq-agent:foreign", "web-agent:foreign", "mcp-agent:absent"]) {
     for (const name of ["chrona_session", "chrona_session_messages", "chrona_session_transcript", "chrona_runs"]) assert.equal((await tool(name, { sessionId })).isError, true);
