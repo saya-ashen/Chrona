@@ -8,6 +8,7 @@ import { dirname, join, resolve } from "node:path";
 
 import { buildArtifacts, buildTargets, parseBuildTarget, type BuildTargetName } from "./manifest";
 import { assertElfInterpreterFile } from "./portable-elf";
+import { verifyReleaseIdentity } from "./release-identity";
 
 const ROOT = resolve(import.meta.dirname, "..");
 // Ordinary preinstalled modules run installation checks on first start.
@@ -201,6 +202,7 @@ export type SmokeReleaseOptions = {
 export async function smokeRelease(target: BuildTargetName, options: SmokeReleaseOptions = {}) {
   const { manifestTarget, releaseDir, binaryPath } = releasePaths(target, options.releaseRoot);
 
+  await verifyReleaseIdentity(releaseDir);
   await assertExists(binaryPath, "Binary");
   if (manifestTarget.executable) {
     await assertExecutable(binaryPath);

@@ -9,6 +9,7 @@ import { normalizeElfInterpreterFile, removeElfLibraryPathsFile } from "../build
 import { preparePiApplication } from "../build/agent-dependencies";
 import { buildEntryConversations } from "../build/entry-conversations";
 import { buildApplicationPages } from "../build/application-pages";
+import { writeReleaseIdentity } from "../build/release-identity";
 import { copyModuleGitRelease, stageModuleGitLicense } from "./module-git-release";
 import { buildProcessHelper } from "../packages/process/scripts/build-helper";
 
@@ -151,6 +152,7 @@ export async function buildBinary(target: BuildTargetName) {
 
   log("copy", "Copying resources...");
   await prepareReleaseResources(releaseDir);
+  await writeReleaseIdentity(releaseDir, ROOT);
 
   console.log("");
   const tarPath = resolve(ROOT, "dist", "releases", `${manifestTarget.releaseName}.tar.gz`);

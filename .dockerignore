@@ -30,6 +30,7 @@ build/*
 !build/agent-declaration-bundle.ts
 !build/agent-dependencies.ts
 !build/entry-conversations.ts
+!build/release-identity.ts
 *.tsbuildinfo
 .env*
 !.env.example

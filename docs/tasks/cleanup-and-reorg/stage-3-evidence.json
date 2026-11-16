@@ -1,0 +1,167 @@
+{
+  "baseCommit": "80b8ba371f43554e30800cf1a63732ea58ffe5a5",
+  "workingTree": "modified",
+  "fullBun": {
+    "files": 348,
+    "exit": 1,
+    "failedFiles": [
+      "packages/pi/src/pi-retry.bun.test.ts"
+    ],
+    "targetedRetry": {
+      "tests": 21,
+      "failed": 0
+    },
+    "note": "One full attempt failed before retry boundary; subsequent unchanged file passed. Other 347 files passed. Not a single full green attempt."
+  },
+  "checksApiSlice": [
+    {
+      "name": "checks",
+      "exit": 0
+    },
+    {
+      "name": "api",
+      "exit": 0
+    },
+    {
+      "name": "slice",
+      "exit": 0
+    },
+    {
+      "name": "build",
+      "exit": 1
+    }
+  ],
+  "finalPackageGates": [
+    {
+      "name": "slice",
+      "exit": 0
+    },
+    {
+      "name": "build",
+      "exit": 0
+    },
+    {
+      "name": "smoke",
+      "exit": 0
+    }
+  ],
+  "generatedByteCheck": [
+    {
+      "path": "web/memory.ts",
+      "sha256": "d431e60d3442e4ccad16902b470d723e9d1090df498f84252c3aede52e2265e9",
+      "matchesTracked": true
+    },
+    {
+      "path": "mcp/memory.ts",
+      "sha256": "d431e60d3442e4ccad16902b470d723e9d1090df498f84252c3aede52e2265e9",
+      "matchesTracked": true
+    },
+    {
+      "path": "qq/memory.ts",
+      "sha256": "d431e60d3442e4ccad16902b470d723e9d1090df498f84252c3aede52e2265e9",
+      "matchesTracked": true
+    },
+    {
+      "path": "memory-local/redaction.ts",
+      "sha256": "4b1575d679065ba0924e5e8fe9a07a0eef16be44e29766350bbbcf0615f4a3b0",
+      "matchesTracked": true
+    }
+  ],
+  "releaseIdentity": {
+    "host": {
+      "commit": "80b8ba371f43554e30800cf1a63732ea58ffe5a5",
+      "workingTree": "modified"
+    },
+    "build": {
+      "bun": "1.4.2",
+      "platform": "linux",
+      "arch": "x64",
+      "lockSha256": "52640bfb6e4ae446513da6943d0531dbe83aebbf43c80f0b3e8b64804777b625"
+    },
+    "modules": [
+      {
+        "name": "web",
+        "repository": null,
+        "branch": "main",
+        "commit": "78adbce9898cb855860fa91565342e43a43921cd",
+        "bundle": "web.bundle",
+        "bundleSha256": "ec3bc7cecec7ffa89261372f043c84670e6f1e360d68cfcfe03b1335c3dcb07f"
+      },
+      {
+        "name": "notify",
+        "repository": null,
+        "branch": "main",
+        "commit": "17f3ce76e8e56f275cf748f418a35f86859ddba9",
+        "bundle": "notify.bundle",
+        "bundleSha256": "c2a2de90cebbb29afd28318b35c60b72ece5ccb5896ec51946d928f71d87ec44"
+      },
+      {
+        "name": "pi",
+        "repository": null,
+        "branch": "main",
+        "commit": "3dcb1a1eb277af5043531afb56cdbb320e5cbd0e",
+        "bundle": "pi.bundle",
+        "bundleSha256": "859a0474348e62b4e5df5b04de292ec88fbea6b47376486b11cd0b826401b5ed"
+      },
+      {
+        "name": "qq",
+        "repository": null,
+        "branch": "main",
+        "commit": "053a4a962f2188e96bcdba10d480811735b84de9",
+        "bundle": "qq.bundle",
+        "bundleSha256": "458c1a6e0128258c4aff96e03fc6eb1648c244f6c33233cb8711ba3beb52adf9"
+      },
+      {
+        "name": "author",
+        "repository": null,
+        "branch": "main",
+        "commit": "f8ad506b42e51e538f136d149d9a7f487a8804a5",
+        "bundle": "author.bundle",
+        "bundleSha256": "e5c4229307829c64e4bfe68f2990dcd03945442498553367dd1b43f6627c05a0"
+      },
+      {
+        "name": "mind",
+        "repository": null,
+        "branch": "main",
+        "commit": "6c27a6d0ac9e20391a2e94fe976b7410826b9663",
+        "bundle": "mind.bundle",
+        "bundleSha256": "823c9e96da2db684077c0595c3c14c9a8ad4e8e1905bee59eb70dcf35ffff90d"
+      },
+      {
+        "name": "chat",
+        "repository": null,
+        "branch": "main",
+        "commit": "3562f580bf216ac2ac51153244a3c3da0ec65ed3",
+        "bundle": "chat.bundle",
+        "bundleSha256": "c42691c05857119606e623c82e68e6aae9e2885e4f8b83bd22e11500ddbfee38"
+      }
+    ],
+    "fileCount": 991
+  },
+  "archiveVerification": {
+    "files": 991,
+    "directories": 102,
+    "bytes": 124173886,
+    "digestModePathErrors": 0,
+    "symlinks": 0
+  },
+  "manualAcceptance": "not-run",
+  "deployment": "not-run",
+  "artifacts": [
+    {
+      "path": "dist/releases/chrona-linux-x64.tar.gz",
+      "bytes": 47754246,
+      "sha256": "0a8cd8104db1ffb172c39bf5aa3be570ac405462ce2e70996c511bb8e4b835df"
+    },
+    {
+      "path": "dist/releases/chrona-linux-x64/chrona",
+      "bytes": 88561120,
+      "sha256": "4a50bf09b0595c6677cdb42880d795cf1891552d724796e52bdad22d2ac775e5"
+    },
+    {
+      "path": "dist/releases/chrona-linux-x64/release-identity.json",
+      "bytes": 196489,
+      "sha256": "dab625e498799081cb4d30a11262328518a2f53f9607607c32da944003d41a3b"
+    }
+  ]
+}
