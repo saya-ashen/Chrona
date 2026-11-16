@@ -1,3 +1,4 @@
+import { readItems } from "./pagination";
 import { redactSensitiveText } from "@chrona/logging/redaction";
 type MemoryPreferences = { provider: string | null; autoRecall: boolean; autoRetain: boolean };
 
@@ -6,7 +7,7 @@ type Call = (target: string, args?: Args) => Promise<unknown>;
 type Message = { direction: string; text: string; createdAt: string };
 export type MemoryJournal = { provider: string; recalled: boolean; retainedThrough: string | null };
 type Session = { id: string; source: string; messages: Message[]; memory?: MemoryJournal };
-type Tool = { target: string; moduleId: string; hash: string; inputSchema: Args };
+type Tool = { target: string | { moduleId: string; tool: string }; label?: string; moduleId: string; hash: string; inputSchema: Args };
 const slug = /^[a-z][a-z0-9-]{1,40}$/;
 const object = (value: unknown): value is Args => !!value && typeof value === "object" && !Array.isArray(value);
 
@@ -35,9 +36,9 @@ export async function selectedMemory(call: Call, source: string) {
   const config = preferences(await call(`${source}.settings`));
   const tools = new Set<string>();
   if (config.provider) {
-    const found = await call("modules.describe", { query: config.provider }).then(page => (page as { items: unknown }).items) as Tool[];
+    const found = await readItems(call, "modules.describe", { query: config.provider }) as Tool[];
     for (const [name, argument] of [["conversation-context", "snapshot"], ["conversation-retain", "snapshot"], ["recall", "query"], ["forget", "id"], ["preferences", undefined]] as const) {
-      const tool = found.find(item => item.target === `${config.provider}.${name}`);
+      const tool = found.find(item => (item.label ?? (typeof item.target === "string" ? item.target : "")) === `${config.provider}.${name}`);
       if (tool && typeof tool.moduleId === "string" && !!tool.moduleId && typeof tool.hash === "string" && !!tool.hash && accepts(tool, argument)) tools.add(name);
     }
   }

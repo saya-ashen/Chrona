@@ -1,4 +1,3 @@
-import { join } from "node:path";
 import type { Prisma } from "@chrona/db";
 import { providerAnswerSchema, type ExecutionPrincipal } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
@@ -6,23 +5,11 @@ import { CallError } from "./module-call-error";
 import { createProviderControl } from "./provider-channel";
 import { assertApprovedAgentPrincipal } from "./agent-context-admission";
 import { selectContextTools } from "./agent-context-tools";
-import { contextInteractions } from "./agent-context-read";
 import { selectAgentProvider, providerView, type ProviderBinding } from "./agent-provider";
-import { contextDigest, contextRequestDigest, modulePrincipal, ownedContext, ownedRun, view, type ModulePrincipal } from "./agent-context-state";
+import { contextDigest, contextRequestDigest, modulePrincipal, ownedContext, type ModulePrincipal } from "./agent-context-state";
 import { executeContextCommand, type ContextCommand } from "./agent-context-admission";
 
 export { ownedContext, ownedRun, view, type ModulePrincipal } from "./agent-context-state";
-
-async function readContextPrimitive(ports: StewardPorts, principal: ModulePrincipal, name: string, args: Record<string, unknown>) {
-  await assertApprovedAgentPrincipal(ports.db, principal);
-  const run = await ownedRun(ports.db, principal, String(args.runId));
-  if (name === "get") return view(run);
-  const after = Number(args.after), limit = Number(args.limit);
-  // Provider channel rows are already normalized and redacted before being committed.
-  const rows = await ports.db.runEvent.findMany({ where: { runId: run.id, sequence: { gt: after } }, orderBy: { sequence: "asc" }, take: limit });
-  const items = rows.map(row => ({ sequence: row.sequence, at: row.createdAt.toISOString(), kind: row.kind, payload: row.payload }));
-  return { items, after: items.at(-1)?.sequence ?? after, ended: !view(run).active, interactions: await contextInteractions(ports, run), transcript: { sessionDir: join(ports.dataDir, "sessions", run.sessionId!, ".chrona", "sessions"), limit } };
-}
 
 async function selectContextProvider(ports: StewardPorts, principal: ModulePrincipal, args: Record<string, unknown>) {
   let providerId = args.providerId as string | undefined;
@@ -53,7 +40,7 @@ async function selectRunTools(ports: StewardPorts, principal: ModulePrincipal, a
 }
 
 function parseAnswer(raw: unknown) {
-  try { return providerAnswerSchema.parse(JSON.parse(String(raw))); }
+  try { return providerAnswerSchema.parse(raw); }
   catch { throw new CallError("invalid", "Invalid Agent interaction answer"); }
 }
 
@@ -79,7 +66,6 @@ async function applyEffects(ports: StewardPorts, command: ContextCommand, output
 /** Kernel retains only scoped context identity, admission receipts and durable Run evidence. */
 export async function admitContextPrimitive(ports: StewardPorts, rawPrincipal: ExecutionPrincipal, name: string, args: Record<string, unknown>, ...[settle = false, settledOutput]: [settle?: boolean, settledOutput?: Prisma.InputJsonValue]) {
   const principal = modulePrincipal(rawPrincipal);
-  if (name === "get" || name === "stream") return readContextPrimitive(ports, principal, name, args);
   let binding: ProviderBinding | undefined;
   if (name === "run" && args.providerRegistration === true) {
     const prior = await registeredRunReceipt(ports, principal, args);

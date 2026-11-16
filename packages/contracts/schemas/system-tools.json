@@ -874,6 +874,9 @@
               {
                 "type": "object",
                 "properties": {
+                  "id": {
+                    "type": "string"
+                  },
                   "at": {
                     "type": "string"
                   },
@@ -895,6 +898,9 @@
               {
                 "type": "object",
                 "properties": {
+                  "id": {
+                    "type": "string"
+                  },
                   "at": {
                     "type": "string"
                   },
@@ -920,6 +926,9 @@
               {
                 "type": "object",
                 "properties": {
+                  "id": {
+                    "type": "string"
+                  },
                   "at": {
                     "type": "string"
                   },
@@ -948,6 +957,26 @@
               }
             ]
           }
+        },
+        "transcriptState": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "available",
+                "pending",
+                "unavailable"
+              ]
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
@@ -3574,6 +3603,9 @@
                       }
                     ]
                   },
+                  "label": {
+                    "type": "string"
+                  },
                   "description": {
                     "type": "string"
                   },
@@ -3682,6 +3714,7 @@
                 },
                 "required": [
                   "target",
+                  "label",
                   "description",
                   "inputSchema",
                   "outputSchema",
@@ -3740,6 +3773,9 @@
                   "additionalProperties": false
                 }
               ]
+            },
+            "label": {
+              "type": "string"
             },
             "source": {
               "type": "object",
@@ -3874,6 +3910,7 @@
           },
           "required": [
             "target",
+            "label",
             "source",
             "description",
             "inputSchema",

@@ -1,10 +1,7 @@
-import { routedTargetSchema } from "./kernel-api";
 import { z } from "zod";
+import { routedTargetSchema } from "./kernel-api";
 import { runtimeStartSchema, runtimeOperationSchema, runtimeOutcomeSchema, runtimeHealthSchema, runtimeCompletionSchema, runtimeTranscriptSchema } from "./local-runtime";
-import { providerInteractionSchema, providerAnswerSchema } from "./provider";
-import { executionIdSchema, executionStartSchema, executionViewSchema, executionInputSchemas, executionResultSourceSchema } from "./execution";
-import { localExecutionStartSchema, applicationExecutionStartSchema, kernelPlacementViewSchema, kernelLocationSchema, kernelCleanupInputSchema, kernelCleanupReceiptSchema } from "./kernel-execution";
-import { executionResponseDataSchemas } from "./execution-events";
+import { executionIdSchema } from "./execution";
 
 /** Pi's thinking levels (`pi --thinking`). */
 export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
@@ -24,24 +21,11 @@ export function agentInput(name: string, raw: unknown): Record<string, unknown> 
   return declaration[1].parse(raw);
 }
 
-
-const id = executionIdSchema;
-const requestKey = z.string().min(1).max(200);
-export const contextInput = z.object({ requestKey }).strict();
-export const contextRunInput = z.object({ contextId: id, requestKey, prompt: z.string().trim().min(1).max(200_000), content: z.array(z.string().min(1).max(1000)).max(10).default([]), lane: z.enum(["foreground", "background"]).default("background"), tools: z.array(routedTargetSchema).max(100).default([]) }).strict();
-export const contextRunTarget = z.object({ runId: id }).strict();
-export const contextWriteInput = contextRunTarget.extend({ requestKey, text: z.string().trim().min(1).max(20_000) });
-export const contextInterruptInput = contextRunTarget.extend({ requestKey });
-export const contextRespondInput = contextRunTarget.extend({ requestKey, questionId: id, answer: z.string().min(1).max(100_000) });
-export const contextStreamInput = contextRunTarget.extend({ after: z.number().int().min(0).default(0), limit: z.number().int().min(1).max(100).default(50) });
-export const contextOutput = z.object({ contextId: id }).strict();
-export const contextRunOutput = z.object({ runId: id, contextId: id, status: z.string(), active: z.boolean() }).strict();
+export const contextRunOutput = z.object({ runId: executionIdSchema, contextId: executionIdSchema, status: z.string(), active: z.boolean() }).strict();
 export const runToolResultSchema = z.object({
-  runId: id, callId: id, target: routedTargetSchema, moduleId: id, hash: z.string().min(1),
+  runId: executionIdSchema, callId: executionIdSchema, target: routedTargetSchema, moduleId: executionIdSchema, hash: z.string().min(1),
   status: z.enum(["succeeded", "failed", "unknown"]), outputState: z.enum(["complete", "filtered", "omitted"]), output: z.json().nullable(),
 }).strict();
-export const contextStreamOutput = z.object({ items: z.array(z.object({ sequence: z.number().int(), at: z.string(), kind: z.string(), payload: z.unknown() }).strict()), after: z.number().int(), ended: z.boolean(), transcript: runtimeTranscriptSchema, interactions: z.array(providerInteractionSchema).max(12) }).strict();
-
 const operation = z.object({ operationId: z.string().regex(/^[a-f0-9]{64}$/) }).strict();
 export const moduleAgentInputs = {
   health: z.object({}).strict(),
@@ -71,7 +55,6 @@ export function moduleAgentInput(name: string, raw: unknown) {
   return moduleAgentInputs[name].parse(camelArguments(raw));
 }
 
-
 /** Host paths are registration input only; execution continues to require an opaque projectRef. */
 export const projectsInput = z.object({
   action: z.enum(["list", "register", "create"]),
@@ -95,68 +78,3 @@ export const projectsOutput = z.discriminatedUnion("action", [
   z.object({ action: z.literal("register"), principal: projectPrincipal, project: projectView }).strict(),
   z.object({ action: z.literal("create"), principal: projectPrincipal, project: projectView }).strict(),
 ]);
-
-
-const target = z.object({ executionId: id, runId: id, attemptId: id }).strict();
-/** Execution primitives contain no coding session, task graph or result-acceptance policy. */
-export const primitiveInputs = {
-  context: contextInput,
-  run: z.union([contextRunInput, executionStartSchema.omit({ workId: true, commandKey: true, goal: true }).extend({ executionId: id, requestKey: id, prompt: executionStartSchema.shape.goal }), ...([localExecutionStartSchema, applicationExecutionStartSchema] as const).map(schema => schema.omit({ workId: true, commandKey: true, goal: true }).extend({ executionId: id, requestKey: id, prompt: executionStartSchema.shape.goal }))]),
-  get: z.union([contextRunTarget, z.object({ executionId: id, runId: id.optional(), attemptId: id.optional() }).strict()]),
-  lookup: z.object({ requestKey: id }).strict(),
-  stream: z.union([contextStreamInput, target.extend({ cursor: z.string().max(1024).optional(), limit: z.number().int().min(1).max(100).default(50) })]),
-  write: z.union([contextWriteInput, target.extend({ requestKey: id, text: executionInputSchemas.send.shape.text })]),
-  interrupt: z.union([contextInterruptInput, target.extend({ requestKey: id })]),
-  respond: z.union([contextRespondInput, target.extend({ requestKey: id, questionId: id, answer: z.string().min(1).max(100_000) })]),
-  inspect: target,
-  placement: z.object({ executionId: id }).strict(),
-  locations: z.object({ after: id.optional(), limit: z.number().int().min(1).max(100) }).strict(),
-  cleanup: kernelCleanupInputSchema,
-};
-export const primitiveOutputs = {
-  context: contextOutput,
-  run: z.union([contextRunOutput, z.object({ execution: executionViewSchema, placement: kernelPlacementViewSchema.optional() }).strict()]),
-  get: z.union([contextRunOutput, executionViewSchema]),
-  lookup: executionViewSchema,
-  stream: z.union([contextStreamOutput, executionResponseDataSchemas.events]),
-  write: z.object({ accepted: z.literal(true) }).strict(),
-  interrupt: z.union([contextRunOutput, executionViewSchema]),
-  respond: z.union([
-    z.object({ accepted: z.literal(true) }).strict(),
-    z.object({ accepted: z.literal(false), error: z.object({ code: z.enum(["not_found", "conflict", "invalid", "forbidden", "capacity"]), message: z.string() }).strict() }).strict(),
-  ]),
-  inspect: z.object({ snapshot: executionResponseDataSchemas.snapshot, source: executionResultSourceSchema }).strict(),
-  placement: kernelPlacementViewSchema,
-  locations: z.object({ locations: z.array(kernelLocationSchema).max(100), after: id.nullable() }).strict(),
-  cleanup: kernelCleanupReceiptSchema,
-};
-export type AgentPrimitive = keyof typeof primitiveInputs;
-export function isAgentPrimitive(name: string): name is AgentPrimitive { return Object.hasOwn(primitiveInputs, name); }
-export function primitiveInput(name: AgentPrimitive, raw: unknown) {
-  // Use the same argument normalization as the other SDK entry points.
-  return primitiveInputs[name].parse(camelArguments(raw));
-}
-
-/** Public app inputs exclude idempotency keys, which arrive as authenticated call metadata. */
-export const publicContextInputs = {
-  context: contextInput.omit({ requestKey: true }),
-  run: contextRunInput.omit({ requestKey: true }),
-  get: contextRunTarget,
-  stream: contextStreamInput,
-  write: contextWriteInput.omit({ requestKey: true }),
-  interrupt: contextInterruptInput.omit({ requestKey: true }),
-  respond: contextRespondInput.omit({ requestKey: true }).extend({ answer: providerAnswerSchema }),
-};
-export const publicWorkInputs = {
-  run: z.union([primitiveInputs.run.options[1].omit({ requestKey: true }), primitiveInputs.run.options[2].omit({ requestKey: true }), primitiveInputs.run.options[3].omit({ requestKey: true })]),
-  get: primitiveInputs.get.options[1],
-  stream: primitiveInputs.stream.options[1],
-  write: primitiveInputs.write.options[1].omit({ requestKey: true }),
-  interrupt: primitiveInputs.interrupt.options[1].omit({ requestKey: true }),
-  respond: primitiveInputs.respond.options[1].omit({ requestKey: true }).extend({ answer: providerAnswerSchema }),
-  lookup: z.object({ key: id }).strict(),
-  inspect: primitiveInputs.inspect,
-  placement: primitiveInputs.placement,
-  locations: primitiveInputs.locations,
-  cleanup: z.union([kernelCleanupInputSchema.options[0].omit({ commandKey: true }), kernelCleanupInputSchema.options[1].omit({ commandKey: true })]),
-};

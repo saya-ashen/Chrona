@@ -165,3 +165,18 @@ test("a durable queued cancel is never claimed after restart", async () => {
   expect(await api.runs.claimNext("background")).toBeNull();
   expect((await db.run.findUniqueOrThrow({ where: { id: run.id } })).status).toBe("cancelled");
 });
+
+test("invalid questions never consume the accepted question budget", async () => {
+  const f = await fixture();
+  for (let i = 0; i < 20; i++) {
+    await expect(f.channel.events.question({ ...question(), method: "invalid" } as unknown as ProviderQuestion, f.controller.signal)).rejects.toMatchObject({ code: "invalid" });
+  }
+  for (let i = 0; i < 12; i++) {
+    const answer = f.channel.events.question(question("confirm", 60_000), f.controller.signal), request = await waiting();
+    await api.provider.answer(request.id, { decision: "cancel" });
+    expect(await answer).toEqual({ decision: "cancel" });
+  }
+  await expect(f.channel.events.question(question(), f.controller.signal)).rejects.toMatchObject({
+    code: "conflict", message: "Provider interaction budget exhausted (12 accepted questions)",
+  });
+});

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { moduleEventReplySchema, type ProviderTranscriptItem } from "@chrona/contracts/steward";
 import { piTranscript, piTranscriptPage, PI_TRANSCRIPT_MAX_BYTES, type PiTranscriptGap } from "./pi-transcript";
 
+const contents = (items: ProviderTranscriptItem[]) => items.map(({ id: _id, ...item }) => item);
 const assistant = (content: unknown) => JSON.stringify({ type: "message", timestamp: "2026-11-07T12:00:00Z", message: { role: "assistant", content } }) + "\n";
 async function pages(sessionDir: string, limit = 300) {
   const items: ProviderTranscriptItem[] = [], gaps: PiTranscriptGap[] = [];
@@ -20,7 +21,7 @@ async function pages(sessionDir: string, limit = 300) {
   return { items, gaps, count };
 }
 
-test("Pi normalizes session history, excludes user prompts/thinking, skips malformed lines and bounds item count", async () => {
+test("Pi normalizes session history, excludes user prompts/thinking, reports malformed lines and bounds item count", async () => {
   const sessionDir = await mkdtemp("/tmp/chrona-pi-transcript-test-");
   try {
     const entries = [
@@ -31,10 +32,11 @@ test("Pi normalizes session history, excludes user prompts/thinking, skips malfo
     ];
     await writeFile(join(sessionDir, "session.jsonl"), entries.map(entry => JSON.stringify(entry)).join("\n") + "\nmalformed\nnull\n42\n");
     const result = await piTranscript({ sessionDir, limit: 20 });
-    expect(result).toEqual([
+    expect(contents(result)).toEqual([
       { at: "2026-11-07T12:00:00Z", kind: "text", text: "检查测试" },
       { at: "2026-11-07T12:00:00Z", kind: "tool", tool: "bash", args: '{"command":"bun test"}' },
       { at: "2026-11-07T12:00:01Z", kind: "result", tool: "bash", text: "failed\nreason", error: true },
+      { at: "", kind: "text", text: "[Pi transcript gap] malformed_record" },
     ]);
     expect(await piTranscript({ sessionDir, limit: 1 })).toEqual(result.slice(-1));
     expect(await piTranscript({ sessionDir: join(sessionDir, "missing"), limit: 20 })).toEqual([]);
@@ -51,12 +53,12 @@ test("Pi pages oversized UTF-8 transcript without splitting, losing or duplicati
     const tail = await piTranscript({ sessionDir, limit: 300 });
     expect(tail[0]).toMatchObject({ kind: "text", text: expect.stringContaining("[Pi transcript gap]") });
     expect(tail.length).toBeGreaterThan(1);
-    expect(tail.slice(1)).toEqual(expected.slice(-(tail.length - 1)));
+    expect(contents(tail.slice(1))).toEqual(expected.slice(-(tail.length - 1)));
     expect(Buffer.byteLength(JSON.stringify(tail))).toBeLessThanOrEqual(PI_TRANSCRIPT_MAX_BYTES);
     expect(moduleEventReplySchema.safeParse({ id: "tail", result: { result: tail } }).success).toBe(true);
     const result = await pages(sessionDir);
-    expect(result.items).toEqual(expected); expect(result.gaps).toEqual([]); expect(result.count).toBeGreaterThan(1);
-    expect(await piTranscript({ sessionDir, limit: 1 })).toEqual(expected.slice(-1));
+    expect(contents(result.items)).toEqual(expected); expect(result.gaps).toEqual([]); expect(result.count).toBeGreaterThan(1);
+    expect(contents(await piTranscript({ sessionDir, limit: 1 }))).toEqual(expected.slice(-1));
   } finally { await rm(sessionDir, { recursive: true, force: true }); }
 });
 
@@ -113,7 +115,7 @@ test("Pi measures serialized UTF-8 bytes including escapes and fits complete ite
     const path = join(sessionDir, "a.jsonl"), text = "字".repeat(Math.floor((PI_TRANSCRIPT_MAX_BYTES - 200) / 3));
     await writeFile(path, assistant(text));
     const page = await piTranscriptPage({ sessionDir, limit: 300 });
-    expect(page.items).toEqual([{ at: "2026-11-07T12:00:00Z", kind: "text", text }]);
+    expect(contents(page.items)).toEqual([{ at: "2026-11-07T12:00:00Z", kind: "text", text }]);
     expect(page.gaps).toEqual([]); expect(page.nextCursor).toBeNull();
     expect(Buffer.byteLength(JSON.stringify(page))).toBeGreaterThan(PI_TRANSCRIPT_MAX_BYTES - 300);
     expect(moduleEventReplySchema.safeParse({ id: "near-bound", result: { result: page } }).success).toBe(true);
@@ -143,7 +145,7 @@ test.each(["user", "assistant"])("Pi legacy tail skips a partial UTF-8 %s record
     const tail = await piTranscript({ sessionDir, limit: 3 });
     expect(tail).toHaveLength(2);
     expect(tail[0]).toMatchObject({ kind: "text", text: expect.stringContaining("Earlier source content was not inspected") });
-    expect(tail[1]).toEqual({ at: "2026-11-07T12:00:00Z", kind: "text", text });
+    expect(contents([tail[1]])[0]).toEqual({ at: "2026-11-07T12:00:00Z", kind: "text", text });
     expect(moduleEventReplySchema.safeParse({ id: "recent-source", result: { result: tail } }).success).toBe(true);
     expect(Buffer.byteLength(JSON.stringify(tail))).toBeLessThanOrEqual(PI_TRANSCRIPT_MAX_BYTES);
   } finally { await rm(sessionDir, { recursive: true, force: true }); }
@@ -162,5 +164,18 @@ test("Pi legacy source suffix preserves a complete record exactly at its read bo
     expect(tail).toHaveLength(3);
     expect(tail[0]).toMatchObject({ kind: "text", text: expect.stringContaining("Earlier source content was not inspected") });
     expect(tail.slice(1).map(item => item.kind === "text" && item.text)).toEqual(["first complete boundary answer", "last answer"]);
+  } finally { await rm(sessionDir, { recursive: true, force: true }); }
+});
+
+test("Pi record IDs agree across tails and pages; malformed records expose exact gaps", async () => {
+  const sessionDir = await mkdtemp("/tmp/chrona-pi-identities-");
+  try {
+    const record = assistant([{ type: "toolCall", name: "bash", arguments: {} }, { type: "toolCall", name: "bash", arguments: {} }]);
+    await writeFile(join(sessionDir, "a.jsonl"), record + "broken\n" + record);
+    const page = await pages(sessionDir, 1), tail = await piTranscript({ sessionDir, limit: 20 });
+    expect(page.items).toHaveLength(4);
+    expect(new Set(page.items.map(item => item.id)).size).toBe(4);
+    expect(tail.filter(item => !item.id?.endsWith(':gap'))).toEqual(page.items);
+    expect(page.gaps).toEqual([{ file: "a.jsonl", offset: Buffer.byteLength(record), bytes: 7, reason: "malformed_record" }]);
   } finally { await rm(sessionDir, { recursive: true, force: true }); }
 });

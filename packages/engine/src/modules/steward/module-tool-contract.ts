@@ -30,12 +30,20 @@ export function moduleToolContract(tool: Tool | SystemTool): ToolContract {
 export function moduleCallbackContractHash(tool: Tool | SystemTool) {
   return createHash("sha256").update(canonicalContractJson(moduleToolContract(tool))).digest("hex");
 }
+function numericValidator(parameter: Extract<import("@chrona/contracts/steward").ModuleToolParameter, { type: "number" | "integer" }>) {
+  let schema = parameter.type === "integer" ? z.number().int() : z.number();
+  if (parameter.minimum !== undefined) schema = schema.min(parameter.minimum);
+  if (parameter.maximum !== undefined) schema = schema.max(parameter.maximum);
+  if (parameter.exclusiveMinimum !== undefined) schema = schema.gt(parameter.exclusiveMinimum);
+  if (parameter.exclusiveMaximum !== undefined) schema = schema.lt(parameter.exclusiveMaximum);
+  return schema;
+}
 function parameterValidator(parameter: import("@chrona/contracts/steward").ModuleToolParameter): z.ZodType {
   if ("anyOf" in parameter) return z.union(parameter.anyOf.map(parameterValidator));
   let schema: z.ZodType;
   switch (parameter.type) {
     case "string": schema = parameter.enum ? z.enum(parameter.enum as [string, ...string[]]) : z.string(); break;
-    case "number": schema = z.number(); break;
+    case "number": case "integer": schema = numericValidator(parameter); break;
     case "boolean": schema = z.boolean(); break;
     case "null": schema = z.null(); break;
     case "array": schema = z.array(parameterValidator(parameter.items)); break;

@@ -14,7 +14,7 @@ import type { ModuleGitFile } from "./module-git";
 import { moduleContext, type BuildReport } from "./module-context";
 import type { StewardPorts } from "./ports";
 
-const input = (value: unknown) => ({ input: JSON.stringify(value) });
+const input = (value: unknown) => ({ input: value });
 const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 const textFiles = (files: Record<string, string>): ModuleGitFile[] => Object.entries(files).map(([path, text]) => ({ path, bytes: Buffer.from(text) }));
 const intent = { changes: ["Install the explicitly imported local material"], preserves: ["Retain application data and exact version material"] };
@@ -317,7 +317,8 @@ test("current Agent imports source and ignored native assets, checks/installs fi
       expect(calls.length).toBeGreaterThan(0);
       for (const call of calls) expect(call).toMatchObject({ caller: `module:${entry.id}`, callerModuleId: entry.id, callerHash: entry.activeHash, chain: [], mode: "sync" });
     }
-    for (const tool of ["source", "submit", "receipt"]) {
+    // Keyless receipt queries are checked above through their visible results.
+    for (const tool of ["source", "submit"]) {
       const calls = invocations.filter(row => row.target === "modules" && row.tool === tool && row.callerModuleId === author.id);
       expect(calls.some(row => row.status === "succeeded")).toBe(true);
       for (const call of calls) expect(call).toMatchObject({ caller: `module:${author.id}`, callerHash: author.activeHash, chain: ["author"], mode: "sync" });

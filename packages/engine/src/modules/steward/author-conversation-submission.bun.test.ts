@@ -14,7 +14,7 @@ import { moduleContext, type BuildReport } from "./module-context";
 import type { StewardPorts } from "./ports";
 
 const selected = ["modules.list", "modules.admit", "modules.submit", "approvals.resolve", "author.prepare", "author.source", "author.write", "author.submit", "author.receipt"];
-const input = (value: unknown) => ({ input: JSON.stringify(value) });
+const input = (value: unknown) => ({ input: value });
 const intent = { changes: ["Install the fixed local conversation proof"], preserves: ["Retain existing application data"] };
 const textFiles = (files: Record<string, string>): ModuleGitFile[] => Object.entries(files).map(([path, text]) => ({ path, bytes: Buffer.from(text) }));
 
@@ -229,7 +229,8 @@ test("current approved owner conversation routes SDK Author material into checke
       expect(calls.length).toBeGreaterThan(0);
       for (const call of calls) expect(call).toMatchObject({ caller: `module:${entry.id}`, callerModuleId: entry.id, callerHash: entry.activeHash, chain: [], mode: "sync" });
     }
-    for (const tool of ["source", "submit", "receipt"]) {
+    // Keyless receipt queries are checked above through their visible results.
+    for (const tool of ["source", "submit"]) {
       const calls = invocations.filter(row => row.target === "modules" && row.tool === tool && row.callerModuleId === author.id);
       expect(calls.some(row => row.status === "succeeded")).toBe(true);
       for (const call of calls) expect(call).toMatchObject({ caller: `module:${author.id}`, callerHash: author.activeHash, chain: ["author"], mode: "sync" });

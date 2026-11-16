@@ -107,3 +107,13 @@ test("empty history has no execution; an unadmitted turn stays historical withou
   expect(f.replies).toEqual([]);
   expect(await f.disk()).toEqual(before);
 });
+
+test("history cursor reaches every older message and rejects foreign cursors", async () => {
+  const f = await fixture(createAgentConversations, "web");
+  const first = await f.app.snapshot(f.saved.id, { limit: 100 });
+  expect(first.nextCursor).toBe("message-37");
+  const older = await f.app.snapshot(f.saved.id, { cursor: first.nextCursor!, limit: 100 });
+  expect(older.messages.map(message => message.id)).toEqual(f.saved.messages.slice(0, 37).map(message => message.id));
+  expect(older.nextCursor).toBeNull();
+  await expect(f.app.snapshot(f.saved.id, { cursor: "foreign" })).rejects.toMatchObject({ code: "invalid" });
+});

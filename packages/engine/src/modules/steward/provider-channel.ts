@@ -38,9 +38,13 @@ export function createProviderChannel(ports: StewardPorts, run: RunIdentity, onI
     catch (error) { observerFailure ??= error; }
   }
   const owned = new Set<string>();
-  const canAsk = (signal: AbortSignal) => !closed && !signal.aborted && ++questions <= 12 && owned.size < 3;
+  function checkQuestionCapacity(signal: AbortSignal) {
+    if (closed || signal.aborted) throw new StewardError("conflict", "Provider interaction is closed or cancelled");
+    if (questions >= 12) throw new StewardError("conflict", "Provider interaction budget exhausted (12 accepted questions)");
+    if (owned.size >= 3) throw new StewardError("conflict", "Provider interaction has 3 pending questions; wait for an answer");
+  }
   async function question(raw: Parameters<ProviderEvents["question"]>[0], signal: AbortSignal): Promise<ProviderAnswer> {
-    if (!canAsk(signal)) throw new StewardError("conflict", "Provider interaction is not active");
+    checkQuestionCapacity(signal);
     const input = parseInput(providerQuestionSchema, raw);
     const safe = safeProviderQuestion(input, [run.token ?? ""]);
     if (!safe) throw new StewardError("invalid", "Sensitive request context cannot be approved here");
@@ -64,8 +68,9 @@ export function createProviderChannel(ports: StewardPorts, run: RunIdentity, onI
     } };
     const abort = () => { void entry.settle({ decision: "cancel" }, "interrupted").catch(error => console.error(JSON.stringify({ component: "provider-channel", event: "interaction.settle_failed", runId: run.id, requestId: request.id, status: "interrupted", error: String(error).slice(0, 2000) }))); };
     const timer = setTimeout(() => { void entry.settle({ decision: "cancel" }, "expired").catch(error => console.error(JSON.stringify({ component: "provider-channel", event: "interaction.settle_failed", runId: run.id, requestId: request.id, status: "expired", error: String(error).slice(0, 2000) }))); }, expires.getTime() - at.getTime());
-    pending.set(request.id, entry); owned.add(request.id);
+    pending.set(request.id, entry); owned.add(request.id); questions++;
     signal.addEventListener("abort", abort, { once: true });
+    let admitted = false;
     try {
       await providerWrite(db, guard, async tx => {
         const { method, title, message, options, timeoutMs } = safe;
@@ -73,12 +78,17 @@ export function createProviderChannel(ports: StewardPorts, run: RunIdentity, onI
         await tx.runInteraction.create({ data: { id: request.id, runId: run.id, request: stored, createdAt: at } });
         if (!signal.aborted && !closed && !entry.closed) await notifyUser(tx, ports, run.workspaceId, { kind: "provider-input-required", run: run.id, ...(run.sessionId ? { session: run.sessionId } : {}), key: `provider-input:${run.id}` });
       });
+      admitted = true;
       if (!entry.closed) await observe(request);
       if (signal.aborted || closed) abort();
       void drainCalls(ports, run.workspaceId).catch(error => console.error(JSON.stringify({ component: "provider-channel", event: "drain_calls.failed", workspaceId: run.workspaceId, error: String(error).slice(0, 2000) })));
       if (entry.closed && !owned.size) await withdraw();
       return await answer;
-    } catch (error) { await entry.settle({ decision: "cancel" }, "interrupted"); throw error; }
+    } catch (error) {
+      if (!admitted) questions--;
+      await entry.settle({ decision: "cancel" }, "interrupted");
+      throw error;
+    }
   }
   const events: ProviderEvents = {
     async raw(value) { if (!closed) await write("raw", safeProviderPayload(value, [run.token ?? ""])); },

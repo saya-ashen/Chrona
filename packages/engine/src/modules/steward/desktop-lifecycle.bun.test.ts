@@ -13,7 +13,7 @@ import type { BuildReport } from "./module-context";
 import type { StewardPorts } from "./ports";
 
 const localTest = process.platform === "linux" ? test : test.skip;
-const input = (value: unknown) => ({ input: JSON.stringify(value) });
+const input = (value: unknown) => ({ input: value });
 const intent = { changes: ["Exercise ordinary desktop application lifecycle"], preserves: ["Keep private application data"] };
 
 /** The stand-in needs no display: its detached child stays alive until kernel retirement (or a bounded failsafe). */

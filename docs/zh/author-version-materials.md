@@ -37,9 +37,9 @@ Author 导入明确选定的源码和运行产物，计算文件摘要，形成�
 
 ## 导入、导出与限制
 
-`author.import` 接受 `{input: JSON.stringify({from,to,source,artifacts,build})}`。`from` 是明确的绝对工作目录；`to` 是全新的 `sources/<workspace>`。`source` 显式列出源码路径；`artifacts` 列出 `{path,executable?}`，Author 读取实际字节并计算 SHA-256，执行标记须与工作文件一致。返回 `{path,record,files,bytes,materialDigest}`。
+`author.import` 接受 `{input: {from,to,source,artifacts,build}}`。`from` 是明确的绝对工作目录；`to` 是全新的 `sources/<workspace>`。`source` 显式列出源码路径；`artifacts` 列出 `{path,executable?}`，Author 读取实际字节并计算 SHA-256，执行标记须与工作文件一致。返回 `{path,record,files,bytes,materialDigest}`。
 
-`author.export` 接受 `{input: JSON.stringify({path,to})}`，从 Author 源码目录或阶段材料导出到全新的绝对目录，返回 `{path,to,files,bytes,materialDigest}`。旧版本先通过已获准的 `author.source` 取回精确版本，再导出；不会自动选择最新版本或覆盖工作目录。
+`author.export` 接受 `{input: {path,to}}`，从 Author 源码目录或阶段材料导出到全新的绝对目录，返回 `{path,to,files,bytes,materialDigest}`。旧版本先通过已获准的 `author.source` 取回精确版本，再导出；不会自动选择最新版本或覆盖工作目录。
 
 显式材料最多 199 个源码文件，加一份记录共 200 个，字节总和不超过 1 MiB；最多 1000 个产物，每个最多 64 MiB、合计最多 256 MiB。文本 `author.write/read` 保留 64 KiB 单文件限制；大源码和二进制使用导入/导出。开发目录如 `.cargo` 可明确选入，`.git`、路径穿越、链接及特殊文件被拒绝。安装依赖目录 `node_modules/.venv/.chrona` 不属于提交材料。
 

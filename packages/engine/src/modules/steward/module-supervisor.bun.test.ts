@@ -655,6 +655,61 @@ test("activated reaches opted-in modules once per version and again when a modul
 });
 
 
+test.each(["handler", "lost", "lost-without-diagnostics"] as const)("unconfirmed activation (%s) never records success or replays after restart", async failure => {
+  const f = await fixture();
+  const version = await f.db.moduleVersion.findFirstOrThrow({ where: { moduleId: f.module.id, hash: "v1" } });
+  await f.db.moduleVersion.update({ where: { id: version.id }, data: { manifest: { ...f.manifest, activated: true } } });
+  if (failure === "lost-without-diagnostics") {
+    await f.db.$executeRawUnsafe("CREATE TRIGGER fail_activation_diagnostic BEFORE INSERT ON Audit BEGIN SELECT RAISE(ABORT, 'Synthetic diagnostic failure'); END");
+  }
+  let effects = 0;
+  const peer = testModuleProcess(async event => {
+    if (event.trigger.kind === "activated") {
+      effects++;
+      if (failure === "handler") throw new Error("registration password=fixture-value failed");
+      peer.processes.at(-1)!.kill();
+    }
+    return {};
+  });
+  f.ports.sandbox = { available: true, isolated: true, startModule: peer.startModule };
+  const logs = spyOn(console, "error").mockImplementation(() => {});
+  try {
+    await f.supervisor.reconcile();
+    await until(() => logs.mock.calls.some(([line]) => String(line).includes('"event":"activation.failed"')));
+    const file = Bun.file(join(f.ports.dataDir, "platform", "activated.json"));
+    expect(JSON.parse(await file.text())[f.module.id]).toMatchObject({ signature: "v1", status: "unconfirmed" });
+    const dependency = await f.db.module.create({ data: { workspaceId: f.module.workspaceId, name: "notify", activeHash: "n1" } });
+    await f.db.moduleVersion.create({ data: { moduleId: dependency.id, hash: "n1", manifest: { name: "notify", entry: "index.ts", effects: [], tests: ["test.ts"] }, source: "user", status: "approved", intent: {}, report: {} } });
+    for (let pass = 0; pass < 3; pass++) { await f.supervisor.reconcile(); await Bun.sleep(20); }
+    await f.supervisor.stop();
+    const restarted = createModuleSupervisor(f.ports, { timers: f.timers });
+    try {
+      for (let pass = 0; pass < 3; pass++) { await restarted.reconcile(); await Bun.sleep(20); }
+      expect(effects).toBe(1);
+    } finally { await restarted.stop(); }
+    expect(JSON.stringify(logs.mock.calls)).not.toContain("fixture-value");
+  } finally { logs.mockRestore(); }
+});
+
+test("activation failures proven unsent remain retryable without recording success", async () => {
+  const f = await fixture();
+  const version = await f.db.moduleVersion.findFirstOrThrow({ where: { moduleId: f.module.id, hash: "v1" } });
+  await f.db.moduleVersion.update({ where: { id: version.id }, data: { manifest: { ...f.manifest, activated: true } } });
+  f.ports.sandbox = { available: false, isolated: true };
+  const logs = spyOn(console, "error").mockImplementation(() => {});
+  const failures = () => logs.mock.calls.filter(([line]) => String(line).includes('"event":"activation.failed"')).length;
+  try {
+    for (let pass = 1; pass <= 3; pass++) {
+      f.advance(120_000);
+      await f.supervisor.reconcile(); await until(() => failures() >= pass); await Bun.sleep(20);
+    }
+    const file = Bun.file(join(f.ports.dataDir, "platform", "activated.json"));
+    expect(await file.exists() ? JSON.parse(await file.text())[f.module.id] : undefined).toBeUndefined();
+    expect(failures()).toBe(3);
+  } finally { logs.mockRestore(); }
+});
+
+
 test.each(["trusted", "renamed", "fork", "unapproved", "drift", "manifest-drift", "missing-seed", "legacy-snapshot"] as const)("Provider host bindings require approved exact release identity (%s)", async kind => {
   const f = await fixture({ keepAlive: true });
   const root = join(f.ports.dataDir, "external"), codeDir = join(root, "pi");

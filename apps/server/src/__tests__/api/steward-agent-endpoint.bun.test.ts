@@ -58,12 +58,14 @@ test("live Agent capability exposes the modern 12 module tools and pure Author m
     const index: { target: string | { moduleId: string; tool: string } }[] = (await reference.json()).data.result.items;
     expect(index.filter(tool => typeof tool.target === "string" && tool.target.startsWith("modules.")).map(tool => tool.target).sort()).toEqual(moduleTools.map(tool => `modules.${tool}`).sort());
     const input = { requestKey: "draft", submitter: { moduleId: f.author.id, hash: "c".repeat(64) }, targets: [{ name: "ordinary", moduleId: null, expectedActiveHash: null }], goal: "Prepare supplied material", intent: { changes: ["Fixture"], preserves: [] } };
-    const prepare = await f.post("m_author_prepare", { input: JSON.stringify(input) });
+    const prepare = await f.post("m_author_prepare", { input });
     expect(prepare.status).toBe(200);
     const body = await prepare.json(), { result } = body.data;
-    expect(Object.keys(result).sort()).toEqual(["admission", "kind", "prompt", "request"]);
+    expect(Object.keys(result).sort()).toEqual(["acceptance", "admission", "kind", "prompt", "request"]);
     expect(typeof result.prompt).toBe("string");
-    for (const guidance of ["current conversation's Agent Run", "prepare itself starts no model", "writes no files", "issues no admission", "author.import", "author.export", "existing tools and budgets", "do not start a nested Agent"]) expect(result.prompt).toContain(guidance);
+    for (const guidance of ["current conversation's Agent Run", "starts no model", "writes no files", "author.import", "author.export", "tools and budgets"]) {
+      expect(result.prompt).toContain(guidance);
+    }
     expect(body).toMatchObject({ ok: true, data: { result: {
       kind: "material-preparation",
       admission: { requestKey: input.requestKey, submitter: input.submitter, targets: input.targets },
@@ -92,7 +94,7 @@ test("live Agent capability exposes the modern 12 module tools and pure Author m
   } finally { await f.close(); }
 }, 20_000);
 
-test("retired modules.build/check routes are not_found and never queue a build", async () => {
+test("a historical build Run cannot restore retired tools or queue a build", async () => {
   const f = await fixture();
   try {
     // A stored internal build session exercises the legacy Provider bridge without creating a build request.
@@ -101,8 +103,8 @@ test("retired modules.build/check routes are not_found and never queue a build",
     await f.db.run.create({ data: { workspaceId: f.workspaceId, sessionId: session.id, lane: "build", trigger: "build", prompt: "Historical fixture only", provider: "historical-fixture", cwd: "/tmp/unused-historical-build", status: "running", tokenHash: createHash("sha256").update(token).digest("hex"), deadlineAt: expires, leaseUntil: expires } });
     for (const tool of ["build", "check", "propose", "request_group"]) {
       const response = await f.request(`/tools/m_modules_${tool}`, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: "{}" });
-      expect(response.status).toBe(404);
-      expect(await response.json()).toMatchObject({ ok: false, error: { code: "not_found" } });
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ ok: false, error: { code: "forbidden" } });
     }
     expect(await f.db.session.count({ where: { source: "build" } })).toBe(1);
     expect(await f.db.run.count({ where: { lane: "build" } })).toBe(1);

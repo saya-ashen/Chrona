@@ -41,3 +41,19 @@ test("backend structural inputs preserve camelCase fields and nullable identity 
   expect(() => validateToolArgs(endpoint, { ...input, sessionId: 3 })).toThrow("Invalid tool arguments");
   expect(() => validateToolArgs(endpoint, { ...input, "operation-id": "forged" })).toThrow("Invalid tool arguments");
 });
+
+test("tool inputs express and enforce integers, numeric ranges and large bounded enums", async () => {
+  const { validateToolArgs, normalizedToolInputSchema } = await import("./module-tool-contract");
+  const values = Array.from({ length: 21 }, (_, index) => `choice-${index}`);
+  const input = moduleManifestSchema.parse({ name: "ranges", entry: "index.ts", tests: ["test.ts"], effects: [], tools: [{
+    name: "select", description: "Numeric business constraints", output: {}, parameters: { type: "object", properties: {
+      count: { type: "integer", minimum: 0, maximum: 100 }, fraction: { type: "number", exclusiveMinimum: 0, exclusiveMaximum: 1 },
+      choice: { type: "string", enum: values },
+    }, required: ["count", "fraction", "choice"] },
+  }] }).tools[0]!;
+  expect(validateToolArgs(input, { count: 4, fraction: 0.5, choice: values[20] })).toEqual({ count: 4, fraction: 0.5, choice: values[20] });
+  for (const invalid of [{ count: 0.5 }, { count: -1 }, { count: 101 }, { fraction: 0 }, { fraction: 1 }]) {
+    expect(() => validateToolArgs(input, { count: 4, fraction: 0.5, choice: values[0], ...invalid })).toThrow("Invalid tool arguments");
+  }
+  expect(normalizedToolInputSchema(input)).toMatchObject({ properties: { count: { type: "integer", minimum: 0, maximum: 100 } } });
+});

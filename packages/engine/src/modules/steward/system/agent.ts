@@ -35,24 +35,28 @@ async function read(ports: StewardPorts, principal: ModulePrincipal, args: Retur
     run = await ownedRun(ports.db, principal, args.runId);
   }
   let transcript;
+  let transcriptState: { status: "available" | "pending" | "unavailable"; reason?: string } = { status: "unavailable", reason: "Provider does not expose normalized transcripts" };
   if (args.view === "native" && !rows.length && after === 0 && !view(run).active) throw new CallError("unavailable", "Provider retained no native output for this Run");
   if (args.view === "normalized") {
-    const binding = await runProviderBinding(ports, principal.workspaceId, run.id), declaration = providerSnapshot(binding.declaration);
-    if (declaration.endpoints.transcript) {
-      try {
+    try {
+      const binding = await runProviderBinding(ports, principal.workspaceId, run.id), declaration = providerSnapshot(binding.declaration);
+      if (declaration.endpoints.transcript) {
         const raw = await callProviderEndpoint(ports, principal.workspaceId, binding, "transcript", { sessionDir: join(run.cwd, ".chrona", "sessions"), limit: args.limit });
         // A normalized conversation is a collection of messages, not a native RPC reply.
         // Keep its complete bounded transcript below the 32 MiB module transport envelope.
         transcript = runtimeTranscriptSchema.parse(maskProviderPayload(runtimeTranscriptSchema.parse(raw), [], 16 * 1024 * 1024));
-      } catch (error) {
-        // Retained Run records remain readable while optional live transcript delivery is unavailable.
-        if (!(error instanceof CallError) || !["unavailable", "not_found", "unknown", "forbidden", "conflict"].includes(error.code)) throw error;
+        transcriptState = { status: "available" };
       }
+    } catch (error) {
+      // Retained Run records remain readable while optional live transcript delivery is unavailable.
+      if (!(error instanceof CallError) || !["unavailable", "not_found", "unknown", "forbidden", "conflict"].includes(error.code)) throw error;
+      transcriptState = { status: "pending", reason: error.message };
+      console.error(JSON.stringify({ component: "agent", event: "transcript.pending", runId: run.id, error: error.message }));
     }
   }
   const items = rows.map(row => ({ sequence: row.sequence, at: row.createdAt.toISOString(), kind: row.kind, payload: row.payload }));
   const sequence = items.at(-1)?.sequence ?? after;
-  return { run: view(run), items, nextCursor: view(run).active || items.length === args.limit ? Buffer.from(JSON.stringify({ runId: run.id, kind: args.view, sequence })).toString("base64url") : null, ended: !view(run).active, interactions: await contextInteractions(ports, run), ...(transcript ? { transcript } : {}) };
+  return { run: view(run), items, nextCursor: view(run).active || items.length === args.limit ? Buffer.from(JSON.stringify({ runId: run.id, kind: args.view, sequence })).toString("base64url") : null, ended: !view(run).active, interactions: await contextInteractions(ports, run), ...(args.view === "normalized" ? { transcriptState } : {}), ...(transcript ? { transcript } : {}) };
 }
 
 export const agent: SystemModule = {
@@ -75,7 +79,7 @@ export const agent: SystemModule = {
       if (args.input.kind === "answer") {
         const binding = await runProviderBinding(ports, workspaceId, args.runId);
         if (!providerSnapshot(binding.declaration).capabilities.interactions) throw new CallError("unavailable", "Provider does not support interactions");
-        return json(await admitContextPrimitive(ports, principal, "respond", { runId: args.runId, requestKey: call.key, questionId: args.input.questionId, answer: JSON.stringify(args.input.answer) }));
+        return json(await admitContextPrimitive(ports, principal, "respond", { runId: args.runId, requestKey: call.key, questionId: args.input.questionId, answer: args.input.answer }));
       }
       const command = { runId: args.runId, requestKey: call.key, message: args.input.text };
       const admission = await admitContextPrimitive(ports, principal, "write", command) as { perform: boolean };

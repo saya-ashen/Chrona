@@ -11,7 +11,7 @@ const cursorSchema = z.object({
   offset: z.number().int().nonnegative().safe(), size: z.number().int().nonnegative().safe(), item: z.number().int().min(0).max(READ_BYTES), skip: z.boolean(),
 }).strict();
 type Cursor = z.infer<typeof cursorSchema>;
-export type PiTranscriptGap = { file: string; offset: number; bytes: number; reason: "record_too_large" | "item_too_large"; item?: number };
+export type PiTranscriptGap = { file: string; offset: number; bytes: number; reason: "record_too_large" | "item_too_large" | "malformed_record"; item?: number };
 export type PiTranscriptPage = { items: ProviderTranscriptItem[]; nextCursor: string | null; gaps: PiTranscriptGap[] };
 export type PiTranscriptPageInput = { sessionDir: string; limit: number; cursor?: string };
 function failure(code: "too_large" | "invalid" | "cursor_expired") {
@@ -52,10 +52,15 @@ function items(entry: Entry): ProviderTranscriptItem[] {
   if (message.role !== "toolResult") return [];
   return [{ at, kind: "result", tool: message.toolName ?? "", text: blocks.filter(block => block.type === "text").map(block => block.text ?? "").join("\n"), error: message.isError === true }];
 }
-function parse(line: Buffer) {
+function parse(line: Buffer, file: string, offset: number): ProviderTranscriptItem[] | null {
   let entry: Entry | null;
-  try { entry = JSON.parse(line.toString("utf8")) as Entry | null; } catch { return []; }
-  return entry && typeof entry === "object" ? items(entry) : [];
+  try { entry = JSON.parse(line.toString("utf8")) as Entry | null; }
+  catch (error) {
+    console.error(JSON.stringify({ component: "pi-transcript", event: "malformed_record", file, offset, bytes: line.length,
+      error: error instanceof SyntaxError ? "Invalid JSON record" : String(error) }));
+    return null;
+  }
+  return entry && typeof entry === "object" ? items(entry).map((item, block) => ({ ...item, id: `${file}:${offset}:${block}` })) : [];
 }
 
 
@@ -95,7 +100,12 @@ function scanPage(data: Buffer, state: Cursor, size: number, nextFileCursor: str
       skipping = skip; offset = end; blockIndex = 0;
       continue;
     }
-    const normalized = parse(data.subarray(offset, end));
+    const normalized = parse(data.subarray(offset, end), file, state.offset + offset);
+    if (normalized === null) {
+      if (!add({ file, offset: state.offset + offset, bytes: end - offset, reason: "malformed_record" }, continuation(end, 0, false), true)) break;
+      offset = end; blockIndex = 0;
+      continue;
+    }
     for (; blockIndex < normalized.length; blockIndex++) {
       const item = normalized[blockIndex];
       const bytes = Buffer.byteLength(JSON.stringify(item));
@@ -178,7 +188,7 @@ function transcriptTail(limit: number) {
 
 /** Read only the recent source window, plus one byte to verify its record boundary. */
 async function recentSource(sessionDir: string) {
-  const files = await filesIn(sessionDir), chunks: Buffer[] = [];
+  const files = await filesIn(sessionDir), chunks: { data: Buffer; file: string; offset: number }[] = [];
   let remaining = READ_BYTES, omitted = false;
   for (let index = files.length - 1; index >= 0; index--) {
     if (!remaining) { omitted = true; break; }
@@ -196,7 +206,7 @@ async function recentSource(sessionDir: string) {
         const newline = buffer.indexOf(10);
         data = newline < 0 ? buffer.subarray(buffer.length) : buffer.subarray(newline + 1);
       }
-      chunks.push(data);
+      chunks.push({ data, file: files[index], offset: Math.max(0, start - 1) + buffer.length - data.length });
     } finally { await handle.close(); }
   }
   return { chunks: chunks.reverse(), omitted };
@@ -210,10 +220,12 @@ async function recentSource(sessionDir: string) {
 export async function piTranscript({ sessionDir, limit }: { sessionDir: string; limit: number }): Promise<ProviderTranscriptItem[]> {
   validateLimit(limit);
   const tail = transcriptTail(limit), source = await recentSource(sessionDir);
-  for (const data of source.chunks) {
+  for (const chunk of source.chunks) {
+    const { data, file } = chunk;
     for (let offset = 0; offset < data.length;) {
       const newline = data.indexOf(10, offset), end = newline < 0 ? data.length : newline + 1;
-      tail.append(parse(data.subarray(offset, end)));
+      const parsed = parse(data.subarray(offset, end), file, chunk.offset + offset);
+      tail.append(parsed ?? [{ id: `${file}:${chunk.offset + offset}:gap`, at: "", kind: "text", text: "[Pi transcript gap] malformed_record" }]);
       offset = end;
     }
   }

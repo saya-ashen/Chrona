@@ -33,7 +33,7 @@ export const agentWriteInput = z.object({ runId: id, input: z.discriminatedUnion
   z.object({ kind: z.literal("message"), text: z.string().trim().min(1).max(20_000) }).strict(),
   z.object({ kind: z.literal("answer"), questionId: id, answer: providerAnswerSchema }).strict(),
 ]) }).strict();
-export const agentReadOutput = z.object({ run: agentRunViewSchema, items: z.array(z.object({ sequence: z.number().int().nonnegative(), at: z.string(), kind: z.string(), payload: z.json() }).strict()).max(100), nextCursor: z.string().nullable(), ended: z.boolean(), interactions: z.array(providerInteractionSchema).max(12), transcript: runtimeTranscriptSchema.optional() }).strict();
+export const agentReadOutput = z.object({ run: agentRunViewSchema, items: z.array(z.object({ sequence: z.number().int().nonnegative(), at: z.string(), kind: z.string(), payload: z.json() }).strict()).max(100), nextCursor: z.string().nullable(), ended: z.boolean(), interactions: z.array(providerInteractionSchema).max(12), transcript: runtimeTranscriptSchema.optional(), transcriptState: z.object({ status: z.enum(["available", "pending", "unavailable"]), reason: z.string().optional() }).strict().optional() }).strict();
 export const agentNativeInput = z.object({ runId: id, request: providerOptionsSchema }).strict();
 export const providerNativeInput = z.object({ operationId: id, request: providerOptionsSchema }).strict();
 export const providerNativeOutput = z.object({ response: providerOptionsSchema }).strict();

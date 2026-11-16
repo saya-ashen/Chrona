@@ -396,9 +396,9 @@ export type ProviderRunInput = {
   executionBudget?: { maxToolCalls: number };
 };
 export type ProviderTranscriptItem =
-  | { at: string; kind: "text"; text: string }
-  | { at: string; kind: "tool"; tool: string; args: string }
-  | { at: string; kind: "result"; tool: string; text: string; error: boolean };
+  | { id?: string; at: string; kind: "text"; text: string }
+  | { id?: string; at: string; kind: "tool"; tool: string; args: string }
+  | { id?: string; at: string; kind: "result"; tool: string; text: string; error: boolean };
 export type ProviderAdapter = {
   name: string;
   supportsRunModel?: boolean;

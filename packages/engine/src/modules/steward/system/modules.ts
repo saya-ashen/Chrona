@@ -42,10 +42,10 @@ async function describe(ports: StewardPorts, workspaceId: string, caller: Caller
       if (args.target) {
         const target = await routedTargetName(ports.db, workspaceId, args.target as RoutedTarget);
         const detail = await interfaceReference(ports, workspaceId, target, caller);
-        return json({ ...detail, target: args.target });
+        return json({ ...detail, label: target, target: args.target });
       }
       const found = await toolSearch(ports, workspaceId, caller, args.query, args.audience === "user");
-      const items = found.map(item => ({ ...item, target: item.moduleId ? { moduleId: item.moduleId, tool: item.target.slice(item.target.indexOf(".") + 1) } : item.target }));
+      const items = found.map(item => ({ ...item, label: item.target, target: item.moduleId ? { moduleId: item.moduleId, tool: item.target.slice(item.target.indexOf(".") + 1) } : item.target }));
       return json(apiPage(items, { cursor: args.cursor, limit: args.limit }, `describe:${workspaceId}:${JSON.stringify(caller)}:${args.query ?? ""}:${args.audience}`, row => typeof row.target === "string" ? row.target : `${row.target.moduleId}.${row.target.tool}`));
 }
 async function health(ports: StewardPorts, workspaceId: string, args: Record<string, unknown>) {

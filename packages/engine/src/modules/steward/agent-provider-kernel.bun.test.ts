@@ -111,6 +111,33 @@ test("normalized reads retain development transcripts larger than a native reply
   await f.invoke("stop", { runId: admitted.runId }, "stop-large-transcript");
 });
 
+test("a terminal Run keeps transcript delivery pending until its Provider becomes available", async () => {
+  const f = await fixture();
+  await registerAgentProvider(f.ports, f.workspaceId, f.backendCaller, declaration);
+  const admitted = await f.run("reply-after-stop");
+  await f.invoke("stop", { runId: admitted.runId }, "stop-before-reply");
+  await f.db.module.update({ where: { id: f.backendCaller.moduleId }, data: { status: "paused" } });
+  expect(await f.invoke("read", { runId: admitted.runId })).toMatchObject({ ended: true, transcriptState: { status: "pending" } });
+  await f.db.module.update({ where: { id: f.backendCaller.moduleId }, data: { status: "active" } });
+  const record = { id: "record-1", at: new Date().toISOString(), kind: "text" as const, text: "retained reply" };
+  f.setTranscript([record]);
+  expect(await f.invoke("read", { runId: admitted.runId })).toMatchObject({
+    ended: true, transcriptState: { status: "available" }, transcript: [record],
+  });
+  const intruder = await f.installCaller("reply-intruder");
+  await expect(agent.handle({ ports: f.ports, workspaceId: f.workspaceId, caller: intruder }, "read", { runId: admitted.runId }))
+    .rejects.toMatchObject({ code: "not_found" });
+});
+
+test("a Provider without transcript support reports unavailable separately from execution status", async () => {
+  const f = await fixture();
+  const { transcript: _transcript, ...endpoints } = declaration.endpoints;
+  await registerAgentProvider(f.ports, f.workspaceId, f.backendCaller, { ...declaration, endpoints });
+  const admitted = await f.run("no-transcript");
+  await f.invoke("stop", { runId: admitted.runId }, "stop-no-transcript");
+  expect(await f.invoke("read", { runId: admitted.runId })).toMatchObject({ ended: true, transcriptState: { status: "unavailable" } });
+});
+
 test("native retries through the public gateway ignore JSON object order and preserve array order", async () => {
   const f = await fixture();
   await registerAgentProvider(f.ports, f.workspaceId, f.backendCaller, declaration);

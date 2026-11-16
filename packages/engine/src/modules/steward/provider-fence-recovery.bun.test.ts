@@ -212,7 +212,7 @@ test.each(["queued", "running"] as const)("fenced application can stop only its 
   await expect(invoke("run", { prompt: "new admission" })).rejects.toMatchObject({ code: "forbidden" });
   await expect(invoke("write", { runId: f.run.id, input: { kind: "message", text: "new work" } })).rejects.toMatchObject({ code: "forbidden" });
   for (const name of ["run", "write", "respond", "native"] as const) {
-    await expect(admitContextPrimitive(f.ports, principal, name, { runId: f.run.id, requestKey: `blocked-${name}`, questionId: "q", answer: JSON.stringify({ decision: "cancel" }), tools: [], content: [], lane: "background", prompt: "blocked" })).rejects.toMatchObject({ code: "forbidden" });
+    await expect(admitContextPrimitive(f.ports, principal, name, { runId: f.run.id, requestKey: `blocked-${name}`, questionId: "q", answer: { decision: "cancel" }, tools: [], content: [], lane: "background", prompt: "blocked" })).rejects.toMatchObject({ code: "forbidden" });
   }
   expect(await f.db.run.count({ where: { workspaceId: f.workspaceId } })).toBe(1);
   const first = await invoke("stop", { runId: f.run.id }, "own-stop");

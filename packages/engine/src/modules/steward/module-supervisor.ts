@@ -327,46 +327,68 @@ class ModuleSupervisor {
           moduleId: module.id, module: module.name, error: String(error).slice(0, 2000) }));
       }
     }
-    void this.announce(modules).catch(error => console.error(JSON.stringify({ level: "error", message: "module activated delivery failed", error: String(error) })));
+    void this.announce(modules).catch(error => console.error(JSON.stringify({ component: "module-supervisor", event: "activation.failed", error: diagnosticText(String(error), 1000) })));
   }
   /**
    * `activated` reaches each module declaring it once per active version and again when a module it `uses` changes version
    * (module-dependency-direction §4), so a sleeping app can register with web. Recorded in platform/activated.json;
-   * a delivery that fails is retried on later passes, at most three times per change.
+   * Successful delivery and unconfirmed dispatch remain distinct across restarts.
    */
-  private announced?: Record<string, string>;
+  private announced?: Record<string, string | { signature: string; activationId: string; status: "unconfirmed" }>;
   private announcing = false;
-  private readonly announceAttempts = new Map<string, number>();
   private readonly manifests = new Map<string, ModuleManifest | null>();
-  private async announce(modules: { id: string; name: string; activeHash: string | null }[]) {
+  private async saveAnnouncements(file: string) {
+    await mkdir(join(this.ports.dataDir, "platform"), { recursive: true });
+    await writeFile(`${file}.tmp`, JSON.stringify(this.announced));
+    await rename(`${file}.tmp`, file);
+  }
+  private async announceModule(file: string,
+    module: { id: string; name: string; activeHash: string | null; activationId: string }, hashes: Map<string, string | null>) {
+    const hash = module.activeHash!, manifest = await this.manifestOf(module.id, hash);
+    if (!manifest?.activated || this.isStopped()) return;
+    const uses = [...new Set(manifest.uses.filter(target => target !== "*").map(target => target.split(".")[0]!))]
+      .filter(name => name !== module.name && hashes.has(name)).sort();
+    const signature = [hash, ...uses.map(name => `${name}@${hashes.get(name)}`)].join(" ");
+    const previous = this.announced![module.id];
+    if (previous === signature) return;
+    if (typeof previous === "object" && previous.activationId === module.activationId) return;
+    const delivered = await this.deliverActivation(module.id, hash, async () => {
+      const current = await this.ports.db.module.findUniqueOrThrow({ where: { id: module.id }, select: { activationId: true } });
+      if (current.activationId !== module.activationId) throw new Error("Module activation changed before announcement dispatch");
+      this.announced![module.id] = { signature, activationId: module.activationId, status: "unconfirmed" };
+      await this.saveAnnouncements(file);
+    });
+    if (delivered === true) this.announced![module.id] = signature;
+    else if (delivered === false) delete this.announced![module.id];
+    await this.saveAnnouncements(file);
+  }
+  private async announce(modules: { id: string; name: string; activeHash: string | null; activationId: string }[]) {
     if (this.announcing || this.stopped) return;
     this.announcing = true;
     const file = join(this.ports.dataDir, "platform", "activated.json");
     try {
-      this.announced ??= await readFile(file, "utf8").then(text => JSON.parse(text) as Record<string, string>).catch(() => ({}));
+      if (!this.announced) {
+        try { this.announced = JSON.parse(await readFile(file, "utf8")); }
+        catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+          this.announced = {};
+        }
+      }
       const hashes = new Map(modules.filter(module => !isModulePaused(module.name)).map(module => [module.name, module.activeHash]));
       for (const module of modules) {
         if (isModulePaused(module.name)) continue;
-        const hash = module.activeHash!, manifest = await this.manifestOf(module.id, hash);
-        if (!manifest?.activated || (this.stopped as boolean)) continue;
-        const uses = [...new Set(manifest.uses.filter(target => target !== "*").map(target => target.split(".")[0]!))].filter(name => name !== module.name && hashes.has(name)).sort();
-        const signature = [hash, ...uses.map(name => `${name}@${hashes.get(name)}`)].join(" ");
-        if (this.announced[module.id] === signature) continue;
-        if (!await this.deliverActivation(module.id, hash, signature)) continue;
-        this.announced[module.id] = signature;
-        await mkdir(join(this.ports.dataDir, "platform"), { recursive: true });
-        await writeFile(`${file}.tmp`, JSON.stringify(this.announced));
-        await rename(`${file}.tmp`, file);
+        await this.announceModule(file, module, hashes);
       }
     } finally { this.announcing = false; }
   }
-  private async deliverActivation(moduleId: string, hash: string, signature: string) {
-    const now = this.ports.now().toISOString(), attempt = `${moduleId} ${signature}`;
-    try { await this.deliver(moduleId, hash, { trigger: { kind: "activated", id: "activated", firedAt: now }, now, params: {} }); }
-    catch {
-      const tries = (this.announceAttempts.get(attempt) ?? 0) + 1;
-      this.announceAttempts.set(attempt, tries);
-      if (tries < 3) return false;
+  private async deliverActivation(moduleId: string, hash: string, beforeDelivery: () => Promise<void>) {
+    const now = this.ports.now().toISOString();
+    try { await this.deliver(moduleId, hash, { trigger: { kind: "activated", id: "activated", firedAt: now }, now, params: {} }, { beforeDelivery }); }
+    catch (error) {
+      const stage = (error as { stage?: DeliveryStage }).stage;
+      console.error(JSON.stringify({ component: "module-supervisor", event: "activation.failed", moduleId, hash,
+        delivery: stage ?? "unconfirmed", error: diagnosticText(String(error), 1000) }));
+      return stage === "unavailable" ? false : null;
     }
     return true;
   }
