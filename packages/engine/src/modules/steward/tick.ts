@@ -7,6 +7,7 @@ import { registerBuiltins } from "./modules/module-builtin";
 import { reconcileAgentStops } from "./agent/agent-recovery";
 import { createRuns, liveRuns } from "./execution/runs";
 import { audit } from "./audit";
+import { diagnosticText } from "./modules/module-diagnostics";
 import { callsSettled, drainCalls } from "./modules/module-calls";
 import { createProviderChannel } from "./agent/provider-channel";
 import { providerStartGate } from "./agent/provider-start";
@@ -27,28 +28,41 @@ type PendingFinalization = { run: ClaimedRun; outcome: Awaited<ReturnType<Provid
 async function finishProvider(ports: StewardPorts, pending: Map<string, PendingFinalization>, entry: PendingFinalization) {
   const { run, outcome, stopEvidence } = entry;
   try { await createRuns(ports, run.workspaceId).finish(run.id, outcome, { stopEvidence }); }
-  catch {
+  catch (error) {
     pending.set(run.id, entry);
-    await audit(ports.db, { workspaceId: run.workspaceId, actor: "chrona", kind: "run_finalize_failed", subjectId: run.id, details: {} }).catch(() => {});
+    console.error(JSON.stringify({ component: "tick", event: "run_finalize_failed", runId: run.id, error: diagnosticText(String(error).replaceAll(run.token, "[Redacted]"), 2000) }));
+    await audit(ports.db, { workspaceId: run.workspaceId, actor: "chrona", kind: "run_finalize_failed", subjectId: run.id, details: {} }).catch(error => {
+      console.error(JSON.stringify({ component: "tick", event: "finalization_audit.failed", runId: run.id, error: diagnosticText(String(error).replaceAll(run.token, "[Redacted]"), 2000) }));
+    });
   }
 }
 function finalizeProvider(ports: StewardPorts, run: ClaimedRun, channel: ReturnType<typeof createProviderChannel>, handle: ReturnType<ProviderAdapter["start"]>, { pending, execution }: { pending: Map<string, PendingFinalization>; execution: boolean }) {
   // Only the actual Provider handle proves process exit; the start gate may resolve before launch.
   return handle.done.then(async outcome => {
     try { await channel.close(); }
-    catch { outcome = { ...outcome, outcome: "failed", error: "Execution interaction persistence failed" }; }
+    catch (error) {
+      console.error(JSON.stringify({ component: "tick", event: "interaction_persistence.failed", runId: run.id, error: diagnosticText(String(error).replaceAll(run.token, "[Redacted]"), 2000) }));
+      outcome = { ...outcome, outcome: "failed", error: "Execution interaction persistence failed" };
+    }
     if (execution) {
       try { registerWorkspaceModule(); await runtimeCall(ports, run.workspaceId, "workspace-local.capture", { runId: run.id }); }
-      catch {
+      catch (error) {
         // The Provider has exited even if the result sidecar could not be written.
-        await audit(ports.db, { workspaceId: run.workspaceId, actor: "chrona", kind: "execution_capture_failed", subjectId: run.id, details: {} }).catch(() => {});
+        console.error(JSON.stringify({ component: "tick", event: "execution_capture_failed", runId: run.id, error: diagnosticText(String(error).replaceAll(run.token, "[Redacted]"), 2000) }));
+        await audit(ports.db, { workspaceId: run.workspaceId, actor: "chrona", kind: "execution_capture_failed", subjectId: run.id, details: {} }).catch(error => {
+          console.error(JSON.stringify({ component: "tick", event: "capture_audit.failed", runId: run.id, error: diagnosticText(String(error).replaceAll(run.token, "[Redacted]"), 2000) }));
+        });
       }
     }
     await finishProvider(ports, pending, { run, outcome, stopEvidence: "provider_exited" });
-  }, async () => {
+  }, async error => {
+    console.error(JSON.stringify({ component: "tick", event: "provider_completion.failed", runId: run.id, error: diagnosticText(String(error).replaceAll(run.token, "[Redacted]"), 2000) }));
     try { await channel.close(); } finally { await finishProvider(ports, pending, { run, outcome: { outcome: "failed", sessionId: null, error: "Provider completion failed" } }); }
-  }).catch(async () => {
-    await audit(ports.db, { workspaceId: run.workspaceId, actor: "chrona", kind: "run_finalize_failed", subjectId: run.id, details: {} }).catch(() => {});
+  }).catch(async error => {
+    console.error(JSON.stringify({ component: "tick", event: "run_finalize_failed", runId: run.id, error: diagnosticText(String(error).replaceAll(run.token, "[Redacted]"), 2000) }));
+    await audit(ports.db, { workspaceId: run.workspaceId, actor: "chrona", kind: "run_finalize_failed", subjectId: run.id, details: {} }).catch(error => {
+      console.error(JSON.stringify({ component: "tick", event: "finalization_audit.failed", runId: run.id, error: diagnosticText(String(error).replaceAll(run.token, "[Redacted]"), 2000) }));
+    });
   });
 }
 async function claimApplicationRuns(ports: StewardPorts, workspaceId: string, now: Date) {

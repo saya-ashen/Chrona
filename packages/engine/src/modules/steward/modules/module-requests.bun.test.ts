@@ -2,12 +2,15 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { isEntryModule, moduleManifestSchema, moduleCallSchema } from "@chrona/contracts/steward";
+import { isEntryModule, moduleManifestSchema, moduleCallSchema, type ModuleEvent } from "@chrona/contracts/steward";
 import { createStewardService } from "../service";
-import { callsSettled, runDueCalls } from "./module-calls";
+import { callStatus, enqueueCall, kernelOrigin, callsSettled, runDueCalls } from "./module-calls";
 import { handleModuleCall } from "./module-effects";
 import type { StewardPorts } from "../ports";
 import { testDb } from "../test-db";
+import { assertInterleavedSettlementConverges } from "../__testing__/state-machine-invariants";
+import { testModuleProcess } from "./module-test-process";
+import { moduleSupervisor } from "./module-supervisor";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -128,4 +131,106 @@ test("installed identities and contracts are readable; credentials and approvals
     for (const target of ["approvals.grants", "approvals.revoke-grant", "modules.permissions"]) await expect(app.call(target, {})).rejects.toMatchObject({ code: "not_found" });
   }
   expect(JSON.stringify({ view, credentials, approvals, calls: await f.db.moduleInvocation.findMany(), audits: await f.db.audit.findMany() })).not.toContain("k-secret");
+});
+
+test.each([
+  { decision: "approve", reenter: false }, { decision: "deny", reenter: false },
+  { decision: "approve", reenter: true }, { decision: "deny", reenter: true },
+] as const)("approval $decision converges before or after waiting (lease reentry=$reenter)", async ({ decision, reenter }) => {
+  const f = await fixture();
+  const app = await f.moduleNamed("requester", { uses: ["approvals.request"] });
+  const origin = { ...kernelOrigin(f.w), caller: { kind: "module" as const, module: app.module.name, moduleId: app.module.id, hash: "requester-1" } };
+  type Handle = { key: string; callId: string; approvalId: string; release(): void; delivery: Promise<number> };
+  const handles: Handle[] = [];
+  try {
+    await assertInterleavedSettlementConverges<Handle, { status: string; decision: string | undefined }>({
+      async beginRequest(scenario) {
+        const queued = await enqueueCall({ tx: f.db, ports: f.ports, origin, target: "approvals.request", raw: { title: scenario } }, { key: scenario });
+        const entered = Promise.withResolvers<void>(), reentered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
+        let arrivals = 0;
+        const db = new Proxy(f.db, { get(target, property, receiver) {
+          if (property !== "moduleInvocation") return Reflect.get(target, property, receiver);
+          return new Proxy(target.moduleInvocation, { get(invocations, key, invocationReceiver) {
+            if (key !== "updateMany") return Reflect.get(invocations, key, invocationReceiver);
+            return async (args: Parameters<typeof invocations.updateMany>[0]) => {
+              if (args?.where?.id === queued.callId && args.data?.status === "waiting") {
+                if (++arrivals === 2) reentered.resolve();
+                entered.resolve(); await release.promise;
+              }
+              return invocations.updateMany(args);
+            };
+          } });
+        } });
+        const delivery = runDueCalls({ ...f.ports, db }, f.w);
+        const handle = { key: scenario, callId: queued.callId, approvalId: "", release: () => release.resolve(), delivery };
+        handles.push(handle);
+        await Promise.race([entered.promise, delivery.then(() => { throw new Error("Delivery never reached waiting barrier"); })]);
+        if (reenter) {
+          await f.db.moduleInvocation.update({ where: { id: queued.callId }, data: { leaseUntil: new Date(0) } });
+          const replay = runDueCalls({ ...f.ports, db }, f.w);
+          handle.delivery = Promise.all([delivery, replay]).then(counts => counts.reduce((sum, count) => sum + count, 0));
+          await Promise.race([reentered.promise, replay.then(() => { throw new Error("Recovered delivery never reached waiting barrier"); })]);
+        }
+        const approvals = await f.db.approval.findMany({ where: { status: "open" } });
+        handle.approvalId = approvals.find(row => (row.payload as { call?: string }).call === queued.callId)!.id;
+        return handle;
+      },
+      async enterWaiting(handle) { handle.release(); await handle.delivery; },
+      async resolveExternally(handle) {
+        await f.api.approvals.resolve(handle.approvalId, { decision, scope: "once" });
+        await f.api.approvals.resolve(handle.approvalId, { decision, scope: "once" });
+      },
+      async readFinalState(handle) {
+        expect(await runDueCalls(f.ports, f.w)).toBe(0);
+        const status = await callStatus(f.ports, origin, handle.callId);
+        expect((await enqueueCall({ tx: f.db, ports: f.ports, origin, target: "approvals.request", raw: { title: handle.key } }, { key: handle.key })).callId).toBe(handle.callId);
+        const receipt = await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: handle.callId } });
+        expect(receipt).toMatchObject({ leaseToken: null, leaseUntil: null });
+        expect(status.output).toEqual({ approval: handle.approvalId, decision: decision === "approve" ? "approved" : "denied" });
+        expect(status).not.toHaveProperty("error");
+        return { status: status.status, decision: (status.output as { decision?: string } | undefined)?.decision };
+      },
+      isStuckWaiting: state => state.status === "waiting",
+    });
+    expect(await f.db.approval.count()).toBe(2);
+  } finally {
+    for (const handle of handles) handle.release();
+    await Promise.allSettled(handles.map(handle => handle.delivery));
+  }
+});
+
+test.each(["mode", "target", "caller", "hash", "workspace"] as const)("an approval cannot settle an unrelated running invocation: %s", async mismatch => {
+  const f = await fixture();
+  const app = await f.moduleNamed("requester", { uses: ["approvals.request"] });
+  const other = await f.moduleNamed("other", { uses: ["approvals.request"] });
+  const origin = { ...kernelOrigin(f.w), caller: { kind: "module" as const, module: app.module.name, moduleId: app.module.id, hash: "requester-1" } };
+  const queued = await enqueueCall({ tx: f.db, ports: f.ports, origin, target: "approvals.request", raw: { title: "bound request" } }, { key: "bound-request" });
+  const approval = await f.api.approvals.create({ action: "modify_external", moduleId: app.module.id, title: "bound approval", detail: "", preview: "", payload: { kind: "module_request", hash: "requester-1", call: queued.callId } });
+  const changes = mismatch === "mode" ? { mode: "sync" } : mismatch === "target" ? { target: "settings", targetIdentity: "system:settings", tool: "update" }
+    : mismatch === "caller" ? { callerModuleId: other.module.id, caller: `module:${other.module.id}` } : mismatch === "hash" ? { callerHash: "other-hash" }
+    : { workspaceId: (await f.db.workspace.create({ data: { name: "other" } })).id };
+  const leaseUntil = new Date(f.ports.now().getTime() + 60_000);
+  await f.db.moduleInvocation.update({ where: { id: queued.callId }, data: { status: "running", leaseToken: "bound-lease", leaseUntil, ...changes } });
+  await f.api.approvals.resolve(approval.id, { decision: "approve", scope: "once" });
+  await callsSettled(f.ports);
+  expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: queued.callId } })).toMatchObject({ status: "running", leaseToken: "bound-lease", leaseUntil, output: null });
+});
+
+test("settled approval delivers its fixed call_result and repeated decisions do not reopen delivery", async () => {
+  const f = await fixture(), results: ModuleEvent[] = [];
+  const peer = testModuleProcess(async event => { if (event.trigger.kind === "call_result") results.push(event); return {}; });
+  f.ports.sandbox = { available: true, isolated: false, startModule: peer.startModule };
+  cleanups.push(() => moduleSupervisor(f.ports).stop());
+  const app = await f.moduleNamed("requester", { uses: ["approvals.request"] });
+  const queued = await app.call("approvals.request", { title: "Deliver decision" }, { key: "decision-reply" });
+  await f.settle();
+  const approval = await f.db.approval.findFirstOrThrow({ where: { status: "open" } });
+  await f.api.approvals.resolve(approval.id, { decision: "approve", scope: "once" });
+  await f.settle();
+  expect(results.map(event => event.trigger)).toEqual([expect.objectContaining({
+    kind: "call_result", callId: queued.callId, key: "decision-reply", status: "succeeded", output: { approval: approval.id, decision: "approved" },
+  })]);
+  await f.api.approvals.resolve(approval.id, { decision: "approve", scope: "once" });
+  await f.settle();
+  expect(results).toHaveLength(1);
 });

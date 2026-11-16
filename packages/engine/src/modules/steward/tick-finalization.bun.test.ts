@@ -1,5 +1,5 @@
 import { testProviderPorts } from "./test-provider";
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 import "./modules/module-effects";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -36,6 +36,7 @@ test.each([
     } } };
   await testProviderPorts(ports);
   const tick = createTick(ports);
+  const errors = spyOn(console, "error").mockImplementation(() => {});
   let runId: string | undefined;
   try {
     const workspaceId = (await db.workspace.create({ data: { name: "finalization" } })).id;
@@ -57,6 +58,9 @@ test.each([
     else completion.resolve({ outcome: item.outcome, sessionId: "original-provider-session", error: item.error });
     await tick.settled({ includeRuns: true });
     expect(await db.audit.count({ where: { kind: "run_finalize_failed", subjectId: runId } })).toBe(1);
+    const diagnostics = errors.mock.calls.map(([line]) => JSON.parse(String(line)));
+    expect(diagnostics).toContainEqual(expect.objectContaining({ component: "tick", event: "run_finalize_failed", runId, error: expect.stringContaining("Foreign key constraint violated") }));
+    if (item.reject) expect(diagnostics).toContainEqual(expect.objectContaining({ event: "provider_completion.failed", runId, error: expect.stringContaining("Provider completion requires reconciliation") }));
     expect(await db.audit.count({ where: { kind: "run_finished", subjectId: runId } })).toBe(0);
     expect(await db.run.findUniqueOrThrow({ where: { id: runId } })).toMatchObject({ status: "running", endedAt: null });
     expect((await db.session.findUniqueOrThrow({ where: { id: run.contextId } })).providerSessionId).toBeNull();
@@ -86,5 +90,6 @@ test.each([
     await moduleSupervisor(ports).stop();
     await db.$disconnect();
     await rm(dataDir, { recursive: true, force: true });
+    errors.mockRestore();
   }
 });

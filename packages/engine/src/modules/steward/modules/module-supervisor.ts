@@ -524,7 +524,10 @@ class ModuleSupervisor {
         await (instance.start ??= this.startInstance(instance));
         const endpoint = await (instance.httpReady ??= moduleHttpReady(instance.channel!, this.timers));
         await this.assertCurrentActivation(instance); return endpoint;
-      } catch { return null; }
+      } catch (error) {
+        console.error(JSON.stringify({ component: "module-supervisor", event: "listener.failed", moduleId: module.id, hash: module.activeHash, path, error: diagnosticText(String(error), 1000) }));
+        return null;
+      }
     }
     return null;
   }

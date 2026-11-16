@@ -14,6 +14,7 @@ import { registerSystemModules } from "../system-modules";
 import { PAUSED_MODULE_NAMES } from "./module-availability";
 import type { StewardPorts } from "../ports";
 import { pruneHistory } from "../retention";
+import { assertPoisonedHeadDoesNotStarveTail } from "../__testing__/state-machine-invariants";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -243,6 +244,25 @@ test("claimed activation conflicts stay unmarked on failure and replay", async (
   expect(await f.db.moduleInvocation.findFirstOrThrow({ where: { key: "activation-conflict" } })).toMatchObject({ status: "failed", errorCode: "conflict", errorReason: null });
   await expect(callSync(f.ports, origin, { moduleId: f.beta.id, tool: "echo" }, {}, { key: "activation-conflict" })).rejects.toMatchObject({ code: "conflict", reason: undefined });
   expect(calls).toBe(1);
+});
+
+test("receipt commit failure logs its cause and preserves the original consumed key", async () => {
+  let deliveries = 0;
+  const f = await fixture({ alpha: async () => ({}), beta: async () => { deliveries++; return { result: { applied: true } }; } });
+  const errors = spyOn(console, "error").mockImplementation(() => {});
+  cleanups.push(async () => { errors.mockRestore(); });
+  await f.db.$executeRawUnsafe(`CREATE TRIGGER fail_call_receipt BEFORE UPDATE OF status ON "ModuleInvocation"
+    BEGIN SELECT RAISE(ABORT, 'injected receipt failure'); END`);
+  const origin = kernelOrigin(f.workspace.id), options = { key: "failed-receipt" };
+  await expect(callSync(f.ports, origin, "beta.echo", {}, options)).rejects.toMatchObject({ code: "unknown", message: expect.stringContaining("Tool receipt could not be committed") });
+  const call = await callStatus(f.ports, origin, { target: "beta.echo", key: options.key });
+  expect(call).toMatchObject({ status: "running" });
+  expect(errors.mock.calls.map(([line]) => JSON.parse(String(line)))).toContainEqual(expect.objectContaining({
+    component: "module-calls", event: "receipt.commit_failed", callId: call.callId, error: expect.stringContaining("Foreign key constraint violated"),
+  }));
+  await f.db.$executeRawUnsafe("DROP TRIGGER fail_call_receipt");
+  await expect(callSync(f.ports, origin, "beta.echo", {}, options)).rejects.toMatchObject({ code: "unknown" });
+  expect(deliveries).toBe(1);
 });
 
 test("sync lost replies persist unknown without proof and never redispatch on replay", async () => {
@@ -1010,4 +1030,24 @@ test("moduleId-only commands remain unpinned and can use a newer active version"
   expect(await callStatus(f.ports, origin, queued.callId)).toMatchObject({ status: "succeeded", output: "compatible" });
   expect((await callSync(f.ports, origin, "beta.echo", {}, { expectedTarget })).output).toBe("compatible");
   expect(hashes).toEqual(["beta-v2", "beta-v2"]);
+});
+
+test("unavailable async calls beyond a delivery batch cannot starve a healthy tail", async () => {
+  let delivered = 0;
+  const f = await fixture({ alpha: async () => ({}), beta: async () => { delivered++; return { result: {} }; } });
+  const origin = kernelOrigin(f.workspace.id);
+  await assertPoisonedHeadDoesNotStarveTail({
+    windowSize: 20,
+    async seedBlockedHead(count) {
+      for (let index = 0; index < count; index++) {
+        await enqueueCall({ tx: f.db, ports: f.ports, origin, target: "unavailable.echo", raw: {} }, { key: `blocked-${index}` });
+        f.advance(1);
+      }
+    },
+    async seedHealthyTail() {
+      await enqueueCall({ tx: f.db, ports: f.ports, origin, target: "beta.echo", raw: {} }, { key: "healthy-tail" });
+    },
+    async tick() { await runDueCalls(f.ports, f.workspace.id); },
+    isTailProcessed: () => delivered === 1,
+  });
 });

@@ -10,7 +10,7 @@ import { toApproval } from "./store";
 import { assertDynamicModuleActivation, groupPayloadSchema, isGroupPayload } from "./modules/module-context";
 import { assertExternalModule } from "./modules/module-identity";
 import { moduleRemovePayloadSchema } from "./modules/module-remove-payload";
-import { drainCalls, settleWaiting } from "./modules/module-calls";
+import { drainCalls } from "./modules/module-calls";
 const inputSchema = approvalSchema.pick({ action: true, title: true, detail: true, preview: true }).extend({ moduleId: z.string().min(1).optional(), payload: z.json() }).strict();
 /** Module activation must still pass its current identity and payload guards. */
 async function approve(tx: Prisma.TransactionClient, workspaceId: string, row: Parameters<typeof toApproval>[0]) {
@@ -18,7 +18,8 @@ async function approve(tx: Prisma.TransactionClient, workspaceId: string, row: P
 }
 /** v2-16: something a module asked the user to decide (`approvals.request`); the decision goes back to its waiting call. */
 export const isModuleRequest = (payload: unknown): payload is { kind: "module_request"; hash: string; call: string } =>
-  !!payload && typeof payload === "object" && !Array.isArray(payload) && (payload as { kind?: unknown }).kind === "module_request" && typeof (payload as { call?: unknown }).call === "string";
+  !!payload && typeof payload === "object" && !Array.isArray(payload) && (payload as { kind?: unknown }).kind === "module_request"
+  && typeof (payload as { call?: unknown }).call === "string" && typeof (payload as { hash?: unknown }).hash === "string";
 /** A module activation is bound to its version hash; a group (v2-15) to every version and no single module. */
 async function assertActivationTarget(tx: Prisma.TransactionClient, workspaceId: string, moduleId: string | undefined, payload: Prisma.JsonValue) {
   if (isGroupPayload(payload)) {
@@ -93,7 +94,12 @@ export function createApprovals(context: RecordContext & { ports?: StewardPorts 
       if (!changed.count) throw new StewardError("conflict", "Approval already resolved");
       await recordWithdrawal(tx, workspaceId, `approval:${id}`, now());
       await audit(tx, { workspaceId, actor: "user", kind: "approval_resolved", subjectId: id, details: { ...input, source } });
-      if (isModuleRequest(row.payload)) await settleWaiting(tx, row.payload.call, { approval: id, decision: status }, now());
+      // The decision can arrive after approval creation but before AwaitUser enters waiting.
+      if (isModuleRequest(row.payload)) await tx.moduleInvocation.updateMany({
+        where: { id: row.payload.call, workspaceId, mode: "async", target: "approvals", targetIdentity: "system:approvals", tool: "request",
+          caller: `module:${row.moduleId}`, callerModuleId: row.moduleId, callerHash: row.payload.hash, status: { in: ["running", "waiting"] } },
+        data: { status: "succeeded", output: { approval: id, decision: status }, error: null, finishedAt: now(), leaseToken: null, leaseUntil: null },
+      });
       return { approval: toApproval(await tx.approval.findUniqueOrThrow({ where: { id } })), payload: input.decision === "approve" ? row.payload : null, request: isModuleRequest(row.payload) };
     }).then(result => afterResolve(result, id, workspaceId, ports, onApproved)),
   };

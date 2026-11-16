@@ -7,6 +7,7 @@ import { createRuns, liveRuns, nextLocalMidnight } from "./runs";
 import { testDb } from "../test-db";
 import type { StewardPorts } from "../ports";
 import { notices } from "../test-notices";
+import { assertTerminalRecordsReleaseQuota, assertExplicitRetryIssuesFreshAttempt } from "../__testing__/state-machine-invariants";
 let db: ReturnType<typeof testDb>, ports: StewardPorts, workspaceId: string, sessionId: string, time: Date, principal: ModulePrincipal;
 beforeEach(async () => {
   db = testDb(); time = new Date("2026-10-15T04:00:00Z");
@@ -92,4 +93,48 @@ test("stop authority survives diagnostic edits and audit deletion; error wording
   expect(view(await ownedRun(ports.db, principal, run.id))).toMatchObject({ status: "failed", active: false });
   await queueContext("confirmed");
   expect(await runs.claimNext("foreground")).not.toBeNull();
+});
+
+test("confirmed terminal Runs release foreground capacity across repeated admissions", async () => {
+  const runs = createRuns(ports, workspaceId);
+  await assertTerminalRecordsReleaseQuota({
+    quota: 1,
+    extra: 2,
+    async allocate(index) {
+      const queued = await queueContext(`quota-${index}`);
+      const claimed = await runs.claimNext("foreground");
+      expect(claimed?.id).toBe(queued.runId);
+      expect(await runs.claimNext("foreground")).toBeNull();
+      return queued.runId;
+    },
+    async settleTerminal(runId) {
+      await runs.finish(runId, { outcome: "finished", sessionId: null, error: null }, { stopEvidence: "provider_exited" });
+      expect(view(await ownedRun(db, principal, runId))).toMatchObject({ status: "finished", active: false });
+    },
+  });
+});
+
+test("an explicit application retry claims a fresh Run and capability after failure", async () => {
+  const runs = createRuns(ports, workspaceId), claims = new Set<string>();
+  await assertExplicitRetryIssuesFreshAttempt({
+    async runFailingAttempt() {
+      const queued = await queueContext("first-failure");
+      const claimed = (await runs.claimNext("foreground"))!;
+      expect(claimed.id).toBe(queued.runId);
+      claims.add(claimed.id);
+      await runs.finish(claimed.id, { outcome: "failed", sessionId: null, error: "fixture failure" }, { stopEvidence: "provider_exited" });
+      return claimed;
+    },
+    async retry(failed) {
+      const queued = await queueContext("explicit-retry");
+      const claimed = (await runs.claimNext("foreground"))!;
+      expect(claimed.id).toBe(queued.runId);
+      expect(claimed.id).not.toBe(failed.id);
+      expect(claimed.token).not.toBe(failed.token);
+      await expect(runs.authenticate(failed.token)).rejects.toMatchObject({ code: "forbidden" });
+      expect(await runs.authenticate(claimed.token)).toMatchObject({ run: { id: claimed.id } });
+      claims.add(claimed.id);
+    },
+    observedDownstreamAttempts: () => claims.size,
+  });
 });

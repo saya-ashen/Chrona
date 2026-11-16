@@ -105,6 +105,8 @@ test.each([false, true])("cold HTTP waits for authenticated readiness (reconcile
 test.each(["stop", "exit", "timeout", "disable"])("HTTP readiness wait settles safely on %s", async action => {
   const f = await fixture({ keepAlive: true, listen: "/api/example" });
   await f.supervisor.reconcile();
+  const errors = spyOn(console, "error").mockImplementation(() => {});
+  cleanups.push(async () => { errors.mockRestore(); });
   const listener = f.supervisor.listener("/api/example");
   await until(() => f.pending().includes(60_000));
   if (action === "stop") await f.supervisor.stop();
@@ -115,6 +117,9 @@ test.each(["stop", "exit", "timeout", "disable"])("HTTP readiness wait settles s
     f.processes[0]!.httpReady("http://127.0.0.1:43210");
   }
   expect(await listener).toBeNull();
+  const diagnostics = errors.mock.calls.map(([line]) => JSON.parse(String(line)));
+  expect(diagnostics).toContainEqual(expect.objectContaining({ component: "module-supervisor", event: "listener.failed", moduleId: f.module.id, hash: "v1", path: "/api/example", error: expect.any(String) }));
+  if (action === "timeout") expect(diagnostics).toContainEqual(expect.objectContaining({ error: "Error: Module HTTP start timeout" }));
 });
 
 test("ordinary tool delivery records observed behavior without readiness claims", async () => {

@@ -1,6 +1,6 @@
 # 执行进度
 
-- 当前阶段：0–5已完成（阶段5最终提交 `694f2d9d`）；阶段6职责搬迁/构建拆分与复审两BLOCK已修复关闭，状态 `applicable-gates-passed-combined-bun-coverage-awaiting-parent-review`。r3 fullBun exit1保留，351通过文件与补材料后17测试定向通过构成组合覆盖；最终门禁见 stage-6-summary.md / stage-6-evidence.json。
+- 当前阶段：0–6已完成，阶段6最终复审 `ec7bbcf2` OK、本地提交 `0ec3e2d1`。阶段7深审已修诊断与审批 waiting 前丢决定竞态，定向与必要API已通过，最终完整slice运行中、待父独立review与本地提交；见 stage-7-summary.md / stage-7-evidence.json。阶段6 r3 fullBun exit1仍保留，351通过文件与fixture17测试补验仅构成组合覆盖，不改称单轮全绿。
 - 基准：6966a5c3；任务分支 refactor/cleanup-and-reorg；隔离目录 /home/saya/workspace/Chrona-cleanup-and-reorg。
 - 原工作区未修改。依赖使用本机既有 node_modules 的独立 reflink/copy，未安装或启用任何插件；正式隔离发行仍需证明不依赖此开发副本。
 - 完整执行方案：plan.md。
@@ -52,3 +52,5 @@
 - 阶段5正常提交曾触发真实hook index污染：临时clone继承GIT_INDEX_FILE，主index被覆盖。父保存污染证据后从HEAD恢复index，不改工作树；修复只清跨仓库Git子进程环境，host gitObject保留hook index。新增4反例修前全失败、修后26 tests/127 assertions通过，独立reviewer d6dcf405 OK。修复后完整slice：102关联文件、types、guardrails全部通过；lint误用旧origin/platform-v2拒绝既有警告，父以任务基准21c63b8仅补lint通过，保留失败日志、不重跑已过部分。补丁生产净+4、含测试净+62；合并原净-90后功能净-28。正常hook提交仍需实际成功后确认。
 
 - 阶段6最终独立复核 ec7bbcf2 OK，原两BLOCK由847c97e5关闭；最后fixture一行真实mapping复制、r4完整slice253关联文件/API21文件131tests/build/smoke/Web60/settings6三尺寸通过。Bun原轮351文件通过+失败fixture17项补验组合覆盖352，保留单轮失败；全库lint193 errors/1033warnings保留。生产净+30、测试净+88、生成0，224文件搬迁单列。阶段6验收关闭，提交后进入阶段7。
+
+- 阶段7独立review d2d92ad9：代码与直接消费者审查OK，仅要求同步文档状态。最终 race-final-r2 verify:slice 于2026-11-16T21:39:21.188Z exit0，lint/type/guardrails/102关联文件通过；生产+40/-14净+26，测试+203/-3净+200，生成/应用/依赖/锁/bundle 0。阶段7验收关闭，待本地提交后进入阶段8。

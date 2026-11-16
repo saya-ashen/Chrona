@@ -9,7 +9,7 @@ import { Prisma } from "@chrona/db/generated/prisma/client";
 import { MAX_CALL_DEPTH, RUN_LIMITS, type ModuleEvent, expectedModuleTargetSchema, type ExpectedModuleTarget, type RoutedTarget } from "@chrona/contracts/steward";
 import type { StewardPorts } from "../ports";
 import { moduleSupervisor } from "./module-supervisor";
-import { recordModuleOutputMismatch } from "./module-diagnostics";
+import { diagnosticText, recordModuleOutputMismatch } from "./module-diagnostics";
 import { currentModuleEvolution } from "./module-evolution";
 import { StewardError } from "../errors";
 import type { SystemTool } from "./module-system-types";
@@ -152,7 +152,10 @@ function privateInvocationFinish(ports: StewardPorts, id: string, resolved: Targ
     const row = await tx.moduleInvocation.update({ where: { id }, data: { ...data, ...((privateTransport || unrecorded(resolved) && privateResult({ target: resolved.module.name, targetIdentity: resolved.module.id, tool: resolved.tool.name })) ? { output: Prisma.DbNull, ...(data.error ? { error: "Private operation failed" } : {}) } : {}), finishedAt: at } });
     await appendRunToolResultIn(tx, row, at, privateTransport || unrecorded(resolved) || resolved.module.name === "secrets");
     return row;
-  }).catch(() => { throw new CallError("unknown", `Tool receipt could not be committed; reconcile call ${id}`); });
+  }).catch(error => {
+    console.error(JSON.stringify({ component: "module-calls", event: "receipt.commit_failed", callId: id, error: diagnosticText(String(error), 2000) }));
+    throw new CallError("unknown", `Tool receipt could not be committed; reconcile call ${id}`);
+  });
 }
 function unrecorded(resolved: Target) { return resolved.system?.unrecorded?.includes(resolved.tool.name) || false; }
 function createSyncInvocation({ ports, origin, resolved, args, path, now, key }: SyncInvocation, { requestedTarget, digest, quiet }: { requestedTarget: RoutedTarget; digest: string; quiet: boolean }) {
