@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
-import { createEvents, type Directory } from "./external/events/events";
+import { createEvents, type Directory } from "./applications/events/events";
 import { callSync, enqueueCall, runDueCalls, type CallOrigin } from "./module-calls";
 import { moduleSupervisor } from "./module-supervisor";
 import { testModuleProcess } from "./module-test-process";

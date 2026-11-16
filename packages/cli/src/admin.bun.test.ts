@@ -7,9 +7,11 @@ import { ensureSqliteDatabase } from "@chrona/db/sqlite-migrations";
 import { acquireSqliteRuntimeLock } from "@chrona/db/sqlite-runtime-lock";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 import { createStewardService } from "@chrona/engine";
-import { removeSecret, runAdmin, setSecret } from "./admin";
+import { qqBindCode, removeSecret, runAdmin, setSecret } from "./admin";
 import { createProgram } from "./program";
 import { seedTestModuleRelease } from "../../engine/src/modules/steward/module-release-test-fixture";
+
+import { createQqBotState } from "../../engine/src/modules/steward/applications/qq/bot";
 
 const dbs: PrismaClient[] = [];
 afterEach(async () => { for (const db of dbs.splice(0)) await db.$disconnect(); });
@@ -244,4 +246,26 @@ test("secret-set saves a module credential from stdin as a private file and neve
     await removeSecret("okx_demo", { dataDir });
     expect(existsSync(join(dataDir, "secrets", "okx_demo.json"))).toBe(false);
   } finally { log.mockRestore(); }
+});
+
+
+test("stopped-service QQ binding uses the application entry and its redeemable private state", async () => {
+  const f = await fixture(40, "qq");
+  await f.db.module.update({ where: { id: f.module.id }, data: { activeHash: null } });
+  const previous = process.env.CHRONA_QQ_APP_ID;
+  process.env.CHRONA_QQ_APP_ID = "12345678";
+  try {
+    const challenge = await qqBindCode({ workspace: "ws_default", ttlMinutes: 10, replace: false }, f.options);
+    expect(challenge.appId).toBe("12345678");
+    expect(challenge.code).toMatch(/^[A-Z0-9]{8}$/);
+    const directory = join(f.options.dataDir, "platform/data", f.module.id);
+    expect(readFileSync(join(directory, "challenge.json"), "utf8")).not.toContain(challenge.code);
+    expect(statSync(join(directory, "challenge.json")).mode & 0o777).toBe(0o600);
+    const state = createQqBotState(directory, challenge.appId);
+    expect(await state.redeem("owner", challenge.code, new Date())).toMatchObject({ ok: true, binding: { openid: "owner", workspaceId: "ws_default" } });
+    await expect(qqBindCode({ workspace: "ws_default", ttlMinutes: 10, replace: false }, f.options)).rejects.toThrow("Already bound");
+  } finally {
+    if (previous === undefined) delete process.env.CHRONA_QQ_APP_ID;
+    else process.env.CHRONA_QQ_APP_ID = previous;
+  }
 });

@@ -5,9 +5,9 @@ import { mkdir, mkdtemp, readdir, rm, stat, utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAgentConversations } from "./conversations";
-import { createAgentConversations as web } from "../external/web/agent-conversations";
-import { createAgentConversations as mcp } from "../external/mcp/agent-conversations";
-import { createAgentConversations as qq } from "../external/qq/agent-conversations";
+import { createAgentConversations as web } from "../applications/web/agent-conversations";
+import { createAgentConversations as mcp } from "../applications/mcp/agent-conversations";
+import { createAgentConversations as qq } from "../applications/qq/agent-conversations";
 
 const directories: string[] = [];
 afterEach(async () => { await Promise.all(directories.splice(0).map(path => rm(path, { recursive: true, force: true }))); });

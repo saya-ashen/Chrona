@@ -2,6 +2,7 @@
 import { $ } from "bun";
 import { resolve } from "node:path";
 import { buildTargets } from "../build/manifest";
+import { restoreApplications } from "./restore-applications";
 
 const ROOT = resolve(import.meta.dirname, "..");
 type Command = { description: string; steps: string[][] };
@@ -77,6 +78,7 @@ export async function main() {
   const selected = commands[name];
   if (!selected) throw new Error(`Unknown ${group} command: ${name}`);
   if (extra.length && selected.steps.length !== 1) throw new Error("Extra args require a single-step command");
+  await restoreApplications();
   for (const step of selected.steps) await $`bun ${[...step, ...extra]}`.cwd(ROOT);
 }
 if (import.meta.main) main().catch(error => { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1; });

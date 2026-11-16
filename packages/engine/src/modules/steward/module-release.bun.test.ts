@@ -9,7 +9,7 @@ import { seedTestModuleRelease } from "./module-release-test-fixture";
 import { readModuleFiles } from "./module-preview";
 
 test.each(["mind", "chat"])("shipped %s manifest is accepted by the real installation contract", async name => {
-  const manifest = JSON.parse(await readFile(join(import.meta.dir, "external", name, "module.json"), "utf8"));
+  const manifest = JSON.parse(await readFile(join(import.meta.dir, "applications", name, "module.json"), "utf8"));
   expect(moduleManifestSchema.safeParse(manifest).success).toBe(true);
 });
 

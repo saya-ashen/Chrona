@@ -9,8 +9,8 @@ import { typecheckBuild, typecheckErrors } from "./module-typecheck";
 import { testReleaseRuntimeChecks } from "./module-release-test-fixture";
 import { registerSystemModules } from "./system-modules";
 import { testDb } from "./test-db";
-import { parsePrepare } from "./external/author/contracts";
-import { prepareMaterial } from "./external/author/workflow";
+import { parsePrepare } from "./applications/author/contracts";
+import { prepareMaterial } from "./applications/author/workflow";
 
 const applications = ["web", "notify", "qq", "author", "mcp", "mind", "files", "events", "memory-local", "remote-execution", "remind"];
 
@@ -20,7 +20,7 @@ test.each(applications)("%s author tests preserve application-owned policies", a
   try {
     const code = join(dataDir, "platform", "store", name);
     await mkdir(code, { recursive: true });
-    const source = join(import.meta.dirname, "external", name);
+    const source = join(import.meta.dirname, "applications", name);
     await cp(source, code, { recursive: true, filter: path => !path.split(/[\\/]/).includes("node_modules") });
     if (await Bun.file(join(code, "package.json")).exists()) {
       // Use the application's installed dependency tree, including declarations and
@@ -43,7 +43,7 @@ test.each(applications)("%s author tests preserve application-owned policies", a
     const reports: TestReport = [];
     const workspace = await db.workspace.create({ data: { name: "offline-app-check" } });
     for (const app of applications) {
-      const declaration = moduleManifestSchema.parse(JSON.parse(await readFile(join(import.meta.dirname, "external", app, "module.json"), "utf8")));
+      const declaration = moduleManifestSchema.parse(JSON.parse(await readFile(join(import.meta.dirname, "applications", app, "module.json"), "utf8")));
       await db.module.create({ data: { workspaceId: workspace.id, name: app, status: "active", activeHash: `fixture-${app}`, versions: { create: { hash: `fixture-${app}`, source: "user", status: "approved", manifest: declaration, intent: {}, report: {} } } } });
     }
     const context = moduleContext({ db, dataDir, ...testReleaseRuntimeChecks(), publicUrl: null, now: () => new Date(), sandbox: { ...sandbox.health, runModule: sandbox.runModule } }, workspace.id);
@@ -73,7 +73,7 @@ test("Author guides the current Agent through fixed material submission without 
     "actual module identity", "author.validate before author.submit", "author.receipt", "Keep the original requestKey",
     "checks actually run", "Installation approval, activation and successful user behavior each need their own evidence",
   ]) expect(result.prompt).toContain(standard);
-  const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(import.meta.dirname, "external/author/module.json"), "utf8")));
+  const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(import.meta.dirname, "applications/author/module.json"), "utf8")));
   expect(manifest.uses).toEqual(["modules.source", "modules.submit", "modules.receipt"]);
   expect(manifest.tools.every(tool => tool.output)).toBe(true);
   const prepare = manifest.tools.find(tool => tool.name === "prepare")!;

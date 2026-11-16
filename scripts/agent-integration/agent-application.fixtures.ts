@@ -9,7 +9,7 @@ import { moduleSupervisor } from "../../packages/engine/src/modules/steward/modu
 import { registerSystemModules } from "../../packages/engine/src/modules/steward/system-modules";
 import { registerLocalRuntime } from "../../packages/engine/src/modules/steward/local-runtime";
 import { resolveExternalRelease } from "../../packages/engine/src/modules/steward/module-release";
-import { buildPiApplication } from "../../packages/engine/src/modules/steward/external/pi/build";
+import { buildPiApplication } from "../../packages/engine/src/modules/steward/applications/pi/build";
 import type { Prisma } from "@chrona/db";
 import type { StewardPorts } from "../../packages/engine/src/modules/steward/ports";
 import "../../packages/engine/src/modules/steward/module-effects";
@@ -59,7 +59,7 @@ export async function agentFixture() {
   let cleanup = () => rm(root, { recursive: true, force: true });
   try {
   await mkdir(dataDir); await mkdir(resources);
-  await cp(resolve(import.meta.dir, "../../packages/engine/src/modules/steward/external/pi"), join(resources, "pi"), { recursive: true });
+  await cp(resolve(import.meta.dir, "../../packages/engine/src/modules/steward/applications/pi"), join(resources, "pi"), { recursive: true });
   // Build only the temporary release so the fake and gateway exercise the same current contract.
   await buildPiApplication(join(resources, "pi"));
   await linkPiFixtureDependencies(join(resources, "pi"));

@@ -2,7 +2,7 @@
 
 Coding 与 coding-web 已退役，删除范围包含整个 `external/coding`、`external/coding-web` 以及旧 `work-v2` 实现。旧应用安装名、`/api/coding/*`、Coding 模块工具、客户端协议与工作台不再是受支持入口；不为旧客户端保留兼容别名。
 
-当前 Chat 是独立的普通应用，拥有自己的会话、草稿、图片附件、工具选择和执行记录，私有数据存于 `chat.sqlite`。它通过内核通用 Agent 接口执行工作，不依赖 Coding 服务。当前实现见 [Chat 应用说明](../../packages/engine/src/modules/steward/external/chat/README.md)与 [manifest](../../packages/engine/src/modules/steward/external/chat/module.json)。这不恢复内核的全局聊天、项目或历史业务接口。
+当前 Chat 是独立的普通应用，拥有自己的会话、草稿、图片附件、工具选择和执行记录，私有数据存于 `chat.sqlite`。它通过内核通用 Agent 接口执行工作，不依赖 Coding 服务。当前实现见 [Chat 应用说明](../../packages/engine/src/modules/steward/applications/chat/README.md)与 [manifest](../../packages/engine/src/modules/steward/applications/chat/module.json)。这不恢复内核的全局聊天、项目或历史业务接口。
 
 ## 文档与历史
 

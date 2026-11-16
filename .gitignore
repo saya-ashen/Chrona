@@ -165,3 +165,6 @@ prisma/*.sync-conflict-*.db*
 /.serena/
 /HANDOFF.md
 /plans/
+
+# Pinned application sources restored from offline inputs, never authoritative checkouts.
+/packages/engine/src/modules/steward/applications/

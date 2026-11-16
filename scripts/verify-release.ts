@@ -1,3 +1,4 @@
+import { restoredApplicationSources } from "./restore-applications";
 import { createHash } from "node:crypto";
 import { closeSync, openSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -19,7 +20,10 @@ const suites = {
   api: JSON.parse(output([process.execPath, "scripts/run-api-tests.ts", "--list"])) as string[],
 };
 if (!suites.bun.length || !suites.api.length) throw new Error("Release verification requires both test suites");
-const trackedTests = output(["git", "ls-files", "*.test.ts", "*.test.tsx", "*.browser-test.ts", "*.browser-test.tsx"]).split("\n");
+const trackedTests = [...new Set([
+  ...output(["git", "ls-files", "*.test.ts", "*.test.tsx", "*.browser-test.ts", "*.browser-test.tsx"]).split("\n"),
+  ...(await restoredApplicationSources()).filter(path => /\.(?:test|browser-test)\.tsx?$/.test(path)),
+])];
 const executed = new Set([...suites.bun, ...suites.api]);
 const report = {
   commit,

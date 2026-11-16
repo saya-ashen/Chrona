@@ -1,3 +1,5 @@
+
+import { restoreApplications } from "./restore-applications";
 /**
  * Concurrent API test runner.
  *
@@ -11,6 +13,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const glob = new Bun.Glob("*.bun.test.{ts,tsx}");
+await restoreApplications();
 const rootDir = process.cwd();
 const tempParent = resolve(rootDir, ".tmp");
 const listOnly = process.argv.includes("--list");

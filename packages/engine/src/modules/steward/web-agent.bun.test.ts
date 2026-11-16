@@ -6,7 +6,7 @@ import { moduleManifestSchema, type RoutedTarget } from "@chrona/contracts/stewa
 import bridge from "../../../../pi/resources/chrona-tools";
 import { agentFixture } from "../../../../../scripts/agent-integration/agent-application.fixtures";
 import { callSync, kernelOrigin } from "./module-calls";
-import { createAgentConversations } from "./external/web/agent-conversations";
+import { createAgentConversations } from "./applications/web/agent-conversations";
 import { createRuns } from "./runs";
 import { createTools } from "./tools";
 import { moduleToolCatalog } from "./module-tools";
@@ -36,7 +36,7 @@ test("Web owns persisted conversations while actual Agent SDK admits scoped and 
   try {
     await f.ports.db.run.delete({ where: { id: "agent-run" } });
     for (const name of ["web", "notify"]) {
-      const source = join(import.meta.dir, "external", name), hash = `web-agent-${name}`;
+      const source = join(import.meta.dir, "applications", name), hash = `web-agent-${name}`;
       const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(source, "module.json"), "utf8")));
       await cp(source, join(f.ports.dataDir, "platform/store", hash), { recursive: true });
       const module = await f.ports.db.module.update({ where: { workspaceId_name: { workspaceId: f.workspaceId, name } }, data: { activeHash: hash } });
@@ -123,7 +123,7 @@ test("structural Author targets survive Web selection, frozen admission, Run cat
     f.ports.onQueued = () => new Promise(() => {});
     for (const name of ["web", "author"]) {
       const hash = `tool-exposure-${name}`;
-      const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(import.meta.dir, "external", name, "module.json"), "utf8")));
+      const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(import.meta.dir, "applications", name, "module.json"), "utf8")));
       const module = await f.ports.db.module.upsert({ where: { workspaceId_name: { workspaceId: f.workspaceId, name } },
         create: { workspaceId: f.workspaceId, name, status: "active", activeHash: hash }, update: { activeHash: hash } });
       await f.ports.db.moduleVersion.create({ data: { moduleId: module.id, hash, source: "user", status: "approved", manifest, intent: {}, report: {} } });

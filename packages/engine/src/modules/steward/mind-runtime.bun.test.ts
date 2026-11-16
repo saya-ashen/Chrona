@@ -50,8 +50,8 @@ async function fixture() {
       await db.moduleVersion.create({ data: { moduleId: app.id, hash, manifest, source: "user", status: "approved", intent: {}, report: {} } });
       return app;
     }
-    const web = await install("web", join(import.meta.dir, "external/web"));
-    const mind = await install("mind", join(import.meta.dir, "external/mind"));
+    const web = await install("web", join(import.meta.dir, "applications/web"));
+    const mind = await install("mind", join(import.meta.dir, "applications/mind"));
     const app = await createServerApp({ steward: runtime });
     const request = (target: string, args: Args = {}, key: string | null = "mind-offline-acceptance", page?: PageRef) => app.request("/api/web/call", {
       method: "POST", headers: { "content-type": "application/json", ...(key === null ? {} : { authorization: `Bearer ${key}` }) }, body: JSON.stringify({ target, args, ...(page ? { page } : {}) }),

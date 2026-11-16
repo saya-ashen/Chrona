@@ -1,7 +1,0 @@
-{
-  "name": "chrona-mcp",
-  "private": true,
-  "dependencies": {
-    "zod": "4.4.3"
-  }
-}

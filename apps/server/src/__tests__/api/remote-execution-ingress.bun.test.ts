@@ -40,7 +40,7 @@ async function fixture(key: string | null = ownerKey, production = false) {
   const tools = toolNames.map(name => ({ name, description: name, visibility: [ownerTools.includes(name) ? "owner" : "kernel"], parameters: { type: "object", properties: { input: { type: "string" } }, required: ["input"] },
       output: {}
 }));
-  const applicationSource = fileURLToPath(new URL("../../../../../packages/engine/src/modules/steward/external/remote-execution", import.meta.url));
+  const applicationSource = fileURLToPath(new URL("../../../../../packages/engine/src/modules/steward/applications/remote-execution", import.meta.url));
   const manifest = moduleManifestSchema.parse(production ? JSON.parse(await readFile(join(applicationSource, "module.json"), "utf8")) : { name: "remote-execution", entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [], tools });
   const receiver = await db.module.create({ data: { workspaceId: "ws_default", name: manifest.name, activeHash: production ? "5".repeat(40) : "s5-http-probe" } });
   await db.moduleVersion.create({ data: { moduleId: receiver.id, hash: receiver.activeHash!, manifest, source: "user", status: "approved", intent: {}, report: {} } });

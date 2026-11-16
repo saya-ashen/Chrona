@@ -4,8 +4,8 @@ import { mkdtemp, readFile, rm, writeFile, access } from "node:fs/promises";
 import { join } from "node:path";
 import { selectedMemory, conversationMemory, memoryView, memoryForget, type MemoryJournal } from "./entry-app/memory";
 import { createAgentConversations } from "./entry-app/conversations";
-import { parseSnapshot } from "./external/memory-local/conversation";
-import { preferences } from "./external/memory-local/preferences";
+import { parseSnapshot } from "./applications/memory-local/conversation";
+import { preferences } from "./applications/memory-local/preferences";
 import { kernelAgentInputs, kernelAgentOutputs, moduleManifestSchema } from "@chrona/contracts/steward";
 
 type Args = Record<string, unknown>;
@@ -176,18 +176,18 @@ test("memory-local SDK accepts direct callers and rejects kernel/lifecycle owner
       assert.equal((await tool("conversation-retain", { snapshot: JSON.stringify(snapshot) }, module)).result.result.retained, false);
     } finally { await app.stop(); }
   `);
-  const child = Bun.spawn([process.execPath, "--no-install", script], { env: { ...process.env, CHRONA_MODULE: join(import.meta.dir, "external/memory-local"), CHRONA_DATA: dataDir, CHRONA_CONTENT: dataDir }, stdout: "pipe", stderr: "pipe" });
+  const child = Bun.spawn([process.execPath, "--no-install", script], { env: { ...process.env, CHRONA_MODULE: join(import.meta.dir, "applications/memory-local"), CHRONA_DATA: dataDir, CHRONA_CONTENT: dataDir }, stdout: "pipe", stderr: "pipe" });
   const stderr = await new Response(child.stderr).text();
   expect(await child.exited, stderr).toBe(0);
   await expect(access(join(dataDir, "memory.db"))).rejects.toThrow();
 });
 test("memory-local declares direct audiences and entry memory selection is private app configuration", async () => {
-  const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(import.meta.dir, "external/memory-local/module.json"), "utf8")));
+  const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(import.meta.dir, "applications/memory-local/module.json"), "utf8")));
   for (const tool of manifest.tools) {
     const expected: typeof tool.visibility = tool.name.startsWith("conversation-") ? ["modules"] : tool.name.startsWith("correct-") ? ["owner"] : ["modules", "owner", "provider"];
     expect(tool.visibility).toEqual(expected);
   }
-  for (const app of ["external/web", "external/qq"]) {
+  for (const app of ["applications/web", "applications/qq"]) {
     const entry = moduleManifestSchema.parse(JSON.parse(await readFile(join(import.meta.dir, app, "module.json"), "utf8")));
     expect(entry).not.toHaveProperty("settings");
     expect(entry.tools.find(tool => tool.name === "settings")).toMatchObject({ visibility: expect.arrayContaining(["owner"]) });

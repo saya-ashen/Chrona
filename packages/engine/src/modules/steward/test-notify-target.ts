@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
-import notifyManifest from "./external/notify/module.json";
+import notifyManifest from "./applications/notify/module.json";
 import type { StewardPorts } from "./ports";
 import { testModuleProcess } from "./module-test-process";
 

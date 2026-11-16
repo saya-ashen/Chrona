@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { composeDigest, isDigestDue, localDayKey, routeNotification } from "./external/notify/budget";
+import { composeDigest, isDigestDue, localDayKey, routeNotification } from "./applications/notify/budget";
 const base = { sentToday: 0, dailyCap: 5, quietHours: { start: "23:00", end: "08:00" }, timezone: "UTC", now: new Date("2026-01-01T12:00:00Z"), urgent: false };
 test.each([
   ["normal", "now", {}, "send"], ["web", "web", {}, "web"], ["digest", "digest", { urgent: true }, "fold"],

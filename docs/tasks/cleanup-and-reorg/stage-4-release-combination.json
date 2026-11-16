@@ -1,0 +1,22 @@
+{
+  "host": {
+    "commit": "c74a45db53b0880b61ba78c8c8433555fa0196c1",
+    "workingTree": "modified"
+  },
+  "isolatedHost": {
+    "commit": null,
+    "workingTree": "unavailable"
+  },
+  "build": {
+    "bun": "1.4.2",
+    "platform": "linux",
+    "arch": "x64",
+    "lockSha256": "52640bfb6e4ae446513da6943d0531dbe83aebbf43c80f0b3e8b64804777b625"
+  },
+  "sameBuild": true,
+  "sameModules": true,
+  "sameModuleLockSha256": true,
+  "resourceFiles": 998,
+  "resourceDifferences": [],
+  "note": "same fixed combination and resource bytes, binary rebuild byte identity not claimed"
+}

@@ -4,17 +4,17 @@ import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { agentFixture } from "../../../../../scripts/agent-integration/agent-application.fixtures";
 import { callSync, kernelOrigin } from "./module-calls";
-import { createQqConversations } from "./external/qq/conversations";
-import { createRelay } from "./external/qq/relay";
+import { createQqConversations } from "./applications/qq/conversations";
+import { createRelay } from "./applications/qq/relay";
 import { contextRunImages } from "./agent-context-read";
-import type { QqReplyItem } from "./external/qq/bot";
+import type { QqReplyItem } from "./applications/qq/bot";
 
 test("QQ owns attachment references, scoped contexts, quotes and delivery uncertainty across restarts", async () => {
   const f = await agentFixture();
   try {
     await f.ports.db.run.delete({ where: { id: "agent-run" } });
     for (const [name, kind] of [["qq", "external"], ["notify", "builtin"]] as const) {
-      const source = join(import.meta.dir, "external", name), hash = `qq-agent-${name}`;
+      const source = join(import.meta.dir, "applications", name), hash = `qq-agent-${name}`;
       const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(source, "module.json"), "utf8")));
       await cp(source, join(f.ports.dataDir, "platform/store", hash), { recursive: true });
       const module = await f.ports.db.module.upsert({ where: { workspaceId_name: { workspaceId: f.workspaceId, name } }, create: { workspaceId: f.workspaceId, name, activeHash: hash }, update: { activeHash: hash } });

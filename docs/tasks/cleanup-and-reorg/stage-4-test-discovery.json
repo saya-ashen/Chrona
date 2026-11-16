@@ -1,0 +1,13 @@
+{
+  "previous": 348,
+  "current": 351,
+  "missing": [],
+  "added": [
+    "examples/desktop-demo/desktop-demo.bun.test.ts",
+    "scripts/application-git-inputs.bun.test.ts",
+    "scripts/restore-applications.bun.test.ts"
+  ],
+  "apiPrevious": 21,
+  "apiCurrent": 21,
+  "note": "examples desktop test now accepted by runner because changed-file verify:slice must execute it; application coverage preserved"
+}

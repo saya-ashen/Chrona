@@ -1,5 +1,5 @@
 import { React, ui } from "/pages.js";
-import type { PageHost } from "../external/web/src/registered-page";
+import type { PageHost } from "../applications/web/src/registered-page";
 type Preferences = { provider: string; autoRecall: boolean; autoRetain: boolean };
 type SavedPreference = { id: string; text: string };
 function usePage(host: PageHost) {

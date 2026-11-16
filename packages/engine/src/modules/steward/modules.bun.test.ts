@@ -20,7 +20,7 @@ import { modulesListOutput } from "./system-outputs";
 import { callSync, listSystemModules } from "./module-calls";
 import { RUN_LIMITS } from "@chrona/contracts/steward";
 import { MODULE_SOURCE_MAX_BYTES } from "../../../../contracts/src/steward/module-material";
-import { approvalNoticeBody } from "./external/notify/approval";
+import { approvalNoticeBody } from "./applications/notify/approval";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });

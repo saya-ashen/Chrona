@@ -3,12 +3,12 @@ import { join } from "node:path";
 import { BUILTIN_MODULE_NAMES, moduleManifestSchema, type ModuleManifest } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { handleModuleCall } from "./module-effects";
-import type { QqReplyItem } from "./external/qq/bot";
+import type { QqReplyItem } from "./applications/qq/bot";
 
 /** Tests: an active shipped entry with its real manifest; `call` routes as its socket would. */
 export async function builtinEntry(ports: StewardPorts, workspaceId: string, name: string) {
   const builtin = (BUILTIN_MODULE_NAMES as readonly string[]).includes(name);
-  const manifest: ModuleManifest = moduleManifestSchema.parse(JSON.parse(readFileSync(join(import.meta.dirname, `${builtin ? "builtin" : "external"}/${name}/module.json`), "utf8")));
+  const manifest: ModuleManifest = moduleManifestSchema.parse(JSON.parse(readFileSync(join(import.meta.dirname, `${builtin ? "builtin" : "applications"}/${name}/module.json`), "utf8")));
   const module = await ports.db.module.create({ data: { workspaceId, name, activeHash: `${name}-test`, builtin } });
   await ports.db.moduleVersion.create({ data: { moduleId: module.id, hash: `${name}-test`, manifest, source: builtin ? "builtin" : "user", intent: {}, report: {}, status: "approved" } });
   const scope = { workspaceId, moduleId: module.id, hash: `${name}-test`, manifest };

@@ -40,7 +40,7 @@ async function fixture() {
   }
   try {
     const workspace = await db.workspace.create({ data: { name: "Web own settings HTTP" } });
-    const hash = "web-own-settings", source = join(import.meta.dir, "external/web"), code = join(root, "platform/store", hash);
+    const hash = "web-own-settings", source = join(import.meta.dir, "applications/web"), code = join(root, "platform/store", hash);
     await cp(source, code, { recursive: true, filter: path => path !== join(source, "node_modules") });
     // Reuse installed app dependencies without copying them or resolving anything over the network.
     await symlink(join(source, "node_modules"), join(code, "node_modules"), "dir");

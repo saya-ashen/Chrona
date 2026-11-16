@@ -9,7 +9,7 @@ import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
 
 const now = new Date("2026-10-22T12:00:00Z");
-const source = resolve(import.meta.dirname, "external/remind");
+const source = resolve(import.meta.dirname, "applications/remind");
 const retainedFiles = ["module.json", "index.ts", "test.ts", "page.ts", "activation-harness.ts", "package.json", "bun.lock", "reminders.ts", "rules.ts", "reminders.test.ts", "reminders.bun.test.ts"];
 const paused = { code: "unavailable", reason: "module_paused" };
 let db: ReturnType<typeof testDb>, ports: StewardPorts, resources: string;

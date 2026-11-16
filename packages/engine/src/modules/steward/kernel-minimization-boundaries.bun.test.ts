@@ -6,7 +6,7 @@ import { callSync, kernelOrigin, listLocalModules } from "./module-calls";
 import { moduleTools } from "./module-tools";
 import { registerProviderCallbacks, retainProviderCallbacks } from "./local-provider";
 import { selectedMemory } from "./entry-app/memory";
-import memoryManifest from "./external/memory-local/module.json";
+import memoryManifest from "./applications/memory-local/module.json";
 import { createApprovals } from "./approvals";
 import type { StewardPorts } from "./ports";
 

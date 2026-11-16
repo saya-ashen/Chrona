@@ -1,0 +1,121 @@
+{
+  "version": 1,
+  "applications": [
+    {
+      "name": "author",
+      "commit": "c5cd0514a14ba832bf7bb8a225eceb2f29b5515f",
+      "bundle": "resources/module-git/author.bundle",
+      "bundleSha256": "5d2862759cf4e50707dd0086d30327d139dfa1d52a97e4a5453007da704830a4",
+      "sourceSha256": "8b747c8205efd04fdb44433ffa40e77468d0a294540acc60f2786e926bc6106b",
+      "artifacts": null
+    },
+    {
+      "name": "chat",
+      "commit": "fa063bf8a81cfbb69f0aabc0c5e72a83756931eb",
+      "bundle": "resources/module-git/chat.bundle",
+      "bundleSha256": "b7af87f6137d08b32cc7c2f25e796db86a3f0303a65a0d07a31ea47dbb31b27f",
+      "sourceSha256": "11ec6f4f47f0a7149242f097db98090e9b643fc52e6f9de84dbc13e2cb69437c",
+      "artifacts": {
+        "file": "resources/application-inputs/chat.artifacts",
+        "sha256": "ca6819e1ae73e950908e22cf45707547d49078ebda49d27e62a3934518923d44"
+      }
+    },
+    {
+      "name": "events",
+      "commit": "281cd4eb4f154cb8b631f0740c6d444c274f5a35",
+      "bundle": "resources/application-inputs/events.bundle",
+      "bundleSha256": "3f5c3af5147cd9103cd3586079d41fd9a70a53974aee9092100339fcc6d5f4f3",
+      "sourceSha256": "20574630e9472d59fb05a840c50c0c37635d73eb1bcc53a28a2c5f095939352e",
+      "artifacts": null
+    },
+    {
+      "name": "files",
+      "commit": "8f391436367c5b414a091fde5e22700278d96568",
+      "bundle": "resources/application-inputs/files.bundle",
+      "bundleSha256": "da4430449857e65709a681ff7cb0d70a9ae1dfd4eebb3fe94e207c93a479fff0",
+      "sourceSha256": "af5293d5710ed2365e8ebc55bc4458bd8696d1f6a671a7437ba35acbd5a7ee0c",
+      "artifacts": null
+    },
+    {
+      "name": "mcp",
+      "commit": "66c8c07718e1c45aa92a0ebae4aa16810c892636",
+      "bundle": "resources/application-inputs/mcp.bundle",
+      "bundleSha256": "379bb897b753ddfcf1c8c877650c110fc44c398a83977f2fcf41059c21f0b088",
+      "sourceSha256": "9ff8e7c48e3139e7fe1a9e40af9ed6e7e198c51f4540f85b627759afbeb91d9e",
+      "artifacts": null
+    },
+    {
+      "name": "memory-local",
+      "commit": "e7917e1f270bac62b754ae29cd198981ec980d8f",
+      "bundle": "resources/application-inputs/memory-local.bundle",
+      "bundleSha256": "66beb84586358a594b19cf5e08119b1c0f1e53a3c28857582df68e47ddb4d4a8",
+      "sourceSha256": "01b8304251ee0ad57f373135f2df6e08c38cc68d7eb6baecfb13b5ada4823fb3",
+      "artifacts": null
+    },
+    {
+      "name": "mind",
+      "commit": "13d46e1ef0adf38628737860a4d51bd2cbc38d2d",
+      "bundle": "resources/module-git/mind.bundle",
+      "bundleSha256": "ef97b9c520e8d2940a41454f749944ee25f53fb678823cc935b36dad64030308",
+      "sourceSha256": "2267e67340e8800cd1ddfcb652ddfe4982fec6dde3eda91ff9fe85de6c08b7ed",
+      "artifacts": {
+        "file": "resources/application-inputs/mind.artifacts",
+        "sha256": "866131dc74a732bd9ba80e32c2ed06322a9819be836b8f8ddca9900b0e33a261"
+      }
+    },
+    {
+      "name": "notify",
+      "commit": "d6427aa89c7ba202cac6a4ecac5bc656f9028691",
+      "bundle": "resources/module-git/notify.bundle",
+      "bundleSha256": "c35f853f81be6657e320ab750c4dd022f3234df4e9385ebcfbad2aa78d832708",
+      "sourceSha256": "d3961cbb4654f9376f8a0580c7cd8bb22b641295d96c7e2ffd4a7884c7aea508",
+      "artifacts": null
+    },
+    {
+      "name": "pi",
+      "commit": "d7633e95a51690c1d91220c17c132579b4406f58",
+      "bundle": "resources/module-git/pi.bundle",
+      "bundleSha256": "58261d4981bce73e1ad947dbcf5f7732b724b7489cfe42561f9b5463457ade00",
+      "sourceSha256": "08d5d569aaf140d51ac57ee3fcff46469afbf91ec1653a94e3584d9d73040b2b",
+      "artifacts": {
+        "file": "resources/application-inputs/pi.artifacts",
+        "sha256": "bccd434a84c4a8846005757a9fb722d156ee5a70e3b114c16173574b222a8c56"
+      }
+    },
+    {
+      "name": "qq",
+      "commit": "583ff71b784cd0f18f5e2d0e64e593ff240318bd",
+      "bundle": "resources/module-git/qq.bundle",
+      "bundleSha256": "536b1af0e5e8b3b548f633d2439fdb1d21f6e05e6039a85ee2e5d40fbf47e171",
+      "sourceSha256": "b9cbe6e53bab0bf6e10380b847433fc06aee880790b575b8036e1443a3209e6e",
+      "artifacts": null
+    },
+    {
+      "name": "remind",
+      "commit": "fc6c037b0250c698feeba4ed70e60b92714f9a1c",
+      "bundle": "resources/application-inputs/remind.bundle",
+      "bundleSha256": "78ae814677e5e2bf6bb237b3f65babb16fbf9b418f0b0fd9b6600fed4c344bfe",
+      "sourceSha256": "2e44fede9904168da7a54df6e6686e0d5c41bd93720fe0ff3f22b8e4e7b5d6f5",
+      "artifacts": null
+    },
+    {
+      "name": "remote-execution",
+      "commit": "d8696c2bd8762cbfce70c7dd2e5d143a49f18b13",
+      "bundle": "resources/application-inputs/remote-execution.bundle",
+      "bundleSha256": "4e4bca291bdefa11ad43b352b029047332b05e4d3f93c4504a8b602302394434",
+      "sourceSha256": "49361b116df5c7761322819bdbce44f733242671a9d66be26036c605c134063f",
+      "artifacts": null
+    },
+    {
+      "name": "web",
+      "commit": "8a8df4deba46e8538ad9b5b92789a19f5cb522c7",
+      "bundle": "resources/module-git/web.bundle",
+      "bundleSha256": "8c2a2ffa37dd83004cdc2481ddfff72f07e4f7e10da5c001a98f01a48b0c5c3e",
+      "sourceSha256": "ebe8619c7786b8fbac8af3bbed3cabfdf33006cc2c496b6b8b342c8f203e36a1",
+      "artifacts": {
+        "file": "resources/application-inputs/web.artifacts",
+        "sha256": "cb569177c7f83efff1df92a2959a14bfc2400da58922b1a0d8807ae1ffd97f7f"
+      }
+    }
+  ]
+}

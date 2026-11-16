@@ -163,7 +163,7 @@ test.skipIf(process.platform !== "linux")("cold actual Pi SDK rejects fenced act
   await writeFile(stopReceipt, receipt(false), { mode: 0o600 });
   const children: ReturnType<typeof Bun.spawn>[] = [];
   f.ports.sandbox!.startModule = input => {
-    const child = Bun.spawn([process.execPath, "--no-install", join(import.meta.dir, "external/pi/runtime.ts")], {
+    const child = Bun.spawn([process.execPath, "--no-install", join(import.meta.dir, "applications/pi/runtime.ts")], {
       cwd: join(import.meta.dir, "../../../../.."), stdin: "ignore", stdout: "ignore", stderr: "pipe",
       env: { ...process.env, CHRONA_IPC_ENDPOINT: input.ipcEndpoint, CHRONA_IPC_TOKEN: input.ipcToken, CHRONA_DATA: input.dataDir,
         CHRONA_MODULE_BINDINGS: "{}", CHRONA_HOST_GENERATION: "b".repeat(64),

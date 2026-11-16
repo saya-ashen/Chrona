@@ -1,0 +1,29 @@
+{
+  "originalSnapshotManifest": ".tmp/cleanup-and-reorg/stage-4/isolated-source-manifest.json",
+  "changedSinceSnapshot": [
+    ".dockerignore",
+    "AGENTS.md",
+    "Dockerfile",
+    "docs/README.md",
+    "docs/tasks/cleanup-and-reorg/progress.md",
+    "docs/tasks/cleanup-and-reorg/stage-4-test-mapping.json",
+    "docs/zh/module-git-release.md",
+    "flake.nix",
+    "packages/engine/src/modules/steward/local-runtime-completion.bun.test.ts",
+    "packages/engine/src/modules/steward/module-release-test-fixture.ts",
+    "resources/module-git/publish-plan.json",
+    "scripts/chrona.ts",
+    "scripts/install-application-dependencies.ts",
+    "scripts/lint-ratchet.ts",
+    "scripts/module-git-release.ts",
+    "scripts/pin-application.ts",
+    "scripts/restore-applications.bun.test.ts",
+    "scripts/restore-applications.ts",
+    "scripts/run-api-tests.ts",
+    "scripts/run-bun-tests.ts",
+    "scripts/verify-release.bun.test.ts",
+    "scripts/verify-release.ts",
+    "scripts/verify-slice.ts"
+  ],
+  "note": "isolated resumed steps explicitly sync amended host test/helper files; root verify:slice validates current working tree; first full Bun result is not relabelled as final single green run"
+}

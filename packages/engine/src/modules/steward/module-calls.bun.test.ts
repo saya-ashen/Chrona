@@ -91,7 +91,7 @@ test("expired application receipt refuses original and changed requests without 
 });
 
 test("shipped files capability examples match its input and output contracts", async () => {
-  const raw = JSON.parse(await readFile(new URL("./external/files/module.json", import.meta.url), "utf8"));
+  const raw = JSON.parse(await readFile(new URL("./applications/files/module.json", import.meta.url), "utf8"));
   const manifest = moduleManifestSchema.parse(raw);
   expect(manifest.tools.map(moduleToolExampleError)).toEqual(manifest.tools.map(() => null));
 });

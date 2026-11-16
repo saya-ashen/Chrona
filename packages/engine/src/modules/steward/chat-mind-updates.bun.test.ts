@@ -3,11 +3,11 @@ import {Database} from 'bun:sqlite';
 import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {Observations} from './external/chat/observations';
-import {readMindUpdates} from './external/chat/mind-updates';
-import {CoreMindStore,evidenceId} from './external/mind/core-store';
-import {CoreMindService} from './external/mind/core-service';
-import type {CoreAccess} from './external/mind/core-types';
+import {Observations} from './applications/chat/observations';
+import {readMindUpdates} from './applications/chat/mind-updates';
+import {CoreMindStore,evidenceId} from './applications/mind/core-store';
+import {CoreMindService} from './applications/mind/core-service';
+import type {CoreAccess} from './applications/mind/core-types';
 
 const owner:CoreAccess={subject:'owner',role:'owner',scopes:[{}]};
 const runtime:CoreAccess={subject:'source',role:'runtime',scopes:[{}]};

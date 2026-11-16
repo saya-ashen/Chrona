@@ -11,7 +11,7 @@ import type { StewardPorts } from "./ports";
 export async function installActivityModule(ports: StewardPorts, workspaceId: string) {
   const dataDir = await mkdtemp("/tmp/chrona-activity-module-test-"), resources = join(dataDir, "platform/builtin");
   await mkdir(resources, { recursive: true });
-  await cp(join(import.meta.dirname, "external/notify"), join(resources, "notify"), { recursive: true });
+  await cp(join(import.meta.dirname, "applications/notify"), join(resources, "notify"), { recursive: true });
   await seedTestModuleRelease(resources, "notify");
   const runtime = createScriptSandbox({ dataDir, executionMode: "trusted-local" });
   ports.dataDir = dataDir;

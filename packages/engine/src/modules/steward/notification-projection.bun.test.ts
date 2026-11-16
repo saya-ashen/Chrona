@@ -1,9 +1,9 @@
 import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { messageSchema } from "@chrona/contracts/steward";
-import { createNotify, type Caller } from "./external/notify/notify";
-import { openStore } from "./external/notify/store";
-import { testDirectory } from "./external/notify/test-directory";
+import { createNotify, type Caller } from "./applications/notify/notify";
+import { openStore } from "./applications/notify/store";
+import { testDirectory } from "./applications/notify/test-directory";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });

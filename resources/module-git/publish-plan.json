@@ -4,51 +4,51 @@
     {
       "name": "web",
       "proposedRepository": "chrona-core/chrona-module-web",
-      "localRepository": "repos/web.git",
+      "localRepository": "../../../chrona-module-web",
       "branch": "main",
-      "commit": "78adbce9898cb855860fa91565342e43a43921cd"
+      "commit": "8a8df4deba46e8538ad9b5b92789a19f5cb522c7"
     },
     {
       "name": "notify",
       "proposedRepository": "chrona-core/chrona-module-notify",
-      "localRepository": "repos/notify.git",
+      "localRepository": "../../../chrona-module-notify",
       "branch": "main",
-      "commit": "17f3ce76e8e56f275cf748f418a35f86859ddba9"
+      "commit": "d6427aa89c7ba202cac6a4ecac5bc656f9028691"
     },
     {
       "name": "pi",
       "proposedRepository": "chrona-core/chrona-module-pi",
-      "localRepository": "repos/pi.git",
+      "localRepository": "../../../chrona-module-pi",
       "branch": "main",
-      "commit": "3dcb1a1eb277af5043531afb56cdbb320e5cbd0e"
+      "commit": "d7633e95a51690c1d91220c17c132579b4406f58"
     },
     {
       "name": "qq",
       "proposedRepository": "chrona-core/chrona-module-qq",
-      "localRepository": "repos/qq.git",
+      "localRepository": "../../../chrona-module-qq",
       "branch": "main",
-      "commit": "053a4a962f2188e96bcdba10d480811735b84de9"
+      "commit": "583ff71b784cd0f18f5e2d0e64e593ff240318bd"
     },
     {
       "name": "author",
       "proposedRepository": "chrona-core/chrona-module-author",
-      "localRepository": "repos/author.git",
+      "localRepository": "../../../chrona-module-author",
       "branch": "main",
-      "commit": "f8ad506b42e51e538f136d149d9a7f487a8804a5"
+      "commit": "c5cd0514a14ba832bf7bb8a225eceb2f29b5515f"
     },
     {
       "name": "mind",
       "proposedRepository": "chrona-core/chrona-module-mind",
-      "localRepository": "repos/mind.git",
+      "localRepository": "../../../chrona-module-mind",
       "branch": "main",
-      "commit": "6c27a6d0ac9e20391a2e94fe976b7410826b9663"
+      "commit": "13d46e1ef0adf38628737860a4d51bd2cbc38d2d"
     },
     {
       "name": "chat",
       "proposedRepository": "chrona-core/chrona-module-chat",
-      "localRepository": "repos/chat.git",
+      "localRepository": "../../../chrona-module-chat",
       "branch": "main",
-      "commit": "3562f580bf216ac2ac51153244a3c3da0ec65ed3"
+      "commit": "fa063bf8a81cfbb69f0aabc0c5e72a83756931eb"
     }
   ]
 }

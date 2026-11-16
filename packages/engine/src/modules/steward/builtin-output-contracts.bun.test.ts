@@ -4,16 +4,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BUILTIN_MODULE_NAMES, OFFICIAL_EXTERNAL_MODULE_NAMES, compileModuleOutput, moduleOutputSchema, moduleManifestSchema, type ModuleTool } from "@chrona/contracts/steward";
 import { isModulePaused } from "./module-availability";
-import { createFiles } from "./external/files/files";
-import { createEvents, type Caller } from "./external/events/events";
-import { createNotify, type Caller as NotifyCaller } from "./external/notify/notify";
-import { openStore } from "./external/notify/store";
-import { conversationMemory } from "./external/memory-local/conversation";
-import { preferences } from "./external/memory-local/preferences";
+import { createFiles } from "./applications/files/files";
+import { createEvents, type Caller } from "./applications/events/events";
+import { createNotify, type Caller as NotifyCaller } from "./applications/notify/notify";
+import { openStore } from "./applications/notify/store";
+import { conversationMemory } from "./applications/memory-local/conversation";
+import { preferences } from "./applications/memory-local/preferences";
 
 const manifests = await Promise.all([
   ...BUILTIN_MODULE_NAMES.map(name => ({ name, directory: "builtin" })),
-  ...OFFICIAL_EXTERNAL_MODULE_NAMES.filter(name => !isModulePaused(name)).map(name => ({ name, directory: "external" })),
+  ...OFFICIAL_EXTERNAL_MODULE_NAMES.filter(name => !isModulePaused(name)).map(name => ({ name, directory: "applications" })),
 ].map(async ({ name, directory }) => {
   const parsed = moduleManifestSchema.parse(await Bun.file(join(import.meta.dirname, directory, name, "module.json")).json());
   expect(parsed.name).toBe(name);

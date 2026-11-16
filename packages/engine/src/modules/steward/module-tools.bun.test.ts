@@ -34,7 +34,7 @@ async function fixture() {
   cleanups.push(async () => { await callsSettled(ports); await moduleSupervisor(ports).stop(); });
   const workspaceId = (await db.workspace.create({ data: { name: "tools" } })).id;
   registerSystemModules();
-  const notifyManifest = moduleManifestSchema.parse(JSON.parse(await Bun.file(new URL("./external/notify/module.json", import.meta.url)).text()));
+  const notifyManifest = moduleManifestSchema.parse(JSON.parse(await Bun.file(new URL("./applications/notify/module.json", import.meta.url)).text()));
   const notify = await db.module.create({ data: { workspaceId, name: "notify", activeHash: "notify-fixture" } });
   await db.moduleVersion.create({ data: { moduleId: notify.id, hash: "notify-fixture", manifest: notifyManifest, intent: {}, source: "user", report: {}, status: "approved" } });
   const api = createModules(ports, workspaceId);

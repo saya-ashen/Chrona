@@ -3,9 +3,9 @@ import { Database } from "bun:sqlite";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { verifyConvertedStorage as qq } from "../external/qq/migrate-storage";
-import { verifyConvertedStorage as web } from "../external/web/migrate-storage";
-import { verifyConvertedStorage as mind } from "../external/mind/migrate-storage";
+import { verifyConvertedStorage as qq } from "../applications/qq/migrate-storage";
+import { verifyConvertedStorage as web } from "../applications/web/migrate-storage";
+import { verifyConvertedStorage as mind } from "../applications/mind/migrate-storage";
 const temporary: string[] = [];
 afterEach(() => { for (const path of temporary.splice(0)) rmSync(path, { recursive: true, force: true }); });
 const directory = () => { const path = mkdtempSync(join(tmpdir(), "chrona-storage-version-")); temporary.push(path); return path; };
@@ -20,7 +20,7 @@ test.each([["qq", qq], ["web", web]] as const)("%s schema 2 accepts converted se
   const db = new Database(join(dir, "conversations/sessions.sqlite"), { create: true });
   db.exec("CREATE TABLE conversations(id TEXT PRIMARY KEY,data TEXT); INSERT INTO conversations VALUES('session','{\"pendingKey\":\"fixed\"}')"); db.close();
   verify(dir);
-  const manifest = JSON.parse(readFileSync(join(import.meta.dir, `../external/${name}/module.json`), "utf8"));
+  const manifest = JSON.parse(readFileSync(join(import.meta.dir, `../applications/${name}/module.json`), "utf8"));
   expect(manifest.data).toEqual({ schema: 2, migrate: "migrate-storage.ts" });
 });
 
@@ -36,6 +36,6 @@ test("Mind schema 2 rejects every old journal and leaves converted state unchang
   const before = readFileSync(path);
   mind(dir);
   expect(readFileSync(path)).toEqual(before);
-  const manifest = JSON.parse(readFileSync(join(import.meta.dir, "../external/mind/module.json"), "utf8"));
+  const manifest = JSON.parse(readFileSync(join(import.meta.dir, "../applications/mind/module.json"), "utf8"));
   expect(manifest.data).toEqual({ schema: 2, migrate: "migrate-storage.ts" });
 });

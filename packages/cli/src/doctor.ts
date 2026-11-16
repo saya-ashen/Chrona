@@ -185,7 +185,7 @@ function externalResources(): string {
   // Same resolution as integrations/steward/module-runtime.ts resourcePath, without its runtime imports.
   const adjacent = join(dirname(process.execPath), "resources");
   const root = process.env.CHRONA_RESOURCE_DIR || (existsSync(adjacent) ? adjacent : null);
-  return root ? join(root, "external") : fileURLToPath(new URL("../../engine/src/modules/steward/external", import.meta.url));
+  return root ? join(root, "external") : fileURLToPath(new URL("../../engine/src/modules/steward/applications", import.meta.url));
 }
 
 function bundledReleaseMessage(name: string, moduleId: string, releaseHash: string, activeHash: string): string | undefined {

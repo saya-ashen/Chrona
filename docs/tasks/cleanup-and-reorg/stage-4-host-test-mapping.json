@@ -1,0 +1,404 @@
+[
+  {
+    "source": "apps/server/src/__tests__/api/remote-execution-ingress.bun.test.ts",
+    "destination": "apps/server/src/__tests__/api/remote-execution-ingress.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "apps/server/src/__tests__/api/steward-agent-endpoint.bun.test.ts",
+    "destination": "apps/server/src/__tests__/api/steward-agent-endpoint.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "apps/server/src/listen.bun.test.ts",
+    "destination": "apps/server/src/listen.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "apps/server/src/rescue.bun.test.ts",
+    "destination": "apps/server/src/rescue.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "examples/desktop-demo/desktop-demo.bun.test.ts",
+    "destination": "examples/desktop-demo/desktop-demo.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/cli/src/admin.bun.test.ts",
+    "destination": "packages/cli/src/admin.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/activity.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/activity.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/author-conversation-submission.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/author-conversation-submission.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/author-material-digest.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/author-material-digest.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/author-material-roundtrip.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/author-material-roundtrip.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/author-runtime.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/author-runtime.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/builtin-events.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/builtin-events.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/builtin-files.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/builtin-files.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/builtin-notify-budget.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/builtin-notify-budget.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/builtin-notify.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/builtin-notify.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/builtin-output-contracts.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/builtin-output-contracts.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/builtin-qq-attachments.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/builtin-qq-attachments.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/builtin-qq-bot.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/builtin-qq-bot.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/builtin-qq-official.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/builtin-qq-official.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/builtin-remind.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/builtin-remind.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/chat-mind-updates.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/chat-mind-updates.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/desktop-lifecycle.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/desktop-lifecycle.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/entry-app/conversation-boundary.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/entry-app/conversation-boundary.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/entry-app/conversation-snapshot.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/entry-app/conversation-snapshot.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/entry-app/delivery-integration.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/entry-app/delivery-integration.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/entry-app/storage-version.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/entry-app/storage-version.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/execution-delivery-governance.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/execution-delivery-governance.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/kernel-minimization-boundaries.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/kernel-minimization-boundaries.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/local-runtime-completion.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/local-runtime-completion.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/memory-policy.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/memory-policy.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/memory.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/memory.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/mind-runtime.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/mind-runtime.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/module-activation-registration.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/module-activation-registration.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/module-calls.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/module-calls.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/module-lifecycle.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/module-lifecycle.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/module-p0-contract.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/module-p0-contract.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/module-policy-author.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/module-policy-author.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/module-tools.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/module-tools.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/module-typecheck-builtin.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/module-typecheck-builtin.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/module-typecheck.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/module-typecheck.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/modules.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/modules.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/notification-projection.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/notification-projection.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/notify-facts.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/notify-facts.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/provider-fence-recovery.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/provider-fence-recovery.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/qq-agent.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/qq-agent.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/test-activity-module.ts",
+    "destination": "packages/engine/src/modules/steward/test-activity-module.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/test-entry.ts",
+    "destination": "packages/engine/src/modules/steward/test-entry.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/test-notices.ts",
+    "destination": "packages/engine/src/modules/steward/test-notices.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/test-notify-target.ts",
+    "destination": "packages/engine/src/modules/steward/test-notify-target.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/today.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/today.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/web-agent.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/web-agent.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/web-own-settings-http.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/web-own-settings-http.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/workspace-files.bun.test.ts",
+    "destination": "packages/engine/src/modules/steward/workspace-files.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/engine/src/test-support.ts",
+    "destination": "packages/engine/src/test-support.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/remote-device/src/device.bun.test.ts",
+    "destination": "packages/remote-device/src/device.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/remote-device/src/production.bun.test.ts",
+    "destination": "packages/remote-device/src/production.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "packages/remote-model/src/kernel.bun.test.ts",
+    "destination": "packages/remote-model/src/kernel.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "scripts/agent-dependencies.bun.test.ts",
+    "destination": "scripts/agent-dependencies.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "scripts/agent-integration/agent-application.bun.test.ts",
+    "destination": "scripts/agent-integration/agent-application.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "scripts/agent-integration/agent-build-contract.bun.test.ts",
+    "destination": "scripts/agent-integration/agent-build-contract.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "scripts/agent-integration/host-recovery.bun.test.ts",
+    "destination": "scripts/agent-integration/host-recovery.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "scripts/agent-integration/settings-page.browser-test.ts",
+    "destination": "scripts/agent-integration/settings-page.browser-test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "scripts/agent-integration/settings-page.bun.test.ts",
+    "destination": "scripts/agent-integration/settings-page.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "scripts/build-binaries.bun.test.ts",
+    "destination": "scripts/build-binaries.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "scripts/module-git-release.bun.test.ts",
+    "destination": "scripts/module-git-release.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "scripts/one-off/storage-20261116/migrate.bun.test.ts",
+    "destination": "scripts/one-off/storage-20261116/migrate.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  },
+  {
+    "source": "scripts/release-smoke.bun.test.ts",
+    "destination": "scripts/release-smoke.bun.test.ts",
+    "owner": "Chrona composition integration",
+    "seam": "pinned applications staging"
+  }
+]

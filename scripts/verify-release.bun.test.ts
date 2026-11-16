@@ -9,6 +9,7 @@ async function fixture(fail: string | undefined, check: (directory: string, exit
     await mkdir(join(directory, "scripts"));
     await mkdir(join(directory, "resources/module-git"), { recursive: true });
     await cp(join(import.meta.dir, "verify-release.ts"), join(directory, "scripts/verify-release.ts"));
+    await writeFile(join(directory, "scripts/restore-applications.ts"), 'export async function restoredApplicationSources() { return ["applications/example/page.browser-test.ts"]; }');
     await writeFile(join(directory, "resources/module-git/lock.json"), JSON.stringify({ version: 1, modules: [] }));
     await writeFile(join(directory, "scripts/step.ts"), `
       import { appendFileSync } from "node:fs";
@@ -53,6 +54,7 @@ test("release verification reports lint debt separately and preserves both log s
     const report = JSON.parse(await readFile(join(directory, ".tmp/release-verification/report.json"), "utf8"));
     expect(report.automatedGatesPassed).toBe(true);
     expect(report.manualAcceptance).toBe("not-run");
+    expect(report.testsOutsideSuites).toContain("applications/example/page.browser-test.ts");
     expect(report.steps.find((step: { name: string }) => step.name === "lint-debt").exitCode).toBe(1);
     const log = await readFile(join(directory, ".tmp/release-verification/build.log"), "utf8");
     expect(log).toContain("stdout:build");

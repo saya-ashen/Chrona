@@ -4,9 +4,9 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAgentConversations } from "./conversations";
-import { createAgentConversations as generatedWeb } from "../external/web/agent-conversations";
-import { createAgentConversations as generatedMcp } from "../external/mcp/agent-conversations";
-import { createAgentConversations as generatedQq } from "../external/qq/agent-conversations";
+import { createAgentConversations as generatedWeb } from "../applications/web/agent-conversations";
+import { createAgentConversations as generatedMcp } from "../applications/mcp/agent-conversations";
+import { createAgentConversations as generatedQq } from "../applications/qq/agent-conversations";
 import { receiptFixture, receiptItem, receiptEvent, healthFixture } from "./delivery-fixture";
 
 type Args = Record<string, unknown>;

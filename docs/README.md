@@ -27,6 +27,7 @@
 | 任务 | 专题入口 |
 | --- | --- |
 | 运行与恢复 | [Agent](zh/agent-builtin-application.md)、[Provider](zh/provider-runtime.md)、[应用恢复](zh/module-recovery.md)、[任务时限](zh/task-timeout.md) |
+| 独立应用与离线输入 | [源码、固定输入与开发检查](zh/independent-applications.md) |
 | 应用开发与材料 | [依赖方向](zh/module-dependency-direction.md)、[版本材料](zh/author-version-materials.md)、[当前对话创作](zh/author-current-conversation.md)、[Git 发行](zh/module-git-release.md) |
 | Web 与设置 | [外壳与组合](zh/web-components-and-shell.md)、[可执行页面](zh/web-executable-components.md)、[应用设置](zh/application-settings.md) |
 | 通知与自动化 | [有限内核事实](zh/kernel-notification-facts.md)、[Mind](zh/mind-implementation.md)、[应用迁移](zh/application-migration.md) |

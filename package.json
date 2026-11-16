@@ -23,21 +23,21 @@
     "bun": ">=1.4.2"
   },
   "scripts": {
-    "dev": "bun --watch apps/server/src/index.bun.ts",
-    "server:start": "bun run apps/server/src/index.bun.ts",
+    "dev": "bun run applications:restore && bun --watch apps/server/src/index.bun.ts",
+    "server:start": "bun run applications:restore && bun run apps/server/src/index.bun.ts",
     "build": "bun scripts/chrona.ts build",
     "start": "bun run server:start",
-    "typecheck": "bunx tsc --noEmit --pretty false",
-    "typecheck:app": "bunx tsc --noEmit --pretty false",
+    "typecheck": "bun run applications:restore && bunx tsc --noEmit --pretty false",
+    "typecheck:app": "bun run applications:restore && bunx tsc --noEmit --pretty false",
     "lint": "bun run lint:ratchet",
-    "lint:warn": "eslint .",
+    "lint:warn": "bun run applications:restore && eslint .",
     "lint:ratchet": "bun run scripts/lint-ratchet.ts",
     "smoke:entrypoints": "bun run scripts/smoke-entrypoints.ts",
     "test": "bun scripts/chrona.ts test all",
     "test:api": "bun run scripts/run-api-tests.ts",
     "test:bun": "bun run scripts/run-bun-tests.ts",
     "db:generate": "prisma generate",
-    "postinstall": "prisma generate && bun run scripts/install-git-hooks.ts",
+    "postinstall": "bun run applications:install && prisma generate && bun run scripts/install-git-hooks.ts",
     "setup": "bun run db:generate && bun run db:seed",
     "db:seed": "bun prisma/seed.ts",
     "check:boundaries": "bun scripts/chrona.ts check boundaries",
@@ -47,7 +47,9 @@
     "ci:local": "bun run scripts/local-ci.ts",
     "hooks:install": "bun run scripts/install-git-hooks.ts",
     "build:smoke": "bun scripts/chrona.ts build smoke",
-    "audit:security": "bun run scripts/audit-security.ts"
+    "audit:security": "bun run scripts/audit-security.ts",
+    "applications:restore": "bun scripts/restore-applications.ts",
+    "applications:install": "bun scripts/install-application-dependencies.ts"
   },
   "dependencies": {
     "@prisma/client": "7.9.1",

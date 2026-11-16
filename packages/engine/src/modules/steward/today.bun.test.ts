@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { todayView } from "./external/web/today";
+import { todayView } from "./applications/web/today";
 
 const at = "2026-10-27T04:00:00Z";
 const runtime = { at, provider: { name: "fixture", available: true, sandboxed: false, lastError: null }, moduleSandbox: false,

@@ -1,12 +1,12 @@
 #!/usr/bin/env bun
 
 import { $ } from "bun";
+import { restoreApplications } from "./restore-applications";
 import { chmod, cp, mkdir, rm, stat } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
 import { buildArtifacts, buildTargets, currentBuildTarget, omitPausedRuntimeModules, parseBuildTarget, type BuildTargetName, type ReleaseResource } from "../build/manifest";
 import { normalizeElfInterpreterFile, removeElfLibraryPathsFile } from "../build/portable-elf";
-import { preparePiApplication } from "../build/agent-dependencies";
 import { buildEntryConversations } from "../build/entry-conversations";
 import { buildApplicationPages } from "../build/application-pages";
 import { writeReleaseIdentity } from "../build/release-identity";
@@ -80,10 +80,9 @@ export function compileArgs(target: BuildTargetName, binaryPath: string) {
 
 /** Generated contract files belong to the exact module commit shipped in its bundle. */
 export async function prepareReleaseModules(resourcesRoot: string) {
-  await buildEntryConversations(resourcesRoot);
-  await buildApplicationPages(resourcesRoot);
-  // Prepare only current release applications; retained sources are pruned from staging after seed verification.
-  await preparePiApplication(resourcesRoot);
+  await buildEntryConversations(join(resourcesRoot, "external"));
+  await buildApplicationPages(join(resourcesRoot, "external"));
+  // Pi artifacts are fixed inputs; seed verification below rejects missing or changed bytes.
   const seedDir = resolve(process.env.CHRONA_MODULE_GIT_SEEDS ?? resolve(ROOT, buildArtifacts.moduleGit.seedDir));
   await stageModuleGitLicense(resourcesRoot, resolve(ROOT, buildArtifacts.moduleGit.seedDir, "LICENSE"), resolve(ROOT, buildArtifacts.moduleGit.seedDir, "THIRD-PARTY-NOTICES.txt"));
   await copyModuleGitRelease(seedDir, resourcesRoot);
@@ -109,6 +108,7 @@ export async function prepareReleaseProcessHelper(resourcesRoot: string): Promis
 }
 
 export async function prepareReleaseResources(releaseDir: string) {
+  await restoreApplications();
   for (const resource of buildArtifacts.resources) await copyResource(resource, releaseDir);
   const resourcesRoot = resolve(releaseDir, buildArtifacts.resourcesRoot);
   await prepareReleaseModules(resourcesRoot);
@@ -116,6 +116,7 @@ export async function prepareReleaseResources(releaseDir: string) {
 }
 
 export async function buildBinary(target: BuildTargetName) {
+  await restoreApplications();
   const nativeTarget = `${process.platform === "win32" ? "windows" : process.platform}-${process.arch}`;
   if (target !== nativeTarget) throw new Error(`Native process supervision requires building ${target} on its matching runner; current runner is ${nativeTarget}`);
   const manifestTarget = buildTargets[target];

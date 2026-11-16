@@ -4,9 +4,9 @@ import { PrismaClient } from "@chrona/db/generated/prisma/client";
 import { acquireSqliteRuntimeLock } from "@chrona/db/sqlite-runtime-lock";
 import { sqlitePathFromFileUrl } from "@chrona/db/sqlite-url";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
-import { createQqBotState, createSecrets, createStewardService, moduleSupervisor, refreshInstallationReceipts, type StewardPorts } from "@chrona/engine";
+import { createSecrets, createStewardService, moduleSupervisor, refreshInstallationReceipts, type StewardPorts } from "@chrona/engine";
 import { getChronaDataDir } from "./start-server";
-import { createModuleRuntimePorts } from "../../integrations/src/steward/module-runtime";
+import { createModuleRuntimePorts, resourcePath } from "../../integrations/src/steward/module-runtime";
 import { moduleInstallRequestSchema, moduleVersionHashSchema } from "@chrona/contracts/steward";
 
 export type AdminCommand = "diagnostics" | "modules" | "catalog" | "install" | "rollback" | "disable" | "enable" | "remove" | "approvals" | "approve" | "reject";
@@ -86,7 +86,15 @@ export async function qqBindCode(input: { workspace: string; ttlMinutes: number;
   try {
     const module = await db.module.findFirst({ where: { workspaceId: input.workspace, name: "qq" } });
     if (!module) throw new Error("The qq module is not registered in this workspace. Start Chrona once first.");
-    const challenge = await createQqBotState(join(dataDir, "platform", "data", module.id), appId).createChallenge({ workspaceId: input.workspace, ttlMinutes: input.ttlMinutes, replace: input.replace });
+    const codeDir = join(resourcePath("external", "packages/engine/src/modules/steward/applications"), "qq");
+    const child = Bun.spawn(["bun", "--no-install", join(codeDir, "bind-code.ts")], {
+      cwd: codeDir, stdin: "pipe", stdout: "pipe", stderr: "pipe",
+    });
+    child.stdin.write(JSON.stringify({ dataDir: join(dataDir, "platform", "data", module.id), appId, workspaceId: input.workspace, ttlMinutes: input.ttlMinutes, replace: input.replace }));
+    child.stdin.end();
+    const [stdout, stderr, exitCode] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
+    if (exitCode !== 0) throw new Error(`QQ binding maintenance failed: ${stderr.trim()}`);
+    const challenge = JSON.parse(stdout) as { code: string; expiresAt: string };
     return { appId, ...challenge };
   } finally { await db.$disconnect(); }
 }

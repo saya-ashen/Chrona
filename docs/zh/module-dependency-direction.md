@@ -1,6 +1,6 @@
 # 模块依赖方向审查
 
-当前 Web 已改为普通 React / TSX 可执行页面，`page-set` 直接接收 JavaScript/CSS；不再使用 json-render 或独立组件登记。第 4 节为 2026-11-02 的历史试验，不能作为当前开发合同。当前入口见 [页面与外壳](web-components-and-shell.md) 和 [开发指南](../../packages/engine/src/modules/steward/external/web/UI-DEVELOPMENT.md)。
+当前 Web 已改为普通 React / TSX 可执行页面，`page-set` 直接接收 JavaScript/CSS；不再使用 json-render 或独立组件登记。第 4 节为 2026-11-02 的历史试验，不能作为当前开发合同。当前入口见 [页面与外壳](web-components-and-shell.md) 和 [开发指南](../../packages/engine/src/modules/steward/applications/web/UI-DEVELOPMENT.md)。
 
 2026-11-08 阅读提示：本页“M1 当前规则”也是阶段快照；Agent 原语及会话迁移后的边界见[应用编排](agent-module-orchestration.md)。§5 的旧应用名单不作为当前待办；实际生产转换见[统一路线](development-roadmap.md)。用户于同日确认五个内置应用允许受检定制，Agent 保持不可动态替换；下节 M1 的全部不可变条款仅保留为历史。
 
@@ -8,7 +8,7 @@
 
 ## M1 当前规则（2026-11-05）
 
-- 内置固定 web/mcp/files/notify/events，只随发行变更，不能普通构建/回滚/删除；qq/remind/mind 已移至 `packages/engine/src/modules/steward/external/`，memory-local 是可选外置。历史定制应用与生产转换另行授权。
+- 内置固定 web/mcp/files/notify/events，只随发行变更，不能普通构建/回滚/删除；qq/remind/mind 已移至 `packages/engine/src/modules/steward/applications/`，memory-local 是可选外置。历史定制应用与生产转换另行授权。
 - web 页面、notify 渠道、events 订阅按实际 moduleId 和工具 contractHash 登记；`expectedTarget` 在入队/投递复核。停用与删除、同名重装不继承旧回调；结果未知不猜测补发，旧无身份绑定 fail closed。
 - mind 在 `provider.wake` 时携带自身协议，tick 不按 mind 名字附加提示；memory 系统按配置和贡献发现实现。移除这些外置应用不阻断普通基础对话。
 - 内置/外置共用 routed calls；业务依赖仍只能从具体指向通用。`uses` 是契约，`visibility` 决定受众，详情见[安全规则](security-simplification.md)。

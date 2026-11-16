@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { callSync, kernelOrigin, enqueueCall } from "../../packages/engine/src/modules/steward/module-calls";
 import { registerLocalRuntime, runtimeCall, startLocalProvider } from "../../packages/engine/src/modules/steward/local-runtime";
-import { createPiOperations } from "../../packages/engine/src/modules/steward/external/pi/operations";
+import { createPiOperations } from "../../packages/engine/src/modules/steward/applications/pi/operations";
 import { moduleManifestSchema, type ExecutionEvent, type ProviderRunInput } from "@chrona/contracts/steward";
 import { retainProviderCallbacks } from "../../packages/engine/src/modules/steward/local-provider";
 import { moduleSupervisor } from "../../packages/engine/src/modules/steward/module-supervisor";

@@ -115,7 +115,7 @@ localTest("ordinary desktop candidate activation, update and disable stop actual
     const workspaceId = (await db.workspace.create({ data: { name: "Isolated desktop lifecycle acceptance" } })).id;
     const platform = join(root, "platform");
     // Only the known Author fixture is seeded approved. Both application versions go through real checks.
-    const authorFiles = await snapshotModule(import.meta.dir, "external/author");
+    const authorFiles = await snapshotModule(import.meta.dir, "applications/author");
     const authorManifest = moduleManifestSchema.parse(JSON.parse(Buffer.from(authorFiles.find(file => file.path === "module.json")!.bytes).toString("utf8")));
     expect(authorManifest.uses).toEqual(["modules.source", "modules.submit", "modules.receipt"]);
     expect(authorManifest.model).toBeUndefined();

@@ -1,6 +1,0 @@
-node_modules/
-*.sqlite*
-playwright-report/
-test-results/
-screenshots/
-browser-fixture.html

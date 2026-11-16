@@ -26,7 +26,7 @@ for (const persistent of [false, true]) {
     const workspace = await db.workspace.create({ data: { name: "registration" } });
     const externalRoot = join(dataDir, "platform", "external");
     await mkdir(externalRoot, { recursive: true });
-    await cp(join(import.meta.dirname, "external", name), join(externalRoot, name), { recursive: true });
+    await cp(join(import.meta.dirname, "applications", name), join(externalRoot, name), { recursive: true });
     await seedTestModuleRelease(externalRoot, name);
     const sdk = resolve(import.meta.dirname, "../../../../integrations/src/steward/module-sdk");
     const sandbox = createScriptSandbox({ executionMode: "trusted-local", dataDir, moduleSdk: sdk });
@@ -39,7 +39,7 @@ for (const persistent of [false, true]) {
         startModule: input => input.codeDir === webRuntimeDir ? peer.startModule(input) : sandbox.startModule(input) } };
     const supervisor = moduleSupervisor(ports);
     cleanups.push(async () => { await supervisor.stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
-    const shippedWeb = moduleManifestSchema.parse(await Bun.file(join(import.meta.dirname, "external/web/module.json")).json());
+    const shippedWeb = moduleManifestSchema.parse(await Bun.file(join(import.meta.dirname, "applications/web/module.json")).json());
     const webManifest = moduleManifestSchema.parse({ name: "web", entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: false, tools: [shippedWeb.tools.find(tool => tool.name === "page-set")!] });
     await mkdir(webCodeDir, { recursive: true });
     await Bun.write(join(webCodeDir, "module.json"), JSON.stringify(webManifest));
@@ -70,7 +70,7 @@ for (const name of ["remind"] as const) for (const status of ["active", "paused"
   test(`retained ${name} source never registers or executes while admission is paused (status=${status})`, async () => {
     const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-registration-paused-"));
     const externalRoot = join(dataDir, "platform", "external"), source = join(externalRoot, name);
-    await cp(join(import.meta.dirname, "external", name), source, { recursive: true });
+    await cp(join(import.meta.dirname, "applications", name), source, { recursive: true });
     // Retained manifests belong to the archived app; do not rewrite them into current contracts.
     const manifest = await Bun.file(join(source, "module.json")).json();
     const workspace = await db.workspace.create({ data: { name: "paused-registration" } });

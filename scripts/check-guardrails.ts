@@ -1,8 +1,11 @@
 #!/usr/bin/env bun
 
+import { checkStagedApplicationInputs } from "./application-git-inputs";
+import { restoreApplications } from "./restore-applications";
+
 import { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, posix, relative, resolve } from "node:path";
 import { buildArtifacts } from "../build/manifest";
 import { contractSchemasDirectory, generateContractSchemas, serializeContractSchema } from "./generate-contract-schemas";
@@ -249,7 +252,7 @@ export function checkMaterials(root = ROOT): GuardrailFinding[] {
 		...gitPaths(root, ["ls-files", "--others", "--exclude-standard", "-z"]),
 	]);
 	for (const mod of buildArtifacts.moduleGit.modules) {
-		const relDir = posix.join("packages/engine/src/modules/steward", mod.source);
+		const relDir = posix.join("packages/engine/src/modules/steward/applications", mod.name);
 		const dir = resolve(root, relDir);
 		const matPath = resolve(dir, "chrona-material.json");
 		if (!existsSync(matPath)) {
@@ -275,9 +278,10 @@ export function checkMaterials(root = ROOT): GuardrailFinding[] {
 			...(record.artifacts ?? []).map((a) => a.path),
 			"chrona-material.json",
 		]);
-		const tracked = gitPaths(root, ["ls-files", "-z", "--cached", "--others", "--exclude-standard", relDir])
-			.map((p) => p.slice(relDir.length + 1))
-			.filter((p) => existsSync(resolve(dir, p)) && !declared.has(p));
+		const tracked = readdirSync(dir, { recursive: true, withFileTypes: true })
+			.filter(entry => entry.isFile())
+			.map(entry => relative(dir, resolve(entry.parentPath, entry.name)).replace(/\\/gu, "/"))
+			.filter((p) => !["node_modules", ".git", ".venv", ".chrona"].includes(p.split("/")[0]!) && existsSync(resolve(dir, p)) && !declared.has(p));
 		for (const unlisted of tracked) {
 			findings.push({
 				check: "materials",
@@ -431,7 +435,7 @@ const STAGED_CHECK_RULES: Array<{ check: GuardrailCheckName; match: (p: string) 
 	},
 	{
 		check: "materials",
-		match: (p) => p.startsWith("packages/engine/src/modules/steward/external/") || p === "build/manifest.ts",
+		match: (p) => p.startsWith("packages/engine/src/modules/steward/applications/") || p.startsWith("resources/application-inputs/") || p.startsWith("resources/module-git/") || p === "build/manifest.ts",
 	},
 	{
 		check: "migrations",
@@ -478,8 +482,10 @@ export function runGuardrails(options: RunGuardrailsOptions = {}): GuardrailFind
 }
 
 if (import.meta.main) {
+	await restoreApplications();
 	const args = process.argv.slice(2);
 	const stagedOnly = args.includes("--staged");
+	if (stagedOnly) checkStagedApplicationInputs(ROOT);
 	const includeBoundaries = args.includes("--with-boundaries");
 	const onlyArg = args.find((a) => a.startsWith("--only="));
 	const only = onlyArg ? (onlyArg.slice("--only=".length).split(",") as GuardrailCheckName[]) : undefined;

@@ -1,5 +1,5 @@
 import type { StewardPorts } from "./ports";
-import { lifecycleNotice } from "./external/notify/lifecycle";
+import { lifecycleNotice } from "./applications/notify/lifecycle";
 import { kernelFactSchema } from "./notification-facts";
 
 export type Notice = { title: string; body: string; level: string; idempotencyKey: string; moduleId: string | null; sessionId: string | null; approvalId: string | null; recipient: string | null; caller: string; status: string };

@@ -7,7 +7,7 @@ import { testDb } from "@chrona/engine/test-support";
 import { createRescueApp, startRescueListener } from "./rescue";
 import { builtinEntry, createRelay, qqEntry } from "@chrona/engine/test-support";
 import { buildArtifacts } from "../../../build/manifest";
-import webManifest from "../../../packages/engine/src/modules/steward/external/web/module.json";
+import webManifest from "../../../packages/engine/src/modules/steward/applications/web/module.json";
 
 const dbs: ReturnType<typeof testDb>[] = [];
 afterEach(async () => { for (const db of dbs.splice(0)) await db.$disconnect(); });

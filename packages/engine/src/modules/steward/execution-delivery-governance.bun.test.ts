@@ -10,10 +10,10 @@ import { createExecutionDelivery } from "./execution-delivery";
 import { createExecutionEventStore } from "./execution-event-store";
 import { callExecutionDeliveryCarrier } from "./execution-delivery-carrier";
 import { executionDigest } from "./execution-delivery-digest";
-import { RemoteExecutionApp } from "./external/remote-execution/app";
-import { RoutedKernelPort } from "./external/remote-execution/kernel-port";
-import { Store } from "./external/remote-execution/store";
-import { digest, readStored, type Delivery, type Target } from "./external/remote-execution/contracts";
+import { RemoteExecutionApp } from "./applications/remote-execution/app";
+import { RoutedKernelPort } from "./applications/remote-execution/kernel-port";
+import { Store } from "./applications/remote-execution/store";
+import { digest, readStored, type Delivery, type Target } from "./applications/remote-execution/contracts";
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); });
@@ -22,7 +22,7 @@ async function fixture() {
   const workspace = await db.workspace.create({ data: { name: "native governance" } });
   const caller = await db.module.create({ data: { workspaceId: workspace.id, name: "caller", activeHash: "b".repeat(40) } });
   const receiver = await db.module.create({ data: { workspaceId: workspace.id, name: "remote-execution", activeHash: "a".repeat(40) } });
-  const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(import.meta.dirname, "external/remote-execution/module.json"), "utf8")));
+  const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(import.meta.dirname, "applications/remote-execution/module.json"), "utf8")));
   await db.moduleVersion.create({ data: { moduleId: receiver.id, hash: receiver.activeHash!, manifest, status: "approved", report: {}, intent: {}, source: "user" } });
   const now = new Date("2026-11-09T10:00:00Z"), ports: StewardPorts = { db, now: () => now, dataDir: "/tmp/s5-native-governance", publicUrl: null };
   ports.executionEvents = createExecutionEventStore(ports);

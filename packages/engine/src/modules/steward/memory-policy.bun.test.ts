@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { conversationMemory, type ConversationSnapshot } from "./external/memory-local/conversation";
+import { conversationMemory, type ConversationSnapshot } from "./applications/memory-local/conversation";
 
 const snapshot = (count: number, options: Partial<ConversationSnapshot> = {}): ConversationSnapshot => ({
   session: { id: "s", source: "entry" }, now: "2026-11-07T12:00:00.000Z", ending: false, autoRecall: true, autoRetain: true, recalled: false, retainedThrough: null,

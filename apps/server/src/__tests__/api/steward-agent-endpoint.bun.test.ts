@@ -22,7 +22,7 @@ async function fixture() {
   await db.moduleVersion.create({ data: { moduleId: entry.id, hash: "v1", manifest: moduleManifestSchema.parse({ name: entry.name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: ["*"],
       authority: "owner"
 }), source: "user", status: "approved", intent: {}, report: {} } });
-  const authorRoot = join(import.meta.dirname, "../../../../../packages/engine/src/modules/steward/external/author");
+  const authorRoot = join(import.meta.dirname, "../../../../../packages/engine/src/modules/steward/applications/author");
   const authorManifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(authorRoot, "module.json"), "utf8")));
   const author = await db.module.create({ data: { workspaceId, name: "author", activeHash: "c".repeat(64) } });
   await db.moduleVersion.create({ data: { moduleId: author.id, hash: "c".repeat(64), manifest: authorManifest, source: "user", status: "approved", intent: {}, report: {} } });

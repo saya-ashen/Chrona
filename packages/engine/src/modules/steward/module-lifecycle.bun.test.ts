@@ -11,7 +11,7 @@ import { testDb } from "./test-db";
 import { seedTestModuleRelease } from "./module-release-test-fixture";
 import { moduleContext } from "./module-context";
 import { propose } from "./module-proposal";
-import { createPages } from "./external/web/pages";
+import { createPages } from "./applications/web/pages";
 import type { StewardPorts } from "./ports";
 import "./module-effects";
 

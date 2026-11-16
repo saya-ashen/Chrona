@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
-import { createQqGateway, createQqTokenSource, sendQqC2c, QQ_TOKEN_URL, type QqC2cMessage } from "./external/qq/official";
+import { createQqGateway, createQqTokenSource, sendQqC2c, QQ_TOKEN_URL, type QqC2cMessage } from "./applications/qq/official";
 
 const SECRET = "test-secret-value";
 const dirs: string[] = [];

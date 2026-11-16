@@ -29,7 +29,7 @@ test.skipIf(!command || process.env.CHRONA_TEST_DEVICE_HTTP !== "1" || process.p
   let runtime: ReturnType<typeof createStewardRuntime> | undefined, server: ReturnType<typeof Bun.serve> | undefined, device: RemoteDevice | undefined;
   try {
     await db.workspace.create({ data: { id: "ws_default", name: "Device acceptance" } });
-    const source = fileURLToPath(new URL("../../engine/src/modules/steward/external/remote-execution", import.meta.url));
+    const source = fileURLToPath(new URL("../../engine/src/modules/steward/applications/remote-execution", import.meta.url));
     const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(source, "module.json"), "utf8")));
     const appModule = await db.module.create({ data: { workspaceId: "ws_default", name: "remote-execution", activeHash: "c".repeat(40) } });
     await db.moduleVersion.create({ data: { moduleId: appModule.id, hash: appModule.activeHash!, manifest, source: "user", status: "approved", intent: {}, report: {} } });

@@ -25,7 +25,7 @@ test("MCP installs from its pinned ordinary release, passes SDK checks and activ
   const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => new Date(), moduleExternalResources: resources, ...testReleaseRuntimeChecks(),
     packages: testReleasePackages(resources), sandbox: { ...sandbox.health, runModule: sandbox.runModule, startModule: sandbox.startModule } };
   try {
-    await cp(join(import.meta.dirname, "external", "mcp"), join(resources, "mcp"), { recursive: true });
+    await cp(join(import.meta.dirname, "applications", "mcp"), join(resources, "mcp"), { recursive: true });
     const seed = await seedTestModuleRelease(resources, "mcp");
     const release = await resolveExternalRelease(ports, "mcp");
     expect(release).toMatchObject({ name: "mcp", origin: "external", hash: seed.commit, git: { commit: seed.commit } });
@@ -69,7 +69,7 @@ for (const name of ["events", "files", "notify", "mcp"]) {
   test(`${name}: real SDK author tests in an offline temporary module copy`, async () => {
     const dataDir = await mkdtemp(join(tmpdir(), `chrona-${name}-author-`)), db = testDb();
     try {
-      const source = join(import.meta.dirname, "external", name), code = join(dataDir, "platform", "store", name);
+      const source = join(import.meta.dirname, "applications", name), code = join(dataDir, "platform", "store", name);
       await mkdir(code, { recursive: true }); await cp(source, code, { recursive: true });
       const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(code, "module.json"), "utf8")));
       const sandbox = createScriptSandbox({ dataDir, executionMode: "trusted-local" });

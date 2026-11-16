@@ -12,8 +12,8 @@ import { moduleSupervisor } from "./module-supervisor";
 import { testModuleProcess } from "./module-test-process";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
-import { createPiApplication, REGISTRATION } from "./external/pi/application";
-import { manifest } from "./external/pi/build";
+import { createPiApplication, REGISTRATION } from "./applications/pi/application";
+import { manifest } from "./applications/pi/build";
 import "./module-effects";
 
 const cleanups: (() => Promise<void>)[] = [];
@@ -75,7 +75,11 @@ else console.log(JSON.stringify({type:'message_end',message:{role:'assistant',mo
   expect(claimed?.runId).toBe(row.id);
   const input: ProviderRunInput = { runId: row.id, token: claimed!.token, lane: "background", cwd: row.cwd, sessionDir: join(dataDir, "sessions"), sessionId: null, prompt: row.prompt, systemPrompt: "system", resources: "configured", deadline: row.deadlineAt };
   async function launched() {
-    for (let count = 0; count < 400; count++) { if (actualClosed) return; await Bun.sleep(5); }
+    for (let count = 0; count < 400; count++) {
+      // spawn() can return before the fake process writes the record asserted after cancellation.
+      if (actualClosed && await Bun.file(processRecord).exists() && Bun.file(processRecord).size > 0) return;
+      await Bun.sleep(5);
+    }
     throw new Error("Fake completion failed to launch");
   }
   return { ports, db, workspaceId, input, application, requests, invoke, launched, acceptClosure, rejectClosure, actualClosed: async () => { await launched(); await actualClosed; }, launches: () => launches, processRecord };

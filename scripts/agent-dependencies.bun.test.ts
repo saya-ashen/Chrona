@@ -12,7 +12,7 @@ import { MODULE_MATERIAL_FILE, MODULE_SOURCE_MAX_BYTES, MODULE_SOURCE_MAX_FILES,
 import { readModuleFiles } from "../packages/engine/src/modules/steward/module-preview";
 import { readModuleMaterial, readModuleSource } from "../packages/engine/src/modules/steward/module-git";
 
-const piPath = "packages/engine/src/modules/steward/external/pi";
+const piPath = "packages/engine/src/modules/steward/applications/pi";
 
 test("compact ordinary packages preserve runtime versions, public exports, real types and license texts", async () => {
   const root = await mkdtemp(join(tmpdir(), "chrona-module-closure-"));

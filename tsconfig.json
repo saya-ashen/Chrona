@@ -84,7 +84,7 @@
         "./packages/integrations/src/steward/module-sdk/sdk.ts"
       ],
       "/pages.js": [
-        "./packages/engine/src/modules/steward/external/web/src/pages.tsx"
+        "./packages/engine/src/modules/steward/applications/web/src/pages.tsx"
       ]
     }
   },

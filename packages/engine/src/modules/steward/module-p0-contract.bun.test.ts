@@ -24,9 +24,9 @@ import { callSync, enqueueCall, kernelOrigin, runDueCalls } from "./module-calls
 import { moduleLifecycleFixtures as fixtures } from "./module-lifecycle.fixtures";
 import { moduleSupervisor } from "./module-supervisor";
 import { testModuleProcess } from "./module-test-process";
-import { createPiOperations } from "./external/pi/operations";
-import { createBrowsers } from "./external/pi/browser";
-import { currentHostGeneration, hostStopped } from "./external/pi/host-recovery";
+import { createPiOperations } from "./applications/pi/operations";
+import { createBrowsers } from "./applications/pi/browser";
+import { currentHostGeneration, hostStopped } from "./applications/pi/host-recovery";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });

@@ -24,7 +24,7 @@ test("real notify SDK uses two external callbacks, retains module bindings throu
   const runtime = createScriptSandbox({ dataDir, executionMode: "trusted-local" });
   const ports: StewardPorts = { db, dataDir, now: () => new Date(), publicUrl: null, moduleExternalResources: resources, sandbox: { ...runtime.health, runModule: runtime.runModule, startModule: runtime.startModule } };
   try {
-    await mkdir(resources, { recursive: true }); await cp(join(import.meta.dirname, "external/notify"), join(resources, "notify"), { recursive: true });
+    await mkdir(resources, { recursive: true }); await cp(join(import.meta.dirname, "applications/notify"), join(resources, "notify"), { recursive: true });
     await seedTestModuleRelease(resources, "notify");
     const release = await resolveExternalRelease(ports, "notify");
     const workspaceId = (await db.workspace.create({ data: { name: "notify-routed" } })).id;

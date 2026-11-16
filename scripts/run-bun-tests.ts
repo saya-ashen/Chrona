@@ -1,10 +1,12 @@
+
+import { restoreApplications } from "./restore-applications";
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { buildProcessHelper } from "../packages/process/scripts/build-helper";
 
 const include = new Bun.Glob("**/*.bun.test.{ts,tsx}");
 const additionalTests = ["state.test.ts", "dom.test.ts", "host-agent.integration.test.ts"]
-	.map(file => `packages/engine/src/modules/steward/external/chat/${file}`);
+	.map(file => `packages/engine/src/modules/steward/applications/chat/${file}`);
 const ignoredSegments = new Set([
 	"node_modules",
 	".direnv",
@@ -19,6 +21,7 @@ const ignoredSegments = new Set([
 	"build",
 	"coverage",
 ]);
+await restoreApplications();
 const rootDir = process.cwd();
 const listOnly = process.argv.includes("--list");
 const requestedFiles = process.argv.slice(2).filter(arg => arg !== "--list").map((p) => p.replace(/^\.\//u, ""));
@@ -32,6 +35,7 @@ const concurrency = Math.max(
 function shouldInclude(path: string) {
 	const retained = [
 		"scripts/",
+		"examples/desktop-demo/",
 		"packages/cli/",
 		"packages/engine/src/modules/steward/", "packages/domain/src/steward/",
 		"packages/integrations/src/steward/", "packages/contracts/src/steward/", "packages/pi/", "packages/process/", "packages/workspaces/", "packages/remote-device/", "packages/remote-model/",

@@ -1,5 +1,3 @@
-// The CLI writes binding codes in the built-in qq module's state format.
-export { createQqBotState } from "./modules/steward/external/qq/bot";
 export { createSecrets } from "./modules/steward/secrets";
 // Stopped-service CLI maintenance uses the engine's checked export and bounded file reader.
 export { readBoundedFile } from "./modules/steward/workspace-files";

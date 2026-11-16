@@ -97,8 +97,7 @@ async function writeJson(path: string, value: unknown) {
 function validateReleaseIdentity(entry: ModuleGitReleaseEntry, names: Set<string>) {
   if ((!activeModuleNames.has(entry.name) && !retiredModuleNames.has(entry.name)) || names.has(entry.name) || entry.branch !== "main" || !oid.test(entry.commit) || entry.bundle !== `${entry.name}.bundle` || !/^[a-f0-9]{64}$/.test(entry.bundleSha256) || (entry.repository !== null && entry.repository !== `https://github.com/chrona-core/chrona-module-${entry.name}`)) throw new Error("Invalid module Git release identity");
 }
-async function readLock(seedDir: string, preparing = false): Promise<ReleaseLock> {
-  const raw: unknown = JSON.parse(await readFile(join(seedDir, "lock.json"), "utf8"));
+export function parseReleaseLock(raw: unknown, preparing = false): ReleaseLock {
   if (typeof raw !== "object" || raw === null || !("version" in raw) || raw.version !== 1 || !("modules" in raw) || !Array.isArray(raw.modules)) throw new Error("Invalid module Git release lock");
   const lock = raw as ReleaseLock, names = new Set<string>();
   for (const entry of lock.modules) {
@@ -108,6 +107,9 @@ async function readLock(seedDir: string, preparing = false): Promise<ReleaseLock
   const missing = [...activeModuleNames].filter(name => !names.has(name));
   if (!preparing && missing.length) throw new Error(`Module Git release lock is incomplete: ${missing.join(", ")}; coordinate seed preparation for the staged release before packaging`);
   return lock;
+}
+async function readLock(seedDir: string, preparing = false): Promise<ReleaseLock> {
+  return parseReleaseLock(JSON.parse(await readFile(join(seedDir, "lock.json"), "utf8")), preparing);
 }
 
 /** Stage the same license in maintained seeds and every packaged module tree. */
@@ -243,6 +245,9 @@ export async function verifyPublishedModuleGitRelease(seedDir: string) {
 if (import.meta.main) {
   const [command, directory, resources] = process.argv.slice(2);
   if (command === "prepare" && directory && resources) {
+    if (resolve(directory) === resolve(import.meta.dirname, "..", buildArtifacts.moduleGit.seedDir)) {
+      throw new Error("Official application history is maintained in independent repositories; use scripts/pin-application.ts after committing main");
+    }
     const { preparePiApplication } = await import("../build/agent-dependencies");
     await preparePiApplication(resolve(resources));
     await prepareModuleGitRelease({ root: resolve(import.meta.dirname, ".."), seedDir: resolve(directory), resourcesRoot: resolve(resources), hostCommit: process.env.CHRONA_MODULE_GIT_COMMIT, hostTimestamp: process.env.CHRONA_MODULE_GIT_TIMESTAMP });

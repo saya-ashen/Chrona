@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createScriptSandbox } from "../../packages/integrations/src/steward/script-sandbox";
 import { createModuleChannel } from "../../packages/engine/src/modules/steward/module-channel";
-import { createSourceFiles } from "../../packages/engine/src/modules/steward/external/author/files";
-import { parseImport } from "../../packages/engine/src/modules/steward/external/author/material";
+import { createSourceFiles } from "../../packages/engine/src/modules/steward/applications/author/files";
+import { parseImport } from "../../packages/engine/src/modules/steward/applications/author/material";
 import { moduleManifestSchema } from "../../packages/contracts/src/steward";
 
 test("ordinary desktop app lifecycle and supervised descendant cleanup", async () => {

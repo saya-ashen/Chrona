@@ -28,4 +28,4 @@ Web 是普通应用，负责认证、导航、主题和页面布局。业务应�
 
 `Workspace` 提供侧栏/主区，`WorkspaceHeader.statusTone` 由应用明确传入；`Composer.onSubmit` 是普通回调。应用负责草稿、loading、错误与显式重试。主要动作和待决定事项清晰，手机无横向滚动；浏览器验证 1440×900、1024×768、390×844。
 
-详见 [可执行页面合同](web-executable-components.md)、[应用设置](application-settings.md)、[随 Web 交付的开发指南](../../packages/engine/src/modules/steward/external/web/UI-DEVELOPMENT.md)。源码、测试、隔离验收、实际部署及真实使用分别报告；本次源码迁移不证明任何运行部署已更新。
+详见 [可执行页面合同](web-executable-components.md)、[应用设置](application-settings.md)、[随 Web 交付的开发指南](../../packages/engine/src/modules/steward/applications/web/UI-DEVELOPMENT.md)。源码、测试、隔离验收、实际部署及真实使用分别报告；本次源码迁移不证明任何运行部署已更新。

@@ -65,7 +65,7 @@ chrona.serve(async request => {
 test("current MCP JSON-RPC requires the API key and routes current tools through the real SDK", async () => {
   const { workspaceId } = await seedWorkspace("MCP listener");
   const selected = createScriptSandbox({ dataDir, executionMode: "trusted-local" });
-  const source = join(import.meta.dirname, "../../../packages/engine/src/modules/steward/external/mcp");
+  const source = join(import.meta.dirname, "../../../packages/engine/src/modules/steward/applications/mcp");
   const code = join(dataDir, "platform/store/mcp-listener");
   await cp(source, code, { recursive: true });
   const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(code, "module.json"), "utf8")));

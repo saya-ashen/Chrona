@@ -31,7 +31,7 @@ export const buildArtifacts = {
     { from: "prisma/migrations", to: "resources/prisma/migrations", required: true },
     { from: ".env.example", to: "resources/.env.example", required: false },
     { from: "packages/pi/resources", to: "resources/pi", required: true },
-    { from: "packages/engine/src/modules/steward/external", to: "resources/external", required: true },
+    { from: "packages/engine/src/modules/steward/applications", to: "resources/external", required: true },
     { from: "packages/integrations/src/steward/module-sdk/package.json", to: "resources/module-sdk/package.json", required: true },
     { from: "packages/integrations/src/steward/module-typecheck/chrona-sdk-loader.ts", to: "resources/module-sdk/chrona-sdk-loader.ts", required: true },
     { from: "packages/integrations/src/steward/module-sdk/sdk.ts", to: "resources/module-sdk/sdk.ts", required: true },

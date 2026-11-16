@@ -37,7 +37,7 @@ Provider 只提供启动、注入、语义事件、停止和结束结果，并�
 | `packages/integrations/src/steward/pi-launch.ts` | 根据 input.execution 决定 Chrona 工具、显式技能/扩展加载；附带 lane 文本 | 将资源与工具选择改为内核明确传入的运行约束，Pi 只转换和执行 |
 | `packages/engine/src/modules/steward/tick.ts` | 另有一份 STEWARD_PROMPT；组装普通上下文、构建上下文及编码分流，负责 Provider 实际退出后的收尾 | 统一指令来源，继续保留领取、启动竞态和治理收尾 |
 | `packages/engine/src/modules/steward/execution-context.ts` | 内核有 CODING_PROMPT，读取项目规则，核实授权、构造受治理输入并持久化事件 | 编码工作说明归 coding；身份、目录核验、边界约束和事件写入保留 |
-| `packages/engine/src/modules/steward/external/coding/work-v2.ts`、`results.ts`、`workspaces.ts` | 工作依赖、placement 选择、结果处理和清理意图已有模块归属，执行通过 executions routed call | 保留并复用，不重建业务模型或第二个队列 |
+| `packages/engine/src/modules/steward/applications/coding/work-v2.ts`、`results.ts`、`workspaces.ts` | 工作依赖、placement 选择、结果处理和清理意图已有模块归属，执行通过 executions routed call | 保留并复用，不重建业务模型或第二个队列 |
 | `packages/engine/src/modules/steward/system/provider.ts`、`module-model.ts` | complete 核实模块身份并预留预算；wake 将来源文本作为不可信数据入队 | 继续作为薄内核系统工具，不拆新应用 |
 | `packages/engine/src/modules/steward/module-build-session.ts` | 构建指令、目标登记和构建治理位于现有模块管理流程 | 不迁入 Provider，不因名称含 build 就整体搬成新应用 |
 | `packages/integrations/src/executor/daemon.ts` | 设备端同样调用 createPiProvider，使用 assignment.goal；当前与服务端编码提示组装存在差异 | 同步纳入改造与验收，不能只改服务器路径 |
@@ -97,7 +97,7 @@ Provider 只提供启动、注入、语义事件、停止和结束结果，并�
 - `packages/integrations/src/steward/pi-provider.ts`、`pi-launch.ts`：移除业务解释、执行显式约束。
 - `packages/engine/src/modules/steward/tick.ts`、`execution-context.ts`：可信输入组装和治理接线。
 - `packages/integrations/src/executor/daemon.ts`：设备端对称接线。
-- `packages/engine/src/modules/steward/external/coding/work-v2.ts` 及其现有目标组装 helper：模块自己的工作说明。
+- `packages/engine/src/modules/steward/applications/coding/work-v2.ts` 及其现有目标组装 helper：模块自己的工作说明。
 - 上述消费者、fixture、生成契约和对应测试；生成文件只经现有生成脚本更新。
 
 条件触及：普通私有构建入口和 prompt 相关测试，只有实际消费新输入或旧提示时修改。版本检查、审批与模块激活算法不在重构目标内。

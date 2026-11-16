@@ -1,8 +1,8 @@
 import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
-import { openStore } from "./external/notify/store";
-import { createNotify } from "./external/notify/notify";
-import { ingestKernelFacts } from "./external/notify/facts";
+import { openStore } from "./applications/notify/store";
+import { createNotify } from "./applications/notify/notify";
+import { ingestKernelFacts } from "./applications/notify/facts";
 import { testDb } from "./test-db";
 import { acknowledgeKernelFacts, readKernelFacts, recordApprovalFact, recordWithdrawal, seedFactConsumer, selectFactConsumer, withdrawnKernelKeys } from "./notification-facts";
 

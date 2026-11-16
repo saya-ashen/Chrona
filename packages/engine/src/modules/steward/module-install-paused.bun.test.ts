@@ -22,7 +22,7 @@ test.each([...PAUSED_MODULE_NAMES])("retained %s sources cannot become an instal
   const dataDir = await mkdtemp("/tmp/chrona-paused-install-"), db = testDb();
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "paused packages" } });
-  const resources = join(dataDir, "external"), source = resolve(import.meta.dirname, "external", name), retained = join(resources, name);
+  const resources = join(dataDir, "external"), source = resolve(import.meta.dirname, "applications", name), retained = join(resources, name);
   await cp(source, retained, { recursive: true });
   const before = await sourceDigest(retained);
   const manifest = JSON.parse(await readFile(join(retained, "module.json"), "utf8")) as { name: string; entry: string; tests: string[] };

@@ -20,7 +20,7 @@
 
 当前源码核对点：
 
-- `packages/engine/src/modules/steward/external/coding/index.ts`：页面登记、业务操作与真实模块调用身份。
+- `packages/engine/src/modules/steward/applications/coding/index.ts`：页面登记、业务操作与真实模块调用身份。
 - `coding/sessions.ts`：业务会话与所选工作的持久记录；它不是 Pi 会话文件。
 - `coding/agent.ts`：coding 对 Agent 原语的适配。
 - `coding/workbench.ts`：基础页的有界列表、进度、问答、停止和成果操作。

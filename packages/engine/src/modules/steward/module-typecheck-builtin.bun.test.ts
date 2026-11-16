@@ -23,7 +23,7 @@ async function fixture() {
   const moduleRuntimes = await Bun.file(join(integrations, "runtimes.json")).json();
   const ports = { db, dataDir: root, publicUrl: null, now: () => new Date(), moduleRuntimes, moduleSdk: join(integrations, "module-sdk"), moduleTypecheck: join(integrations, "module-typecheck") } as StewardPorts;
   const pi = join(root, "pi");
-  await cp(join(import.meta.dir, "external/pi"), pi, { recursive: true, filter: path => !path.split(/[\\/]/).some(part => ["node_modules", "vendor"].includes(part)) });
+  await cp(join(import.meta.dir, "applications/pi"), pi, { recursive: true, filter: path => !path.split(/[\\/]/).some(part => ["node_modules", "vendor"].includes(part)) });
   await assembleModuleDependencies(pi);
   const lock = await readFile(join(pi, "bun.lock"), "utf8");
   expect(lock).not.toMatch(/https?:|workspace:/);
@@ -49,7 +49,7 @@ async function fixture() {
   // Check the actual Pi source, not just its bundled JavaScript entrypoint.
   await writeFile(join(pi, "index.ts"), 'import "./runtime.ts";\n');
   const manifest = moduleManifestSchema.parse(await Bun.file(join(pi, "module.json")).json());
-  const web = moduleManifestSchema.parse(await Bun.file(join(import.meta.dir, "external/web/module.json")).json());
+  const web = moduleManifestSchema.parse(await Bun.file(join(import.meta.dir, "applications/web/module.json")).json());
   return { root, pi, manifest, web, moduleRuntimes, context: moduleContext(ports, workspace.id) };
 }
 
@@ -139,9 +139,9 @@ test("Chat entry checks against generated kernel and Web contracts before packag
   const workspace = await db.workspace.create({ data: { name: "Chat contract check" } });
   const ports = { db, dataDir: root, publicUrl: null, now: () => new Date(), moduleRuntimes: await Bun.file(join(integrations, "runtimes.json")).json(),
     moduleSdk: join(integrations, "module-sdk"), moduleTypecheck: join(integrations, "module-typecheck") } as StewardPorts;
-  const code = join(import.meta.dir, "external/chat");
+  const code = join(import.meta.dir, "applications/chat");
   const manifest = moduleManifestSchema.parse(await Bun.file(join(code, "module.json")).json());
-  const web = moduleManifestSchema.parse(await Bun.file(join(import.meta.dir, "external/web/module.json")).json());
+  const web = moduleManifestSchema.parse(await Bun.file(join(import.meta.dir, "applications/web/module.json")).json());
   const checked = await typecheckBuild(moduleContext(ports, workspace.id), code, manifest, { moduleName: "web", manifest: web });
   expect(checked, JSON.stringify(checked)).toEqual({ status: "passed" });
 }, 60_000);

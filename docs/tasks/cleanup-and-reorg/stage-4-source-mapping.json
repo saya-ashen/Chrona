@@ -1,0 +1,3410 @@
+[
+  {
+    "source": "packages/engine/src/modules/steward/external/author/LICENSE",
+    "destination": "/home/saya/workspace/chrona-module-author/LICENSE",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "ec698798d97e2fdf85077e23eca23ec4ab31f3c205d7d84ffb8b686a4b4069e7",
+    "afterSha256": "ec698798d97e2fdf85077e23eca23ec4ab31f3c205d7d84ffb8b686a4b4069e7"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/author/README.md",
+    "destination": "/home/saya/workspace/chrona-module-author/README.md",
+    "exists": true,
+    "sameBytes": false,
+    "beforeSha256": "9778f93ffc33cd41ac8b6d9dee840d2d4e29d5a464fda7593cd9b933735f12ca",
+    "afterSha256": "5d5cdf13b9ff4d9a77906d8e1725c4f3fe75cd4c6a3aba2f79e0946ce6dbcbaf"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/author/author.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-author/author.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "95b6cf54e328d72a21d417ee4625f0f00c73a0184fa4728420e4e2ee96f59c11",
+    "afterSha256": "95b6cf54e328d72a21d417ee4625f0f00c73a0184fa4728420e4e2ee96f59c11"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/author/chrona-material.json",
+    "destination": "/home/saya/workspace/chrona-module-author/chrona-material.json",
+    "exists": true,
+    "sameBytes": false,
+    "beforeSha256": "0ac0d27e8266eab3462708598f1441c73fc936ee134b4f297861741070657005",
+    "afterSha256": "d5ddeca91f7c9096130641a45e4ee399c2ee850d02e29f10ed0abac20449e1cf"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/author/contracts.ts",
+    "destination": "/home/saya/workspace/chrona-module-author/contracts.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "e13b75368ed091e52871055e5a2f20033df1e5d0b4b4efc80e60adcfbdcf1adf",
+    "afterSha256": "e13b75368ed091e52871055e5a2f20033df1e5d0b4b4efc80e60adcfbdcf1adf"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/author/distribution.ts",
+    "destination": "/home/saya/workspace/chrona-module-author/distribution.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "58cefb70cddd2a3c7133f4a070f07fe893261a614895dda37d088ff639d7d049",
+    "afterSha256": "58cefb70cddd2a3c7133f4a070f07fe893261a614895dda37d088ff639d7d049"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/author/files.ts",
+    "destination": "/home/saya/workspace/chrona-module-author/files.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "218773a0802822cfee987c2e4a5d3b1a5c9f6dfedfb6d207ba4ec3b2948c221d",
+    "afterSha256": "218773a0802822cfee987c2e4a5d3b1a5c9f6dfedfb6d207ba4ec3b2948c221d"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/author/index.ts",
+    "destination": "/home/saya/workspace/chrona-module-author/index.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "85656bc7bfb781d6d9f74c56001b76a0b2b609141443da228fd532f7963c5e2d",
+    "afterSha256": "85656bc7bfb781d6d9f74c56001b76a0b2b609141443da228fd532f7963c5e2d"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/author/kernel-client.ts",
+    "destination": "/home/saya/workspace/chrona-module-author/kernel-client.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "9035fb062a558d62f8149e9a0a5eb2ea158bd988afd68c965cc2952da8dc4c3d",
+    "afterSha256": "9035fb062a558d62f8149e9a0a5eb2ea158bd988afd68c965cc2952da8dc4c3d"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/author/material.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-author/material.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "bfc51ddd4721f608ff8723d96f6ef945481d43a388703584970e38486e665022",
+    "afterSha256": "bfc51ddd4721f608ff8723d96f6ef945481d43a388703584970e38486e665022"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/author/material.ts",
+    "destination": "/home/saya/workspace/chrona-module-author/material.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "c3307ed9cebf383c95314273b340b26290c0487a565d2907f3eebd1d3346a97f",
+    "afterSha256": "c3307ed9cebf383c95314273b340b26290c0487a565d2907f3eebd1d3346a97f"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/author/module.json",
+    "destination": "/home/saya/workspace/chrona-module-author/module.json",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "6b7b008efb619b6920add96d1a91317817b5d25b9ecc0949808ac8ad8bc63e2a",
+    "afterSha256": "6b7b008efb619b6920add96d1a91317817b5d25b9ecc0949808ac8ad8bc63e2a"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/author/pagination.ts",
+    "destination": "/home/saya/workspace/chrona-module-author/pagination.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "3ade1447303a866328545e409a2120625f6c28db4fed62d8547a43ac19549049",
+    "afterSha256": "3ade1447303a866328545e409a2120625f6c28db4fed62d8547a43ac19549049"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/author/publish.ts",
+    "destination": "/home/saya/workspace/chrona-module-author/publish.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "ee3a6907cd0386b1b9b3b42168f68433028c1a48d044ae5028a362eaa51f921e",
+    "afterSha256": "ee3a6907cd0386b1b9b3b42168f68433028c1a48d044ae5028a362eaa51f921e"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/author/test.ts",
+    "destination": "/home/saya/workspace/chrona-module-author/test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "11bf32e4a30b855d5164b23a893f1a9e199d17e1adaff4caef9ea030ebd7c447",
+    "afterSha256": "11bf32e4a30b855d5164b23a893f1a9e199d17e1adaff4caef9ea030ebd7c447"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/author/validate.ts",
+    "destination": "/home/saya/workspace/chrona-module-author/validate.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "eb5931f077fe42e8bc77359ca28e7caf2bfb04e6da689a457798acf54ad1e158",
+    "afterSha256": "eb5931f077fe42e8bc77359ca28e7caf2bfb04e6da689a457798acf54ad1e158"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/author/workflow.ts",
+    "destination": "/home/saya/workspace/chrona-module-author/workflow.ts",
+    "exists": true,
+    "sameBytes": false,
+    "beforeSha256": "a4bb7753a41b55b7a7152d907409c0fd8445e16385bbc136d9359094ba8e11db",
+    "afterSha256": "3b2a419fe95784259e107989a84f68ecfeb1f7d4dc74b1a3109992ad66db9f8d"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/.gitignore",
+    "destination": "/home/saya/workspace/chrona-module-chat/.gitignore",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "1b6a65096c7ee35468cf740c3a17f916c042cce7d3a1d1fc032768bad9a3e890",
+    "afterSha256": "1b6a65096c7ee35468cf740c3a17f916c042cce7d3a1d1fc032768bad9a3e890"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/LICENSE",
+    "destination": "/home/saya/workspace/chrona-module-chat/LICENSE",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "ec698798d97e2fdf85077e23eca23ec4ab31f3c205d7d84ffb8b686a4b4069e7",
+    "afterSha256": "ec698798d97e2fdf85077e23eca23ec4ab31f3c205d7d84ffb8b686a4b4069e7"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/README.md",
+    "destination": "/home/saya/workspace/chrona-module-chat/README.md",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "e53b8b9c58ef1d8ed3da98f91fd2a096648e54cd5b2c75ab28fdab798e31c698",
+    "afterSha256": "e53b8b9c58ef1d8ed3da98f91fd2a096648e54cd5b2c75ab28fdab798e31c698"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/browser-check.js",
+    "destination": "/home/saya/workspace/chrona-module-chat/browser-check.js",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "ca0fe25a3ffde20f34ac328ee6fe1344935fcde042f89eb602c4e8bb22133310",
+    "afterSha256": "ca0fe25a3ffde20f34ac328ee6fe1344935fcde042f89eb602c4e8bb22133310"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/browser-fixture.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/browser-fixture.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "d32d78cd75046f63b1b57ebf8f07d0ba847bc8162f3fdba65a7a66da45b3643c",
+    "afterSha256": "d32d78cd75046f63b1b57ebf8f07d0ba847bc8162f3fdba65a7a66da45b3643c"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/build.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/build.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "db19709a380e94d6769c3a98265ca201a868df1ba5fe5594a2e2a552807aa968",
+    "afterSha256": "db19709a380e94d6769c3a98265ca201a868df1ba5fe5594a2e2a552807aa968"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/bun.lock",
+    "destination": "/home/saya/workspace/chrona-module-chat/bun.lock",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "ea7cca188d188988799f61ce34b09d6a8d996fe7864c266fa746b253dea833d2",
+    "afterSha256": "ea7cca188d188988799f61ce34b09d6a8d996fe7864c266fa746b253dea833d2"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/chrona-material.json",
+    "destination": "/home/saya/workspace/chrona-module-chat/chrona-material.json",
+    "exists": true,
+    "sameBytes": false,
+    "beforeSha256": "2008c3ec4b55d2330231826e2b9a7133df140696ae8df5b6e4a58794a5b65f66",
+    "afterSha256": "b579608cbc8163d8be791a93485bbbb40a868ae7e7d02db9a261999a4e5b3c96"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/client-state.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/client-state.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "22152c5206b38d84e949919404e21fc6c31d231bdb46990f30bede259106a7aa",
+    "afterSha256": "22152c5206b38d84e949919404e21fc6c31d231bdb46990f30bede259106a7aa"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/context-admission.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/context-admission.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "9927c2deb84f0086e00229605e61ba17eff223a5824b77910f636e2e07ee772c",
+    "afterSha256": "9927c2deb84f0086e00229605e61ba17eff223a5824b77910f636e2e07ee772c"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/create-checks.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/create-checks.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "c9548bec4aabfe479c7a9f994fe00352f3856a5aad3e761155fe7318d45d4d3d",
+    "afterSha256": "c9548bec4aabfe479c7a9f994fe00352f3856a5aad3e761155fe7318d45d4d3d"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/create.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/create.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "8a8775e4013023b56320023e5774889d35ae5c27815cbd9d6aee869ec0927739",
+    "afterSha256": "8a8775e4013023b56320023e5774889d35ae5c27815cbd9d6aee869ec0927739"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/delivery.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/delivery.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "42c1a4d742b99e36617176110d7a33c66fa62d844a9c06f62370323783903226",
+    "afterSha256": "42c1a4d742b99e36617176110d7a33c66fa62d844a9c06f62370323783903226"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/dom-checks.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/dom-checks.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "0dcdb834d45428169eb1442381ff6fecbbdbc9e6507112df1f80c4574802c95a",
+    "afterSha256": "0dcdb834d45428169eb1442381ff6fecbbdbc9e6507112df1f80c4574802c95a"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/dom.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/dom.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "3e5f9215a5e621129154a9f1e59159ea39215b6aef4ad24d0811d44d8a390d4a",
+    "afterSha256": "3e5f9215a5e621129154a9f1e59159ea39215b6aef4ad24d0811d44d8a390d4a"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/frontend-context.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/frontend-context.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "f7a7e7b18b10265c2d357ff843d98362412782d307d717602cc54765d7fc7fe5",
+    "afterSha256": "f7a7e7b18b10265c2d357ff843d98362412782d307d717602cc54765d7fc7fe5"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/host-agent.integration.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/host-agent.integration.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "b7828d5bc5d95091ce76ab12c5ae39cec3e5e3ee3fadb4ac3b8419ad699487d8",
+    "afterSha256": "b7828d5bc5d95091ce76ab12c5ae39cec3e5e3ee3fadb4ac3b8419ad699487d8"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/index.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/index.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "64430da270117abe824a33f6714f11f6aef07e422b3cf280d855b569a04fa56f",
+    "afterSha256": "64430da270117abe824a33f6714f11f6aef07e422b3cf280d855b569a04fa56f"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/mind-tasks.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/mind-tasks.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "8a166f15a47067a0c68bed5d594571a869ef278f8a8b1229503e8522dd93eb92",
+    "afterSha256": "8a166f15a47067a0c68bed5d594571a869ef278f8a8b1229503e8522dd93eb92"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/mind-updates.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/mind-updates.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "9c4428189a8a696c1651eaffbd01eafdcb69ad118aa07afe2ade133e59a9e253",
+    "afterSha256": "9c4428189a8a696c1651eaffbd01eafdcb69ad118aa07afe2ade133e59a9e253"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/mind-updates.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/mind-updates.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "f6fcf201991e1d34275f4b76f313fbbf7eb33d60c2a18bff824407f5f23d6b9b",
+    "afterSha256": "f6fcf201991e1d34275f4b76f313fbbf7eb33d60c2a18bff824407f5f23d6b9b"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/module.json",
+    "destination": "/home/saya/workspace/chrona-module-chat/module.json",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "2b2a9272605fb66f3909630651f65b9c766086bebe23b673bb5e658c0ef8cd6e",
+    "afterSha256": "2b2a9272605fb66f3909630651f65b9c766086bebe23b673bb5e658c0ef8cd6e"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/observations.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/observations.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "7dabca6dece64babb8630da37c67d347e928077604e7f3295f3c215029624252",
+    "afterSha256": "7dabca6dece64babb8630da37c67d347e928077604e7f3295f3c215029624252"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/observations.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/observations.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "cb795663365f4b2c013dae864c83ff12137372cb3a0a20a95c7e40ef12117db4",
+    "afterSha256": "cb795663365f4b2c013dae864c83ff12137372cb3a0a20a95c7e40ef12117db4"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/package.json",
+    "destination": "/home/saya/workspace/chrona-module-chat/package.json",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "173e9f0ee1cf536ff627799b1e6a5d867b156e1e7fd7b8a5acf733400273395e",
+    "afterSha256": "173e9f0ee1cf536ff627799b1e6a5d867b156e1e7fd7b8a5acf733400273395e"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/playwright.config.json",
+    "destination": "/home/saya/workspace/chrona-module-chat/playwright.config.json",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "b6f34aa3fa5e93c3dfe64db636bee75d03c71214e735a26a3bffde2c7d393fa3",
+    "afterSha256": "b6f34aa3fa5e93c3dfe64db636bee75d03c71214e735a26a3bffde2c7d393fa3"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/race-checks.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/race-checks.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "59cb60c74f595ab11cbfc896e3d9be51461dc435ebade22f3346b2a9964b0e3d",
+    "afterSha256": "59cb60c74f595ab11cbfc896e3d9be51461dc435ebade22f3346b2a9964b0e3d"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/race.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/race.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "82d1093908640122990dd168cf89b16b8af2bd8bcc48f5407b6f65406db89c15",
+    "afterSha256": "82d1093908640122990dd168cf89b16b8af2bd8bcc48f5407b6f65406db89c15"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/reconcile.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/reconcile.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "11a4ec25a22deec1bb882ec68fca00b43c7981b242c0948538f38b0d0f2a724d",
+    "afterSha256": "11a4ec25a22deec1bb882ec68fca00b43c7981b242c0948538f38b0d0f2a724d"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/registration-checks.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/registration-checks.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "feb68135aef567f34e42e6af05c72cc4ff1b326e7d25c02dcf3503794fdea2b6",
+    "afterSha256": "feb68135aef567f34e42e6af05c72cc4ff1b326e7d25c02dcf3503794fdea2b6"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/selection-checks.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/selection-checks.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "57e0b43ced2fa57e3bfad003a33c8b430c321d029665a8e698a052888d2174c6",
+    "afterSha256": "57e0b43ced2fa57e3bfad003a33c8b430c321d029665a8e698a052888d2174c6"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/selection.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/selection.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "a799c859e7b30a07ebb115d63af2240f821b6d66a6c52b97e369454ae5d5e5da",
+    "afterSha256": "a799c859e7b30a07ebb115d63af2240f821b6d66a6c52b97e369454ae5d5e5da"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/state-checks.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/state-checks.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "2dc147fc4e6dd4a6d3d0919aa196e6b4b2b59495553e097ce9625ea3f235807b",
+    "afterSha256": "2dc147fc4e6dd4a6d3d0919aa196e6b4b2b59495553e097ce9625ea3f235807b"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/state.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/state.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "2786e5d279e458390d96271ae0bf6ba314c3fefe8246690cf80f8fa648aa8f25",
+    "afterSha256": "2786e5d279e458390d96271ae0bf6ba314c3fefe8246690cf80f8fa648aa8f25"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/state.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/state.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "84df38f9ed01dadc9627204208d20869ab25471af57d35cad55e13a7e8f38059",
+    "afterSha256": "84df38f9ed01dadc9627204208d20869ab25471af57d35cad55e13a7e8f38059"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/tasks-ui.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/tasks-ui.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "185d6be163fc6db9b0adea4d97d42a7be22b5324cbbcf6dc87e47ab205d5eb26",
+    "afterSha256": "185d6be163fc6db9b0adea4d97d42a7be22b5324cbbcf6dc87e47ab205d5eb26"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/tasks.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/tasks.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "ee63ce7f26c72484030595ac3123d0c523e5a469724ccf09f7958914fd765a9c",
+    "afterSha256": "ee63ce7f26c72484030595ac3123d0c523e5a469724ccf09f7958914fd765a9c"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/test-support/host-style.css",
+    "destination": "/home/saya/workspace/chrona-module-chat/test-support/host-style.css",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "307e6c6be1d5bda5ff84985e861cce654ab3391fc489f11cd4f67e9bbf7fe325",
+    "afterSha256": "307e6c6be1d5bda5ff84985e861cce654ab3391fc489f11cd4f67e9bbf7fe325"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/test-support/registration-test.mjs",
+    "destination": "/home/saya/workspace/chrona-module-chat/test-support/registration-test.mjs",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "29896046b55a18fd14ae4d4b9747e9086485687f8f852ac9e4bd203fa7c4cb83",
+    "afterSha256": "29896046b55a18fd14ae4d4b9747e9086485687f8f852ac9e4bd203fa7c4cb83"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/test.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "2bf78c484724e2ac42f63c5464fc33fef5040806251159fe93ee2716babd5d79",
+    "afterSha256": "2bf78c484724e2ac42f63c5464fc33fef5040806251159fe93ee2716babd5d79"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/tool-selection.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/tool-selection.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "6d076ae8f101a8c576d3dcf461175a869a3e14e29688b88baac24e2f69cb0eb7",
+    "afterSha256": "6d076ae8f101a8c576d3dcf461175a869a3e14e29688b88baac24e2f69cb0eb7"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/ui-mind.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/ui-mind.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "1ab77c2eaea057a72c1656da62aa83adf1a5a935ca40829a146fcfd36f4fb673",
+    "afterSha256": "1ab77c2eaea057a72c1656da62aa83adf1a5a935ca40829a146fcfd36f4fb673"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/ui.css",
+    "destination": "/home/saya/workspace/chrona-module-chat/ui.css",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "30184080eb1d8e01dc699e032df5b0478b67834a7ba3e9d92fed78e8a0748c86",
+    "afterSha256": "30184080eb1d8e01dc699e032df5b0478b67834a7ba3e9d92fed78e8a0748c86"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/ui.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/ui.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "a49f79e9426a352eef649c07b96c51b3c6096fee498d98d11dcfce919364ad6c",
+    "afterSha256": "a49f79e9426a352eef649c07b96c51b3c6096fee498d98d11dcfce919364ad6c"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/view-types.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/view-types.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "5b270c032386a6ac57afee4794fa0ce8496c1b07906c73bf0b474c85c1aaf48e",
+    "afterSha256": "5b270c032386a6ac57afee4794fa0ce8496c1b07906c73bf0b474c85c1aaf48e"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/chat/web-registration.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-chat/web-registration.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "9f6b4c1728b0ec1e1b2b6d3d972c216ee37ff862c713ccf142c8335b3e57865e",
+    "afterSha256": "9f6b4c1728b0ec1e1b2b6d3d972c216ee37ff862c713ccf142c8335b3e57865e"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/events/LICENSE",
+    "destination": "/home/saya/workspace/chrona-module-events/LICENSE",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "ec698798d97e2fdf85077e23eca23ec4ab31f3c205d7d84ffb8b686a4b4069e7",
+    "afterSha256": "ec698798d97e2fdf85077e23eca23ec4ab31f3c205d7d84ffb8b686a4b4069e7"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/events/author.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-events/author.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "87405982f2b30c018670be4c74ed88217f2a598920fb6b4c01b89b35a0d258d5",
+    "afterSha256": "87405982f2b30c018670be4c74ed88217f2a598920fb6b4c01b89b35a0d258d5"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/events/declarations.ts",
+    "destination": "/home/saya/workspace/chrona-module-events/declarations.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "327621b08c2c20455bd65aed83b4531744198d6a8c587d23d2b475b9eeb9b88d",
+    "afterSha256": "327621b08c2c20455bd65aed83b4531744198d6a8c587d23d2b475b9eeb9b88d"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/events/events.ts",
+    "destination": "/home/saya/workspace/chrona-module-events/events.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "7b5601a81549d661187337815d99c1fe2f1aac976ead8bfeb90ee1c77093da78",
+    "afterSha256": "7b5601a81549d661187337815d99c1fe2f1aac976ead8bfeb90ee1c77093da78"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/events/index.ts",
+    "destination": "/home/saya/workspace/chrona-module-events/index.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "369224744ff820a234202e25b421886bed5414d9bdf640b67d2655af74ea101d",
+    "afterSha256": "369224744ff820a234202e25b421886bed5414d9bdf640b67d2655af74ea101d"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/events/kernel-client.ts",
+    "destination": "/home/saya/workspace/chrona-module-events/kernel-client.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "9035fb062a558d62f8149e9a0a5eb2ea158bd988afd68c965cc2952da8dc4c3d",
+    "afterSha256": "9035fb062a558d62f8149e9a0a5eb2ea158bd988afd68c965cc2952da8dc4c3d"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/events/module.json",
+    "destination": "/home/saya/workspace/chrona-module-events/module.json",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "00772f848a075211c77c2662a483c4d92c2ee8f37bb4cad8c6c2bca566856c87",
+    "afterSha256": "00772f848a075211c77c2662a483c4d92c2ee8f37bb4cad8c6c2bca566856c87"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/events/pagination.ts",
+    "destination": "/home/saya/workspace/chrona-module-events/pagination.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "3ade1447303a866328545e409a2120625f6c28db4fed62d8547a43ac19549049",
+    "afterSha256": "3ade1447303a866328545e409a2120625f6c28db4fed62d8547a43ac19549049"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/events/runtime.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-events/runtime.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "3304b657237f49dcc0580abe002e7e2145a4c7e91c1dc91be03899fa33e70ed5",
+    "afterSha256": "3304b657237f49dcc0580abe002e7e2145a4c7e91c1dc91be03899fa33e70ed5"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/events/test.ts",
+    "destination": "/home/saya/workspace/chrona-module-events/test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "95257143566bafc557c7b01d2271e7feff0a4c2fd4de4b4b23dd9452a4695bcb",
+    "afterSha256": "95257143566bafc557c7b01d2271e7feff0a4c2fd4de4b4b23dd9452a4695bcb"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/files/LICENSE",
+    "destination": "/home/saya/workspace/chrona-module-files/LICENSE",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "ec698798d97e2fdf85077e23eca23ec4ab31f3c205d7d84ffb8b686a4b4069e7",
+    "afterSha256": "ec698798d97e2fdf85077e23eca23ec4ab31f3c205d7d84ffb8b686a4b4069e7"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/files/build-ui.ts",
+    "destination": "/home/saya/workspace/chrona-module-files/build-ui.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "17e821b91963e4f9d1df1ff0d36abbbb3537bc537c398eee451462cfc8a5af50",
+    "afterSha256": "17e821b91963e4f9d1df1ff0d36abbbb3537bc537c398eee451462cfc8a5af50"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/files/files.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-files/files.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "9bc494138690d235ff17097247add4dfac2276a39b2035c77a226be6e61de403",
+    "afterSha256": "9bc494138690d235ff17097247add4dfac2276a39b2035c77a226be6e61de403"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/files/files.ts",
+    "destination": "/home/saya/workspace/chrona-module-files/files.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "60953c430bde105810fe5914c5d78230c0e40cbf808a3bd6666d9c9ccb270b2a",
+    "afterSha256": "60953c430bde105810fe5914c5d78230c0e40cbf808a3bd6666d9c9ccb270b2a"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/files/index.ts",
+    "destination": "/home/saya/workspace/chrona-module-files/index.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "e4d63ef25bc06b65cf9fba8d023c6580ed0fc1ff1c949582f3b35921e1165f42",
+    "afterSha256": "e4d63ef25bc06b65cf9fba8d023c6580ed0fc1ff1c949582f3b35921e1165f42"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/files/module.json",
+    "destination": "/home/saya/workspace/chrona-module-files/module.json",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "284312ac76fe703b3b2207c8d2a2093018f2fb4edfdacbd9bd1793ff1962bd36",
+    "afterSha256": "284312ac76fe703b3b2207c8d2a2093018f2fb4edfdacbd9bd1793ff1962bd36"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/files/page-bundle.js",
+    "destination": "/home/saya/workspace/chrona-module-files/page-bundle.js",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "12c18d21ed53bf58208a8ab21d0e0ba9b492169c3832f8a36af9aa5cbbef38e7",
+    "afterSha256": "12c18d21ed53bf58208a8ab21d0e0ba9b492169c3832f8a36af9aa5cbbef38e7"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/files/page-ui.tsx",
+    "destination": "/home/saya/workspace/chrona-module-files/page-ui.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "e165dac9cfa3fd80313f3fb751ffb4e259e35d0d3365683b55907c77bf860954",
+    "afterSha256": "e165dac9cfa3fd80313f3fb751ffb4e259e35d0d3365683b55907c77bf860954"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/files/page.ts",
+    "destination": "/home/saya/workspace/chrona-module-files/page.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "84c8ec4bfa033678e8ca9f7b74161aa55fa591f70fb377ec75d7f0a46d3828af",
+    "afterSha256": "84c8ec4bfa033678e8ca9f7b74161aa55fa591f70fb377ec75d7f0a46d3828af"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/files/test.ts",
+    "destination": "/home/saya/workspace/chrona-module-files/test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "a88e25273810e88d7f9f1adf89d3cdfe3f83ab37ef0e73fefeb3a3ad2794dd6f",
+    "afterSha256": "a88e25273810e88d7f9f1adf89d3cdfe3f83ab37ef0e73fefeb3a3ad2794dd6f"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mcp/LICENSE",
+    "destination": "/home/saya/workspace/chrona-module-mcp/LICENSE",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "ec698798d97e2fdf85077e23eca23ec4ab31f3c205d7d84ffb8b686a4b4069e7",
+    "afterSha256": "ec698798d97e2fdf85077e23eca23ec4ab31f3c205d7d84ffb8b686a4b4069e7"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mcp/agent-conversations.ts",
+    "destination": "/home/saya/workspace/chrona-module-mcp/agent-conversations.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "c51b3171a38e5b176bcfb20668d9c03ae086725157de181d498069c45eca943d",
+    "afterSha256": "c51b3171a38e5b176bcfb20668d9c03ae086725157de181d498069c45eca943d"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mcp/app-overview.ts",
+    "destination": "/home/saya/workspace/chrona-module-mcp/app-overview.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "6a3f55b12f2bd267aba331bbe3c3279120891e1772359ce2c5ee71855d735ffe",
+    "afterSha256": "6a3f55b12f2bd267aba331bbe3c3279120891e1772359ce2c5ee71855d735ffe"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mcp/build-ui.ts",
+    "destination": "/home/saya/workspace/chrona-module-mcp/build-ui.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "17e821b91963e4f9d1df1ff0d36abbbb3537bc537c398eee451462cfc8a5af50",
+    "afterSha256": "17e821b91963e4f9d1df1ff0d36abbbb3537bc537c398eee451462cfc8a5af50"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mcp/bun.lock",
+    "destination": "/home/saya/workspace/chrona-module-mcp/bun.lock",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "89ca0dc3feab4c15689e9454058616f7e8cd5edb04252212e4b61cab770d15e2",
+    "afterSha256": "89ca0dc3feab4c15689e9454058616f7e8cd5edb04252212e4b61cab770d15e2"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mcp/delivery.ts",
+    "destination": "/home/saya/workspace/chrona-module-mcp/delivery.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "d10026947dde59bd4b71e391c02e1756d6700b94e0f7edb785d2ad5f57fd5ff1",
+    "afterSha256": "d10026947dde59bd4b71e391c02e1756d6700b94e0f7edb785d2ad5f57fd5ff1"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mcp/index.ts",
+    "destination": "/home/saya/workspace/chrona-module-mcp/index.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "c53c820eb9e9e7477bc582994e0ebb4f68e92767cbc4f8fd3275f1362031c673",
+    "afterSha256": "c53c820eb9e9e7477bc582994e0ebb4f68e92767cbc4f8fd3275f1362031c673"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mcp/kernel-client.ts",
+    "destination": "/home/saya/workspace/chrona-module-mcp/kernel-client.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "9035fb062a558d62f8149e9a0a5eb2ea158bd988afd68c965cc2952da8dc4c3d",
+    "afterSha256": "9035fb062a558d62f8149e9a0a5eb2ea158bd988afd68c965cc2952da8dc4c3d"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mcp/memory.ts",
+    "destination": "/home/saya/workspace/chrona-module-mcp/memory.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "d431e60d3442e4ccad16902b470d723e9d1090df498f84252c3aede52e2265e9",
+    "afterSha256": "d431e60d3442e4ccad16902b470d723e9d1090df498f84252c3aede52e2265e9"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mcp/module.json",
+    "destination": "/home/saya/workspace/chrona-module-mcp/module.json",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "3d89b784076fb0a2cd55c398470389097a974aa7eea8ac1f8e4598d12f80a863",
+    "afterSha256": "3d89b784076fb0a2cd55c398470389097a974aa7eea8ac1f8e4598d12f80a863"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mcp/package.json",
+    "destination": "/home/saya/workspace/chrona-module-mcp/package.json",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "d652cba18b391151da4543a9cc497f1fa901fa43146de55445383e0a54b5343a",
+    "afterSha256": "d652cba18b391151da4543a9cc497f1fa901fa43146de55445383e0a54b5343a"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mcp/page.ts",
+    "destination": "/home/saya/workspace/chrona-module-mcp/page.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "344064f5342918a31e8a366f8baad3ef97270a4b2a15749dfc011b541fdb6dec",
+    "afterSha256": "344064f5342918a31e8a366f8baad3ef97270a4b2a15749dfc011b541fdb6dec"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mcp/pagination.ts",
+    "destination": "/home/saya/workspace/chrona-module-mcp/pagination.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "3ade1447303a866328545e409a2120625f6c28db4fed62d8547a43ac19549049",
+    "afterSha256": "3ade1447303a866328545e409a2120625f6c28db4fed62d8547a43ac19549049"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mcp/preferences.ts",
+    "destination": "/home/saya/workspace/chrona-module-mcp/preferences.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "35903a0eed4f574117fd9946ba23f6c28d14a02686c6353d8ec204df68ec60df",
+    "afterSha256": "35903a0eed4f574117fd9946ba23f6c28d14a02686c6353d8ec204df68ec60df"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mcp/runtime.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mcp/runtime.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "c355dadcd54765a0de21576873b16945b1d9ccf429512f73c9f61d519552bf24",
+    "afterSha256": "c355dadcd54765a0de21576873b16945b1d9ccf429512f73c9f61d519552bf24"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mcp/settings-bundle.js",
+    "destination": "/home/saya/workspace/chrona-module-mcp/settings-bundle.js",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "bba098429dc53b59146a608770699891f3303bc0339a9189b523a7a19a00ebdc",
+    "afterSha256": "bba098429dc53b59146a608770699891f3303bc0339a9189b523a7a19a00ebdc"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mcp/settings-ui.tsx",
+    "destination": "/home/saya/workspace/chrona-module-mcp/settings-ui.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "8af4c58916c0d8573b7b88a1b0a7a2fbff64d3b9210747c9ac9e78a721490691",
+    "afterSha256": "8af4c58916c0d8573b7b88a1b0a7a2fbff64d3b9210747c9ac9e78a721490691"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mcp/settings.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mcp/settings.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "68678ad60f95235b5cb3ef3e02ef2d6e01976a9cb69b649a51163b8bc0b8d4d5",
+    "afterSha256": "68678ad60f95235b5cb3ef3e02ef2d6e01976a9cb69b649a51163b8bc0b8d4d5"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mcp/test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mcp/test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "068afe3534b1afe3a61d2bea174f59e36591d4ae84653f7aebb7b9eb250c766e",
+    "afterSha256": "068afe3534b1afe3a61d2bea174f59e36591d4ae84653f7aebb7b9eb250c766e"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mcp/ui-settings.ts",
+    "destination": "/home/saya/workspace/chrona-module-mcp/ui-settings.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "4fb953c2d220db4b2095f2a3e0e2edde2b0a62a6681d28b03695551360360755",
+    "afterSha256": "4fb953c2d220db4b2095f2a3e0e2edde2b0a62a6681d28b03695551360360755"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mcp/validation.ts",
+    "destination": "/home/saya/workspace/chrona-module-mcp/validation.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "3e774f768a4f8d605c7726fd7ee2c56f1af8fb0121ede63c78e6f3c33d356124",
+    "afterSha256": "3e774f768a4f8d605c7726fd7ee2c56f1af8fb0121ede63c78e6f3c33d356124"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/memory-local/LICENSE",
+    "destination": "/home/saya/workspace/chrona-module-memory-local/LICENSE",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "ec698798d97e2fdf85077e23eca23ec4ab31f3c205d7d84ffb8b686a4b4069e7",
+    "afterSha256": "ec698798d97e2fdf85077e23eca23ec4ab31f3c205d7d84ffb8b686a4b4069e7"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/memory-local/bun.lock",
+    "destination": "/home/saya/workspace/chrona-module-memory-local/bun.lock",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "16eaa39c8d4aede4e0e1ab89fb4348cacff20d36000e9078032eda739e4f1cc4",
+    "afterSha256": "16eaa39c8d4aede4e0e1ab89fb4348cacff20d36000e9078032eda739e4f1cc4"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/memory-local/conversation.ts",
+    "destination": "/home/saya/workspace/chrona-module-memory-local/conversation.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "bb195fc29a574335f53604551a1db183ae73200d934e16cc81175516b28f21b4",
+    "afterSha256": "bb195fc29a574335f53604551a1db183ae73200d934e16cc81175516b28f21b4"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/memory-local/corrections.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-memory-local/corrections.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "f701c7192a02da3091e3c44c13858db1c06bee3726c3263a4aacef5a857bfdf0",
+    "afterSha256": "f701c7192a02da3091e3c44c13858db1c06bee3726c3263a4aacef5a857bfdf0"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/memory-local/corrections.ts",
+    "destination": "/home/saya/workspace/chrona-module-memory-local/corrections.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "878303c415ab3937356330d4e0fcb5412466a73e605c2a5fef94457d74802e21",
+    "afterSha256": "878303c415ab3937356330d4e0fcb5412466a73e605c2a5fef94457d74802e21"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/memory-local/index.ts",
+    "destination": "/home/saya/workspace/chrona-module-memory-local/index.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "abe41899ff29e395027d126ab072bd621c9291fc466221ec259d67f6c2526bd6",
+    "afterSha256": "abe41899ff29e395027d126ab072bd621c9291fc466221ec259d67f6c2526bd6"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/memory-local/module.json",
+    "destination": "/home/saya/workspace/chrona-module-memory-local/module.json",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "875c9ad16056f80c7e25017b8f7abd42d32d4aa0a5d9cf7eb998717c2456351f",
+    "afterSha256": "875c9ad16056f80c7e25017b8f7abd42d32d4aa0a5d9cf7eb998717c2456351f"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/memory-local/package.json",
+    "destination": "/home/saya/workspace/chrona-module-memory-local/package.json",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "d6aaf4aa074c51901cca191c88c64626a7ccd7a7a4330f57c2cf19e922dabe3d",
+    "afterSha256": "d6aaf4aa074c51901cca191c88c64626a7ccd7a7a4330f57c2cf19e922dabe3d"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/memory-local/preferences.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-memory-local/preferences.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "46c2f137af93342482e74ea7e1dcb1ca92d8f0e9d391ba43f5c8e8d7f9b77043",
+    "afterSha256": "46c2f137af93342482e74ea7e1dcb1ca92d8f0e9d391ba43f5c8e8d7f9b77043"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/memory-local/preferences.ts",
+    "destination": "/home/saya/workspace/chrona-module-memory-local/preferences.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "740040b2d934d0d1a3b422688534f55ecb9db746bce8a3c105969af36b6a48a7",
+    "afterSha256": "740040b2d934d0d1a3b422688534f55ecb9db746bce8a3c105969af36b6a48a7"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/memory-local/redaction.ts",
+    "destination": "/home/saya/workspace/chrona-module-memory-local/redaction.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "4b1575d679065ba0924e5e8fe9a07a0eef16be44e29766350bbbcf0615f4a3b0",
+    "afterSha256": "4b1575d679065ba0924e5e8fe9a07a0eef16be44e29766350bbbcf0615f4a3b0"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/memory-local/test.ts",
+    "destination": "/home/saya/workspace/chrona-module-memory-local/test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "8a881e15001069584a6500aa04ff50f03b61884d5e7f2632d3e578e84bd31173",
+    "afterSha256": "8a881e15001069584a6500aa04ff50f03b61884d5e7f2632d3e578e84bd31173"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/LICENSE",
+    "destination": "/home/saya/workspace/chrona-module-mind/LICENSE",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "ec698798d97e2fdf85077e23eca23ec4ab31f3c205d7d84ffb8b686a4b4069e7",
+    "afterSha256": "ec698798d97e2fdf85077e23eca23ec4ab31f3c205d7d84ffb8b686a4b4069e7"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/README.md",
+    "destination": "/home/saya/workspace/chrona-module-mind/README.md",
+    "exists": true,
+    "sameBytes": false,
+    "beforeSha256": "3387da1e49b97b488f6cdb1363fa6f83b390dfa9ed484b0c4d49741e774fe67e",
+    "afterSha256": "35c01adc9dd07037f2f8306929d77d0977deca73696fb68b2ee7f61b7dea593e"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/build.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/build.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "ca0bed6514dbdfedf6fe3b44d659bf4b5362fa97a6f26b585aed9ef68fbcb358",
+    "afterSha256": "ca0bed6514dbdfedf6fe3b44d659bf4b5362fa97a6f26b585aed9ef68fbcb358"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/bun.lock",
+    "destination": "/home/saya/workspace/chrona-module-mind/bun.lock",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "93deec94976b23c49a43fe60dd3edc3b0136fe3af6937eda253f36fe690e1f91",
+    "afterSha256": "93deec94976b23c49a43fe60dd3edc3b0136fe3af6937eda253f36fe690e1f91"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/chrona-material.json",
+    "destination": "/home/saya/workspace/chrona-module-mind/chrona-material.json",
+    "exists": true,
+    "sameBytes": false,
+    "beforeSha256": "6581b831697b3768b648e0c2341d0316ec9233c290e335ef31f94ac68cc34a98",
+    "afterSha256": "6f23e54e1ce24fed903fa425eeff3563362963eab050401e6195ff792d4af1cd"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-actions.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-actions.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "87bd3aef13bc04a857719547f7af60897ec91317e775989affff453a01d7713c",
+    "afterSha256": "87bd3aef13bc04a857719547f7af60897ec91317e775989affff453a01d7713c"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-admission-prompt.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-admission-prompt.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "b2696ea59f2e0c00bdeaea276b2412c0776b3e4e0f4e377289e738c7dc39f0be",
+    "afterSha256": "b2696ea59f2e0c00bdeaea276b2412c0776b3e4e0f4e377289e738c7dc39f0be"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-admission-prompt.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-admission-prompt.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "71d43b411ece9a1602d3412dbbbbba1ef00a75a191f7873df9ff68a8abcad70c",
+    "afterSha256": "71d43b411ece9a1602d3412dbbbbba1ef00a75a191f7873df9ff68a8abcad70c"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-admission.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-admission.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "4f417de2d3b1bc1cb922f05c08f9b80f5a36b46749e0c03d85cd704992bed2d1",
+    "afterSha256": "4f417de2d3b1bc1cb922f05c08f9b80f5a36b46749e0c03d85cd704992bed2d1"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-admission.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-admission.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "075b45f16a69f8c95e6741111880e63331346b72395d42c96e5dcbf8e2277798",
+    "afterSha256": "075b45f16a69f8c95e6741111880e63331346b72395d42c96e5dcbf8e2277798"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-application-cleanup.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-application-cleanup.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "c49935e1e7291c102110fb53ca2aefec31f1268058e5c7d3ae6ea1fa24c2fe6b",
+    "afterSha256": "c49935e1e7291c102110fb53ca2aefec31f1268058e5c7d3ae6ea1fa24c2fe6b"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-application-integration.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-application-integration.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "9093d605a5b6ba7617b1f0d45e17e46c0b8621fb7544c17bfa55962562bb5b2a",
+    "afterSha256": "9093d605a5b6ba7617b1f0d45e17e46c0b8621fb7544c17bfa55962562bb5b2a"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-application-projection.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-application-projection.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "1a148f0ca7d29d33262e40fb97a3d853062180600b7289a2e0cf34761d1db0be",
+    "afterSha256": "1a148f0ca7d29d33262e40fb97a3d853062180600b7289a2e0cf34761d1db0be"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-application.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-application.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "3499f140d99ef7f4ec01a88287188235c5053b2da82e19a3d7a58abdce37cfcc",
+    "afterSha256": "3499f140d99ef7f4ec01a88287188235c5053b2da82e19a3d7a58abdce37cfcc"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-application.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-application.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "b7a6d0de89abbb60cadbc59367fa2e412bad92a58a234ea0e14715d3f65634f9",
+    "afterSha256": "b7a6d0de89abbb60cadbc59367fa2e412bad92a58a234ea0e14715d3f65634f9"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-artifact.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-artifact.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "897b85e1e460d53b9763796d311aaa4cd96742d1107c216bf0fbe35e82a8c41c",
+    "afterSha256": "897b85e1e460d53b9763796d311aaa4cd96742d1107c216bf0fbe35e82a8c41c"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-capabilities.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-capabilities.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "3e77d79fc65f6aaff420b326a632596607b4525b9556432d85a1d4bfcf312041",
+    "afterSha256": "3e77d79fc65f6aaff420b326a632596607b4525b9556432d85a1d4bfcf312041"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-capabilities.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-capabilities.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "69876ca947c3442e78fc4216c5fc597246d42ff8322a5d633c1360ed3b07bcfa",
+    "afterSha256": "69876ca947c3442e78fc4216c5fc597246d42ff8322a5d633c1360ed3b07bcfa"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-chat-responsibility.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-chat-responsibility.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "aada2d0fecbcf1e53b69bb39db56e9050617f5439fde334e5bf45cc0a617544d",
+    "afterSha256": "aada2d0fecbcf1e53b69bb39db56e9050617f5439fde334e5bf45cc0a617544d"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-context.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-context.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "50e9e829a30418aded39ac0c19f9c552316cbe7094e8b6f3ae4abd42a2911739",
+    "afterSha256": "50e9e829a30418aded39ac0c19f9c552316cbe7094e8b6f3ae4abd42a2911739"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-control-admission.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-control-admission.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "7cd148919bf3a40170c1c4ec73aee7048ebbf4ec28a5205493e491ae52dcea5a",
+    "afterSha256": "7cd148919bf3a40170c1c4ec73aee7048ebbf4ec28a5205493e491ae52dcea5a"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-delivery-admission.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-delivery-admission.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "0d33f4b8efde6ad84dac5de3726e9467cf8e053b26466b9d760df6ae1cba0cdf",
+    "afterSha256": "0d33f4b8efde6ad84dac5de3726e9467cf8e053b26466b9d760df6ae1cba0cdf"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-delivery-admission.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-delivery-admission.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "4027969ec85905ed221f5d22aa9817d7634a5e570bfed2c86cc13fc65acd6d95",
+    "afterSha256": "4027969ec85905ed221f5d22aa9817d7634a5e570bfed2c86cc13fc65acd6d95"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-delivery-cleanup.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-delivery-cleanup.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "cd0cf855c549bf8a745d2fb8d1c29efede765bfdc2a9870df030819c9b5759be",
+    "afterSha256": "cd0cf855c549bf8a745d2fb8d1c29efede765bfdc2a9870df030819c9b5759be"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-delivery-integration.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-delivery-integration.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "b4518bc391cd0e714e169acf12ff2dc22ba7b9e98e4e5f072a7f64d33f645c2f",
+    "afterSha256": "b4518bc391cd0e714e169acf12ff2dc22ba7b9e98e4e5f072a7f64d33f645c2f"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-delivery-understanding.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-delivery-understanding.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "dd482e67be9086fdd67cf02bde65bd26ecc5ea4c87b9ea22f5f454707ad4c64f",
+    "afterSha256": "dd482e67be9086fdd67cf02bde65bd26ecc5ea4c87b9ea22f5f454707ad4c64f"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-delivery.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-delivery.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "a93f86fa29ad8a74f407ed6e361f0e35f84097b7299ee86f9baf3ffd9baff70b",
+    "afterSha256": "a93f86fa29ad8a74f407ed6e361f0e35f84097b7299ee86f9baf3ffd9baff70b"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-delivery.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-delivery.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "13a389d829bb93d79db9598dae91da58a3aae2ead91a2ea16c4eb35a3e5c7a14",
+    "afterSha256": "13a389d829bb93d79db9598dae91da58a3aae2ead91a2ea16c4eb35a3e5c7a14"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-display.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-display.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "6f421815888b8f42f71875792ff5b5fa9db0b6f813342983add746076bc85240",
+    "afterSha256": "6f421815888b8f42f71875792ff5b5fa9db0b6f813342983add746076bc85240"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-display.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-display.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "895337a91b7c6ca1bcd50994ad401fe207292bc95336f880d402d5c025ff56ef",
+    "afterSha256": "895337a91b7c6ca1bcd50994ad401fe207292bc95336f880d402d5c025ff56ef"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-execution-privacy-race.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-execution-privacy-race.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "946787b636bae3cc167e7d07fcccc02fc0c84ae05798eb267afbd4429945a3e5",
+    "afterSha256": "946787b636bae3cc167e7d07fcccc02fc0c84ae05798eb267afbd4429945a3e5"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-execution.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-execution.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "65dd8a74ce164b354297d074f497ec6e7313eaeed34e0fe9d64a87d33c626e42",
+    "afterSha256": "65dd8a74ce164b354297d074f497ec6e7313eaeed34e0fe9d64a87d33c626e42"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-execution.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-execution.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "4bdae98843e4d47d62a7b52aa9f1cb52f11c19a817076fc578de176b305e0135",
+    "afterSha256": "4bdae98843e4d47d62a7b52aa9f1cb52f11c19a817076fc578de176b305e0135"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-forget-checkpoint.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-forget-checkpoint.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "0c0d250d209ad49695c48c7a82e2901640532ee28077a05e7ecb62f25bc768b1",
+    "afterSha256": "0c0d250d209ad49695c48c7a82e2901640532ee28077a05e7ecb62f25bc768b1"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-notifications.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-notifications.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "e17741d7764e4d569e2b579877214eb8e64a6138c4629c1a6ef3cc191c32e228",
+    "afterSha256": "e17741d7764e4d569e2b579877214eb8e64a6138c4629c1a6ef3cc191c32e228"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-notifications.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-notifications.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "ea83c735ba66858498ac15f8438df6bcbec51de2e3d80a7f1128dc477cb90a52",
+    "afterSha256": "ea83c735ba66858498ac15f8438df6bcbec51de2e3d80a7f1128dc477cb90a52"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-observation.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-observation.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "63730f786cc40466b117f0d5c737092076a9427c49ee504a9a0f5ae598862342",
+    "afterSha256": "63730f786cc40466b117f0d5c737092076a9427c49ee504a9a0f5ae598862342"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-observation.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-observation.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "db27ced0df1f4ecfdffd7be6a22fa0f7e91b0949e23ca79d8f3e8caff40896ff",
+    "afterSha256": "db27ced0df1f4ecfdffd7be6a22fa0f7e91b0949e23ca79d8f3e8caff40896ff"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-organizer.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-organizer.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "aeb9b473913884e22e70b0c421cf4aa47b2858895e94df3a126be6e7151f70e8",
+    "afterSha256": "aeb9b473913884e22e70b0c421cf4aa47b2858895e94df3a126be6e7151f70e8"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-organizer.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-organizer.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "57d4e2a04175faed25b4a9aeb6ccadcf7ea5db4f24d66f9d29c11bef99a2d861",
+    "afterSha256": "57d4e2a04175faed25b4a9aeb6ccadcf7ea5db4f24d66f9d29c11bef99a2d861"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-prompt.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-prompt.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "2b63ef0698f6aabb6c006adf2e3c2d9f378591e6e90463bf293e484c249e1589",
+    "afterSha256": "2b63ef0698f6aabb6c006adf2e3c2d9f378591e6e90463bf293e484c249e1589"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-reauthorization.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-reauthorization.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "62d46f6b3bb86d7a0936f87bdf653f1d8092213d32ae28e20ea189317a8c3a94",
+    "afterSha256": "62d46f6b3bb86d7a0936f87bdf653f1d8092213d32ae28e20ea189317a8c3a94"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-recovery.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-recovery.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "b205164fe6f06af1074cf67b136184095ca950fcb9a3ab4f2ec5a412ca86b968",
+    "afterSha256": "b205164fe6f06af1074cf67b136184095ca950fcb9a3ab4f2ec5a412ca86b968"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-recovery.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-recovery.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "e41a8be2d5a5853aaf5424e14e94886aabdb05b079fca77612a2d3216ec01243",
+    "afterSha256": "e41a8be2d5a5853aaf5424e14e94886aabdb05b079fca77612a2d3216ec01243"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-redaction.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-redaction.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "79a05a8feab73d7e4dd38034edbf8d71eac7968ccf3d4be1d5e63ded8e4e9cdd",
+    "afterSha256": "79a05a8feab73d7e4dd38034edbf8d71eac7968ccf3d4be1d5e63ded8e4e9cdd"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-runtime-retry.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-runtime-retry.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "0d2e6adb68ff650a7eaf561da648555a3ad5907a2391f2acda1196c64e2265f5",
+    "afterSha256": "0d2e6adb68ff650a7eaf561da648555a3ad5907a2391f2acda1196c64e2265f5"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-runtime.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-runtime.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "3752fe7146d234191541a6491fc4292311dad03432c42e3e44f7cb6973651961",
+    "afterSha256": "3752fe7146d234191541a6491fc4292311dad03432c42e3e44f7cb6973651961"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-runtime.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-runtime.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "562e26e9e0276b2d73dfa4448bf0dd64d5380eb0539f83c849625b477c44bc29",
+    "afterSha256": "562e26e9e0276b2d73dfa4448bf0dd64d5380eb0539f83c849625b477c44bc29"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-service.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-service.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "7d9cbe09faea6cf49a3fe62b8f09050f7862c18df7d22b0784c90552ba6c6c8e",
+    "afterSha256": "7d9cbe09faea6cf49a3fe62b8f09050f7862c18df7d22b0784c90552ba6c6c8e"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-sources-concurrent-chat.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-sources-concurrent-chat.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "270b34cada06ddf1b426e19477707e16c18979b5176aafe8281a6abc1b29eae3",
+    "afterSha256": "270b34cada06ddf1b426e19477707e16c18979b5176aafe8281a6abc1b29eae3"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-sources.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-sources.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "f284cc3d31aebf681b3798f271c4a4aae54c90b8a83f49f9457db73d26b9811b",
+    "afterSha256": "f284cc3d31aebf681b3798f271c4a4aae54c90b8a83f49f9457db73d26b9811b"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-sources.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-sources.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "1b6e5cf137727cdd9dd0382bde7f07dba9d398ba52cc07993d845407c59f6f8d",
+    "afterSha256": "1b6e5cf137727cdd9dd0382bde7f07dba9d398ba52cc07993d845407c59f6f8d"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-store.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-store.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "6106880da3176181532d7f5653c4feff6d2ef2c858035d6167642b11d1add603",
+    "afterSha256": "6106880da3176181532d7f5653c4feff6d2ef2c858035d6167642b11d1add603"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-store.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-store.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "589f6498a03f677f15f20aeec69d9b35ac0eeb69db42c624b3c9a73a65670be9",
+    "afterSha256": "589f6498a03f677f15f20aeec69d9b35ac0eeb69db42c624b3c9a73a65670be9"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-task-view.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-task-view.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "b38509823c90c5ff2485153ce0db3fe90028199c4f838970354e502866bc401c",
+    "afterSha256": "b38509823c90c5ff2485153ce0db3fe90028199c4f838970354e502866bc401c"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-task-view.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-task-view.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "b4e493d9efa4f29528e59e1f69c21b0a14f369dce077f50d4e054695df5e1886",
+    "afterSha256": "b4e493d9efa4f29528e59e1f69c21b0a14f369dce077f50d4e054695df5e1886"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-types.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-types.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "feb4bb46d9467199d87d76d749715ceeedb7f09b36020e835cb81a75f6306a27",
+    "afterSha256": "feb4bb46d9467199d87d76d749715ceeedb7f09b36020e835cb81a75f6306a27"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-verification-artifact.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-verification-artifact.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "70a60e98122ccfa08d2086b12a7d7808620f4a698550bfa78806d592c202088f",
+    "afterSha256": "70a60e98122ccfa08d2086b12a7d7808620f4a698550bfa78806d592c202088f"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-verification-understanding.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-verification-understanding.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "6c05402f25098deb8fab5877139a5d9720d295a8334af406a81d433829c821f6",
+    "afterSha256": "6c05402f25098deb8fab5877139a5d9720d295a8334af406a81d433829c821f6"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-verification.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-verification.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "323d73dbbf2247c383f0998bfe5f88c32d6dca8234b868513dc73671f96b7fe1",
+    "afterSha256": "323d73dbbf2247c383f0998bfe5f88c32d6dca8234b868513dc73671f96b7fe1"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/core-verification.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/core-verification.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "f34dd7e08210f33fcaef50be4ecc39f309ce5eedfe702a05801da8887f7c7b33",
+    "afterSha256": "f34dd7e08210f33fcaef50be4ecc39f309ce5eedfe702a05801da8887f7c7b33"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/index.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/index.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "512099822f8e92fd2ffc978344cee0f3cf237eae929a6900512d0d70fbf619d1",
+    "afterSha256": "512099822f8e92fd2ffc978344cee0f3cf237eae929a6900512d0d70fbf619d1"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/migrate-storage.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/migrate-storage.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "746beba460832b9b91f5a594318fa9ad60b1ebd648645728b96882e5935c21c2",
+    "afterSha256": "746beba460832b9b91f5a594318fa9ad60b1ebd648645728b96882e5935c21c2"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/module.json",
+    "destination": "/home/saya/workspace/chrona-module-mind/module.json",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "d3bf7721449df070113ee66ed2929f98c80552ad0ee4dbd058a6ad3a9ec78fd2",
+    "afterSha256": "d3bf7721449df070113ee66ed2929f98c80552ad0ee4dbd058a6ad3a9ec78fd2"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/offline-entry.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/offline-entry.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "7562d1928838c482980cdd62ae931d4f8b9006fa813310ecebba0c7ec65d405a",
+    "afterSha256": "7562d1928838c482980cdd62ae931d4f8b9006fa813310ecebba0c7ec65d405a"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/package.json",
+    "destination": "/home/saya/workspace/chrona-module-mind/package.json",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "dc05d2085e7af7a4c4dfbd810d4faf75aaf065a571284b4ea1170332e26b3d9c",
+    "afterSha256": "dc05d2085e7af7a4c4dfbd810d4faf75aaf065a571284b4ea1170332e26b3d9c"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/test-support/storage.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/test-support/storage.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "e62414204b3ac535c7bc98ac0dfcb693ccdc93369c5b6538a17e7967b89db067",
+    "afterSha256": "e62414204b3ac535c7bc98ac0dfcb693ccdc93369c5b6538a17e7967b89db067"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "ec1c4c39aaad2b1ccd584b19e6df6dd8056b44af78172afe959d4d181f4a7638",
+    "afterSha256": "ec1c4c39aaad2b1ccd584b19e6df6dd8056b44af78172afe959d4d181f4a7638"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/workspace-applications.bun.test.tsx",
+    "destination": "/home/saya/workspace/chrona-module-mind/workspace-applications.bun.test.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "d0f34b08540b025203af13661513222b105d2ab53f9d3be6ded834035d471489",
+    "afterSha256": "d0f34b08540b025203af13661513222b105d2ab53f9d3be6ded834035d471489"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/workspace-delivery.bun.test.tsx",
+    "destination": "/home/saya/workspace/chrona-module-mind/workspace-delivery.bun.test.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "b0dd9005ff72cb75b43d660c5a610d8bf842f1264ed1242b8765ddd87c58eb33",
+    "afterSha256": "b0dd9005ff72cb75b43d660c5a610d8bf842f1264ed1242b8765ddd87c58eb33"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/workspace-ui.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-mind/workspace-ui.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "3a27950f727caf93ad7985aa8420667ae537b752797d945ccd79585816766f5f",
+    "afterSha256": "3a27950f727caf93ad7985aa8420667ae537b752797d945ccd79585816766f5f"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/workspace-ui.tsx",
+    "destination": "/home/saya/workspace/chrona-module-mind/workspace-ui.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "dd4b309b9025a59d60b785eb8226373be3bdf36cdc5b46391eec99cf5171802a",
+    "afterSha256": "dd4b309b9025a59d60b785eb8226373be3bdf36cdc5b46391eec99cf5171802a"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/mind/workspace.css",
+    "destination": "/home/saya/workspace/chrona-module-mind/workspace.css",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "5629d1eca41f437080bc870499c3d990a2200daf76b3a30cbffe9dfb56dde97c",
+    "afterSha256": "5629d1eca41f437080bc870499c3d990a2200daf76b3a30cbffe9dfb56dde97c"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/LICENSE",
+    "destination": "/home/saya/workspace/chrona-module-notify/LICENSE",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "ec698798d97e2fdf85077e23eca23ec4ab31f3c205d7d84ffb8b686a4b4069e7",
+    "afterSha256": "ec698798d97e2fdf85077e23eca23ec4ab31f3c205d7d84ffb8b686a4b4069e7"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/activity.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-notify/activity.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "5115431926312ff3abdeb95d67694f5c08fd6e6a096e3f466ea390fbb9a07413",
+    "afterSha256": "5115431926312ff3abdeb95d67694f5c08fd6e6a096e3f466ea390fbb9a07413"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/activity.ts",
+    "destination": "/home/saya/workspace/chrona-module-notify/activity.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "abb8eb97f02fa325e97b1f91a8eaea4004b171d8747048a3ce8c6cab54de9d36",
+    "afterSha256": "abb8eb97f02fa325e97b1f91a8eaea4004b171d8747048a3ce8c6cab54de9d36"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/approval.ts",
+    "destination": "/home/saya/workspace/chrona-module-notify/approval.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "046b353bbd701c70475d42b748fa0ebab9a77c80a19839ba7c8d317a68b85b04",
+    "afterSha256": "046b353bbd701c70475d42b748fa0ebab9a77c80a19839ba7c8d317a68b85b04"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/budget.ts",
+    "destination": "/home/saya/workspace/chrona-module-notify/budget.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "5d62c55429cf8bdd1032b5148e7d7ee3b1840cc4e6d147ea729c1a779015a88f",
+    "afterSha256": "5d62c55429cf8bdd1032b5148e7d7ee3b1840cc4e6d147ea729c1a779015a88f"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/build-ui.ts",
+    "destination": "/home/saya/workspace/chrona-module-notify/build-ui.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "17e821b91963e4f9d1df1ff0d36abbbb3537bc537c398eee451462cfc8a5af50",
+    "afterSha256": "17e821b91963e4f9d1df1ff0d36abbbb3537bc537c398eee451462cfc8a5af50"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/chrona-material.json",
+    "destination": "/home/saya/workspace/chrona-module-notify/chrona-material.json",
+    "exists": true,
+    "sameBytes": false,
+    "beforeSha256": "684b6d05a0b4b402719e28e002f852832ecfbc5f94bbae8f435be10bda51c4a6",
+    "afterSha256": "4decaf665b7a7794981072035435d1217bfe1c13d7c6e0108c5c7572b0f2456a"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/continuity.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-notify/continuity.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "46facf7bae26d2d3ba773453d8dc4b5cb5272a6c993bad20b49ffa0a34a44a86",
+    "afterSha256": "46facf7bae26d2d3ba773453d8dc4b5cb5272a6c993bad20b49ffa0a34a44a86"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/facts.ts",
+    "destination": "/home/saya/workspace/chrona-module-notify/facts.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "228c26c830c55824ca45e576376a871f35836fa749ed48007796017953a67a68",
+    "afterSha256": "228c26c830c55824ca45e576376a871f35836fa749ed48007796017953a67a68"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/format-test.ts",
+    "destination": "/home/saya/workspace/chrona-module-notify/format-test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "2d2d8308c3f52c10f1abbc3eb7d2464fe0da27991eab9611816cc6c00084d7c5",
+    "afterSha256": "2d2d8308c3f52c10f1abbc3eb7d2464fe0da27991eab9611816cc6c00084d7c5"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/index.ts",
+    "destination": "/home/saya/workspace/chrona-module-notify/index.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "9a726b1a09db383475b9007da9a9722937b84f62e28ff8858cc99bacbde46507",
+    "afterSha256": "9a726b1a09db383475b9007da9a9722937b84f62e28ff8858cc99bacbde46507"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/kernel-client.ts",
+    "destination": "/home/saya/workspace/chrona-module-notify/kernel-client.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "9035fb062a558d62f8149e9a0a5eb2ea158bd988afd68c965cc2952da8dc4c3d",
+    "afterSha256": "9035fb062a558d62f8149e9a0a5eb2ea158bd988afd68c965cc2952da8dc4c3d"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/lifecycle.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-notify/lifecycle.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "a78d3df924eb4c7344cad6354f621d47f4e97e0bd290af321ef92a348b8785f0",
+    "afterSha256": "a78d3df924eb4c7344cad6354f621d47f4e97e0bd290af321ef92a348b8785f0"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/lifecycle.ts",
+    "destination": "/home/saya/workspace/chrona-module-notify/lifecycle.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "c8cdc4dec843c2ec4e40b4fdd082ec7373ed29ecbdae5a7f0f128670ebf70cf8",
+    "afterSha256": "c8cdc4dec843c2ec4e40b4fdd082ec7373ed29ecbdae5a7f0f128670ebf70cf8"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/migrate.ts",
+    "destination": "/home/saya/workspace/chrona-module-notify/migrate.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "b4f4149512425f7552b8aa28916f438c58a341b3938616573e481938d23ff216",
+    "afterSha256": "b4f4149512425f7552b8aa28916f438c58a341b3938616573e481938d23ff216"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/module.json",
+    "destination": "/home/saya/workspace/chrona-module-notify/module.json",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "ef3d3d66fc5375c4a816aeba2c6250d3420fb3341ee0b9011b274ee4aaf168a4",
+    "afterSha256": "ef3d3d66fc5375c4a816aeba2c6250d3420fb3341ee0b9011b274ee4aaf168a4"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/nonconsumer.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-notify/nonconsumer.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "61cf0d09a8bbd5dc12d62f47bfe4d3d05b1eb2208165030264ddcaff74d09f70",
+    "afterSha256": "61cf0d09a8bbd5dc12d62f47bfe4d3d05b1eb2208165030264ddcaff74d09f70"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/notify.ts",
+    "destination": "/home/saya/workspace/chrona-module-notify/notify.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "2bdb386b4b9a094820b7532ad10e499c3101f31211377a79c3e02b179fac8a87",
+    "afterSha256": "2bdb386b4b9a094820b7532ad10e499c3101f31211377a79c3e02b179fac8a87"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/pagination.ts",
+    "destination": "/home/saya/workspace/chrona-module-notify/pagination.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "3ade1447303a866328545e409a2120625f6c28db4fed62d8547a43ac19549049",
+    "afterSha256": "3ade1447303a866328545e409a2120625f6c28db4fed62d8547a43ac19549049"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/registry.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-notify/registry.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "6be40c4dfa6a7c0c9b7a5c26aded4f7eee9d49a6bd309eb053969cd35929fd70",
+    "afterSha256": "6be40c4dfa6a7c0c9b7a5c26aded4f7eee9d49a6bd309eb053969cd35929fd70"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/registry.ts",
+    "destination": "/home/saya/workspace/chrona-module-notify/registry.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "731bcd36a47b2488e39d4c0f1cdd25589dd651b444cf182e9d231129c216841c",
+    "afterSha256": "731bcd36a47b2488e39d4c0f1cdd25589dd651b444cf182e9d231129c216841c"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/runtime.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-notify/runtime.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "26aeda7627886b802f3e22fb756103f10b378e77441ba8687e4daa9929baaef6",
+    "afterSha256": "26aeda7627886b802f3e22fb756103f10b378e77441ba8687e4daa9929baaef6"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/settings-bundle.js",
+    "destination": "/home/saya/workspace/chrona-module-notify/settings-bundle.js",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "6afbe9dc68443007c1e16d4c8c1114b5da742d5319823a1b9f617ad113b586c9",
+    "afterSha256": "6afbe9dc68443007c1e16d4c8c1114b5da742d5319823a1b9f617ad113b586c9"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/settings-page.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-notify/settings-page.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "c85e5e9eb9e3ac9caf4ef1afb9252c9c7cc5f7c30c031202024852d5f6f1d837",
+    "afterSha256": "c85e5e9eb9e3ac9caf4ef1afb9252c9c7cc5f7c30c031202024852d5f6f1d837"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/settings-page.ts",
+    "destination": "/home/saya/workspace/chrona-module-notify/settings-page.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "e0fad47ccd7f825e3e88af77e98ea018317d485f9bca48fc81c17a4b456089bd",
+    "afterSha256": "e0fad47ccd7f825e3e88af77e98ea018317d485f9bca48fc81c17a4b456089bd"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/settings-ui.tsx",
+    "destination": "/home/saya/workspace/chrona-module-notify/settings-ui.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "c5d3a6e7436084b45ce3d222299b22a330fa53164e6de39d60be86d7918e05d8",
+    "afterSha256": "c5d3a6e7436084b45ce3d222299b22a330fa53164e6de39d60be86d7918e05d8"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/store.ts",
+    "destination": "/home/saya/workspace/chrona-module-notify/store.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "358d23afc96b99f88a74eedbc1d7be35c9aaa078c00aac0ad3519a26a3288f1f",
+    "afterSha256": "358d23afc96b99f88a74eedbc1d7be35c9aaa078c00aac0ad3519a26a3288f1f"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/test-directory.ts",
+    "destination": "/home/saya/workspace/chrona-module-notify/test-directory.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "f9ca04809592bf89588366684af6135d381dd63415bf640d42899f47ba5740bf",
+    "afterSha256": "f9ca04809592bf89588366684af6135d381dd63415bf640d42899f47ba5740bf"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/test-storage.ts",
+    "destination": "/home/saya/workspace/chrona-module-notify/test-storage.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "00330db15be8dc4a2e6eea58142ab784701d93e1777dc5e9af11bae7e5584d6c",
+    "afterSha256": "00330db15be8dc4a2e6eea58142ab784701d93e1777dc5e9af11bae7e5584d6c"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/notify/test.ts",
+    "destination": "/home/saya/workspace/chrona-module-notify/test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "6232db04ee3359b9996d621c7dfe84086a052c7040738d4c65c633bdf9c943ad",
+    "afterSha256": "6232db04ee3359b9996d621c7dfe84086a052c7040738d4c65c633bdf9c943ad"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/README.md",
+    "destination": "/home/saya/workspace/chrona-module-pi/README.md",
+    "exists": true,
+    "sameBytes": false,
+    "beforeSha256": "5aa34509b3a749ad67096ec2bdff5e2f3865b4e8c1f02932daa0d55a77a09cbd",
+    "afterSha256": "0e098a064ba1f1936179717eed4a4215f44e7ecd3e6c1ad2a458ade05b67fbde"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/application.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-pi/application.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "636ceff7969313f4209203adf29bb98310c758fbc0237b2bb984aa957d3f4a0f",
+    "afterSha256": "636ceff7969313f4209203adf29bb98310c758fbc0237b2bb984aa957d3f4a0f"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/application.ts",
+    "destination": "/home/saya/workspace/chrona-module-pi/application.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "e881f89360815db71028719a02900a6e0047f4af929a93c2ff66e43536b36b7b",
+    "afterSha256": "e881f89360815db71028719a02900a6e0047f4af929a93c2ff66e43536b36b7b"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/browser.ts",
+    "destination": "/home/saya/workspace/chrona-module-pi/browser.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "01b264c4095725e9151bdc6e83edaf61263075d59294df2b0e5fa722fee3fdc9",
+    "afterSha256": "01b264c4095725e9151bdc6e83edaf61263075d59294df2b0e5fa722fee3fdc9"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/build-ui.ts",
+    "destination": "/home/saya/workspace/chrona-module-pi/build-ui.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "17e821b91963e4f9d1df1ff0d36abbbb3537bc537c398eee451462cfc8a5af50",
+    "afterSha256": "17e821b91963e4f9d1df1ff0d36abbbb3537bc537c398eee451462cfc8a5af50"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/build.ts",
+    "destination": "/home/saya/workspace/chrona-module-pi/build.ts",
+    "exists": true,
+    "sameBytes": false,
+    "beforeSha256": "b50f7c1650c0eb1c10038b62cf2fbaa1fb4da582e5d9790570f11fc4efd0d90f",
+    "afterSha256": "1c5487eed78b23b96c4072fea4f325225d4997906baff57db5ac57e8bf886c71"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/bun.lock",
+    "destination": "/home/saya/workspace/chrona-module-pi/bun.lock",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "0a5da0de4ce5a55a280d2bfe1fb61e5f0721389e9be832b85c1c2470d187b82f",
+    "afterSha256": "0a5da0de4ce5a55a280d2bfe1fb61e5f0721389e9be832b85c1c2470d187b82f"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/chrona-material.json",
+    "destination": "/home/saya/workspace/chrona-module-pi/chrona-material.json",
+    "exists": true,
+    "sameBytes": false,
+    "beforeSha256": "7833edefe5b91dcf47e5443012396e61f007b1e0678c1c428a279a83a97c106a",
+    "afterSha256": "f3f264dc36dc4a2f2868bfef856eb8fb3cbc93acfbe7043e2327e02c89a504fc"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/completions.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-pi/completions.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "d5ed4e892a153b39cb485be00aa77469750f0c66bc05b927369dbbc84042acec",
+    "afterSha256": "d5ed4e892a153b39cb485be00aa77469750f0c66bc05b927369dbbc84042acec"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/completions.ts",
+    "destination": "/home/saya/workspace/chrona-module-pi/completions.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "e2bf9ab6423f52eb2054d9a8946a359ecf2c1f92747ff33534a57fdbef449f6a",
+    "afterSha256": "e2bf9ab6423f52eb2054d9a8946a359ecf2c1f92747ff33534a57fdbef449f6a"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/configuration.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-pi/configuration.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "60d28a38d577b0468e1153b48ce88f3d6569c2a3b2f3d8f72a41df1d421c2949",
+    "afterSha256": "60d28a38d577b0468e1153b48ce88f3d6569c2a3b2f3d8f72a41df1d421c2949"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/configuration.ts",
+    "destination": "/home/saya/workspace/chrona-module-pi/configuration.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "fb371cd753413eea997878ade13229a38ab2d07c003a03bb5b9789241f56b717",
+    "afterSha256": "fb371cd753413eea997878ade13229a38ab2d07c003a03bb5b9789241f56b717"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/host-recovery.ts",
+    "destination": "/home/saya/workspace/chrona-module-pi/host-recovery.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "bcd3c645fdba2627759e4b5a839fbe95d01e610e1e661db2be25ce3128f71223",
+    "afterSha256": "bcd3c645fdba2627759e4b5a839fbe95d01e610e1e661db2be25ce3128f71223"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/index.ts",
+    "destination": "/home/saya/workspace/chrona-module-pi/index.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "119198a0b73fc8dc264b52ef61aade36dea29973db6824c559b9759d41098713",
+    "afterSha256": "119198a0b73fc8dc264b52ef61aade36dea29973db6824c559b9759d41098713"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/journal.ts",
+    "destination": "/home/saya/workspace/chrona-module-pi/journal.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "1bcc57f4f4593ea23eb1c4afcb846add46fb3c1b4d6d2755af2089fd8f37cca3",
+    "afterSha256": "1bcc57f4f4593ea23eb1c4afcb846add46fb3c1b4d6d2755af2089fd8f37cca3"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/module.json",
+    "destination": "/home/saya/workspace/chrona-module-pi/module.json",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "82855b10f7af045f48cf61bc0e32157510b57058caabfdc47aec86cd3f7addfe",
+    "afterSha256": "82855b10f7af045f48cf61bc0e32157510b57058caabfdc47aec86cd3f7addfe"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/operations.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-pi/operations.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "10ff322441c1a0150a68cb350ffbb065ea720fd4bed7a9cad82999ebd172af2c",
+    "afterSha256": "10ff322441c1a0150a68cb350ffbb065ea720fd4bed7a9cad82999ebd172af2c"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/operations.ts",
+    "destination": "/home/saya/workspace/chrona-module-pi/operations.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "c5956d44d539bb68271fe2ee7edbbee31ace751386a1fccd9de2bf1867c12f70",
+    "afterSha256": "c5956d44d539bb68271fe2ee7edbbee31ace751386a1fccd9de2bf1867c12f70"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/package.json",
+    "destination": "/home/saya/workspace/chrona-module-pi/package.json",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "71fcc5a9417b2e333a3f4e4186e79665afabbfc0a67c2b32bda707f094684564",
+    "afterSha256": "71fcc5a9417b2e333a3f4e4186e79665afabbfc0a67c2b32bda707f094684564"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/registration.ts",
+    "destination": "/home/saya/workspace/chrona-module-pi/registration.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "62042bbe7e9cd858d9099591abc7f4df27ead6862714829f278c1f1c352bf230",
+    "afterSha256": "62042bbe7e9cd858d9099591abc7f4df27ead6862714829f278c1f1c352bf230"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/runtime.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-pi/runtime.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "d76ea1ba444cc31b78cde8cdaafe9f084fe545ff51b72a11aba943786e8c4070",
+    "afterSha256": "d76ea1ba444cc31b78cde8cdaafe9f084fe545ff51b72a11aba943786e8c4070"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/runtime.fixture.ts",
+    "destination": "/home/saya/workspace/chrona-module-pi/runtime.fixture.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "cd7c806212dcd00ad68f7703587051938dbe2c71e7952040c19e7d318bb074b5",
+    "afterSha256": "cd7c806212dcd00ad68f7703587051938dbe2c71e7952040c19e7d318bb074b5"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/runtime.js",
+    "destination": "/home/saya/workspace/chrona-module-pi/runtime.js",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "25f6b23039e607935151f0aa0385fc4c2725ff7f7c406ee3189751bbb9bcabe9",
+    "afterSha256": "25f6b23039e607935151f0aa0385fc4c2725ff7f7c406ee3189751bbb9bcabe9"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/runtime.ts",
+    "destination": "/home/saya/workspace/chrona-module-pi/runtime.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "509ead808a34f53fc545b3214161588b17712638b69babf3ed84ee306d05c353",
+    "afterSha256": "509ead808a34f53fc545b3214161588b17712638b69babf3ed84ee306d05c353"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/schema.ts",
+    "destination": "/home/saya/workspace/chrona-module-pi/schema.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "413a523ae28b46c482ce211f6ca4a87be7a4ff6c310e1014b7e5d4c09845f9d6",
+    "afterSha256": "413a523ae28b46c482ce211f6ca4a87be7a4ff6c310e1014b7e5d4c09845f9d6"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/settings-bundle.js",
+    "destination": "/home/saya/workspace/chrona-module-pi/settings-bundle.js",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "06b6da30e52c3bb8cda48e167efe84bc193848fcf96f3e0ab84fa10e3e12d4a4",
+    "afterSha256": "06b6da30e52c3bb8cda48e167efe84bc193848fcf96f3e0ab84fa10e3e12d4a4"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/settings-page.ts",
+    "destination": "/home/saya/workspace/chrona-module-pi/settings-page.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "f6b9974ba877389779e7eaf44f34f4e369d9a1b425e36866b4004aa59378302e",
+    "afterSha256": "f6b9974ba877389779e7eaf44f34f4e369d9a1b425e36866b4004aa59378302e"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/settings-ui.tsx",
+    "destination": "/home/saya/workspace/chrona-module-pi/settings-ui.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "256bae5dc1ee23828725b128392e422415ef9d0dd40955bd046169f5f10fadb1",
+    "afterSha256": "256bae5dc1ee23828725b128392e422415ef9d0dd40955bd046169f5f10fadb1"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/test-entry.ts",
+    "destination": "/home/saya/workspace/chrona-module-pi/test-entry.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "6274c1dd05537d75efd0f489fa88c5309efbe3261efeb87c7646715b934266e6",
+    "afterSha256": "6274c1dd05537d75efd0f489fa88c5309efbe3261efeb87c7646715b934266e6"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/test.js",
+    "destination": "/home/saya/workspace/chrona-module-pi/test.js",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "c5a83cf3d7b4fcc894b84bd0b7ae16b38b8f27a6f7114c6868e78e26d249ce71",
+    "afterSha256": "c5a83cf3d7b4fcc894b84bd0b7ae16b38b8f27a6f7114c6868e78e26d249ce71"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/test.ts",
+    "destination": "/home/saya/workspace/chrona-module-pi/test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "45a923d216bb890ac1fc6b3a59dad4bf14f5744a6cfbda0d6975c35482291779",
+    "afterSha256": "45a923d216bb890ac1fc6b3a59dad4bf14f5744a6cfbda0d6975c35482291779"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/transcript-sdk.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-pi/transcript-sdk.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "399ff7dbd1cb45300da49021a88850eafa9e57d81422ac410d31b270b8e543a3",
+    "afterSha256": "399ff7dbd1cb45300da49021a88850eafa9e57d81422ac410d31b270b8e543a3"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/pi/transcript-sdk.fixture.ts",
+    "destination": "/home/saya/workspace/chrona-module-pi/transcript-sdk.fixture.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "bb8074a1e8b375facbc7240cb9451fade8a6c103773424a91110ce048030fa39",
+    "afterSha256": "bb8074a1e8b375facbc7240cb9451fade8a6c103773424a91110ce048030fa39"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/LICENSE",
+    "destination": "/home/saya/workspace/chrona-module-qq/LICENSE",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "ec698798d97e2fdf85077e23eca23ec4ab31f3c205d7d84ffb8b686a4b4069e7",
+    "afterSha256": "ec698798d97e2fdf85077e23eca23ec4ab31f3c205d7d84ffb8b686a4b4069e7"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/agent-conversations.ts",
+    "destination": "/home/saya/workspace/chrona-module-qq/agent-conversations.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "c51b3171a38e5b176bcfb20668d9c03ae086725157de181d498069c45eca943d",
+    "afterSha256": "c51b3171a38e5b176bcfb20668d9c03ae086725157de181d498069c45eca943d"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/approval-test.ts",
+    "destination": "/home/saya/workspace/chrona-module-qq/approval-test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "d48b23ab64b625d3f73b06515ccf0fe4cc64791526d67ec58a3f1ee4d4bd89eb",
+    "afterSha256": "d48b23ab64b625d3f73b06515ccf0fe4cc64791526d67ec58a3f1ee4d4bd89eb"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/bot.ts",
+    "destination": "/home/saya/workspace/chrona-module-qq/bot.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "d74cc0417820a6c88df121bc754773a76ab4d84d48bba207579813af8afac1b8",
+    "afterSha256": "d74cc0417820a6c88df121bc754773a76ab4d84d48bba207579813af8afac1b8"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/build-ui.ts",
+    "destination": "/home/saya/workspace/chrona-module-qq/build-ui.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "17e821b91963e4f9d1df1ff0d36abbbb3537bc537c398eee451462cfc8a5af50",
+    "afterSha256": "17e821b91963e4f9d1df1ff0d36abbbb3537bc537c398eee451462cfc8a5af50"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/bun.lock",
+    "destination": "/home/saya/workspace/chrona-module-qq/bun.lock",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "4ac0e37543a36f8fc6702082509cabe744ed6424de21c6df8c63844cb1e80d0f",
+    "afterSha256": "4ac0e37543a36f8fc6702082509cabe744ed6424de21c6df8c63844cb1e80d0f"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/chrona-material.json",
+    "destination": "/home/saya/workspace/chrona-module-qq/chrona-material.json",
+    "exists": true,
+    "sameBytes": false,
+    "beforeSha256": "ed7e351e6d8825eea9f0801632087a6ea943cbc928f175779809247508b2cb74",
+    "afterSha256": "83028c59dbd8268b9a41e62812bed79b76a2dda88a93ffe3ba430a1655cff2e7"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/conversations.ts",
+    "destination": "/home/saya/workspace/chrona-module-qq/conversations.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "58640f63828dd0df40da3960ef1507eaad2636ffa090249a042ae6912cd6db29",
+    "afterSha256": "58640f63828dd0df40da3960ef1507eaad2636ffa090249a042ae6912cd6db29"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/delivery.ts",
+    "destination": "/home/saya/workspace/chrona-module-qq/delivery.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "d10026947dde59bd4b71e391c02e1756d6700b94e0f7edb785d2ad5f57fd5ff1",
+    "afterSha256": "d10026947dde59bd4b71e391c02e1756d6700b94e0f7edb785d2ad5f57fd5ff1"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/format-test.ts",
+    "destination": "/home/saya/workspace/chrona-module-qq/format-test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "3371a5c30fcd8f26ef8bbe6adf84ab928dda267c4304b3e26791a12c803dab15",
+    "afterSha256": "3371a5c30fcd8f26ef8bbe6adf84ab928dda267c4304b3e26791a12c803dab15"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/index.ts",
+    "destination": "/home/saya/workspace/chrona-module-qq/index.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "59964611cb6459377a373bd3eef41f82748f993666b3c0874e4108e12ef0a24d",
+    "afterSha256": "59964611cb6459377a373bd3eef41f82748f993666b3c0874e4108e12ef0a24d"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/kernel-client.ts",
+    "destination": "/home/saya/workspace/chrona-module-qq/kernel-client.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "9035fb062a558d62f8149e9a0a5eb2ea158bd988afd68c965cc2952da8dc4c3d",
+    "afterSha256": "9035fb062a558d62f8149e9a0a5eb2ea158bd988afd68c965cc2952da8dc4c3d"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/memory.ts",
+    "destination": "/home/saya/workspace/chrona-module-qq/memory.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "d431e60d3442e4ccad16902b470d723e9d1090df498f84252c3aede52e2265e9",
+    "afterSha256": "d431e60d3442e4ccad16902b470d723e9d1090df498f84252c3aede52e2265e9"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/migrate-storage.ts",
+    "destination": "/home/saya/workspace/chrona-module-qq/migrate-storage.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "a18a78f285a2bb3623e80451e165566a6678b0fb0f3da5570bdea226c45a5ca8",
+    "afterSha256": "a18a78f285a2bb3623e80451e165566a6678b0fb0f3da5570bdea226c45a5ca8"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/module.json",
+    "destination": "/home/saya/workspace/chrona-module-qq/module.json",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "4725a7e03f3f3eb6718710544392aad883243dd2fd975e9dd86d0adf42bde0ba",
+    "afterSha256": "4725a7e03f3f3eb6718710544392aad883243dd2fd975e9dd86d0adf42bde0ba"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/official.ts",
+    "destination": "/home/saya/workspace/chrona-module-qq/official.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "36f1f3f0907cfd2bda55ead6eb907277e6a30594edd6f2045641840d6bdbc8c8",
+    "afterSha256": "36f1f3f0907cfd2bda55ead6eb907277e6a30594edd6f2045641840d6bdbc8c8"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/offline-harness.ts",
+    "destination": "/home/saya/workspace/chrona-module-qq/offline-harness.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "76938f1d0021a06622ec2b285335c55ddcd16db1455ff488a63273047483f13d",
+    "afterSha256": "76938f1d0021a06622ec2b285335c55ddcd16db1455ff488a63273047483f13d"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/package.json",
+    "destination": "/home/saya/workspace/chrona-module-qq/package.json",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "064740ee2bf5a4c68c5948d0843208e6d3a5a35983806fdd8605e688ca4789e8",
+    "afterSha256": "064740ee2bf5a4c68c5948d0843208e6d3a5a35983806fdd8605e688ca4789e8"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/page.ts",
+    "destination": "/home/saya/workspace/chrona-module-qq/page.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "719a7201f547e8e899ee363aef622c76a09837437d08d3e30d7f4e2c1da4d406",
+    "afterSha256": "719a7201f547e8e899ee363aef622c76a09837437d08d3e30d7f4e2c1da4d406"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/pagination.ts",
+    "destination": "/home/saya/workspace/chrona-module-qq/pagination.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "3ade1447303a866328545e409a2120625f6c28db4fed62d8547a43ac19549049",
+    "afterSha256": "3ade1447303a866328545e409a2120625f6c28db4fed62d8547a43ac19549049"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/preferences.ts",
+    "destination": "/home/saya/workspace/chrona-module-qq/preferences.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "35903a0eed4f574117fd9946ba23f6c28d14a02686c6353d8ec204df68ec60df",
+    "afterSha256": "35903a0eed4f574117fd9946ba23f6c28d14a02686c6353d8ec204df68ec60df"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/regression-test.ts",
+    "destination": "/home/saya/workspace/chrona-module-qq/regression-test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "560a3feb692fc808659a70981f2b6424b612d076ad03fb371aa57be41ef12240",
+    "afterSha256": "560a3feb692fc808659a70981f2b6424b612d076ad03fb371aa57be41ef12240"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/relay.ts",
+    "destination": "/home/saya/workspace/chrona-module-qq/relay.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "d07c90232f1c1629e7854058c7a234bae8e4ddfa6c22f04d9bf95ea803a92eff",
+    "afterSha256": "d07c90232f1c1629e7854058c7a234bae8e4ddfa6c22f04d9bf95ea803a92eff"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/settings-bundle.js",
+    "destination": "/home/saya/workspace/chrona-module-qq/settings-bundle.js",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "bba098429dc53b59146a608770699891f3303bc0339a9189b523a7a19a00ebdc",
+    "afterSha256": "bba098429dc53b59146a608770699891f3303bc0339a9189b523a7a19a00ebdc"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/settings-ui.tsx",
+    "destination": "/home/saya/workspace/chrona-module-qq/settings-ui.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "8af4c58916c0d8573b7b88a1b0a7a2fbff64d3b9210747c9ac9e78a721490691",
+    "afterSha256": "8af4c58916c0d8573b7b88a1b0a7a2fbff64d3b9210747c9ac9e78a721490691"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/settings.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-qq/settings.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "db0e956562fd506885e1204510626f6a921bb81cf094d1cf42013862d2fa12c8",
+    "afterSha256": "db0e956562fd506885e1204510626f6a921bb81cf094d1cf42013862d2fa12c8"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/test.ts",
+    "destination": "/home/saya/workspace/chrona-module-qq/test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "14e85c4d1a69f4cfa4b36d812808a4b971d17856d0d897e167ec5223bfcb8c3e",
+    "afterSha256": "14e85c4d1a69f4cfa4b36d812808a4b971d17856d0d897e167ec5223bfcb8c3e"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/ui-settings.ts",
+    "destination": "/home/saya/workspace/chrona-module-qq/ui-settings.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "4fb953c2d220db4b2095f2a3e0e2edde2b0a62a6681d28b03695551360360755",
+    "afterSha256": "4fb953c2d220db4b2095f2a3e0e2edde2b0a62a6681d28b03695551360360755"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/qq/unconfigured-harness.ts",
+    "destination": "/home/saya/workspace/chrona-module-qq/unconfigured-harness.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "d1a19aff00c81bdf79cfbeae216e02b1ca1de4a8ae36c782b86a5f71e3fa98f4",
+    "afterSha256": "d1a19aff00c81bdf79cfbeae216e02b1ca1de4a8ae36c782b86a5f71e3fa98f4"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remind/LICENSE",
+    "destination": "/home/saya/workspace/chrona-module-remind/LICENSE",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "ec698798d97e2fdf85077e23eca23ec4ab31f3c205d7d84ffb8b686a4b4069e7",
+    "afterSha256": "ec698798d97e2fdf85077e23eca23ec4ab31f3c205d7d84ffb8b686a4b4069e7"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remind/activation-harness.ts",
+    "destination": "/home/saya/workspace/chrona-module-remind/activation-harness.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "861fa008a0d911a0a084bc76c6ac4bf22a97de0e73601f00da4e6e3d8c3a8862",
+    "afterSha256": "861fa008a0d911a0a084bc76c6ac4bf22a97de0e73601f00da4e6e3d8c3a8862"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remind/build-ui.ts",
+    "destination": "/home/saya/workspace/chrona-module-remind/build-ui.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "17e821b91963e4f9d1df1ff0d36abbbb3537bc537c398eee451462cfc8a5af50",
+    "afterSha256": "17e821b91963e4f9d1df1ff0d36abbbb3537bc537c398eee451462cfc8a5af50"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remind/bun.lock",
+    "destination": "/home/saya/workspace/chrona-module-remind/bun.lock",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "3cd92cccaf605e48d6d95d4d5b0d457bc4c78b88355e8f85c514b3cd0df1c558",
+    "afterSha256": "3cd92cccaf605e48d6d95d4d5b0d457bc4c78b88355e8f85c514b3cd0df1c558"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remind/index.ts",
+    "destination": "/home/saya/workspace/chrona-module-remind/index.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "cfd4fa6073cb65dd2592fbb2d32123ed40441fe3fc5249c6115e418ede9ff2ae",
+    "afterSha256": "cfd4fa6073cb65dd2592fbb2d32123ed40441fe3fc5249c6115e418ede9ff2ae"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remind/module.json",
+    "destination": "/home/saya/workspace/chrona-module-remind/module.json",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "e28f2ab91c2bab3ed17c683c05387242ffee035e36bd4bd964840a76c3983112",
+    "afterSha256": "e28f2ab91c2bab3ed17c683c05387242ffee035e36bd4bd964840a76c3983112"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remind/package.json",
+    "destination": "/home/saya/workspace/chrona-module-remind/package.json",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "dc3d6034618313bcc01bbfc86220aa4d59643b0a18467dbe1dec90f8fe78990e",
+    "afterSha256": "dc3d6034618313bcc01bbfc86220aa4d59643b0a18467dbe1dec90f8fe78990e"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remind/page-bundle.js",
+    "destination": "/home/saya/workspace/chrona-module-remind/page-bundle.js",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "a96c59146874083708417ed3a2eb1ad436b6deb833b4613bdf8074f392fcdfb5",
+    "afterSha256": "a96c59146874083708417ed3a2eb1ad436b6deb833b4613bdf8074f392fcdfb5"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remind/page-ui.tsx",
+    "destination": "/home/saya/workspace/chrona-module-remind/page-ui.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "69edca7bb5b693c5e214cc4646ec9612163f6a068a562acf5e368402d057416f",
+    "afterSha256": "69edca7bb5b693c5e214cc4646ec9612163f6a068a562acf5e368402d057416f"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remind/page.ts",
+    "destination": "/home/saya/workspace/chrona-module-remind/page.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "5f8e56505fd7350fb424877a8706440c453e03eb6b93d5f7104db29975dfb27b",
+    "afterSha256": "5f8e56505fd7350fb424877a8706440c453e03eb6b93d5f7104db29975dfb27b"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remind/reminders.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-remind/reminders.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "70cd26f23778b67d6a0792a64f4e128a4f42b0941b6459d6cfe10ef7a3d12691",
+    "afterSha256": "70cd26f23778b67d6a0792a64f4e128a4f42b0941b6459d6cfe10ef7a3d12691"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remind/reminders.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-remind/reminders.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "4549728066ae410ada4ef39e37fdfc77f1f3c08b2f9fafefc4c64629b09c2b5f",
+    "afterSha256": "4549728066ae410ada4ef39e37fdfc77f1f3c08b2f9fafefc4c64629b09c2b5f"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remind/reminders.ts",
+    "destination": "/home/saya/workspace/chrona-module-remind/reminders.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "3307cadc5ace10dab667dafdd19d44476b63759ceb9b8583f0991e160e0bafb0",
+    "afterSha256": "3307cadc5ace10dab667dafdd19d44476b63759ceb9b8583f0991e160e0bafb0"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remind/rules.ts",
+    "destination": "/home/saya/workspace/chrona-module-remind/rules.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "95d45c20f72d8a08b8ab05935baaf5dd6bcf814690c2b0fb266809471c5725df",
+    "afterSha256": "95d45c20f72d8a08b8ab05935baaf5dd6bcf814690c2b0fb266809471c5725df"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remind/test.ts",
+    "destination": "/home/saya/workspace/chrona-module-remind/test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "902e711e0f9cba2a1e6d358103ea65f1378e6871602f50a1ed5b74f94223226f",
+    "afterSha256": "902e711e0f9cba2a1e6d358103ea65f1378e6871602f50a1ed5b74f94223226f"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remote-execution/LICENSE",
+    "destination": "/home/saya/workspace/chrona-module-remote-execution/LICENSE",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "ec698798d97e2fdf85077e23eca23ec4ab31f3c205d7d84ffb8b686a4b4069e7",
+    "afterSha256": "ec698798d97e2fdf85077e23eca23ec4ab31f3c205d7d84ffb8b686a4b4069e7"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remote-execution/README.md",
+    "destination": "/home/saya/workspace/chrona-module-remote-execution/README.md",
+    "exists": true,
+    "sameBytes": false,
+    "beforeSha256": "bd73fb96a7bec79770aff0988d2090a6a7051fbc2d0c11f1175c0b7582c72346",
+    "afterSha256": "01a6ab7d16a0f937f283c0696a60c41035e6af42fb04ceac312782403f5f595e"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remote-execution/app.ts",
+    "destination": "/home/saya/workspace/chrona-module-remote-execution/app.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "3d38b51180e935d4f393beb670baff274fefd16cf19e904158abb0a571e9cdba",
+    "afterSha256": "3d38b51180e935d4f393beb670baff274fefd16cf19e904158abb0a571e9cdba"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remote-execution/budget.ts",
+    "destination": "/home/saya/workspace/chrona-module-remote-execution/budget.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "b3202c919f347bb459e0a96538a6214f373f4bbb0372ffcea7a340729900f191",
+    "afterSha256": "b3202c919f347bb459e0a96538a6214f373f4bbb0372ffcea7a340729900f191"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remote-execution/contracts.ts",
+    "destination": "/home/saya/workspace/chrona-module-remote-execution/contracts.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "b164f8ade8a9732ec633389af23ad0044a68379b50710edd4de58c2fa0ec6f8f",
+    "afterSha256": "b164f8ade8a9732ec633389af23ad0044a68379b50710edd4de58c2fa0ec6f8f"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remote-execution/harness.ts",
+    "destination": "/home/saya/workspace/chrona-module-remote-execution/harness.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "1773acc4ba44a4e66f6bdeb56e589223d5730b08de6a15de7f8d99e1e65ba22a",
+    "afterSha256": "1773acc4ba44a4e66f6bdeb56e589223d5730b08de6a15de7f8d99e1e65ba22a"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remote-execution/index.ts",
+    "destination": "/home/saya/workspace/chrona-module-remote-execution/index.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "a57034c3968aa50e3e326ce42be0ec6a85063f22a1cc2aff42aada3a2dc2d4c5",
+    "afterSha256": "a57034c3968aa50e3e326ce42be0ec6a85063f22a1cc2aff42aada3a2dc2d4c5"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remote-execution/kernel-client.ts",
+    "destination": "/home/saya/workspace/chrona-module-remote-execution/kernel-client.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "9035fb062a558d62f8149e9a0a5eb2ea158bd988afd68c965cc2952da8dc4c3d",
+    "afterSha256": "9035fb062a558d62f8149e9a0a5eb2ea158bd988afd68c965cc2952da8dc4c3d"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remote-execution/kernel-port.ts",
+    "destination": "/home/saya/workspace/chrona-module-remote-execution/kernel-port.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "12dce5a8299141462ed0a34c1ef26449b6a2a106cba90a1dc895ff421a8e7ecc",
+    "afterSha256": "12dce5a8299141462ed0a34c1ef26449b6a2a106cba90a1dc895ff421a8e7ecc"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remote-execution/liveness.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-remote-execution/liveness.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "a62caf8e0309105431637470da3f79054270f858c8094c3998eaf13838234953",
+    "afterSha256": "a62caf8e0309105431637470da3f79054270f858c8094c3998eaf13838234953"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remote-execution/module.json",
+    "destination": "/home/saya/workspace/chrona-module-remote-execution/module.json",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "2e4307eeb4f3715e58983b3e37d9cc9a0e1c6234f64cbcf1dd025d6fccbf7965",
+    "afterSha256": "2e4307eeb4f3715e58983b3e37d9cc9a0e1c6234f64cbcf1dd025d6fccbf7965"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remote-execution/pagination.ts",
+    "destination": "/home/saya/workspace/chrona-module-remote-execution/pagination.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "3ade1447303a866328545e409a2120625f6c28db4fed62d8547a43ac19549049",
+    "afterSha256": "3ade1447303a866328545e409a2120625f6c28db4fed62d8547a43ac19549049"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remote-execution/protocol.schema.json",
+    "destination": "/home/saya/workspace/chrona-module-remote-execution/protocol.schema.json",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "98d367b2e1ad4462220bb612a8c8ad3b7b7b5a11809a6e20c444eff6e9b27000",
+    "afterSha256": "98d367b2e1ad4462220bb612a8c8ad3b7b7b5a11809a6e20c444eff6e9b27000"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remote-execution/storage.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-remote-execution/storage.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "f5174b014d3c47df1a8fe43b9004e08cb81dee2230bf21b62d1d20f12b48203a",
+    "afterSha256": "f5174b014d3c47df1a8fe43b9004e08cb81dee2230bf21b62d1d20f12b48203a"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remote-execution/storage.ts",
+    "destination": "/home/saya/workspace/chrona-module-remote-execution/storage.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "125360a65a22f01f71d1880f267a0ad583818ef23a5f25d42b27fec41100afb4",
+    "afterSha256": "125360a65a22f01f71d1880f267a0ad583818ef23a5f25d42b27fec41100afb4"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remote-execution/store.ts",
+    "destination": "/home/saya/workspace/chrona-module-remote-execution/store.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "487dea99ffa4833ae0031f1ca60eaa4094ae089edf9cd66cd0fa01cae33cf228",
+    "afterSha256": "487dea99ffa4833ae0031f1ca60eaa4094ae089edf9cd66cd0fa01cae33cf228"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/remote-execution/test.ts",
+    "destination": "/home/saya/workspace/chrona-module-remote-execution/test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "27f4df5f1ae35960484aefe8cb20799e37fb7bf875c1e76a4f1894614a8c5bf0",
+    "afterSha256": "27f4df5f1ae35960484aefe8cb20799e37fb7bf875c1e76a4f1894614a8c5bf0"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/DESIGN.md",
+    "destination": "/home/saya/workspace/chrona-module-web/DESIGN.md",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "c8d7b26d26238ff36748f78e3efd90ab26758151f284d224f2d50683176aed05",
+    "afterSha256": "c8d7b26d26238ff36748f78e3efd90ab26758151f284d224f2d50683176aed05"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/LICENSE",
+    "destination": "/home/saya/workspace/chrona-module-web/LICENSE",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "ec698798d97e2fdf85077e23eca23ec4ab31f3c205d7d84ffb8b686a4b4069e7",
+    "afterSha256": "ec698798d97e2fdf85077e23eca23ec4ab31f3c205d7d84ffb8b686a4b4069e7"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/MATERIAL-ADMISSION.md",
+    "destination": "/home/saya/workspace/chrona-module-web/MATERIAL-ADMISSION.md",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "9772d9c3679f67de7214830bee9cfffd87796b7d425f6972ac5b39a4b1740b0c",
+    "afterSha256": "9772d9c3679f67de7214830bee9cfffd87796b7d425f6972ac5b39a4b1740b0c"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/THIRD-PARTY-NOTICES.txt",
+    "destination": "/home/saya/workspace/chrona-module-web/THIRD-PARTY-NOTICES.txt",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "4364b016048603ce718a4b12d8ced7f542de497a81b69e3887fa3643a01869db",
+    "afterSha256": "4364b016048603ce718a4b12d8ced7f542de497a81b69e3887fa3643a01869db"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/UI-DEVELOPMENT.md",
+    "destination": "/home/saya/workspace/chrona-module-web/UI-DEVELOPMENT.md",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "5697f20434f00949a2e4eba901b41302872e9663e2ffd5c3846db9e75e4b04e2",
+    "afterSha256": "5697f20434f00949a2e4eba901b41302872e9663e2ffd5c3846db9e75e4b04e2"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/agent-conversations.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/agent-conversations.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "f23d0425d0cf0f61699d651ea9c3dec7566cb8363f5953312d851fcfab44cf03",
+    "afterSha256": "f23d0425d0cf0f61699d651ea9c3dec7566cb8363f5953312d851fcfab44cf03"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/agent-conversations.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/agent-conversations.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "c51b3171a38e5b176bcfb20668d9c03ae086725157de181d498069c45eca943d",
+    "afterSha256": "c51b3171a38e5b176bcfb20668d9c03ae086725157de181d498069c45eca943d"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/app-overview.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/app-overview.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "a0656d8f7fc951ab297b9807da72233642793e82c823ad6c28367f546f7c82f2",
+    "afterSha256": "a0656d8f7fc951ab297b9807da72233642793e82c823ad6c28367f546f7c82f2"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/app-overview.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/app-overview.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "696ff1e5fc5a3a4bf6abd6564516df72a803072f18b679a51cd01e4d4051328f",
+    "afterSha256": "696ff1e5fc5a3a4bf6abd6564516df72a803072f18b679a51cd01e4d4051328f"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/app.js",
+    "destination": "/home/saya/workspace/chrona-module-web/app.js",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "94baab2177ff69242ab1adcd34e5ec6e95923008053977ad68df7427224b89fc",
+    "afterSha256": "94baab2177ff69242ab1adcd34e5ec6e95923008053977ad68df7427224b89fc"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/attachments.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/attachments.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "694ca531049d9611a36cc84338723434781d82f60970cf8858fba17ab562ad01",
+    "afterSha256": "694ca531049d9611a36cc84338723434781d82f60970cf8858fba17ab562ad01"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/attachments.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/attachments.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "e6686b0b69879a8e4906e6a3c89b0f5cd425355b5091606cdd32b2ae6274185d",
+    "afterSha256": "e6686b0b69879a8e4906e6a3c89b0f5cd425355b5091606cdd32b2ae6274185d"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/build-ui.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/build-ui.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "17e821b91963e4f9d1df1ff0d36abbbb3537bc537c398eee451462cfc8a5af50",
+    "afterSha256": "17e821b91963e4f9d1df1ff0d36abbbb3537bc537c398eee451462cfc8a5af50"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/build.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/build.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "f79d700e2fb90686d24fc9d515874469e60fe6afefa24f387e5bda8853c7a953",
+    "afterSha256": "f79d700e2fb90686d24fc9d515874469e60fe6afefa24f387e5bda8853c7a953"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/bun.lock",
+    "destination": "/home/saya/workspace/chrona-module-web/bun.lock",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "0d420d0a3964e050f4dd7b8fe7c0e1b42cc3c2c6d8d78ca622eb1dcf26d56107",
+    "afterSha256": "0d420d0a3964e050f4dd7b8fe7c0e1b42cc3c2c6d8d78ca622eb1dcf26d56107"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/chat-api.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/chat-api.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "da0f0d6098efbac2480817072527808b9e6d9d08a27888b82d80c65217820dbe",
+    "afterSha256": "da0f0d6098efbac2480817072527808b9e6d9d08a27888b82d80c65217820dbe"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/chat-browser.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/chat-browser.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "7850c46ff965938f80fb0497988ea2639820d1e2fc6fa238dfff9f52e20ab1be",
+    "afterSha256": "7850c46ff965938f80fb0497988ea2639820d1e2fc6fa238dfff9f52e20ab1be"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/chrona-material.json",
+    "destination": "/home/saya/workspace/chrona-module-web/chrona-material.json",
+    "exists": true,
+    "sameBytes": false,
+    "beforeSha256": "a704c8a7d1436f2c97de40a933cb7999dff814172cf4f27458fc771b0c76d1cc",
+    "afterSha256": "345c8a7da8a04fcdaa21834a707ea1447634951ce493e3ee57d9bf395c7fd41c"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/delivery.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/delivery.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "d10026947dde59bd4b71e391c02e1756d6700b94e0f7edb785d2ad5f57fd5ff1",
+    "afterSha256": "d10026947dde59bd4b71e391c02e1756d6700b94e0f7edb785d2ad5f57fd5ff1"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/feedback-link.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/feedback-link.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "681d0e440110b8b8191feb8e52704ea81568952726dddcca5ab87d5fb92aead2",
+    "afterSha256": "681d0e440110b8b8191feb8e52704ea81568952726dddcca5ab87d5fb92aead2"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/image.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/image.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "9c941f8c2c1269a1fb1cab624bf47188ad4dda6820b2455a0954305c50004a06",
+    "afterSha256": "9c941f8c2c1269a1fb1cab624bf47188ad4dda6820b2455a0954305c50004a06"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/index.html",
+    "destination": "/home/saya/workspace/chrona-module-web/index.html",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "714aabfe5b84957d399dda307ead6170873bc2e6a722bd4ffe116cec47c2675c",
+    "afterSha256": "714aabfe5b84957d399dda307ead6170873bc2e6a722bd4ffe116cec47c2675c"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/index.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/index.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "ba1041b14edc2e2c6bf2c2f3086fe6e6cc949b4625cb1ca411c8ad2e19804ecf",
+    "afterSha256": "ba1041b14edc2e2c6bf2c2f3086fe6e6cc949b4625cb1ca411c8ad2e19804ecf"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/inline-settings.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/inline-settings.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "b982644611e042c0a66ce5e8839bde48fbfc9b6fefff22070895de7ee4a56cde",
+    "afterSha256": "b982644611e042c0a66ce5e8839bde48fbfc9b6fefff22070895de7ee4a56cde"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/kernel-client.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/kernel-client.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "9035fb062a558d62f8149e9a0a5eb2ea158bd988afd68c965cc2952da8dc4c3d",
+    "afterSha256": "9035fb062a558d62f8149e9a0a5eb2ea158bd988afd68c965cc2952da8dc4c3d"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/lifecycle.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/lifecycle.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "1db97cae60d93cf1b009f13cc2ffd3695220195cc01c0ff28153d46d630143c7",
+    "afterSha256": "1db97cae60d93cf1b009f13cc2ffd3695220195cc01c0ff28153d46d630143c7"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/material-admission.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/material-admission.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "2efcfa39f03a455e63960fb9b62ac28c19f4b4f17983d0e42ef01ad7a1eaa782",
+    "afterSha256": "2efcfa39f03a455e63960fb9b62ac28c19f4b4f17983d0e42ef01ad7a1eaa782"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/material-admission.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/material-admission.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "2d20a2179f21b092b126588a0ab3eadda579a81c6c9e87c1652cc38767a43b10",
+    "afterSha256": "2d20a2179f21b092b126588a0ab3eadda579a81c6c9e87c1652cc38767a43b10"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/memory.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/memory.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "d431e60d3442e4ccad16902b470d723e9d1090df498f84252c3aede52e2265e9",
+    "afterSha256": "d431e60d3442e4ccad16902b470d723e9d1090df498f84252c3aede52e2265e9"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/migrate-storage.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/migrate-storage.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "a18a78f285a2bb3623e80451e165566a6678b0fb0f3da5570bdea226c45a5ca8",
+    "afterSha256": "a18a78f285a2bb3623e80451e165566a6678b0fb0f3da5570bdea226c45a5ca8"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/module.json",
+    "destination": "/home/saya/workspace/chrona-module-web/module.json",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "c64e57e21a7289971c0abd7ee2b2198cbf8d298dd9441b52874bd0fbcad764d5",
+    "afterSha256": "c64e57e21a7289971c0abd7ee2b2198cbf8d298dd9441b52874bd0fbcad764d5"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/package.json",
+    "destination": "/home/saya/workspace/chrona-module-web/package.json",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "e3b11a7fc7e81dc1c999d4a4aacf864132fb7e3369e3159fd24a569a985135c0",
+    "afterSha256": "e3b11a7fc7e81dc1c999d4a4aacf864132fb7e3369e3159fd24a569a985135c0"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/page-inventory.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/page-inventory.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "217f1617e54da74ad7647ef3306da4dad24b7b7b013398ca73e501e8c9940a61",
+    "afterSha256": "217f1617e54da74ad7647ef3306da4dad24b7b7b013398ca73e501e8c9940a61"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/page-read-sharing.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/page-read-sharing.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "0b2afc86ef4bec831ed852cc183e8fa0769063bea624e5c1b007b962f5f961a5",
+    "afterSha256": "0b2afc86ef4bec831ed852cc183e8fa0769063bea624e5c1b007b962f5f961a5"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/pages.js",
+    "destination": "/home/saya/workspace/chrona-module-web/pages.js",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "0af6afca6f301b5002d06b00d68b33622020b4feb97aabe1e464b1f9420daedd",
+    "afterSha256": "0af6afca6f301b5002d06b00d68b33622020b4feb97aabe1e464b1f9420daedd"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/pages.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/pages.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "aae53c6573ad5142e9135d6f8b603a54f4b50f0ce7e20aadc760604f8e8400bf",
+    "afterSha256": "aae53c6573ad5142e9135d6f8b603a54f4b50f0ce7e20aadc760604f8e8400bf"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/pagination.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/pagination.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "3ade1447303a866328545e409a2120625f6c28db4fed62d8547a43ac19549049",
+    "afterSha256": "3ade1447303a866328545e409a2120625f6c28db4fed62d8547a43ac19549049"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/preferences.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/preferences.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "35903a0eed4f574117fd9946ba23f6c28d14a02686c6353d8ec204df68ec60df",
+    "afterSha256": "35903a0eed4f574117fd9946ba23f6c28d14a02686c6353d8ec204df68ec60df"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/react-pages-browser.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/react-pages-browser.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "53b73160d15402657824ae20d15af062541facf1b8ee8b24d96368830eeb9f7d",
+    "afterSha256": "53b73160d15402657824ae20d15af062541facf1b8ee8b24d96368830eeb9f7d"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/read-concurrency.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/read-concurrency.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "d068b268ba270ef77767c7014e6f71582dba454f3c6b2bd06db4e76b80b9117b",
+    "afterSha256": "d068b268ba270ef77767c7014e6f71582dba454f3c6b2bd06db4e76b80b9117b"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/registered-page-browser.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/registered-page-browser.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "034b4a201896ba54f0c8b6cf54db672a28f31390b98b306668ec815b335e1b45",
+    "afterSha256": "034b4a201896ba54f0c8b6cf54db672a28f31390b98b306668ec815b335e1b45"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/registration-test-build.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/registration-test-build.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "99810079cf49becbd98303d132c509d29d54e521cd3f023026a496d66c061645",
+    "afterSha256": "99810079cf49becbd98303d132c509d29d54e521cd3f023026a496d66c061645"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/registration-test.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/registration-test.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "5bcc724aa8cae7fff0230ee9463227838a228c61a8513ddf0229c6d176bfb400",
+    "afterSha256": "5bcc724aa8cae7fff0230ee9463227838a228c61a8513ddf0229c6d176bfb400"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/registration-test.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/registration-test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "6616f0dca1af1d496d6b2cb2726587677593ec191a03e3d1cb7d7a7312f2d281",
+    "afterSha256": "6616f0dca1af1d496d6b2cb2726587677593ec191a03e3d1cb7d7a7312f2d281"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/settings-bundle.js",
+    "destination": "/home/saya/workspace/chrona-module-web/settings-bundle.js",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "958d9df95d302972cbc5f6b4e8558c3fe1b13ce2919c64d431b8bfa34356f735",
+    "afterSha256": "958d9df95d302972cbc5f6b4e8558c3fe1b13ce2919c64d431b8bfa34356f735"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/settings-pages.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/settings-pages.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "a869c2ee6314358a650f8c1b104b6c6785ccb7bdab6f8bbea001b4bbaf26ef36",
+    "afterSha256": "a869c2ee6314358a650f8c1b104b6c6785ccb7bdab6f8bbea001b4bbaf26ef36"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/settings-store.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/settings-store.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "035ac4581484c44c738ce884978e90880ac87c535177635fd48262d5e1a37f06",
+    "afterSha256": "035ac4581484c44c738ce884978e90880ac87c535177635fd48262d5e1a37f06"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/settings-timeout.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/settings-timeout.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "a261d6feb794fe2a8ad76d46774606134be1eab2b23d5bf0df1d99218079605c",
+    "afterSha256": "a261d6feb794fe2a8ad76d46774606134be1eab2b23d5bf0df1d99218079605c"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/settings.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/settings.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "a30d0182117b3f49f5c2294c2ed44c94090e6159ef5947e4879b91c4c40cbb82",
+    "afterSha256": "a30d0182117b3f49f5c2294c2ed44c94090e6159ef5947e4879b91c4c40cbb82"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/settings.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/settings.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "e5bc7e491ce43d6987df0e076253096c0ff886a6b09baf56f67c33533f74f5f3",
+    "afterSha256": "e5bc7e491ce43d6987df0e076253096c0ff886a6b09baf56f67c33533f74f5f3"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/shell.browser-test.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/shell.browser-test.ts",
+    "exists": true,
+    "sameBytes": false,
+    "beforeSha256": "59db5be12b294ddc75149c44492a9be01285ade6a99cdfc5e4ec63cff28a5988",
+    "afterSha256": "fffbcb35f9fdf2319a688318c068288b968f1f4ac3834c88f134e206c6a5f0dc"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/shell.css",
+    "destination": "/home/saya/workspace/chrona-module-web/shell.css",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "5576ae3aef0cb1c203961f02bdb6ac870f0051658e1575cf09f49fe380352176",
+    "afterSha256": "5576ae3aef0cb1c203961f02bdb6ac870f0051658e1575cf09f49fe380352176"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/application-pages.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/application-pages.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "66766ff822946ddf632633ce03d43ba7fb81ad5cb50e51e07c188db54c45394e",
+    "afterSha256": "66766ff822946ddf632633ce03d43ba7fb81ad5cb50e51e07c188db54c45394e"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/base.css",
+    "destination": "/home/saya/workspace/chrona-module-web/src/base.css",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "251150b141b357e10bc41ee09d034e93a79f2a9c8fa9f0f4a3244d1dd2617cd8",
+    "afterSha256": "251150b141b357e10bc41ee09d034e93a79f2a9c8fa9f0f4a3244d1dd2617cd8"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/chat.browser-test.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/chat.browser-test.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "e75978cfe90cfa96ca47de5de04ef25678eb7752e47e155f1669733f61a1f22f",
+    "afterSha256": "e75978cfe90cfa96ca47de5de04ef25678eb7752e47e155f1669733f61a1f22f"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/display.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/display.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "2cebd251ffda9afc09d9f70dac10b0dfeff9bb7b18d0862e08d550805ab95abb",
+    "afterSha256": "2cebd251ffda9afc09d9f70dac10b0dfeff9bb7b18d0862e08d550805ab95abb"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/markdown.bun.test.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/markdown.bun.test.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "88cd72c7d0da0b5bda59a23b120a1f186db54880bcbabd57a81075c8b95e1acd",
+    "afterSha256": "88cd72c7d0da0b5bda59a23b120a1f186db54880bcbabd57a81075c8b95e1acd"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/memory-settings.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/memory-settings.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "664282c5ded187684d889558208bab17bd4d2211c6ca25e4a5119e28b6d8c1c8",
+    "afterSha256": "664282c5ded187684d889558208bab17bd4d2211c6ca25e4a5119e28b6d8c1c8"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/page-runtime.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/src/page-runtime.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "07e894602253e7e1853dafbb3a9b8e785c40e6f50e6ea103825176d013e069db",
+    "afterSha256": "07e894602253e7e1853dafbb3a9b8e785c40e6f50e6ea103825176d013e069db"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/pages-loading.browser-test.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/pages-loading.browser-test.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "6128b33bdc1cda400d5fdafef5b28f65e6bb59ee2692ea18377bccc64967fd7b",
+    "afterSha256": "6128b33bdc1cda400d5fdafef5b28f65e6bb59ee2692ea18377bccc64967fd7b"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/pages.css",
+    "destination": "/home/saya/workspace/chrona-module-web/src/pages.css",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "75e8edcc2acf872e0d449f36c6a702c53b448bc64109e6a8f424752cc53efe90",
+    "afterSha256": "75e8edcc2acf872e0d449f36c6a702c53b448bc64109e6a8f424752cc53efe90"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/pages.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/pages.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "c2abdb6de92b5deabef8561eef4e1a9679ab2a9a52baa653b3c8ddf6f6a4b7bf",
+    "afterSha256": "c2abdb6de92b5deabef8561eef4e1a9679ab2a9a52baa653b3c8ddf6f6a4b7bf"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/password-forms.bun.test.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/password-forms.bun.test.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "1cb3c4c58de9810c3d2a79d461643780fd58d62533a9db24251ceb8c2d00db94",
+    "afterSha256": "1cb3c4c58de9810c3d2a79d461643780fd58d62533a9db24251ceb8c2d00db94"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/registered-page.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/src/registered-page.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "bbd49c4f6a527cefe8c494c66597362530d9ddc1408ad4aca28bd95f25fd0d3c",
+    "afterSha256": "bbd49c4f6a527cefe8c494c66597362530d9ddc1408ad4aca28bd95f25fd0d3c"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/settings-fixture.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/src/settings-fixture.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "7d24c91d94ccc92e434a363aa5f730feaaf535a4a056b86eccd9ad9efbb4ab77",
+    "afterSha256": "7d24c91d94ccc92e434a363aa5f730feaaf535a4a056b86eccd9ad9efbb4ab77"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/settings-inline.browser-test.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/settings-inline.browser-test.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "8662c7dd33c278ab47cf291c08d4d8d1abd543eb0d6864fd15fe7fb5878c3f7f",
+    "afterSha256": "8662c7dd33c278ab47cf291c08d4d8d1abd543eb0d6864fd15fe7fb5878c3f7f"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/settings-timeout.browser-test.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/settings-timeout.browser-test.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "845eb78faf3099893ce2aacd8158d1239a08def9fb522351454a2a21a9ba92df",
+    "afterSha256": "845eb78faf3099893ce2aacd8158d1239a08def9fb522351454a2a21a9ba92df"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/styles.d.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/src/styles.d.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "ed40c186ec554494b80630ad8870fce60d5eeea16c30c00e6dd59846d78b8701",
+    "afterSha256": "ed40c186ec554494b80630ad8870fce60d5eeea16c30c00e6dd59846d78b8701"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/action.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/action.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "1542fbadfb3cc74f5246055216d4b736f091befb20eda24a6462e28c5e9daae6",
+    "afterSha256": "1542fbadfb3cc74f5246055216d4b736f091befb20eda24a6462e28c5e9daae6"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/activity.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/activity.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "1eb33de3c5d52684380baf1da3666b182b468eb969c7965723103c9af77453e0",
+    "afterSha256": "1eb33de3c5d52684380baf1da3666b182b468eb969c7965723103c9af77453e0"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/adapter.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/adapter.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "19b39f36049e5964c291027fe86af8094096e0898c7ce97a33625efd30f6303c",
+    "afterSha256": "19b39f36049e5964c291027fe86af8094096e0898c7ce97a33625efd30f6303c"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/apps.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/apps.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "28cb97f51648cf89e8bd26c7810e727857535e37e8f97831989fcfd33ab2d255",
+    "afterSha256": "28cb97f51648cf89e8bd26c7810e727857535e37e8f97831989fcfd33ab2d255"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/chat-execution.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/chat-execution.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "70c183b91a1c5db9b11dcfb36c355016f1caa7d465f5a5cf16889d6a0719afba",
+    "afterSha256": "70c183b91a1c5db9b11dcfb36c355016f1caa7d465f5a5cf16889d6a0719afba"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/chat-messages.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/chat-messages.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "3ac719ad68b3cfe7b7073b682af9d74afd1eb417c7134754adb643627ad0cf8b",
+    "afterSha256": "3ac719ad68b3cfe7b7073b682af9d74afd1eb417c7134754adb643627ad0cf8b"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/chat-stream.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/chat-stream.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "cf37faab94aee5490ab70e37e50a3f07f287b32a3b0324c2c387a26b7cc0caad",
+    "afterSha256": "cf37faab94aee5490ab70e37e50a3f07f287b32a3b0324c2c387a26b7cc0caad"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/chat.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/chat.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "ed8d571ff93c8ae419244a4da3604dea2490ff984104c18447e5a8bfdf622b0a",
+    "afterSha256": "ed8d571ff93c8ae419244a4da3604dea2490ff984104c18447e5a8bfdf622b0a"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/components.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/components.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "660f3e4d03630544cae8de5284da30da546debeb8c89f0cc73221552bd5e5c55",
+    "afterSha256": "660f3e4d03630544cae8de5284da30da546debeb8c89f0cc73221552bd5e5c55"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/credentials.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/credentials.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "11f51d70cfac52cbe812f827b32090f8651fdc3126613a3be565842d9e2d69c9",
+    "afterSha256": "11f51d70cfac52cbe812f827b32090f8651fdc3126613a3be565842d9e2d69c9"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/detail-components.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/detail-components.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "8e3926a77315bb636ff160259dade3d21155e5bf40a3a3aa160e8fbacea10cd0",
+    "afterSha256": "8e3926a77315bb636ff160259dade3d21155e5bf40a3a3aa160e8fbacea10cd0"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/detail-types.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/detail-types.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "72b1f1acb7bbf765fefbe362894f62c5ed0fc61f0bce08485ae86726c34514df",
+    "afterSha256": "72b1f1acb7bbf765fefbe362894f62c5ed0fc61f0bce08485ae86726c34514df"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/detail.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/detail.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "53e852ad11707ad883a96955d991a0efcbfa27bbf8c673ad758b1f1b49c6ebec",
+    "afterSha256": "53e852ad11707ad883a96955d991a0efcbfa27bbf8c673ad758b1f1b49c6ebec"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/diagnostics.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/diagnostics.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "10b9ca46da744642ac2ae8b042070f8977af625d40f094cfba37329e5cb061cb",
+    "afterSha256": "10b9ca46da744642ac2ae8b042070f8977af625d40f094cfba37329e5cb061cb"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/forms.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/forms.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "1ced2efd1ec475b9ce8b034c2b8c5f3c5ce2de6eb37762cb40bf0b68035969e1",
+    "afterSha256": "1ced2efd1ec475b9ce8b034c2b8c5f3c5ce2de6eb37762cb40bf0b68035969e1"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/login.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/login.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "ffb5ece6476142d37a591ffb5ca454d6cca1d27876c917ea6748e50bced09dea",
+    "afterSha256": "ffb5ece6476142d37a591ffb5ca454d6cca1d27876c917ea6748e50bced09dea"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/model-settings.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/model-settings.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "9dc4d89824935814ec2b69e456e08a737cad6d1ba6161601349229360a2dd52c",
+    "afterSha256": "9dc4d89824935814ec2b69e456e08a737cad6d1ba6161601349229360a2dd52c"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/page.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/page.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "bd7993e724ae9c38180209e511d829c1f5905fafd8936e2456f4bb2e6ce5c8c1",
+    "afterSha256": "bd7993e724ae9c38180209e511d829c1f5905fafd8936e2456f4bb2e6ce5c8c1"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/password-forms.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/password-forms.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "7cbefea810df1fd836bd14e58149c8245e8dff7b64c7bc1fd51251da38f890af",
+    "afterSha256": "7cbefea810df1fd836bd14e58149c8245e8dff7b64c7bc1fd51251da38f890af"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/query.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/query.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "e6d6f20b6bf92b837e3e11e0afedd834dbd7239995d4ac3b8afb9a3a6a39fb9c",
+    "afterSha256": "e6d6f20b6bf92b837e3e11e0afedd834dbd7239995d4ac3b8afb9a3a6a39fb9c"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/registered-pages.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/registered-pages.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "4e81a3b70e58c64a7faa2bcfa3c2f9654c2eac5b149a3629f93dd0ca2e0818cb",
+    "afterSha256": "4e81a3b70e58c64a7faa2bcfa3c2f9654c2eac5b149a3629f93dd0ca2e0818cb"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/runtime.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/runtime.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "2a877cbed2d4d5e59e222651c42852342c42931f9492a2741a12306fc545415d",
+    "afterSha256": "2a877cbed2d4d5e59e222651c42852342c42931f9492a2741a12306fc545415d"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/settings-forms.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/settings-forms.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "fa994e2681f57bcc52c6a96334e1d8aa8f1aba0a4c45e1a2c24c97faad6686b4",
+    "afterSha256": "fa994e2681f57bcc52c6a96334e1d8aa8f1aba0a4c45e1a2c24c97faad6686b4"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/settings.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/settings.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "28ea73b26d8a31c651c76b11f3482cf033f5840fa445ad4e1eb3940f7b2942d8",
+    "afterSha256": "28ea73b26d8a31c651c76b11f3482cf033f5840fa445ad4e1eb3940f7b2942d8"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/text.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/text.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "f0769248fd5890cfb5ac95a0272bfd08b1c12b28db55888a070d68000d40b17e",
+    "afterSha256": "f0769248fd5890cfb5ac95a0272bfd08b1c12b28db55888a070d68000d40b17e"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/today.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/today.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "603014d6259cb09703b7425b25f596507163566c295c7136a35c9f1ebd214ab8",
+    "afterSha256": "603014d6259cb09703b7425b25f596507163566c295c7136a35c9f1ebd214ab8"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/system/types.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/src/system/types.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "030a02dcc9bc32894f0aa620c2178644c2a4a18f98033464e1b8972ae06555ab",
+    "afterSha256": "030a02dcc9bc32894f0aa620c2178644c2a4a18f98033464e1b8972ae06555ab"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/ui.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/ui.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "2ece64c2bb330cc790d3a0436e1580468223882dca92900580d5832399ef217f",
+    "afterSha256": "2ece64c2bb330cc790d3a0436e1580468223882dca92900580d5832399ef217f"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/workspace.browser-test.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/workspace.browser-test.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "4f80f9dfe740c31db3471d38c273aa748cff7b4d22c427a77f403ff41023a5ef",
+    "afterSha256": "4f80f9dfe740c31db3471d38c273aa748cff7b4d22c427a77f403ff41023a5ef"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/workspace.bun.test.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/workspace.bun.test.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "33814b3b5634db14bea202b8e20034cf54dc6ef356e6be2806af19c0fb0ac76b",
+    "afterSha256": "33814b3b5634db14bea202b8e20034cf54dc6ef356e6be2806af19c0fb0ac76b"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/src/workspace.tsx",
+    "destination": "/home/saya/workspace/chrona-module-web/src/workspace.tsx",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "2a23f5772958b910c7dffe16c332ba2a933eaff38dc21bdefcbe838c2a6b2838",
+    "afterSha256": "2a23f5772958b910c7dffe16c332ba2a933eaff38dc21bdefcbe838c2a6b2838"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/stages-author.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/stages-author.bun.test.ts",
+    "exists": true,
+    "sameBytes": false,
+    "beforeSha256": "bface42897aadb9ccf3f26202f1c865edb859c4ec359d6e7a2e8267a8b5cc7f3",
+    "afterSha256": "1eab2aeae43ded7b1909be38bfbf2f5855b905012a3cd73a4202e6d125e0c114"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/style.css",
+    "destination": "/home/saya/workspace/chrona-module-web/style.css",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "307e6c6be1d5bda5ff84985e861cce654ab3391fc489f11cd4f67e9bbf7fe325",
+    "afterSha256": "307e6c6be1d5bda5ff84985e861cce654ab3391fc489f11cd4f67e9bbf7fe325"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/system-pages.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/system-pages.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "4562a53bdc8ee93a62a59c8add2dba4c7705039ef57bfb5f96caffe56ce6e33f",
+    "afterSha256": "4562a53bdc8ee93a62a59c8add2dba4c7705039ef57bfb5f96caffe56ce6e33f"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/test-attachments.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/test-attachments.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "7ef24f8ae7314bb90a74aac45169b04c873b52dbe74ec38a62cf83bfd9947224",
+    "afterSha256": "7ef24f8ae7314bb90a74aac45169b04c873b52dbe74ec38a62cf83bfd9947224"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/test-content.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/test-content.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "383e9004ca8307d044db0032e48b68cfb3fdd75bc9bf89932d65223c954896e0",
+    "afterSha256": "383e9004ca8307d044db0032e48b68cfb3fdd75bc9bf89932d65223c954896e0"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/test-material-admission.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/test-material-admission.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "afd0a695d0e59efaa2723a710965932244fd364fd90468cc2b07dec58d5821f2",
+    "afterSha256": "afd0a695d0e59efaa2723a710965932244fd364fd90468cc2b07dec58d5821f2"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/test-model-settings.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/test-model-settings.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "acb2cc968cf13c1bf6fab5b13909064cd61742fffb5960e31c3e2fe959af9861",
+    "afterSha256": "acb2cc968cf13c1bf6fab5b13909064cd61742fffb5960e31c3e2fe959af9861"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/test-settings-page.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/test-settings-page.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "9023382008561c8186e35fd9841afd20fa419cf23b05d8399423429b76e7c0be",
+    "afterSha256": "9023382008561c8186e35fd9841afd20fa419cf23b05d8399423429b76e7c0be"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/test-system-pages.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/test-system-pages.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "6f59bc55aa166eb319a283784b03ca0a7c50ff9b4c4e719fbe400c6210d70505",
+    "afterSha256": "6f59bc55aa166eb319a283784b03ca0a7c50ff9b4c4e719fbe400c6210d70505"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/test.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "7b1a268ad809e9c97310c953f03d2e76b851d31327c3dde7ddaa5679d0866a6e",
+    "afterSha256": "7b1a268ad809e9c97310c953f03d2e76b851d31327c3dde7ddaa5679d0866a6e"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/today-health.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/today-health.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "51e15483b5c30fc30436cb6f760c1868727a63b0791eaf2fdd9f3411aaa76cea",
+    "afterSha256": "51e15483b5c30fc30436cb6f760c1868727a63b0791eaf2fdd9f3411aaa76cea"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/today.bun.test.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/today.bun.test.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "efadf09cea96e84d4a8b54f8c8f27c0d501b52ad70326d0659e808037c55c71c",
+    "afterSha256": "efadf09cea96e84d4a8b54f8c8f27c0d501b52ad70326d0659e808037c55c71c"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/today.ts",
+    "destination": "/home/saya/workspace/chrona-module-web/today.ts",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "8a3dc950a478bbc1a3c1407c59de0eb2e40417a83116dfa5e9105e563bb04b98",
+    "afterSha256": "8a3dc950a478bbc1a3c1407c59de0eb2e40417a83116dfa5e9105e563bb04b98"
+  },
+  {
+    "source": "packages/engine/src/modules/steward/external/web/tsconfig.json",
+    "destination": "/home/saya/workspace/chrona-module-web/tsconfig.json",
+    "exists": true,
+    "sameBytes": true,
+    "beforeSha256": "3d6c9acb8e8e9372b0aa5e5f710decb8fbbf475a1722e1da2ae484d9e54a3280",
+    "afterSha256": "3d6c9acb8e8e9372b0aa5e5f710decb8fbbf475a1722e1da2ae484d9e54a3280"
+  }
+]

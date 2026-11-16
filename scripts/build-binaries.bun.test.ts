@@ -115,7 +115,7 @@ test("release stages a host-native guardian with platform stop evidence and the 
   } finally { rmSync(root, { recursive: true, force: true }); }
 }, 15_000);
 
-test("fixed module seeds package exactly the seven current applications and regenerate active artifacts before release verification", async () => {
+test("fixed module seeds package seven applications with exact Pi artifacts and reject missing artifacts", async () => {
   const { cp, mkdtemp, mkdir, readFile, rm, writeFile } = await import("node:fs/promises");
   const { tmpdir } = await import("node:os");
   const { buildArtifacts } = await import("../build/manifest");
@@ -134,11 +134,11 @@ test("fixed module seeds package exactly the seven current applications and rege
       await writeFile(join(dir, "module.json"), JSON.stringify({ name: module.name, entry: "index.ts", keepAlive: true, effects: [], tests: ["test.ts"] }));
       await writeFile(join(dir, "index.ts"), "// entry\n");
     }
-    await cp(join(import.meta.dirname, "../packages/engine/src/modules/steward/external/pi"), join(resourcesRoot, "external/pi"), { recursive: true, filter: path => !path.split(/[\\/]/).some(part => ["node_modules", "vendor", ".git"].includes(part)) });
+    await cp(join(import.meta.dirname, "../packages/engine/src/modules/steward/applications/pi"), join(resourcesRoot, "external/pi"), { recursive: true, filter: path => !path.split(/[\\/]/).some(part => ["node_modules", "vendor", ".git"].includes(part)) });
     const { preparePiApplication } = await import("../build/agent-dependencies");
     await preparePiApplication(resourcesRoot);
     const { buildEntryConversations } = await import("../build/entry-conversations");
-    await buildEntryConversations(resourcesRoot);
+    await buildEntryConversations(join(resourcesRoot, "external"));
     const lock = await prepareModuleGitRelease({ root, resourcesRoot, seedDir, hostCommit: "a".repeat(40), hostTimestamp: "1735689600" });
     for (const name of ["coding", "coding-web", "events", "files", "mcp", "memory-local", "remind", "remote-execution", "editor", "unexpected-app"]) {
       const dir = join(resourcesRoot, "external", name);
@@ -166,6 +166,8 @@ test("fixed module seeds package exactly the seven current applications and rege
     expect(await Bun.file(join(resourcesRoot, "module-git/pi.bundle")).exists()).toBe(true);
     expect(await Bun.file(join(resourcesRoot, "external/pi/vendor/zod/package.json")).exists()).toBe(true);
     expect(await readFile(join(resourcesRoot, "external/web/LICENSE"), "utf8")).toBe(await readFile(join(root, "LICENSE"), "utf8"));
+    await rm(join(resourcesRoot, "external/pi/runtime.js"));
+    await expect(prepareReleaseModules(resourcesRoot)).rejects.toThrow(/artifact|material/i);
   } finally {
     if (previous === undefined) delete process.env.CHRONA_MODULE_GIT_SEEDS;
     else process.env.CHRONA_MODULE_GIT_SEEDS = previous;

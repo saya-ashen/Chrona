@@ -108,7 +108,7 @@
 
 ## 5. 远程执行目标架构
 
-普通应用已使用 `remote-execution` 名称，源码位于 [`external/remote-execution`](../../packages/engine/src/modules/steward/external/remote-execution/)。它已登记为普通可选安装包，实际固定 seed 安装通过（`builtin: false`、0 execution authority），未默认安装或增加权限；完整发行 runtime 尚未接受。Agent 仍是唯一不可变的内置应用。
+普通应用已使用 `remote-execution` 名称，源码位于 [`external/remote-execution`](../../packages/engine/src/modules/steward/applications/remote-execution/)。它已登记为普通可选安装包，实际固定 seed 安装通过（`builtin: false`、0 execution authority），未默认安装或增加权限；完整发行 runtime 尚未接受。Agent 仍是唯一不可变的内置应用。
 
 ```mermaid
 flowchart LR

@@ -40,7 +40,7 @@
 
 当前实现提供指引、模板和现有文件持久化路径。它没有强制验收 gate、自动恢复或审批后自动续接。主集成仍需把工作表路径、负责人和待验收项接入原任务交接/审批展示，并由现有任务继续机制消费；这些集成不在 Author 本次修复内，也不能据此声称已经实现全自动恢复。
 
-本次仅运行 Author 定向测试 `bun test ./packages/engine/src/modules/steward/external/author/{author,material}.bun.test.ts`：15 项通过、0 失败。测试覆盖模板初始未知身份与 `not-run`、多目标检查范围、真实 SDK 子进程中的显式保存/分页读取/更新、重复 prepare 保留证据、子进程停止后磁盘记录仍在，以及更新工作表不改变暂存应用材料。SDK 测试使用临时目录和替身 kernel；这些检查不证明真实宿主功能、视觉质量或审批后续接已验收。
+本次仅运行 Author 定向测试 `bun test ./packages/engine/src/modules/steward/applications/author/{author,material}.bun.test.ts`：15 项通过、0 失败。测试覆盖模板初始未知身份与 `not-run`、多目标检查范围、真实 SDK 子进程中的显式保存/分页读取/更新、重复 prepare 保留证据、子进程停止后磁盘记录仍在，以及更新工作表不改变暂存应用材料。SDK 测试使用临时目录和替身 kernel；这些检查不证明真实宿主功能、视觉质量或审批后续接已验收。
 
 ## 历史修改
 

@@ -1,9 +1,12 @@
 #!/usr/bin/env bun
 
+import { restoredApplicationSources, restoreApplications } from "./restore-applications";
+
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { dirname, extname, basename, relative, resolve } from "node:path";
 import { type GuardrailCheckName, runGuardrails, selectGuardrailChecksForPaths } from "./check-guardrails";
 
+await restoreApplications();
 const ROOT = resolve(import.meta.dirname, "..");
 const decoder = new TextDecoder();
 const CODE_EXT_RE = /\.(?:[cm]?[jt]sx?)$/u;
@@ -45,10 +48,10 @@ function expandInputPaths(inputs: string[]): string[] {
 	return [...out].sort();
 }
 
-function discoverWorkspaceChangedFiles(): string[] {
+async function discoverWorkspaceChangedFiles(): Promise<string[]> {
 	const tracked = gitLines(["diff", "--name-only", "-z", "--diff-filter=ACMR", "HEAD"]);
 	const untracked = gitLines(["ls-files", "--others", "--exclude-standard", "-z"]);
-	return [...new Set([...tracked, ...untracked])]
+	return [...new Set([...tracked, ...untracked, ...await restoredApplicationSources()])]
 		.filter((p) => !p.startsWith("plans/") && !p.startsWith(".serena/") && existsSync(resolve(ROOT, p)))
 		.sort();
 }
@@ -219,12 +222,12 @@ function runTestsStep(targetFiles: string[]): StepResult {
 	};
 }
 
-function main() {
+async function main() {
 	const rawArgs = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 	const skipTests = process.argv.includes("--no-tests");
 	const scoped = rawArgs.length > 0;
 	const normalizedPrefixes = rawArgs.map((p) => relative(ROOT, resolve(ROOT, p)).replace(/\\/gu, "/"));
-	const targetFiles = scoped ? expandInputPaths(rawArgs) : discoverWorkspaceChangedFiles();
+	const targetFiles = scoped ? expandInputPaths(rawArgs) : await discoverWorkspaceChangedFiles();
 	const lintTargets = targetFiles.filter((p) => CODE_EXT_RE.test(p));
 
 	console.log(
@@ -262,5 +265,5 @@ function main() {
 }
 
 if (import.meta.main) {
-	main();
+	await main();
 }

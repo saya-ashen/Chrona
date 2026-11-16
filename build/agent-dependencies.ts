@@ -260,8 +260,16 @@ export async function stageModuleMaterial(moduleDir: string, input: { artifacts:
 
 /** Build the staged Provider application before pinning or verifying its Git material. */
 export async function preparePiApplication(resourcesRoot: string): Promise<void> {
-  const { buildPiApplication } = await import("../packages/engine/src/modules/steward/external/pi/build");
   const moduleDir = resolve(resourcesRoot, "external/pi");
+  // Bundle the target's builder against the host's locked build dependency; a temporary stage has no node_modules yet.
+  const builder = await Bun.build({
+    entrypoints: [join(moduleDir, "build.ts")], target: "bun",
+    plugins: [{ name: "pi-build-dependency", setup(build) {
+      build.onResolve({ filter: /^(zod|@chrona\/(contracts|logging|pi)(?:\/.*)?)$/ }, args => ({ path: Bun.resolveSync(args.path, ROOT) }));
+    } }],
+  });
+  if (!builder.success) throw new AggregateError(builder.logs, "Pi application builder failed");
+  const { buildPiApplication } = await import(`data:text/javascript;base64,${Buffer.from(await builder.outputs[0]!.text()).toString("base64")}`);
   await buildPiApplication(moduleDir);
   await assembleModuleDependencies(moduleDir);
   // Release seed preparation stages this shared license too. Include it before

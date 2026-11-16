@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { BUILTIN_MODULE_NAMES } from "@chrona/contracts/steward";
 import { seedTestModuleRelease, testReleasePackages, testReleaseRuntimeChecks } from "./module-release-test-fixture";
-import { createFiles } from "./external/files/files";
+import { createFiles } from "./applications/files/files";
 import { registerBuiltins } from "./module-builtin";
 import { createExternalModuleInstaller, installExternal, refreshInstallationReceipts } from "./module-install";
 import { buildPending } from "./module-build";
@@ -26,7 +26,7 @@ async function fixture(real = false) {
   await cp(shippedResources, resources, { recursive: true });
   await symlink(join(import.meta.dirname, "../../../../../node_modules"), join(resources, "agent/node_modules"), "dir");
   for (const name of BUILTIN_MODULE_NAMES) await seedTestModuleRelease(resources, name);
-  await cp(join(import.meta.dirname, "external/files"), join(externalResources, "files"), { recursive: true });
+  await cp(join(import.meta.dirname, "applications/files"), join(externalResources, "files"), { recursive: true });
   await seedTestModuleRelease(externalResources, "files");
   const workspaceId = (await db.workspace.create({ data: { name: "files" } })).id;
   const peer = testModuleProcess(async (event, _call, input) => {

@@ -45,7 +45,7 @@ async function fixture(unknown = false, applicationRelay = false) {
     const auth = () => ({ version: 1, requestId: randomUUID(), credential, device });
     if (applicationRelay) {
       const engineRoot = dirname(fileURLToPath(import.meta.resolve("@chrona/engine")));
-      const source = join(engineRoot, "modules/steward/external/remote-execution");
+      const source = join(engineRoot, "modules/steward/applications/remote-execution");
       const appManifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(source, "module.json"), "utf8")));
       await db.moduleVersion.create({ data: { moduleId: receiver.moduleId, hash: receiver.hash, manifest: appManifest, source: "user", status: "approved", intent: {}, report: {} } });
       const code = join(f.ports.dataDir, "platform/store", receiver.hash);

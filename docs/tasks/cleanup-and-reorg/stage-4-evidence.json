@@ -1,0 +1,442 @@
+{
+  "updatedAt": "2026-11-16T18:59:17.361686+00:00",
+  "baseline": "c74a45db53b0880b61ba78c8c8433555fa0196c1",
+  "head": "c74a45db53b0880b61ba78c8c8433555fa0196c1",
+  "noStagedFiles": true,
+  "contractsIndexUnchanged": true,
+  "sourcePreservation": {
+    "originalFiles": 426,
+    "presentInIndependentRepositories": 426,
+    "sameBytes": 411,
+    "mapping": "stage-4-source-mapping.json"
+  },
+  "applications": "stage-4-applications.json",
+  "applicationNetLineCounts": "stage-4-line-counts.json",
+  "changedFiles": "stage-4-changed-files.json",
+  "testDiscovery": "stage-4-test-discovery.json",
+  "testMapping": "stage-4-test-mapping.json",
+  "hostTestMapping": "stage-4-host-test-mapping.json",
+  "runs": [
+    {
+      "record": ".tmp/cleanup-and-reorg/stage-4/isolated-results.json",
+      "results": [
+        {
+          "name": "install",
+          "command": [
+            "bun",
+            "install",
+            "--offline",
+            "--frozen-lockfile",
+            "--ignore-scripts"
+          ],
+          "cwd": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/isolated",
+          "started": "2026-11-16T17:53:08.086Z",
+          "finished": "2026-11-16T17:53:08.613Z",
+          "exitCode": 0,
+          "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/isolated-install.log"
+        },
+        {
+          "name": "restore",
+          "command": [
+            "bun",
+            "scripts/restore-applications.ts"
+          ],
+          "cwd": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/isolated",
+          "started": "2026-11-16T17:53:08.614Z",
+          "finished": "2026-11-16T17:53:09.062Z",
+          "exitCode": 0,
+          "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/isolated-restore.log"
+        },
+        {
+          "name": "app-install",
+          "command": [
+            "bun",
+            "scripts/install-application-dependencies.ts",
+            "--offline"
+          ],
+          "cwd": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/isolated",
+          "started": "2026-11-16T17:53:09.062Z",
+          "finished": "2026-11-16T17:53:09.339Z",
+          "exitCode": 0,
+          "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/isolated-app-install.log"
+        },
+        {
+          "name": "db-generate",
+          "command": [
+            "bun",
+            "run",
+            "db:generate"
+          ],
+          "cwd": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/isolated",
+          "started": "2026-11-16T17:53:09.339Z",
+          "finished": "2026-11-16T17:53:10.536Z",
+          "exitCode": 0,
+          "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/isolated-db-generate.log"
+        },
+        {
+          "name": "typecheck",
+          "command": [
+            "bunx",
+            "tsc",
+            "--noEmit",
+            "--pretty",
+            "false"
+          ],
+          "cwd": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/isolated",
+          "started": "2026-11-16T17:53:10.536Z",
+          "finished": "2026-11-16T17:53:29.918Z",
+          "exitCode": 0,
+          "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/isolated-typecheck.log"
+        },
+        {
+          "name": "bun",
+          "command": [
+            "bun",
+            "scripts/run-bun-tests.ts"
+          ],
+          "cwd": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/isolated",
+          "started": "2026-11-16T17:53:29.918Z",
+          "finished": "2026-11-16T18:08:48.023Z",
+          "exitCode": 1,
+          "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/isolated-bun.log"
+        }
+      ]
+    },
+    {
+      "record": ".tmp/cleanup-and-reorg/stage-4/resumed-results.json",
+      "results": [
+        {
+          "name": "verify-slice",
+          "command": [
+            "bun",
+            "run",
+            "verify:slice"
+          ],
+          "cwd": "/home/saya/workspace/Chrona-cleanup-and-reorg",
+          "started": "2026-11-16T18:10:16.576Z",
+          "finished": "2026-11-16T18:10:58.440Z",
+          "exitCode": 1,
+          "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/resumed-verify-slice.log"
+        }
+      ]
+    },
+    {
+      "record": ".tmp/cleanup-and-reorg/stage-4/resumed-r2-results.json",
+      "results": [
+        {
+          "name": "verify-slice",
+          "command": [
+            "bun",
+            "run",
+            "verify:slice"
+          ],
+          "cwd": "/home/saya/workspace/Chrona-cleanup-and-reorg",
+          "started": "2026-11-16T18:11:20.388Z",
+          "finished": "2026-11-16T18:21:40.126Z",
+          "exitCode": 0,
+          "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/resumed-r2-verify-slice.log"
+        },
+        {
+          "name": "api",
+          "command": [
+            "bun",
+            "scripts/run-api-tests.ts"
+          ],
+          "cwd": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/isolated",
+          "started": "2026-11-16T18:21:40.126Z",
+          "finished": "2026-11-16T18:22:22.752Z",
+          "exitCode": 1,
+          "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/resumed-r2-api.log"
+        }
+      ]
+    },
+    {
+      "record": ".tmp/cleanup-and-reorg/stage-4/final-results.json",
+      "results": [
+        {
+          "name": "review-fixes",
+          "command": [
+            "bun",
+            "scripts/run-bun-tests.ts",
+            "scripts/application-git-inputs.bun.test.ts",
+            "scripts/restore-applications.bun.test.ts",
+            "scripts/check-guardrails.bun.test.ts"
+          ],
+          "cwd": "/home/saya/workspace/Chrona-cleanup-and-reorg",
+          "started": "2026-11-16T18:27:50.665Z",
+          "finished": "2026-11-16T18:27:51.660Z",
+          "exitCode": 0,
+          "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/final-review-fixes.log"
+        },
+        {
+          "name": "api",
+          "command": [
+            "bun",
+            "scripts/run-api-tests.ts"
+          ],
+          "cwd": "/home/saya/workspace/Chrona-cleanup-and-reorg",
+          "started": "2026-11-16T18:27:51.660Z",
+          "finished": "2026-11-16T18:28:37.305Z",
+          "exitCode": 0,
+          "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/final-api.log"
+        },
+        {
+          "name": "build",
+          "command": [
+            "bun",
+            "run",
+            "build"
+          ],
+          "cwd": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/isolated",
+          "started": "2026-11-16T18:28:37.305Z",
+          "finished": "2026-11-16T18:28:44.410Z",
+          "exitCode": 1,
+          "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/final-build.log"
+        }
+      ]
+    },
+    {
+      "record": ".tmp/cleanup-and-reorg/stage-4/final-r2-results.json",
+      "results": [
+        {
+          "name": "review-fixes",
+          "command": [
+            "bun",
+            "scripts/run-bun-tests.ts",
+            "scripts/application-git-inputs.bun.test.ts",
+            "scripts/restore-applications.bun.test.ts",
+            "scripts/check-guardrails.bun.test.ts",
+            "scripts/build-binaries.bun.test.ts",
+            "scripts/agent-integration/agent-build-contract.bun.test.ts"
+          ],
+          "cwd": "/home/saya/workspace/Chrona-cleanup-and-reorg",
+          "started": "2026-11-16T18:32:19.237Z",
+          "finished": "2026-11-16T18:32:26.147Z",
+          "exitCode": 0,
+          "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/final-r2-review-fixes.log"
+        },
+        {
+          "name": "build",
+          "command": [
+            "bun",
+            "run",
+            "build"
+          ],
+          "cwd": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/isolated",
+          "started": "2026-11-16T18:32:26.148Z",
+          "finished": "2026-11-16T18:32:32.362Z",
+          "exitCode": 0,
+          "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/final-r2-build.log"
+        },
+        {
+          "name": "smoke",
+          "command": [
+            "bun",
+            "run",
+            "build:smoke"
+          ],
+          "cwd": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/isolated",
+          "started": "2026-11-16T18:32:32.362Z",
+          "finished": "2026-11-16T18:32:59.022Z",
+          "exitCode": 0,
+          "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/final-r2-smoke.log"
+        },
+        {
+          "name": "pi-portability",
+          "command": [
+            "bun",
+            "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/run-pi-portable-probe.ts"
+          ],
+          "cwd": "/home/saya/workspace/Chrona-cleanup-and-reorg",
+          "started": "2026-11-16T18:32:59.022Z",
+          "finished": "2026-11-16T18:32:59.183Z",
+          "exitCode": 1,
+          "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/final-r2-pi-portability.log"
+        }
+      ]
+    },
+    {
+      "record": ".tmp/cleanup-and-reorg/stage-4/final-r3-results.json",
+      "results": [
+        {
+          "name": "shell-browser",
+          "command": [
+            "bun",
+            "packages/engine/src/modules/steward/applications/web/shell.browser-test.ts"
+          ],
+          "cwd": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/isolated",
+          "started": "2026-11-16T18:33:29.219Z",
+          "finished": "2026-11-16T18:33:33.486Z",
+          "exitCode": 0,
+          "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/final-r3-shell-browser.log"
+        },
+        {
+          "name": "settings-browser",
+          "command": [
+            "bun",
+            "scripts/agent-integration/settings-page.browser-test.ts"
+          ],
+          "cwd": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/isolated",
+          "started": "2026-11-16T18:33:33.486Z",
+          "finished": "2026-11-16T18:33:35.089Z",
+          "exitCode": 0,
+          "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/final-r3-settings-browser.log"
+        },
+        {
+          "name": "host-build",
+          "command": [
+            "bun",
+            "run",
+            "build"
+          ],
+          "cwd": "/home/saya/workspace/Chrona-cleanup-and-reorg",
+          "started": "2026-11-16T18:33:35.089Z",
+          "finished": "2026-11-16T18:33:41.414Z",
+          "exitCode": 0,
+          "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/final-r3-host-build.log"
+        },
+        {
+          "name": "host-smoke",
+          "command": [
+            "bun",
+            "run",
+            "build:smoke"
+          ],
+          "cwd": "/home/saya/workspace/Chrona-cleanup-and-reorg",
+          "started": "2026-11-16T18:33:41.415Z",
+          "finished": "2026-11-16T18:34:07.229Z",
+          "exitCode": 0,
+          "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/final-r3-host-smoke.log"
+        },
+        {
+          "name": "verify-slice",
+          "command": [
+            "bun",
+            "run",
+            "verify:slice"
+          ],
+          "cwd": "/home/saya/workspace/Chrona-cleanup-and-reorg",
+          "started": "2026-11-16T18:34:07.229Z",
+          "finished": "2026-11-16T18:44:51.975Z",
+          "exitCode": 0,
+          "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/final-r3-verify-slice.log"
+        }
+      ]
+    },
+    {
+      "record": ".tmp/cleanup-and-reorg/stage-4/staged-final-fix/results.json",
+      "results": [
+        {
+          "name": "verify-slice",
+          "cwd": "/home/saya/workspace/Chrona-cleanup-and-reorg",
+          "command": [
+            "bun",
+            "run",
+            "verify:slice"
+          ],
+          "started": "2026-11-16T18:47:43.361Z",
+          "finished": "2026-11-16T18:58:20.953Z",
+          "exitCode": 0,
+          "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/staged-final-fix/verify-slice.log"
+        }
+      ]
+    }
+  ],
+  "portablePiConsumption": {
+    "code": 0,
+    "loggerWritten": true,
+    "runtimeActivatedAndHealthChecked": true,
+    "shippedTestEntryPassed": true,
+    "forbiddenPaths": [
+      "/home/saya/workspace/Chrona-cleanup-and-reorg/node_modules",
+      "/home/saya/workspace/Chrona-cleanup-and-reorg/packages",
+      "/home/saya/workspace/chrona-module-"
+    ],
+    "violations": [],
+    "trace": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/pi-portable-files.trace"
+  },
+  "releaseCombination": "stage-4-release-combination.json",
+  "finalSliceResult": {
+    "name": "verify-slice",
+    "cwd": "/home/saya/workspace/Chrona-cleanup-and-reorg",
+    "command": [
+      "bun",
+      "run",
+      "verify:slice"
+    ],
+    "started": "2026-11-16T18:47:43.361Z",
+    "finished": "2026-11-16T18:58:20.953Z",
+    "exitCode": 0,
+    "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/staged-final-fix/verify-slice.log"
+  },
+  "pending": null,
+  "uncovered": [
+    "complete Docker image build",
+    "complete Nix derivation build",
+    "Windows/macOS native acceptance",
+    "real model/QQ/account/deployment",
+    "Chat complete test.ts SDK lifecycle entry",
+    "Pi author admission lifecycle (packaged runtime and shipped fake-provider test-entry did execute)"
+  ],
+  "limitations": [
+    "Pi vendor thread-stream retains two historical absolute __dirname values; strace confirms current tested consumers do not access original checkout; cross-root artifact reproducibility is not claimed",
+    "original 349-file Bun run failed in sqlite-url/builtin-mcp/local-runtime-completion; directed fixes passed, not relabelled as one full green attempt",
+    "isolated API database safety fixture fails because .tmp parent is treated as isolated; unchanged full 21-file suite passed in main directory",
+    "stage-3 Pi retry150ms intermittent full-suite failure remains historical evidence"
+  ],
+  "review": "B four findings fixed with actual Git/ESLint/index/concurrent regressions; parent independent re-review pending",
+  "previousFinalSliceResult": {
+    "name": "verify-slice",
+    "command": [
+      "bun",
+      "run",
+      "verify:slice"
+    ],
+    "cwd": "/home/saya/workspace/Chrona-cleanup-and-reorg",
+    "started": "2026-11-16T18:34:07.229Z",
+    "finished": "2026-11-16T18:44:51.975Z",
+    "exitCode": 0,
+    "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/stage-4/final-r3-verify-slice.log"
+  },
+  "stagedReleaseLockFix": {
+    "sharedContract": "module-git-release.parseReleaseLock, also used by readLock",
+    "requiredIndexLock": true,
+    "checks": [
+      "required active release set",
+      "record identity including branch/bundle/repository",
+      "commit/bundle SHA and portable bundle path correspond to application input"
+    ],
+    "regressions": "15 application Git-input tests plus 7 release contract tests passed; 10 invalid-release variants each rejected by both actual staged CLIs",
+    "directedLog": ".tmp/cleanup-and-reorg/stage-4/staged-final-fix/directed.log",
+    "sourceNetCounts": [
+      {
+        "path": "scripts/module-git-release.ts",
+        "added": 4,
+        "removed": 2,
+        "net": 2,
+        "beforeSha256": "c8f5562dc08fab79fd6d07c8b71bbf265510e9e2b5fce1c7fe8b8b20e4efc017",
+        "afterSha256": "90098b80814e6eae5262fb76d9aa6b29944a5a246830ac7cc1b95a865243686f"
+      },
+      {
+        "path": "scripts/application-git-inputs.ts",
+        "added": 5,
+        "removed": 4,
+        "net": 1,
+        "beforeSha256": "ece1238ac5a2ac108cd33574021c1b6caa8538824af89457d69f32deafd5666d",
+        "afterSha256": "2869f6d6ccd63feff9e8b4abfada791ec36a3678513eb81e8fa3d11c3adc822c"
+      },
+      {
+        "path": "scripts/application-git-inputs.bun.test.ts",
+        "added": 70,
+        "removed": 16,
+        "net": 54,
+        "beforeSha256": "52684aca2242cff790ab8ce80f99c0e8438aedd9a1d907eb0900733bf2122401",
+        "afterSha256": "797c14322a1cdee6af807c756ca8238813fef718c21c702c8a9c9fd8527e4fc2"
+      }
+    ],
+    "lint": "0 errors; 2 unchanged max-len warnings in module-git-release.ts",
+    "typecheck": "passed",
+    "mainIndexChanged": false,
+    "independentReview": "pending parent re-review"
+  }
+}

@@ -14,7 +14,7 @@ const eslintConfig = defineConfig([
   },
   {
     // The built-in web module executes in a browser.
-    files: ["packages/engine/src/modules/steward/external/web/*.js"],
+    files: ["packages/engine/src/modules/steward/applications/web/*.js"],
     languageOptions: { globals: globals.browser },
   },
   {
@@ -220,12 +220,14 @@ const eslintConfig = defineConfig([
     "**/coverage/**",
     "**/*.min.js",
     // Generated browser bundle; lint its src/pages.tsx source instead.
-    "packages/engine/src/modules/steward/external/web/pages.js",
+    "packages/engine/src/modules/steward/applications/web/pages.js",
     // Portable registration helper; lint external/web/registration-test.ts instead.
-    "packages/engine/src/modules/steward/external/chat/test-support/registration-test.mjs",
+    "packages/engine/src/modules/steward/applications/chat/test-support/registration-test.mjs",
+    // Generated Pi dependency artifacts; validate their fixed bytes as module material.
+    "packages/engine/src/modules/steward/applications/pi/vendor/**",
     // Generated Pi Provider bundles; lint their TypeScript sources instead.
-    "packages/engine/src/modules/steward/external/pi/runtime.js",
-    "packages/engine/src/modules/steward/external/pi/test.js",
+    "packages/engine/src/modules/steward/applications/pi/runtime.js",
+    "packages/engine/src/modules/steward/applications/pi/test.js",
     // Historical plans, frozen candidate snapshots, and throwaway scratch dirs are not live source.
     "plans/**",
     "playwright-report/**",

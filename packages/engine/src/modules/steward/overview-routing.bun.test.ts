@@ -24,7 +24,7 @@ test("web.today routes through the real web and notify modules without recursion
     const workspaceId = (await db.workspace.create({ data: { name: "overview" } })).id;
     for (const name of ["web", "notify"]) {
       await mkdir(resources, { recursive: true });
-      await cp(join(import.meta.dirname, "external", name), join(resources, name), { recursive: true });
+      await cp(join(import.meta.dirname, "applications", name), join(resources, name), { recursive: true });
       await seedTestModuleRelease(resources, name);
       const release = await resolveExternalRelease(ports, name);
       const module = await db.module.create({ data: { workspaceId, name, builtin: false, activeHash: release.hash } });

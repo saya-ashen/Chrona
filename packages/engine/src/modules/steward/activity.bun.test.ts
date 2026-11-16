@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { activityRecords, activityRecordsOutput } from "./activity";
-import { activityView } from "./external/notify/activity";
+import { activityView } from "./applications/notify/activity";
 import { registerSystemModules } from "./system-modules";
 import { callSync, kernelOrigin } from "./module-calls";
 const listActivity = (ports: StewardPorts, workspaceId: string, args: Parameters<typeof activityView>[1]) => activityView(async (target, input) => {

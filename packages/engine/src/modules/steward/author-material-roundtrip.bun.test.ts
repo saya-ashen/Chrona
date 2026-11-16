@@ -124,7 +124,7 @@ test("current Agent imports source and ignored native assets, checks/installs fi
       await db!.moduleVersion.create({ data: { moduleId: module.id, hash: revision.commit, manifest, source: "user", status: "approved", intent: {}, report: { git: revision } } });
       return db!.module.update({ where: { id: module.id }, data: { activeHash: revision.commit } });
     };
-    const authorFiles = await snapshotModule(import.meta.dir, "external/author");
+    const authorFiles = await snapshotModule(import.meta.dir, "applications/author");
     const authorManifest = moduleManifestSchema.parse(JSON.parse(Buffer.from(authorFiles.find(file => file.path === "module.json")!.bytes).toString("utf8")));
     expect(authorManifest.uses).toEqual(["modules.source", "modules.submit", "modules.receipt"]);
     expect(authorManifest.model).toBeUndefined();

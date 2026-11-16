@@ -1,6 +1,6 @@
 # 模块 Git 种子与官方发布
 
-当前发行集合固定为 Pi、Web、Notify、Author、Mind、Chat、QQ 七个普通应用，默认预装前六个，QQ 按需安装。通用 Agent API 归 kernel，Pi 是可停用或移除的普通 Provider 应用。其他应用的源码与依赖材料可以保留在仓库，但不进入发行源码、Git 种子或默认初始化；Remind 仍暂停，Editor 已退役，见[退役记录](editor-retirement.md)。集合以 `build/manifest.ts` 为准；对应种子的来源与发行 commit 由同步后的 `resources/module-git/lock.json` 和 `publish-plan.json` 记录，不能用旧种子快照证明当前发行已完成验证。
+当前发行集合固定为 Pi、Web、Notify、Author、Mind、Chat、QQ 七个普通应用，默认预装前六个，QQ 按需安装。通用 Agent API 归 kernel，Pi 是可停用或移除的普通 Provider 应用。其他应用的源码、依赖材料和开发 bundle 由独立应用仓库与固定开发输入保留，但不进入七应用发行或默认初始化；Remind 仍暂停，Editor 已退役，见[退役记录](editor-retirement.md)。集合以 `build/manifest.ts` 为准；对应种子的来源与发行 commit 由同步后的 `resources/module-git/lock.json` 和 `publish-plan.json` 记录，不能用旧种子快照证明当前发行已完成验证。
 
 2026-11-08 的历史盘点仅 files/events/remind 的 repository 非空，其余为 null；这是当时的锁定元数据，不能承诺当前提交均有公开 upstream。官方仓库命名约定为 `chrona-core/chrona-module-<name>`；离线种子、历史公开仓库与当前提交发布核验分别记录。后续收口见[统一开发路线](development-roadmap.md)。
 
@@ -8,7 +8,7 @@
 
 ## 准备和审阅
 
-默认构建复制资源后，生成当前入口会话材料和 Pi 依赖，给当前种子集合的 staging 模块复制 `resources/module-git/LICENSE`，并给含第三方 bundle 的模块复制 `THIRD-PARTY-NOTICES.txt`，再验证并复制固定种子。验证后按发行清单裁剪 staging 的 external 模块树，只保留上述七个应用；仓库中的其他源码树不受影响。构建不会生成初始提交，也不依赖主仓库 `.git` 或宿主 commit 环境变量。
+默认构建复制资源后，生成当前入口会话材料和 Pi 依赖，给当前种子集合的 staging 模块复制 `resources/module-git/LICENSE`，并给含第三方 bundle 的模块复制 `THIRD-PARTY-NOTICES.txt`，再验证并复制固定种子。验证后按发行清单裁剪 staging 的 external 模块树，只保留上述七个应用；独立仓库与开发固定输入不受影响。构建不会生成初始提交，也不依赖主仓库 `.git` 或宿主 commit 环境变量。
 
 受版本控制的发行输入是 `resources/module-git/`：`lock.json`、当前集合的完整 `.bundle`、MIT `LICENSE`、`THIRD-PARTY-NOTICES.txt` 和不含本机路径的 `publish-plan.json`。默认构建、Docker、Nix 消费同一历史；`CHRONA_MODULE_GIT_SEEDS` 可显式覆盖种子目录，仍严格验证 checksum、commit 和源码 tree。
 
@@ -32,15 +32,15 @@ bun scripts/build-binaries.ts --resources-only dist/module-resources
 CHRONA_RESOURCE_DIR="$PWD/dist/module-resources/resources" bun run dev
 ```
 
-维护已有发布历史时，先把固定 `lock.json` 和对应 bundle 复制到维护目录；prepare 会在 bare 缓存缺失时从已校验 bundle 恢复 main，再追加提交。不得从空目录为已有公开模块重新提取 root。
-
-维护者准备了 staging 资源根（含 builtin/ 与 external/，且先完成生成契约）后，可单独准备；prepare 自动使用主仓库 `LICENSE` 和固定发行目录的第三方通知，与正常构建共用同一 staging 规则：
+13 个应用现由独立仓库维护，开发组合见[独立应用与固定输入](independent-applications.md)。修改先进入应用本地 `main`，再从明确指定的干净 checkout 更新固定输入；七个发行应用必须继承当前发行 commit：
 
 ```sh
-bun scripts/module-git-release.ts prepare /absolute/path/to/seeds /absolute/path/to/staged/resources
+bun scripts/pin-application.ts web /absolute/path/to/chrona-module-web
 ```
 
-仅显式 prepare 在无主仓库 `.git` 的维护环境需提供真实宿主基线 `CHRONA_MODULE_GIT_COMMIT`（40hex）与 `CHRONA_MODULE_GIT_TIMESTAMP`（Unix 秒）。它们是源码提取溯源，dirty 输入不声称等于该主仓库 commit。准备不创建 GitHub 仓库、不推送、不修改用户数据。
+该入口核对已提交源码与完整材料，生成完整 main bundle、精确 artifact 输入，更新开发 lock 与适用的发行 lock。Git bundle 不包含声明的 artifacts；不得把 bundle checkout 当完整发行资源。新输入审阅后再提交主仓库，不推送、不猜测远端。
+
+旧 `module-git-release.ts prepare` 继续供独立的合成/历史提取目录使用，拒绝直接更新主仓库的正式种子目录；正式应用历史由独立仓库提交。旧 bare 缓存不作为当前应用 main 的事实来源，正常构建只读固定 lock/bundle 并使用临时仓库核验。
 
 ## 真实公开发布 gate
 

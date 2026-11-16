@@ -44,10 +44,13 @@ export function testReleasePackages(resourcesRoot: string): NonNullable<StewardP
       const manifest = JSON.parse(await readFile(join(dir, "module.json"), "utf8")) as { name: string };
       const modules = resolve(resourcesRoot, manifest.name, "node_modules");
       const pkg = JSON.parse(await readFile(join(dir, "package.json"), "utf8")) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
-      for (const name of [".", ...Object.keys({ ...pkg.dependencies, ...pkg.devDependencies })]) {
+      await mkdir(join(dir, "node_modules"), { recursive: true });
+      for (const name of Object.keys({ ...pkg.dependencies, ...pkg.devDependencies })) {
         if (!(await stat(join(modules, name))).isDirectory()) throw new Error(`Release fixture dependency missing: ${name}`);
+        const target = join(dir, "node_modules", name);
+        await mkdir(dirname(target), { recursive: true });
+        await symlink(join(modules, name), target, "dir");
       }
-      await symlink(modules, join(dir, "node_modules"), "dir");
     }
     return { errors: [], installed: { npm, python: false, packages: {} } };
   } };

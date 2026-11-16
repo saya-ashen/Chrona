@@ -4,13 +4,13 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { contentRefSchema } from "@chrona/contracts/steward";
 import { testDb } from "./test-db";
-import webManifest from "./external/web/module.json";
+import webManifest from "./applications/web/module.json";
 import type { StewardPorts } from "./ports";
 import { readWorkspaceFile, FILE_MAX_BYTES } from "./workspace-files";
 import { readRunContent } from "./run-content";
 import { registerWorkspaceModule } from "./local-workspace";
 import { runtimeCall } from "./local-runtime";
-import { createAttachments } from "./external/web/attachments";
+import { createAttachments } from "./applications/web/attachments";
 import { contextRunImages } from "./agent-context-read";
 
 async function fixture() {

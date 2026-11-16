@@ -15,14 +15,16 @@ COPY bun.lock package.json prisma.config.ts tsconfig.json ./
 COPY apps/server apps/server
 COPY packages packages
 COPY prisma prisma
-COPY scripts/docker-entrypoint.sh scripts/docker-entrypoint.sh
+COPY scripts/docker-entrypoint.sh scripts/restore-applications.ts scripts/module-git-release.ts scripts/
+COPY build build
+COPY resources/module-git resources/module-git
+COPY resources/application-inputs resources/application-inputs
 RUN bun install --frozen-lockfile --ignore-scripts \
     && bun run db:generate
-COPY build build
-COPY scripts/build-binaries.ts scripts/module-git-release.ts scripts/
-COPY resources/module-git resources/module-git
+COPY scripts/build-binaries.ts scripts/
 COPY .env.example .env.example
 RUN bun scripts/build-binaries.ts --resources-only /app \
+    && rm -rf /app/resources/application-inputs /app/packages/engine/src/modules/steward/applications \
     && apt-get purge -y --auto-remove build-essential
 ENV CHRONA_RESOURCE_DIR=/app/resources
 ENV NODE_ENV=production

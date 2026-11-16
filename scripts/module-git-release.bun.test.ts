@@ -155,7 +155,7 @@ test.skipIf(process.platform === "win32")("public upstream verification never ma
   }
 }, 30_000);
 
-const webRoot = resolve(import.meta.dirname, "../packages/engine/src/modules/steward/external/web");
+const webRoot = resolve(import.meta.dirname, "../packages/engine/src/modules/steward/applications/web");
 const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 
 test("actual Web release preserves all source and verifies artifacts while Git contains source and record only", async () => {

@@ -31,7 +31,7 @@ async function fixture() {
   try {
     const workspaceId = (await db.workspace.create({ data: { name: "Offline Author runtime" } })).id;
     const hash = "a".repeat(64), code = join(root, "platform/store", hash);
-    await cp(join(import.meta.dir, "external/author"), code, { recursive: true });
+    await cp(join(import.meta.dir, "applications/author"), code, { recursive: true });
     const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(code, "module.json"), "utf8")));
     const author = await db.module.create({ data: { workspaceId, name: "author", activeHash: hash, status: "active" } });
     await db.moduleVersion.create({ data: { moduleId: author.id, hash, manifest, source: "user", status: "approved", intent: {}, report: {} } });

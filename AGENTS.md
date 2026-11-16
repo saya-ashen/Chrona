@@ -59,9 +59,9 @@ Chrona 是随用户需求生长的个人工具。默认中文，代码、命令�
 | --- | --- |
 | 依赖方向 | `apps → packages/engine → packages/domain → packages/contracts`；路由校验并委托，domain 无 I/O |
 | 合同／kernel | `packages/contracts/src/steward`、`packages/engine/src/modules/steward`；[实现现状](docs/zh/kernel-api-implementation.md) |
-| 应用 | `steward/external/`（含普通 Provider 应用 `pi`）；[普通应用迁移](docs/zh/application-migration.md) |
+| 应用 | 独立 `chrona-module-*` 仓库；固定输入恢复到 `steward/applications/`（含普通 Provider 应用 `pi`）；[普通应用迁移](docs/zh/application-migration.md) |
 | 宿主／SDK／Pi | `packages/integrations/src/steward`、`packages/pi`；[Agent](docs/zh/agent-builtin-application.md) |
-| Web | `external/web/src/pages.tsx`、`src/system/`、`app.js`；[组合与外壳](docs/zh/web-components-and-shell.md)、[可执行页面](docs/zh/web-executable-components.md) |
+| Web | `applications/web/src/pages.tsx`、`src/system/`、`app.js`；[组合与外壳](docs/zh/web-components-and-shell.md)、[可执行页面](docs/zh/web-executable-components.md) |
 | 设置／材料 | [应用设置](docs/zh/application-settings.md)、[版本材料](docs/zh/author-version-materials.md)、[当前对话创作](docs/zh/author-current-conversation.md) |
 | 通知／恢复 | [有限事实](docs/zh/kernel-notification-facts.md)、[运维](docs/zh/operations.md) |
 | 可选工具 | 当前会话有 context-mode / CodeGraph 时，按需读[工具手册](docs/agents/tooling.md)；没有则用原生工具，不臆造可用性 |
