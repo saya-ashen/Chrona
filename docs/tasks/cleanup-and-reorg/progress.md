@@ -1,6 +1,6 @@
 # 执行进度
 
-- 当前阶段：0–7已完成，阶段7独立复审 `d2d92ad9` OK，最终 `verify:slice` 退出0，本地提交 `7f067370`。阶段8 BLOCK remediation 已完成本地未提交修订：保留预检、备份验证和离线验收，删除 `deployment:deliver` 及自报授权/停机 JSON；r4已通过的构建/验收及启动器/doctor/smoke证据保留；r5最后F1未知失败调用、F2源码package根已最小修复，先复现3失败再通过36项部署回归及最终99关联文件slice（PID1717489），待父独立关闭复审；见 stage-8-summary.md / stage-8-evidence.json。阶段6 r3 fullBun exit1仍保留，351通过文件与fixture17测试补验仅构成组合覆盖，不改称单轮全绿。
+- 当前阶段：0–8已本地提交，HEAD `caf46efabdf3735bb71ea43302a0566b96f43bdc`。阶段9本地最终验证已完成：clean commit 正式发行入口、353 Bun/21 API、完整slice（97关联文件）、三尺寸Web60/settings6、精确归档隔离runtime和修正harness后的定向可移植probe通过；首次portable断言失败原样保留。全库lint193 errors/1029 warnings，Nix整包/Docker镜像未构建。chino由父只读发现历史unknown固定回执，部署状态 blocked_by_unknown_receipt；未切换服务。阶段9证据文档未暂存/提交，待父独立审阅。见 stage-9-summary.md / stage-9-evidence.json。
 - 基准：6966a5c3；任务分支 refactor/cleanup-and-reorg；隔离目录 /home/saya/workspace/Chrona-cleanup-and-reorg。
 - 原工作区未修改。依赖使用本机既有 node_modules 的独立 reflink/copy，未安装或启用任何插件；正式隔离发行仍需证明不依赖此开发副本。
 - 完整执行方案：plan.md。
@@ -56,3 +56,5 @@
 - 阶段7独立review d2d92ad9：代码与直接消费者审查OK，仅要求同步文档状态。最终 race-final-r2 verify:slice 于2026-11-16T21:39:21.188Z exit0，lint/type/guardrails/102关联文件通过；生产+40/-14净+26，测试+203/-3净+200，生成/应用/依赖/锁/bundle 0。阶段7验收关闭，待本地提交后进入阶段8。
 
 - 阶段8最终独立复审36e2a7ee OK，F1未知调用结果/F2源码package推导均关闭。最终r5-r2完整slice exit0，99关联文件/type/ratchet/guardrails通过，36部署回归75断言通过；其余同源码构建/归档验收沿用r4，dirty身份不当clean。生产净+241、测试净+272，生成/合同/应用pin/schema/Nix 0；删除自报授权/停止JSON交付包装器。阶段8验收关闭，本地提交后进入阶段9最终验证与受控部署前核对。
+
+- 最终独立审查 c9f435b9 OK（仅本地证据提交）；clean caf46efa 的353/353 Bun、21/21 API、正式发行与隔离验收通过，42条skip及历史失败完整保留。阶段0–8实施及阶段9本地交付验证完成；真实部署 blocked_by_unknown_receipt，生产备份/切换/数据连续性验收未执行。最终证据提交仅文档，不改变已冻结发行字节。

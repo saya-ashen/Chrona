@@ -50,3 +50,7 @@ Bun 全量扫描原为 343 文件，API 为 20 文件。新增发行脚本自测
 settings browser 原 fixture 在 blob ESM 内不能解析 `/pages.js`；改用真实 `deps.source` 对应的隔离同源 HTTP 页面脚本，仍禁止其他 origin 的请求。错误状态按当前应用实际返回断言（Pi 为设置无效，Notify 为 `Error: invalid`），增加持久设置仍为上一成功值的检查；不声称 Notify 已有中文错误文案。六个场景已实际复验通过，相关三文件 lint 无问题。
 
 `.tmp/cleanup-and-reorg/bundle-history-check.json` 已逐个验证全部七个旧 commit 都是候选 commit 的祖先，且 bundle SHA256 与 lock 一致。当前应用源码与旧 bundle 已存在大量未同步差异，因此候选应用 diff 不仅包含本次 fixture 修复；Web 为 98 文件、Notify 14、Pi 12、QQ 14、Author 10、Mind 25、Chat 14。发行复验针对这个明确组合，不声称这些源码差异全部由本阶段新写。
+
+## 阶段9精确版本最终验证
+
+本轮覆盖 clean `caf46efabdf3735bb71ea43302a0566b96f43bdc`，显式 `LINT_RATCHET_BASE=caf46efa`，区别于前文历史阶段基准。正式 verify:release exit0（353/353 Bun、21/21 API、checks/build/runtime smoke）；全库 lint 仍 exit1，193 errors/1029 warnings，不能称 lint 全绿。完整 slice 97关联文件及三尺寸 Web60/settings6 通过。13应用 fresh 离线恢复/材料校验/构建、精确tar字节/mode核对及隔离runtime通过；初次portable harness读宿主别名使unit失败，原日志保留，只修fixture后定向r2通过且零主树/快照源码访问。Nix整包、Docker镜像、真实模型/消息/部署未覆盖；父只读发现unknown固定回执，部署 blocked_by_unknown_receipt。完整身份、实际清单、skip原文、失败及归档SHA见 stage-9-evidence.json 和 stage-9-summary.md。
