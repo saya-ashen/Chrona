@@ -1,8 +1,8 @@
 export { createStewardService } from "./service";
-export { createRegisteredProviderClient } from "./agent-client";
-export { stopAgentRuns } from "./local-runtime";
-export { createModules } from "./modules";
-export { createRuns, liveRuns, authenticateRun } from "./runs";
+export { createRegisteredProviderClient } from "./agent/agent-client";
+export { stopAgentRuns } from "./execution/local-runtime";
+export { createModules } from "./modules/modules";
+export { createRuns, liveRuns, authenticateRun } from "./execution/runs";
 export { createTick } from "./tick";
 export { createTools } from "./tools";
 export type { ApprovedAction, OnApproved } from "./ports";
@@ -12,4 +12,4 @@ export { StewardError } from "./errors";
 export type { StewardErrorCode } from "./errors";
 export { notifyUser } from "./notify-user";
 export type { UserNotice } from "./notify-user";
-export { callSync, enqueueCall, callStatus, runDueCalls, drainCalls, callsSettled, CallError } from "./module-calls";
+export { callSync, enqueueCall, callStatus, runDueCalls, drainCalls, callsSettled, CallError } from "./modules/module-calls";

@@ -2,8 +2,8 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { moduleContext } from "./module-context";
-import { onApproved } from "./module-activation";
+import { moduleContext } from "./modules/module-context";
+import { onApproved } from "./modules/module-activation";
 import { createApprovals } from "./approvals";
 import { testDb } from "./test-db";
 

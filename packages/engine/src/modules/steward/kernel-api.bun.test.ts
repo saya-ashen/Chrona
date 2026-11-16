@@ -1,13 +1,13 @@
 import { afterEach, expect, test } from "bun:test";
-import { handleModuleCall } from "./module-effects";
+import { handleModuleCall } from "./modules/module-effects";
 import { createApprovals } from "./approvals";
 import { mkdtemp, rm } from "node:fs/promises";
 import { moduleCallSchema, moduleManifestSchema } from "@chrona/contracts/steward";
 import { testDb } from "./test-db";
 import { registerSystemModules } from "./system-modules";
-import { callSync, enqueueCall, kernelOrigin, listSystemModules, callStatus, runDueCalls } from "./module-calls";
-import { testModuleProcess } from "./module-test-process";
-import { moduleSupervisor } from "./module-supervisor";
+import { callSync, enqueueCall, kernelOrigin, listSystemModules, callStatus, runDueCalls } from "./modules/module-calls";
+import { testModuleProcess } from "./modules/module-test-process";
+import { moduleSupervisor } from "./modules/module-supervisor";
 import { drainTimers } from "./timers";
 import type { StewardPorts } from "./ports";
 

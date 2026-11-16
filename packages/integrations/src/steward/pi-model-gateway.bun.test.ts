@@ -5,7 +5,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { piHostConfiguration } from "./pi-model-gateway";
-import { createPiApplicationHost } from "./agent-application-host";
+import { createPiApplicationHost } from "./runtime/agent-application-host";
 
 const keys = ["CHRONA_RESOURCE_DIR", "CHRONA_STEWARD_PI_COMMAND", "CHRONA_STEWARD_PI_AGENT_DIR", "CHRONA_STEWARD_PI_MODEL", "CHRONA_STEWARD_PI_VERSION", "CHRONA_STEWARD_PI_RESOURCES_FILE", "CHRONA_STEWARD_PI_WEB_EXTENSION", "CHRONA_STEWARD_EXECUTION_MODE", "CHRONA_STEWARD_SANDBOX_BWRAP", "CHRONA_STEWARD_BROWSER"] as const;
 const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));

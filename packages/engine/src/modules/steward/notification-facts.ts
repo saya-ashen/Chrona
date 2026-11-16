@@ -4,8 +4,8 @@ import { ACTIONS } from "@chrona/contracts/steward";
 import type { Prisma } from "@chrona/db";
 import { redactSensitiveText } from "@chrona/logging/redaction";
 import type { StewardPorts } from "./ports";
-import type { Caller } from "./module-call-types";
-import { CallError } from "./module-call-error";
+import type { Caller } from "./modules/module-call-types";
+import { CallError } from "./modules/module-call-error";
 
 type Db = StewardPorts["db"] | Prisma.TransactionClient;
 const text = z.string().max(4000), identity = z.string().min(1).max(256);

@@ -6,8 +6,8 @@ import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { createServerApp } from "../../../../../apps/server/src/app";
 import { createStewardRuntime } from "../../../../../apps/server/src/steward-runtime";
 import { resetEnvCacheForTests } from "../../../../../apps/server/src/config/env";
-import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";
-import { moduleSupervisor } from "./module-supervisor";
+import { createScriptSandbox } from "../../../../integrations/src/steward/runtime/script-sandbox";
+import { moduleSupervisor } from "./modules/module-supervisor";
 import { testDb } from "./test-db";
 
 type Args = Record<string, unknown>;

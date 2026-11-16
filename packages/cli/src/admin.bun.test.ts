@@ -9,7 +9,7 @@ import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 import { createStewardService } from "@chrona/engine";
 import { qqBindCode, removeSecret, runAdmin, setSecret } from "./admin";
 import { createProgram } from "./program";
-import { seedTestModuleRelease } from "../../engine/src/modules/steward/module-release-test-fixture";
+import { seedTestModuleRelease } from "../../engine/src/modules/steward/modules/module-release-test-fixture";
 
 import { createQqBotState } from "../../engine/src/modules/steward/applications/qq/bot";
 

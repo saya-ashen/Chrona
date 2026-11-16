@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { createStewardService } from "./service";
-import { listLocalModules, listSystemModules } from "./module-calls";
+import { listLocalModules, listSystemModules } from "./modules/module-calls";
 import type { StewardPorts } from "./ports";
 
 test("service bootstraps kernel Agent and private event delivery before any Provider operation", () => {

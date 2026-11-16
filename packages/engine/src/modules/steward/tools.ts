@@ -2,10 +2,10 @@ import { createHash } from "node:crypto";
 import { RUN_LIMITS } from "@chrona/contracts/steward";
 import type { Prisma } from "@chrona/db";
 import type { StewardPorts } from "./ports";
-import { authenticateRun } from "./runs";
+import { authenticateRun } from "./execution/runs";
 import { audit } from "./audit";
 import { StewardError } from "./errors";
-import { contextRunTools, callContextTool } from "./agent-context-tools";
+import { contextRunTools, callContextTool } from "./agent/agent-context-tools";
 
 /** No provider-supplied workspace IDs: all ownership comes from the capability. */
 export function createTools(ports: StewardPorts) {

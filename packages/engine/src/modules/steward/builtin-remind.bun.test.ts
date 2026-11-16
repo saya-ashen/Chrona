@@ -3,8 +3,8 @@ import { cp, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
-import { installationId, installExternal } from "./module-install";
-import { callSync, enqueueCall } from "./module-calls";
+import { installationId, installExternal } from "./modules/module-install";
+import { callSync, enqueueCall } from "./modules/module-calls";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
 

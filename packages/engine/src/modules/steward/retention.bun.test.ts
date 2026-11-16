@@ -2,10 +2,10 @@ import { afterEach, expect, test } from "bun:test";
 import type { Prisma } from "@chrona/db";
 import { testDb } from "./test-db";
 import { pruneHistory } from "./retention";
-import { appendRunEventIn } from "./run-events";
+import { appendRunEventIn } from "./execution/run-events";
 import { createTick } from "./tick";
-import { moduleFailurePolicy, recordModuleExecution } from "./module-failure-policy";
-import { settleRunCompletion } from "./agent-completion-settlement";
+import { moduleFailurePolicy, recordModuleExecution } from "./modules/module-failure-policy";
+import { settleRunCompletion } from "./agent/agent-completion-settlement";
 
 const now = new Date("2026-11-12T12:00:00Z");
 const old = new Date("2026-11-01T12:00:00Z");

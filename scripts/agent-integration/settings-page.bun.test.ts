@@ -3,7 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { agentFixture } from "./agent-application.fixtures";
-import { callSync, kernelOrigin } from "../../packages/engine/src/modules/steward/module-calls";
+import { callSync, kernelOrigin } from "../../packages/engine/src/modules/steward/modules/module-calls";
 import { pageErrors } from "../../packages/engine/src/modules/steward/applications/web/pages";
 import { manifest } from "../../packages/engine/src/modules/steward/applications/pi/build";
 import { SETTINGS_PAGE, settingsRegistration } from "../../packages/engine/src/modules/steward/applications/pi/settings-page";

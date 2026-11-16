@@ -1,8 +1,8 @@
 import { moduleManifestSchema } from "@chrona/contracts/steward";
-import { CallError } from "../module-call-error";
-import type { Caller, Json } from "../module-call-types";
+import { CallError } from "../modules/module-call-error";
+import type { Caller, Json } from "../modules/module-call-types";
 import type { StewardPorts } from "../ports";
-import { isOwnerCaller } from "../module-owner";
+import { isOwnerCaller } from "../modules/module-owner";
 
 export { tool, text } from "./tool-declaration";
 /** Module identity for operations scoped to the caller's own resources. */

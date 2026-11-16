@@ -1,6 +1,6 @@
 import { publicSystemTools } from "./tool-contract-declarations";
 import { createSettings } from "../settings";
-import { CallError, type SystemModule } from "../module-calls";
+import { CallError, type SystemModule } from "../modules/module-calls";
 import { entry, json, requireOwner } from "./shared";
 
 /** Kernel governance only. Applications own their settings and preferences. */

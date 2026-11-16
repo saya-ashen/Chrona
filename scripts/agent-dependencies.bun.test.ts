@@ -6,11 +6,11 @@ import { dirname, join, resolve } from "node:path";
 import ts from "typescript";
 import { assembleModuleDependencies, preparePiApplication, stageModuleMaterial } from "../build/agent-dependencies";
 import { moduleGitReleaseSource } from "./module-git-release";
-import { snapshotModuleMaterial } from "../packages/engine/src/modules/steward/module-artifacts";
-import { seedTestModuleRelease } from "../packages/engine/src/modules/steward/module-release-test-fixture";
+import { snapshotModuleMaterial } from "../packages/engine/src/modules/steward/modules/module-artifacts";
+import { seedTestModuleRelease } from "../packages/engine/src/modules/steward/modules/module-release-test-fixture";
 import { MODULE_MATERIAL_FILE, MODULE_SOURCE_MAX_BYTES, MODULE_SOURCE_MAX_FILES, parseModuleMaterial } from "../packages/contracts/src/steward/module-material";
-import { readModuleFiles } from "../packages/engine/src/modules/steward/module-preview";
-import { readModuleMaterial, readModuleSource } from "../packages/engine/src/modules/steward/module-git";
+import { readModuleFiles } from "../packages/engine/src/modules/steward/modules/module-preview";
+import { readModuleMaterial, readModuleSource } from "../packages/engine/src/modules/steward/modules/module-git";
 
 const piPath = "packages/engine/src/modules/steward/applications/pi";
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { applicationBaselineSources, checkStagedApplicationInputs } from "./application-git-inputs";
+import pathRenames from "./lint-path-renames.json";
 import { restoredApplicationSources, restoreApplications } from "./restore-applications";
 
 import { ESLint } from "eslint";
@@ -79,17 +80,17 @@ function pathsFromGit(args: string[]): string[] {
 	return git(args)?.split("\0").filter(Boolean) ?? [];
 }
 
-function isLintablePath(path: string): boolean {
+function isLintablePath(path: string, useStagedIndex = false): boolean {
 	return (
 		lintableExtensions.has(path.slice(path.lastIndexOf("."))) &&
-		existsSync(resolve(ROOT, path))
+		(useStagedIndex ? git(["cat-file", "-e", `:${path}`]) !== null : existsSync(resolve(ROOT, path)))
 	);
 }
 
 function changedLintableFiles(baseRef: string, stagedOnly: boolean): string[] {
 	if (stagedOnly) {
 		return pathsFromGit(["diff", "--cached", "--name-only", "-z", "--diff-filter=ACMR"])
-			.filter(isLintablePath)
+			.filter(path => isLintablePath(path, true))
 			.sort((left, right) => left.localeCompare(right));
 	}
 	const files = new Set<string>();
@@ -121,11 +122,15 @@ if (stagedOnly) checkStagedApplicationInputs(ROOT);
 const applicationBaseline = applicationBaselineSources(ROOT, baseRef);
 const eslint = new ESLint({ cwd: ROOT });
 const applicationPrefix = "packages/engine/src/modules/steward/applications/";
-const applicationFiles = (await restoredApplicationSources()).filter(isLintablePath);
+const applicationFiles = (await restoredApplicationSources()).filter(path => isLintablePath(path));
 const candidates =
 	explicitFiles.length > 0
-		? explicitFiles.filter(isLintablePath)
+		? explicitFiles.filter(path => isLintablePath(path, stagedOnly))
 		: [...new Set([...changedLintableFiles(baseRef, stagedOnly), ...applicationFiles])];
+const renamedSources = new Set(candidates.map(path => (pathRenames as Record<string, string>)[path]).filter(Boolean));
+for (const [next, previous] of Object.entries(pathRenames)) {
+	if (renamedSources.has(previous) && isLintablePath(next, stagedOnly) && !candidates.includes(next)) candidates.push(next);
+}
 const files: string[] = [];
 for (const path of candidates) {
 	if (!await eslint.isPathIgnored(resolve(ROOT, path))) files.push(path);
@@ -152,7 +157,7 @@ async function collectCurrentResults(eslintInstance: ESLint, targetPaths: string
 	return results;
 }
 
-const currentResults = await collectCurrentResults(eslint, files, stagedOnly && explicitFiles.length === 0);
+const currentResults = await collectCurrentResults(eslint, files, stagedOnly);
 const currentByPath = new Map(
 	currentResults.map((result) => [
 		resolve(ROOT, result.filePath),
@@ -161,16 +166,27 @@ const currentByPath = new Map(
 );
 const regressions: string[] = [];
 const inheritedApplicationDebt = new Set<string>();
+const comparedRenames = new Set<string>();
 
 for (const path of files) {
 	const baselinePath = path.replace(applicationPrefix, "packages/engine/src/modules/steward/external/");
-	const source = path.startsWith(applicationPrefix) && applicationBaseline
+	const directSource = path.startsWith(applicationPrefix) && applicationBaseline
 		? applicationBaseline.get(path) ?? null
 		: git(["show", `${baseRef}:${baselinePath}`]);
-	const current = currentByPath.get(resolve(ROOT, path)) ?? {
-		errors: 0,
-		warnings: 0,
-	};
+	const previousPath = directSource === null ? (pathRenames as Record<string, string>)[path] : undefined;
+	// The old tree keeps its own debt until its deletion is part of the checked tree.
+	const oldPathRemains = previousPath && isLintablePath(previousPath, stagedOnly);
+	const source = directSource ?? (previousPath && !oldPathRemains ? git(["show", `${baseRef}:${previousPath}`]) : null);
+	if (previousPath && comparedRenames.has(previousPath)) continue;
+	if (previousPath) comparedRenames.add(previousPath);
+	// A split shares one original budget; moving code cannot multiply its lint allowance.
+	const relatedPaths = previousPath
+		? Object.entries(pathRenames).filter(([, old]) => old === previousPath).map(([next]) => next)
+		: [path];
+	const current = relatedPaths.reduce((total, next) => {
+		const item = currentByPath.get(resolve(ROOT, next));
+		return { errors: total.errors + (item?.errors ?? 0), warnings: total.warnings + (item?.warnings ?? 0) };
+	}, { errors: 0, warnings: 0 });
 	if (source === null) {
 		if (current.errors > 0 || current.warnings > 0)
 			regressions.push(formatDebt(path, { errors: 0, warnings: 0 }, current));

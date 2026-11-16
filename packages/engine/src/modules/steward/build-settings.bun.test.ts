@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { createBuildGovernance } from "./build-governance";
 import { createSettings, kernelSettingsSchema } from "./settings";
-import { createRuns } from "./runs";
+import { createRuns } from "./execution/runs";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
 

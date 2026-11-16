@@ -7,9 +7,9 @@ import { ensureSqliteDatabase } from "@chrona/db/sqlite-migrations";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { candidateReceiptSchema } from "../../../../contracts/src/steward/module-candidates";
-import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";
+import { createScriptSandbox } from "../../../../integrations/src/steward/runtime/script-sandbox";
 import runtimes from "../../../../integrations/src/steward/runtimes.json";
-import type { BuildReport } from "./module-context";
+import type { BuildReport } from "./modules/module-context";
 import type { StewardPorts } from "./ports";
 
 const localTest = process.platform === "linux" ? test : test.skip;
@@ -89,9 +89,9 @@ localTest("ordinary desktop candidate activation, update and disable stop actual
     const singletonDatabases = await shared.db.$queryRawUnsafe<{ name: string; file: string }[]>("PRAGMA database_list");
     if (singletonDatabases.find(item => item.name === "main")?.file === join(root, "test.db")) importedDatabase = shared.db;
     const [{ callSync }, { checkoutModule, snapshotModule }, { commitModuleSource }, { moduleSupervisor }, { createModules }, { registerLocalRuntime }, { registerSystemModules }] = await Promise.all([
-      import("./module-calls"), import("./module-files"), import("./module-git"), import("./module-supervisor"), import("./modules"), import("./local-runtime"), import("./system-modules"),
+      import("./modules/module-calls"), import("./modules/module-files"), import("./modules/module-git"), import("./modules/module-supervisor"), import("./modules/modules"), import("./execution/local-runtime"), import("./system-modules"),
     ]);
-    await import("./module-effects");
+    await import("./modules/module-effects");
     ensureSqliteDatabase({ databaseUrl, migrationsDir: resolve(import.meta.dir, "../../../../../prisma/migrations") });
     db = new PrismaClient({ adapter: new PrismaBunSqlite({ url: databaseUrl }) });
     const databases = await db.$queryRawUnsafe<{ name: string; file: string }[]>("PRAGMA database_list");

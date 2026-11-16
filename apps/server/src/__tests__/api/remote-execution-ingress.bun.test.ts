@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { registerAgentProvider } from "../../../../../packages/engine/src/modules/steward/agent-provider";
+import { registerAgentProvider } from "../../../../../packages/engine/src/modules/steward/agent/agent-provider";
 import { testProviderManifest } from "../../../../../packages/engine/src/modules/steward/test-provider-process";
 import { generateKeyPairSync, randomBytes, sign, createHash } from "node:crypto";
 import { cp, mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
@@ -275,8 +275,8 @@ on("tool", async event => {
     launch = ownerMessages.find((message: { kind: string }) => message.kind === "launch").envelope;
     target = launch.packet.target;
     await report("started", processIdentity); await deviceRequest("poll", { device });
-    const { moduleContext } = await import("../../../../../packages/engine/src/modules/steward/module-context");
-    const { requestStatus } = await import("../../../../../packages/engine/src/modules/steward/module-status");
+    const { moduleContext } = await import("../../../../../packages/engine/src/modules/steward/modules/module-context");
+    const { requestStatus } = await import("../../../../../packages/engine/src/modules/steward/modules/module-status");
     const context = moduleContext(f.runtime.ports, "ws_default");
     await expect(requestStatus(context, receiver.moduleId, "paused", "offline owner execution")).rejects.toMatchObject({ code: "conflict" });
     expect(await f.db.module.findUniqueOrThrow({ where: { id: receiver.moduleId } })).toMatchObject({ status: "active", executionFenceAt: expect.any(Date) });

@@ -3,16 +3,16 @@ import { dirname, join, relative, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { assembleModuleDependencies, stageModuleMaterial } from "../../build/agent-dependencies";
 import { testDb } from "../../packages/engine/src/modules/steward/test-db";
-import { createScriptSandbox } from "../../packages/integrations/src/steward/script-sandbox";
-import { seedTestModuleRelease } from "../../packages/engine/src/modules/steward/module-release-test-fixture";
-import { moduleSupervisor } from "../../packages/engine/src/modules/steward/module-supervisor";
+import { createScriptSandbox } from "../../packages/integrations/src/steward/runtime/script-sandbox";
+import { seedTestModuleRelease } from "../../packages/engine/src/modules/steward/modules/module-release-test-fixture";
+import { moduleSupervisor } from "../../packages/engine/src/modules/steward/modules/module-supervisor";
 import { registerSystemModules } from "../../packages/engine/src/modules/steward/system-modules";
-import { registerLocalRuntime } from "../../packages/engine/src/modules/steward/local-runtime";
-import { resolveExternalRelease } from "../../packages/engine/src/modules/steward/module-release";
+import { registerLocalRuntime } from "../../packages/engine/src/modules/steward/execution/local-runtime";
+import { resolveExternalRelease } from "../../packages/engine/src/modules/steward/modules/module-release";
 import { buildPiApplication } from "../../packages/engine/src/modules/steward/applications/pi/build";
 import type { Prisma } from "@chrona/db";
 import type { StewardPorts } from "../../packages/engine/src/modules/steward/ports";
-import "../../packages/engine/src/modules/steward/module-effects";
+import "../../packages/engine/src/modules/steward/modules/module-effects";
 
 /** Assemble locally available packages and resolve only this release's declared vendor closure. */
 export async function linkPiFixtureDependencies(moduleDir: string) {

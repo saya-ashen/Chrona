@@ -5,10 +5,10 @@ import { tmpdir } from "node:os";
 import type { ProviderAdapter, ProviderRunInput } from "@chrona/contracts/steward";
 import { testDb } from "./test-db";
 import { testProviderPorts } from "./test-provider";
-import { callSync, kernelOrigin } from "./module-calls";
-import { startLocalProvider } from "./local-runtime";
-import { createRuns } from "./runs";
-import { moduleSupervisor } from "./module-supervisor";
+import { callSync, kernelOrigin } from "./modules/module-calls";
+import { startLocalProvider } from "./execution/local-runtime";
+import { createRuns } from "./execution/runs";
+import { moduleSupervisor } from "./modules/module-supervisor";
 import type { StewardPorts } from "./ports";
 
 type Outcome = Awaited<ReturnType<ProviderAdapter["start"]>["done"]>;

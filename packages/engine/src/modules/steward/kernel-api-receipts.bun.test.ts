@@ -7,11 +7,11 @@ import { PrismaClient } from "@chrona/db/generated/prisma/client";
 import { ensureSqliteDatabase } from "@chrona/db/sqlite-migrations";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 import { createApprovals } from "./approvals";
-import { callStatus, callSync, callsSettled, enqueueCall, kernelOrigin, runDueCalls } from "./module-calls";
-import { handleModuleCall } from "./module-effects";
-import { createModules } from "./modules";
-import { completeApprovedOperationsIn } from "./module-operation-result";
-import { moduleSupervisor } from "./module-supervisor";
+import { callStatus, callSync, callsSettled, enqueueCall, kernelOrigin, runDueCalls } from "./modules/module-calls";
+import { handleModuleCall } from "./modules/module-effects";
+import { createModules } from "./modules/modules";
+import { completeApprovedOperationsIn } from "./modules/module-operation-result";
+import { moduleSupervisor } from "./modules/module-supervisor";
 import { registerSystemModules } from "./system-modules";
 import type { StewardPorts } from "./ports";
 

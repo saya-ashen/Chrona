@@ -1,15 +1,15 @@
 import { test, expect } from "bun:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { callSync, kernelOrigin, enqueueCall } from "../../packages/engine/src/modules/steward/module-calls";
-import { registerLocalRuntime, runtimeCall, startLocalProvider } from "../../packages/engine/src/modules/steward/local-runtime";
+import { callSync, kernelOrigin, enqueueCall } from "../../packages/engine/src/modules/steward/modules/module-calls";
+import { registerLocalRuntime, runtimeCall, startLocalProvider } from "../../packages/engine/src/modules/steward/execution/local-runtime";
 import { createPiOperations } from "../../packages/engine/src/modules/steward/applications/pi/operations";
 import { moduleManifestSchema, type ExecutionEvent, type ProviderRunInput } from "@chrona/contracts/steward";
-import { retainProviderCallbacks } from "../../packages/engine/src/modules/steward/local-provider";
-import { moduleSupervisor } from "../../packages/engine/src/modules/steward/module-supervisor";
-import { callProviderEndpoint } from "../../packages/engine/src/modules/steward/agent-provider";
+import { retainProviderCallbacks } from "../../packages/engine/src/modules/steward/agent/local-provider";
+import { moduleSupervisor } from "../../packages/engine/src/modules/steward/modules/module-supervisor";
+import { callProviderEndpoint } from "../../packages/engine/src/modules/steward/agent/agent-provider";
 import { testDb } from "../../packages/engine/src/modules/steward/test-db";
-import "../../packages/engine/src/modules/steward/module-effects";
+import "../../packages/engine/src/modules/steward/modules/module-effects";
 
 import { agentFixture as fixture } from "./agent-application.fixtures";
 

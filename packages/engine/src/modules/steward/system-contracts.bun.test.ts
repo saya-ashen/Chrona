@@ -3,7 +3,7 @@ import { z } from "zod";
 import { ACTIONS, APPROVAL_SCOPES, approvalSchema, resolveApprovalSchema } from "@chrona/contracts/steward";
 import { approvals } from "./system/approvals";
 import { registerSystemModules } from "./system-modules";
-import { checkSystemOutput, listSystemModules } from "./module-calls";
+import { checkSystemOutput, listSystemModules } from "./modules/module-calls";
 
 test("every system tool a module or the owner can call declares its output (v2-25)", () => {
   registerSystemModules();

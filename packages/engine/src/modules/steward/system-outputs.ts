@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { moduleHealthSummarySchema } from "./module-diagnostics";
+import { moduleHealthSummarySchema } from "./modules/module-diagnostics";
 import { appSchema, approvalSchema, providerRunViewSchema, healthSchema, APPROVAL_STATUSES, routedTargetSchema } from "@chrona/contracts/steward";
 
 export const runtimeOutput = healthSchema.extend({ at: z.string().datetime() });

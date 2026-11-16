@@ -205,11 +205,11 @@ it.each(["fresh", "local", "outdated", "unfetched", "missing", "invalid", "inact
   ensureSqliteDatabase({ databaseUrl: `file:${databasePath}`, migrationsDir: join(import.meta.dir, "../../../prisma/migrations") });
   const { PrismaClient } = await import("@chrona/db/generated/prisma/client");
   const { PrismaBunSqlite } = await import("prisma-adapter-bun-sqlite");
-  const { seedTestModuleRelease } = await import("../../engine/src/modules/steward/module-release-test-fixture");
-  const { testModuleSandbox } = await import("../../engine/src/modules/steward/module-test-process");
-  const { createExternalModuleInstaller, installExternal, externalPackageCatalog, refreshInstallationReceipts } = await import("../../engine/src/modules/steward/module-install");
-  const { buildPending } = await import("../../engine/src/modules/steward/module-build");
-  const { moduleContext } = await import("../../engine/src/modules/steward/module-context");
+  const { seedTestModuleRelease } = await import("../../engine/src/modules/steward/modules/module-release-test-fixture");
+  const { testModuleSandbox } = await import("../../engine/src/modules/steward/modules/module-test-process");
+  const { createExternalModuleInstaller, installExternal, externalPackageCatalog, refreshInstallationReceipts } = await import("../../engine/src/modules/steward/modules/module-install");
+  const { buildPending } = await import("../../engine/src/modules/steward/modules/module-build");
+  const { moduleContext } = await import("../../engine/src/modules/steward/modules/module-context");
   const db = new PrismaClient({ adapter: new PrismaBunSqlite({ url: `file:${databasePath}` }) });
   try {
     const workspaceId = "ws_default";
@@ -306,11 +306,11 @@ it("reports rejected updates and clears the error for the next candidate without
   ensureSqliteDatabase({ databaseUrl: `file:${databasePath}`, migrationsDir: join(import.meta.dir, "../../../prisma/migrations") });
   const { PrismaClient } = await import("@chrona/db/generated/prisma/client");
   const { PrismaBunSqlite } = await import("prisma-adapter-bun-sqlite");
-  const { seedTestModuleRelease } = await import("../../engine/src/modules/steward/module-release-test-fixture");
-  const { testModuleSandbox } = await import("../../engine/src/modules/steward/module-test-process");
-  const { createExternalModuleInstaller, installExternal, externalPackageCatalog, refreshInstallationReceipts } = await import("../../engine/src/modules/steward/module-install");
-  const { buildPending } = await import("../../engine/src/modules/steward/module-build");
-  const { moduleContext } = await import("../../engine/src/modules/steward/module-context");
+  const { seedTestModuleRelease } = await import("../../engine/src/modules/steward/modules/module-release-test-fixture");
+  const { testModuleSandbox } = await import("../../engine/src/modules/steward/modules/module-test-process");
+  const { createExternalModuleInstaller, installExternal, externalPackageCatalog, refreshInstallationReceipts } = await import("../../engine/src/modules/steward/modules/module-install");
+  const { buildPending } = await import("../../engine/src/modules/steward/modules/module-build");
+  const { moduleContext } = await import("../../engine/src/modules/steward/modules/module-context");
   const db = new PrismaClient({ adapter: new PrismaBunSqlite({ url: `file:${databasePath}` }) });
   try {
     const workspaceId = "ws_default";

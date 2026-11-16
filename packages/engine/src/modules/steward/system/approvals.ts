@@ -2,8 +2,8 @@ import { apiPage } from "../api-page";
 import { publicSystemTools } from "./tool-contract-declarations";
 import { APPROVAL_STATUSES } from "@chrona/contracts/steward";
 import { createApprovals, isModuleRequest } from "../approvals";
-import { createModules, isModuleApproval } from "../modules";
-import { AwaitUser, CallError, type Caller, type SystemModule } from "../module-calls";
+import { createModules, isModuleApproval } from "../modules/modules";
+import { AwaitUser, CallError, type Caller, type SystemModule } from "../modules/module-calls";
 import type { StewardPorts } from "../ports";
 import { entry, json, requireOwner } from "./shared";
 

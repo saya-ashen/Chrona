@@ -3,7 +3,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { RUN_LIMITS } from "@chrona/contracts/steward";
-import { createRuns } from "./runs";
+import { createRuns } from "./execution/runs";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
 let db: ReturnType<typeof testDb>, ports: StewardPorts, workspaceId: string, sessionId: string;

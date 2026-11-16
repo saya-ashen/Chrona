@@ -6,7 +6,7 @@ import { sqlitePathFromFileUrl } from "@chrona/db/sqlite-url";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 import { createSecrets, createStewardService, moduleSupervisor, refreshInstallationReceipts, type StewardPorts } from "@chrona/engine";
 import { getChronaDataDir } from "./start-server";
-import { createModuleRuntimePorts, resourcePath } from "../../integrations/src/steward/module-runtime";
+import { createModuleRuntimePorts, resourcePath } from "../../integrations/src/steward/runtime/module-runtime";
 import { moduleInstallRequestSchema, moduleVersionHashSchema } from "@chrona/contracts/steward";
 
 export type AdminCommand = "diagnostics" | "modules" | "catalog" | "install" | "rollback" | "disable" | "enable" | "remove" | "approvals" | "approve" | "reject";

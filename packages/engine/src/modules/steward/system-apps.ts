@@ -1,9 +1,9 @@
-import { moduleToolContract } from "./module-tool-contract";
+import { moduleToolContract } from "./modules/module-tool-contract";
 import { z } from "zod";
 import { moduleManifestSchema, moduleCapabilitiesSchema, moduleOriginSchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
-import { moduleCapabilities, moduleIdentity } from "./module-identity";
-import { CallError, listSystemModules, type SystemTool, type Tool } from "./module-calls";
+import { moduleCapabilities, moduleIdentity } from "./modules/module-identity";
+import { CallError, listSystemModules, type SystemTool, type Tool } from "./modules/module-calls";
 
 const interfaceToolSchema = z.object({ name: z.string(), description: z.string(), inputSchema: z.record(z.string(), z.json()), outputSchema: z.json().nullable(),
   examples: z.array(z.json()).nullable(), sideEffects: z.array(z.string()).nullable(), errors: z.array(z.object({ code: z.string(), description: z.string(), recovery: z.string() })).nullable(),

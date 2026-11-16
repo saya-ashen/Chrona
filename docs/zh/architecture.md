@@ -48,8 +48,8 @@ Mind 的组件和三类执行日志共用 `mind.sqlite`，执行预算与恢复�
 | `apps/server` | Bun/Hono HTTP、运行时 tick、Provider 桥、鉴权代理及救援入口 |
 | `packages/contracts/src/steward` | zod、工具与 wire 合同 |
 | `packages/domain/src/steward` | 无 I/O 的纯策略 |
-| `packages/engine/src/modules/steward` | kernel Agent API、Provider 登记；`external/` 仍暂存 13 个普通应用源码，尚未完成独立仓库剥离 |
-| `packages/integrations/src/steward`、`packages/pi` | 宿主、SDK、进程监管与 Pi Provider |
+| `packages/engine/src/modules/steward` | `agent/` 管通用 Agent 与 Provider 登记，`execution/` 管 Run 准入与交付，`modules/` 管应用材料、调用与生命周期；13 个应用由独立仓库维护，固定输入恢复到私有 `applications/` staging |
+| `packages/integrations/src/steward`、`packages/pi` | 宿主 `runtime/`、依赖安装 `packages/`、SDK 与类型检查资源，以及 Pi Provider |
 | `packages/db`、`packages/cli` | SQLite/Prisma、迁移与备份恢复、启动和诊断 |
 
 依赖方向：`apps → engine → domain → contracts`。页面由普通 Web 应用承载，共用 React runtime 与 UI 组件；Web 拥有外壳，业务应用拥有内容及设置。应用直接登记编译后的 React / TSX 页面，可信页面无浏览器沙箱。详见[Web 合同](web-components-and-shell.md)、[应用设置](application-settings.md)、[依赖方向](module-dependency-direction.md)。

@@ -3,10 +3,10 @@ import { cp, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { agentFixture } from "../../../../../scripts/agent-integration/agent-application.fixtures";
-import { callSync, kernelOrigin } from "./module-calls";
+import { callSync, kernelOrigin } from "./modules/module-calls";
 import { createQqConversations } from "./applications/qq/conversations";
 import { createRelay } from "./applications/qq/relay";
-import { contextRunImages } from "./agent-context-read";
+import { contextRunImages } from "./agent/agent-context-read";
 import type { QqReplyItem } from "./applications/qq/bot";
 
 test("QQ owns attachment references, scoped contexts, quotes and delivery uncertainty across restarts", async () => {

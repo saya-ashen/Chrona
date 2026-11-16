@@ -7,11 +7,11 @@ import { testDb } from "./test-db";
 import webManifest from "./applications/web/module.json";
 import type { StewardPorts } from "./ports";
 import { readWorkspaceFile, FILE_MAX_BYTES } from "./workspace-files";
-import { readRunContent } from "./run-content";
-import { registerWorkspaceModule } from "./local-workspace";
-import { runtimeCall } from "./local-runtime";
+import { readRunContent } from "./execution/run-content";
+import { registerWorkspaceModule } from "./execution/local-workspace";
+import { runtimeCall } from "./execution/local-runtime";
 import { createAttachments } from "./applications/web/attachments";
-import { contextRunImages } from "./agent-context-read";
+import { contextRunImages } from "./agent/agent-context-read";
 
 async function fixture() {
   const db = testDb(), root = await mkdtemp(join(tmpdir(), "chrona-file-ownership-"));

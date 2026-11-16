@@ -4,7 +4,7 @@ import { z } from "zod";
 import { chronaToolInputSchemas, moduleManifestSchema } from "@chrona/contracts/steward";
 import { moduleWireMessageSchema, moduleWireTransport } from "../packages/contracts/src/steward/module-wire";
 import { publicSystemTools } from "../packages/engine/src/modules/steward/system/tool-contract-declarations";
-import { normalizedToolInputSchema } from "../packages/engine/src/modules/steward/module-tool-input";
+import { normalizedToolInputSchema } from "../packages/engine/src/modules/steward/modules/module-tool-input";
 
 export const contractSchemasDirectory = resolve(import.meta.dirname, "../packages/contracts/schemas");
 

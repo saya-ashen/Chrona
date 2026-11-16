@@ -1,10 +1,10 @@
-import "./module-effects";
+import "./modules/module-effects";
 import { cp, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";
-import { seedTestModuleRelease } from "./module-release-test-fixture";
-import { resolveBuiltinRelease } from "./module-release";
-import { moduleSupervisor } from "./module-supervisor";
+import { createScriptSandbox } from "../../../../integrations/src/steward/runtime/script-sandbox";
+import { seedTestModuleRelease } from "./modules/module-release-test-fixture";
+import { resolveBuiltinRelease } from "./modules/module-release";
+import { moduleSupervisor } from "./modules/module-supervisor";
 import type { StewardPorts } from "./ports";
 
 /** Real notify SDK process for callers that compose activity through routed calls. */

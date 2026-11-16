@@ -6,13 +6,13 @@ import { tmpdir } from "node:os";
 import { moduleManifestSchema, type AgentProviderRegistration } from "@chrona/contracts/steward";
 import { createAgentConversations } from "./conversations";
 import { agent } from "../system/agent";
-import { registerAgentProvider } from "../agent-provider";
-import { moduleSupervisor } from "../module-supervisor";
-import { testModuleProcess } from "../module-test-process";
+import { registerAgentProvider } from "../agent/agent-provider";
+import { moduleSupervisor } from "../modules/module-supervisor";
+import { testModuleProcess } from "../modules/module-test-process";
 import { testDb } from "../test-db";
 import { registerSystemModules } from "../system-modules";
 import type { StewardPorts } from "../ports";
-import "../module-effects";
+import "../modules/module-effects";
 
 // Exercise the real durable Run view and Provider transcript path, without launching a model.
 test("a confirmed failed Run survives a throwing Provider transcript read without replay or cursor mixing", async () => {

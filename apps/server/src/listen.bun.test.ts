@@ -5,7 +5,7 @@ import { isEntryModule, moduleManifestSchema } from "@chrona/contracts/steward";
 import { createServerApp } from "./app";
 import { createStewardRuntime } from "./steward-runtime";
 import { resetEnvCacheForTests } from "./config/env";
-import { createScriptSandbox } from "../../../packages/integrations/src/steward/script-sandbox";
+import { createScriptSandbox } from "../../../packages/integrations/src/steward/runtime/script-sandbox";
 import { db, resetTestDb, seedWorkspace } from "./__tests__/bun-test-helpers";
 
 let saved: string | undefined, dataDir: string, stop: (() => Promise<void>) | undefined;

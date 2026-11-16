@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { testDb } from "@chrona/engine/test-support";
 import { createStewardRuntime } from "./steward-runtime";
-import { stewardDataDir } from "../../../packages/integrations/src/steward/module-runtime";
+import { stewardDataDir } from "../../../packages/integrations/src/steward/runtime/module-runtime";
 test("released runtime never selects a test Provider from environment flags", async () => {
   const db = testDb({ injectedAgent: false }), dataDir = mkdtempSync(join(tmpdir(), "chrona-e2e-gate-"));
   const previousGate = process.env.CHRONA_E2E_TEST_ROUTES, previousAgent = process.env.CHRONA_STEWARD_AGENT;

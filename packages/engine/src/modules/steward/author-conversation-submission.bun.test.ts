@@ -7,10 +7,10 @@ import { ensureSqliteDatabase } from "@chrona/db/sqlite-migrations";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 import { moduleManifestSchema, type ModuleManifest } from "@chrona/contracts/steward";
 import { candidateReceiptSchema } from "../../../../contracts/src/steward/module-candidates";
-import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";
+import { createScriptSandbox } from "../../../../integrations/src/steward/runtime/script-sandbox";
 import runtimes from "../../../../integrations/src/steward/runtimes.json";
-import type { ModuleGitFile } from "./module-git";
-import { moduleContext, type BuildReport } from "./module-context";
+import type { ModuleGitFile } from "./modules/module-git";
+import { moduleContext, type BuildReport } from "./modules/module-context";
 import type { StewardPorts } from "./ports";
 
 const selected = ["modules.list", "modules.admit", "modules.submit", "approvals.resolve", "author.prepare", "author.source", "author.write", "author.submit", "author.receipt"];
@@ -62,9 +62,9 @@ test("current approved owner conversation routes SDK Author material into checke
     const sharedDatabases = await shared.db.$queryRawUnsafe<{ name: string; file: string }[]>("PRAGMA database_list");
     if (sharedDatabases.find(item => item.name === "main")?.file === join(root, "test.db")) importedDatabase = shared.db;
     const [{ admitContextPrimitive }, { callContextTool, contextRunTools, selectContextTools }, { readCandidateAdmissionIn, readCandidateSetIn }, { checkoutModule, snapshotModule }, { commitModuleSource }, { moduleSupervisor }, { createModules }, { registerLocalRuntime }, { registerSystemModules }, { createRuns }] = await Promise.all([
-      import("./agent-context"), import("./agent-context-tools"), import("./module-candidate-records"), import("./module-files"), import("./module-git"), import("./module-supervisor"), import("./modules"), import("./local-runtime"), import("./system-modules"), import("./runs"),
+      import("./agent/agent-context"), import("./agent/agent-context-tools"), import("./modules/module-candidate-records"), import("./modules/module-files"), import("./modules/module-git"), import("./modules/module-supervisor"), import("./modules/modules"), import("./execution/local-runtime"), import("./system-modules"), import("./execution/runs"),
     ]);
-    await import("./module-effects");
+    await import("./modules/module-effects");
     ensureSqliteDatabase({ databaseUrl: process.env.DATABASE_URL, migrationsDir: resolve(import.meta.dir, "../../../../../prisma/migrations") });
     db = new PrismaClient({ adapter: new PrismaBunSqlite({ url: databaseUrl }) });
     const databases = await db.$queryRawUnsafe<{ name: string; file: string }[]>("PRAGMA database_list");

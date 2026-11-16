@@ -5,10 +5,10 @@ import { join, resolve } from "node:path";
 import { PrismaClient } from "@chrona/db/generated/prisma/client";
 import { ensureSqliteDatabase } from "@chrona/db/sqlite-migrations";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
-import { AwaitUser, CallError, callStatus, callSync, enqueueCall, kernelOrigin, registerSystemModule, runDueCalls, settleWaiting, type SystemModule } from "./module-calls";
+import { AwaitUser, CallError, callStatus, callSync, enqueueCall, kernelOrigin, registerSystemModule, runDueCalls, settleWaiting, type SystemModule } from "./modules/module-calls";
 import { StewardError } from "./errors";
 import { settings } from "./system/settings";
-import { systemModules } from "./module-registry";
+import { systemModules } from "./modules/module-registry";
 import type { StewardPorts } from "./ports";
 
 const cleanup: (() => Promise<unknown>)[] = [];

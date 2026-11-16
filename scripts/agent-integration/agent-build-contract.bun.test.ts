@@ -3,7 +3,7 @@ import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema, runtimeStartSchema } from "@chrona/contracts/steward";
 import { buildPiApplication, parameters } from "../../packages/engine/src/modules/steward/applications/pi/build";
-import { validateToolArgs } from "../../packages/engine/src/modules/steward/module-tool-contract";
+import { validateToolArgs } from "../../packages/engine/src/modules/steward/modules/module-tool-contract";
 
 test("built external Pi exposes structured kernel endpoints and owner configuration", async () => {
   const root = await mkdtemp("/tmp/chrona-pi-build-contract-");

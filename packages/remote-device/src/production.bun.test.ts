@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { moduleManifestSchema, kernelCleanupReceiptSchema, executionSignedStopSchema, type KernelExecutionStart } from "@chrona/contracts/steward";
 import { createExecutionDelivery, kernelExecutionCleanup } from "@chrona/engine";
 import { testDb } from "@chrona/engine/test-support";
-import { registerLocalModule } from "../../engine/src/modules/steward/module-registry";
+import { registerLocalModule } from "../../engine/src/modules/steward/modules/module-registry";
 import { createServerApp } from "../../../apps/server/src/app";
 import { createStewardRuntime } from "../../../apps/server/src/steward-runtime";
 import { resetEnvCacheForTests } from "../../../apps/server/src/config/env";

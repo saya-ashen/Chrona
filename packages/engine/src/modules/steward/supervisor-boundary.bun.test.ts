@@ -1,11 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
-import "./module-effects";
+import "./modules/module-effects";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema, RUN_LIMITS, type ModuleEvent } from "@chrona/contracts/steward";
-import { PAUSED_MODULE_NAMES } from "./module-availability";
-import { createModuleSupervisor } from "./module-supervisor";
-import { testModuleProcess } from "./module-test-process";
+import { PAUSED_MODULE_NAMES } from "./modules/module-availability";
+import { createModuleSupervisor } from "./modules/module-supervisor";
+import { testModuleProcess } from "./modules/module-test-process";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
 

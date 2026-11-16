@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { pageInput } from "@chrona/contracts/steward";
-import { CallError } from "./module-call-error";
+import { CallError } from "./modules/module-call-error";
 
 /** Stable identity ordering; cursors are scoped positions, never authorization. */
 export function pagePosition(raw: unknown, scope: string) {

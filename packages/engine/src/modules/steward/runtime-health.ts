@@ -2,7 +2,7 @@ import type { Health } from "@chrona/contracts/steward";
 import { localDayKey } from "@chrona/domain/steward/local-day";
 import type { StewardPorts } from "./ports";
 import { budgetTimezone } from "./settings";
-import { listAgentProviders } from "./agent-provider";
+import { listAgentProviders } from "./agent/agent-provider";
 
 /** Facts owned by the runtime; application health and page composition stay with modules. */
 export async function runtimeHealth(ports: StewardPorts, workspaceId: string) {

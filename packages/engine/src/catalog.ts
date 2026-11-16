@@ -1,1 +1,1 @@
-export { externalPackageCatalog } from "./modules/steward/module-install";
+export { externalPackageCatalog } from "./modules/steward/modules/module-install";

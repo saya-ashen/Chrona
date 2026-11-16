@@ -1,5 +1,5 @@
-import type { Tool } from "../module-call-types";
-import type { SystemTool } from "../module-system-tool-types";
+import type { Tool } from "../modules/module-call-types";
+import type { SystemTool } from "../modules/module-system-tool-types";
 
 type Properties = Tool["parameters"]["properties"];
 export const tool = (name: string, description: string, properties: Properties, required: string[], extra: Partial<SystemTool> = {}): SystemTool =>

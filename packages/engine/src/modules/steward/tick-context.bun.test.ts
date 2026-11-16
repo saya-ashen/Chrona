@@ -1,16 +1,16 @@
 import { testProviderPorts } from "./test-provider";
 import { afterEach, expect, test } from "bun:test";
-import "./module-effects";
+import "./modules/module-effects";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ProviderRunInput } from "@chrona/contracts/steward";
-import { callSync, kernelOrigin } from "./module-calls";
-import { testModuleSandbox } from "./module-test-process";
-import { moduleSupervisor } from "./module-supervisor";
+import { callSync, kernelOrigin } from "./modules/module-calls";
+import { testModuleSandbox } from "./modules/module-test-process";
+import { moduleSupervisor } from "./modules/module-supervisor";
 import { createTick } from "./tick";
-import { createRuns, createRunSession } from "./runs";
+import { createRuns, createRunSession } from "./execution/runs";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
 

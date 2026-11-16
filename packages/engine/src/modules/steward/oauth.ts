@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { audit } from "./audit";
-import { CallError } from "./module-calls";
+import { CallError } from "./modules/module-calls";
 import { createSecrets } from "./secrets";
 import type { StewardPorts } from "./ports";
 import { resolveOAuthDefinition, type ApprovedOAuth } from "./oauth-definition";

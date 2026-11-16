@@ -1,7 +1,7 @@
 import { apiPage } from "../api-page";
 import { publicSystemTools } from "./tool-contract-declarations";
 import { secretNames, moduleManifestSchema, type ModuleManifest } from "@chrona/contracts/steward";
-import { CallError, type Caller, type SystemModule } from "../module-calls";
+import { CallError, type Caller, type SystemModule } from "../modules/module-calls";
 import { createSecrets } from "../secrets";
 import { authorizeOAuth, hiddenField, locked, oauthToken } from "../oauth";
 import { resolveOAuthDefinition } from "../oauth-definition";
@@ -9,7 +9,7 @@ import { kernelField } from "../secret-fields";
 import { audit } from "../audit";
 import type { StewardPorts } from "../ports";
 import { entry, json, requireOwner } from "./shared";
-import { isOwnerCaller } from "../module-owner";
+import { isOwnerCaller } from "../modules/module-owner";
 
 /**
  * `secrets` (v2-10, v2-16): `get` reads a credential the calling module lists in `secrets`; checked owners

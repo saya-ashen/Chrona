@@ -2,17 +2,17 @@ import { join } from "node:path";
 import { kernelAgentInputs, providerNativeOutput, runtimeTranscriptSchema } from "@chrona/contracts/steward";
 import type { Prisma } from "@chrona/db";
 import { publicSystemTools } from "./tool-contract-declarations";
-import type { SystemModule } from "../module-system-types";
-import { CallError } from "../module-call-error";
+import type { SystemModule } from "../modules/module-system-types";
+import { CallError } from "../modules/module-call-error";
 import { json } from "./shared";
-import { assertApprovedAgentPrincipal } from "../agent-context-admission";
-import { admitContextPrimitive, ownedRun, view, type ModulePrincipal } from "../agent-context";
-import { assertAgentInterruptPrincipal } from "../agent-context-admission";
-import { contextInteractions } from "../agent-context-read";
-import { callProviderEndpoint, listAgentProviders, registerAgentProvider, runProviderBinding, providerSnapshot } from "../agent-provider";
-import { maskProviderPayload } from "../agent-provider-redaction";
-import { liveRuns } from "../runs";
-import { finishRunFromProviderStatus } from "../agent-provider-finalization";
+import { assertApprovedAgentPrincipal } from "../agent/agent-context-admission";
+import { admitContextPrimitive, ownedRun, view, type ModulePrincipal } from "../agent/agent-context";
+import { assertAgentInterruptPrincipal } from "../agent/agent-context-admission";
+import { contextInteractions } from "../agent/agent-context-read";
+import { callProviderEndpoint, listAgentProviders, registerAgentProvider, runProviderBinding, providerSnapshot } from "../agent/agent-provider";
+import { maskProviderPayload } from "../agent/agent-provider-redaction";
+import { liveRuns } from "../execution/runs";
+import { finishRunFromProviderStatus } from "../agent/agent-provider-finalization";
 import type { StewardPorts } from "../ports";
 
 function cursorSequence(cursor: string | undefined, runId: string, kind: string) {

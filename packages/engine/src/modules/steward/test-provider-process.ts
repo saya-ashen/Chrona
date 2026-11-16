@@ -3,8 +3,8 @@ import { basename } from "node:path";
 import { z } from "zod";
 import { moduleManifestSchema, runtimeStartSchema, runtimeOperationSchema, runtimeOutcomeSchema, runtimeHealthSchema, runtimeTranscriptSchema, runtimeCompletionSchema, providerAnswerSchema, THINKING_LEVELS, type ModuleTool, type ProviderAdapter, type ProviderRunInput, type RuntimeEvent } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
-import { CallError } from "./module-calls";
-import { testModuleProcess } from "./module-test-process";
+import { CallError } from "./modules/module-calls";
+import { testModuleProcess } from "./modules/module-test-process";
 
 type Outcome = Awaited<ReturnType<ProviderAdapter["start"]>["done"]>;
 type Operation = { digest: string; handle: ReturnType<ProviderAdapter["start"]>; outcome?: Outcome; failure?: boolean };

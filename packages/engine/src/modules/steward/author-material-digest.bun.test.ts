@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { createHash } from 'node:crypto';
-import { moduleMaterialDigest } from './module-artifacts';
+import { moduleMaterialDigest } from './modules/module-artifacts';
 import { packageMaterial } from './applications/author/distribution';
 import { materialSummary, type MaterialFile } from './applications/author/material';
 

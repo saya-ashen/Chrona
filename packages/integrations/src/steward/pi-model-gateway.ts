@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import type { PiProviderOptions } from "@chrona/pi";
-import { executionMode, resourcePath, stewardDataDir, processHelperPath } from "./module-runtime";
+import { executionMode, resourcePath, stewardDataDir, processHelperPath } from "./runtime/module-runtime";
 
 export type PiHostOptions = { port: number; dataDir?: string };
 

@@ -1,12 +1,12 @@
 import { afterEach, expect, test } from "bun:test";
-import "./module-effects";
+import "./modules/module-effects";
 import { mkdtemp, rm } from "node:fs/promises";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { testDb } from "./test-db";
 import { registerSystemModules } from "./system-modules";
-import { callSync, kernelOrigin } from "./module-calls";
-import { testModuleProcess } from "./module-test-process";
-import { moduleSupervisor } from "./module-supervisor";
+import { callSync, kernelOrigin } from "./modules/module-calls";
+import { testModuleProcess } from "./modules/module-test-process";
+import { moduleSupervisor } from "./modules/module-supervisor";
 import { drainTimers } from "./timers";
 import type { StewardPorts } from "./ports";
 import type { Prisma } from "@chrona/db";

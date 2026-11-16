@@ -2,9 +2,9 @@
 import { readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { StewardPorts } from "./ports";
-import { moduleContext } from "./module-context";
-import { versionMaterialRestorable } from "./module-source";
-import { moduleSupervisor } from "./module-supervisor";
+import { moduleContext } from "./modules/module-context";
+import { versionMaterialRestorable } from "./modules/module-source";
+import { moduleSupervisor } from "./modules/module-supervisor";
 
 const DAY_MS = 24 * 3600_000;
 const GRACE_MS = 7 * DAY_MS;

@@ -3,7 +3,7 @@ import { chmod, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
-import { callSync, registerSystemModule, type Caller } from "./module-calls";
+import { callSync, registerSystemModule, type Caller } from "./modules/module-calls";
 import type { StewardPorts } from "./ports";
 import { createSecrets } from "./secrets";
 import { secrets } from "./system/secrets";

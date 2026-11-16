@@ -7,10 +7,10 @@ import { audit } from "./audit";
 import { recordApprovalFact, recordWithdrawal } from "./notification-facts";
 import { parseInput, StewardError } from "./errors";
 import { toApproval } from "./store";
-import { assertDynamicModuleActivation, groupPayloadSchema, isGroupPayload } from "./module-context";
-import { assertExternalModule } from "./module-identity";
-import { moduleRemovePayloadSchema } from "./module-remove-payload";
-import { drainCalls, settleWaiting } from "./module-calls";
+import { assertDynamicModuleActivation, groupPayloadSchema, isGroupPayload } from "./modules/module-context";
+import { assertExternalModule } from "./modules/module-identity";
+import { moduleRemovePayloadSchema } from "./modules/module-remove-payload";
+import { drainCalls, settleWaiting } from "./modules/module-calls";
 const inputSchema = approvalSchema.pick({ action: true, title: true, detail: true, preview: true }).extend({ moduleId: z.string().min(1).optional(), payload: z.json() }).strict();
 /** Module activation must still pass its current identity and payload guards. */
 async function approve(tx: Prisma.TransactionClient, workspaceId: string, row: Parameters<typeof toApproval>[0]) {

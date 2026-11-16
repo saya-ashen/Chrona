@@ -6,7 +6,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { createServerApp } from "../../../../../apps/server/src/app";
 import { createStewardRuntime } from "../../../../../apps/server/src/steward-runtime";
-import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";
+import { createScriptSandbox } from "../../../../integrations/src/steward/runtime/script-sandbox";
 import { testDb } from "./test-db";
 
 /** Real Hono/native-tool auth, router, supervisor, SDK and private content; only the Run is fake. */

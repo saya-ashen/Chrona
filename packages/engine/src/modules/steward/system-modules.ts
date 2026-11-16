@@ -1,6 +1,6 @@
 import { timers } from "./system/timers";
 import { agent } from "./system/agent";
-import { registerSystemModule } from "./module-calls";
+import { registerSystemModule } from "./modules/module-calls";
 import { approvals } from "./system/approvals";
 import { modules } from "./system/modules";
 import { settings } from "./system/settings";

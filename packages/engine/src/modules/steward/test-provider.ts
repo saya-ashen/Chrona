@@ -2,11 +2,11 @@ import { randomUUID } from "node:crypto";
 import { basename } from "node:path";
 import type { AgentProviderRegistration } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
-import { callSync, kernelOrigin } from "./module-calls";
+import { callSync, kernelOrigin } from "./modules/module-calls";
 import { testProviderManifest, testProviderProcess } from "./test-provider-process";
-import { registerLocalRuntime } from "./local-runtime";
+import { registerLocalRuntime } from "./execution/local-runtime";
 import { registerSystemModules } from "./system-modules";
-import "./module-effects";
+import "./modules/module-effects";
 
 type Fixture = { ports?: StewardPorts; install(workspaceId: string): Promise<void> };
 const fixtures = new WeakMap<StewardPorts["db"], Fixture>();

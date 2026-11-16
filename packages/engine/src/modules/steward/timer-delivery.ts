@@ -3,8 +3,8 @@ import { z } from "zod";
 import { timerScheduleSchema, wakeBudgetSchema } from "@chrona/contracts/steward";
 import type { Prisma } from "@chrona/db";
 import type { StewardPorts } from "./ports";
-import { CallError } from "./module-call-error";
-import { isModulePaused } from "./module-availability";
+import { CallError } from "./modules/module-call-error";
+import { isModulePaused } from "./modules/module-availability";
 import { budgetTimezone } from "./settings";
 import { localDayKey } from "@chrona/domain/steward/local-day";
 

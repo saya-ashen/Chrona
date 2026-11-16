@@ -3,10 +3,10 @@ import { z } from "zod";
 import { moduleManifestSchema, timerSetInput, wakeBudgetSchema, type ModuleEvent } from "@chrona/contracts/steward";
 import { Prisma } from "@chrona/db/generated/prisma/client";
 import type { StewardPorts } from "./ports";
-import type { Caller } from "./module-call-types";
-import { CallError } from "./module-call-error";
-import { moduleSupervisor } from "./module-supervisor";
-import { isModulePaused } from "./module-availability";
+import type { Caller } from "./modules/module-call-types";
+import { CallError } from "./modules/module-call-error";
+import { moduleSupervisor } from "./modules/module-supervisor";
+import { isModulePaused } from "./modules/module-availability";
 import { withTimerLock } from "./timer-lock";
 import { apiPage } from "./api-page";
 

@@ -1,7 +1,7 @@
-import type { VerifiedExecutionStop } from "./execution-delivery-stop-types";
+import type { VerifiedExecutionStop } from "./execution/execution-delivery-stop-types";
 import type { Prisma, PrismaClient } from "@chrona/db";
 import type { ProviderAdapter, ExecutionPrincipal, ExecutionRef, ExecutionSnapshot, ExecutionControl, ExecutionEventStore, ExecutionPorts, ExecutionProjectGrant, ModuleEntry } from "@chrona/contracts/steward";
-import type { ExternalModuleInstaller } from "./module-install-types";
+import type { ExternalModuleInstaller } from "./modules/module-install-types";
 import type { LocalExecutionProjectGrant, WorkPlacement, ExecutionStartV2 } from "@chrona/contracts/steward";
 
 export type ExecutionV2Admission = {

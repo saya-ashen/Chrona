@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { BUILTIN_MODULE_NAMES, moduleManifestSchema, type ModuleManifest } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
-import { handleModuleCall } from "./module-effects";
+import { handleModuleCall } from "./modules/module-effects";
 import type { QqReplyItem } from "./applications/qq/bot";
 
 /** Tests: an active shipped entry with its real manifest; `call` routes as its socket would. */

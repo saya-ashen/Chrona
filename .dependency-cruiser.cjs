@@ -40,7 +40,7 @@ module.exports = {
         "Kernel steward files, system modules and server code use shared contracts; they cannot import any Agent implementation, type, manifest or test fixture.",
       severity: "error",
       from: {
-        path: "^(packages/engine/src/modules/steward/([^/]+\\.ts$|system/)|apps/server/)",
+        path: "^(packages/engine/src/modules/steward/([^/]+\\.ts$|system/|agent/|execution/|modules/)|apps/server/)",
       },
       to: { path: AGENT },
     },

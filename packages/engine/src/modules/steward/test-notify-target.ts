@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import notifyManifest from "./applications/notify/module.json";
 import type { StewardPorts } from "./ports";
-import { testModuleProcess } from "./module-test-process";
+import { testModuleProcess } from "./modules/module-test-process";
 
 /** An ordinary approved target for routing tests; notification policy belongs to Notify's own tests. */
 export async function installNotifyTarget(ports: StewardPorts, workspaceId: string, mockDelivery = false) {

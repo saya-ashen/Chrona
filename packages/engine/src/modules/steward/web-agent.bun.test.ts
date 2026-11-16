@@ -5,11 +5,11 @@ import { join } from "node:path";
 import { moduleManifestSchema, type RoutedTarget } from "@chrona/contracts/steward";
 import bridge from "../../../../pi/resources/chrona-tools";
 import { agentFixture } from "../../../../../scripts/agent-integration/agent-application.fixtures";
-import { callSync, kernelOrigin } from "./module-calls";
+import { callSync, kernelOrigin } from "./modules/module-calls";
 import { createAgentConversations } from "./applications/web/agent-conversations";
-import { createRuns } from "./runs";
+import { createRuns } from "./execution/runs";
 import { createTools } from "./tools";
-import { moduleToolCatalog } from "./module-tools";
+import { moduleToolCatalog } from "./modules/module-tools";
 
 test("attachment ownership uses the complete private journal, not the recent message window", async () => {
   const dataDir = await mkdtemp("/tmp/chrona-journal-attachment-");

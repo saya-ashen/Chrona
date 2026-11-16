@@ -1,15 +1,15 @@
 import type { StewardPorts } from "./ports";
 import { createApprovals } from "./approvals";
-import { createModules, isModuleApproval } from "./modules";
+import { createModules, isModuleApproval } from "./modules/modules";
 import { createTools } from "./tools";
 import { createSettings } from "./settings";
-import { createRuns } from "./runs";
+import { createRuns } from "./execution/runs";
 import { createTick } from "./tick";
-import { createProviderControl } from "./provider-channel";
+import { createProviderControl } from "./agent/provider-channel";
 import { registerSystemModules } from "./system-modules";
-import { registerLocalRuntime } from "./local-runtime";
+import { registerLocalRuntime } from "./execution/local-runtime";
 // Registers what modules' own calls do with the supervisor (see module-supervisor).
-import "./module-effects";
+import "./modules/module-effects";
 /** Authenticated owner boundary. */
 export function createStewardService(inputPorts: StewardPorts) {
   registerSystemModules();

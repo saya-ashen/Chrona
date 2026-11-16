@@ -31,6 +31,7 @@ function fixture() {
   symlinkSync(resolve("node_modules"), join(root, "node_modules"), "dir");
   writeFileSync(join(root, "eslint.config.mjs"), 'export default [{files:["**/*.js"],rules:{"no-undef":"error"}}];');
   cpSync(resolve("scripts/lint-ratchet.ts"), join(root, "scripts/lint-ratchet.ts"));
+  cpSync(resolve("scripts/lint-path-renames.json"), join(root, "scripts/lint-path-renames.json"));
   cpSync(resolve("scripts/application-git-inputs.ts"), join(root, "scripts/application-git-inputs.ts"));
   cpSync(resolve("scripts/check-guardrails.ts"), join(root, "scripts/check-guardrails.ts"));
   cpSync(resolve("scripts/module-git-release.ts"), join(root, "scripts/module-git-release.ts"));

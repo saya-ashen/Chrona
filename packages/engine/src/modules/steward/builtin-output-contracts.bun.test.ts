@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BUILTIN_MODULE_NAMES, OFFICIAL_EXTERNAL_MODULE_NAMES, compileModuleOutput, moduleOutputSchema, moduleManifestSchema, type ModuleTool } from "@chrona/contracts/steward";
-import { isModulePaused } from "./module-availability";
+import { isModulePaused } from "./modules/module-availability";
 import { createFiles } from "./applications/files/files";
 import { createEvents, type Caller } from "./applications/events/events";
 import { createNotify, type Caller as NotifyCaller } from "./applications/notify/notify";

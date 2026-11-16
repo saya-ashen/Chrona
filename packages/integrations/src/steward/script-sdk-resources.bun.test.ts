@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { createScriptSandbox } from "./script-sandbox";
+import { createScriptSandbox } from "./runtime/script-sandbox";
 import { createModuleChannel } from "@chrona/engine";
 
 async function releaseResources(root: string) {

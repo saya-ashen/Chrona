@@ -2,12 +2,12 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { testDb } from "./test-db";
-import { handleModuleCall } from "./module-effects";
+import { handleModuleCall } from "./modules/module-effects";
 import { completeOAuth, resetOAuth } from "./oauth";
 import { addsOAuthDefinitions, oauthDefinitionIdentity, type OAuthDefinition } from "./oauth-definition";
 import { createSecrets } from "./secrets";
 import { secretView } from "./secret-fields";
-import { registerSystemModule } from "./module-calls";
+import { registerSystemModule } from "./modules/module-calls";
 import { secrets } from "./system/secrets";
 import type { StewardPorts } from "./ports";
 

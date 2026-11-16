@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { moduleManifestSchema, type ModuleManifest, type SecretSpec } from "@chrona/contracts/steward";
-import { CallError } from "./module-call-error";
+import { CallError } from "./modules/module-call-error";
 import type { StewardPorts } from "./ports";
 
 export type OAuthDefinition = {

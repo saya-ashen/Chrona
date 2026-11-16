@@ -2,8 +2,8 @@ import { afterEach, expect, spyOn, test } from "bun:test";
 import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { collectStore } from "./store-gc";
-import { moduleSupervisor } from "./module-supervisor";
-import { commitModuleSource } from "./module-git";
+import { moduleSupervisor } from "./modules/module-supervisor";
+import { commitModuleSource } from "./modules/module-git";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
 

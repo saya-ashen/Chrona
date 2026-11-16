@@ -4,12 +4,12 @@ export { testDb } from "./modules/steward/test-db";
 export { createQqBotHandler, createQqBotState, type QqReplyItem } from "./modules/steward/applications/qq/bot";
 export { downloadQqAttachment, type QqC2cMessage } from "./modules/steward/applications/qq/official";
 export { createRelay, qqReplyText } from "./modules/steward/applications/qq/relay";
-export { callSync, callsSettled, runDueCalls } from "./modules/steward/module-calls";
+export { callSync, callsSettled, runDueCalls } from "./modules/steward/modules/module-calls";
 export { notices } from "./modules/steward/test-notices";
-export { handleModuleCall } from "./modules/steward/module-effects";
+export { handleModuleCall } from "./modules/steward/modules/module-effects";
 export { builtinEntry, qqEntry } from "./modules/steward/test-entry";
 
 export { createQqConversations } from "./modules/steward/applications/qq/conversations";
 
 export { agentFixture } from "../../../scripts/agent-integration/agent-application.fixtures";
-export { kernelOrigin } from "./modules/steward/module-calls";
+export { kernelOrigin } from "./modules/steward/modules/module-calls";

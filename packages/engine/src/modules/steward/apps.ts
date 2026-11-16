@@ -1,5 +1,5 @@
 import { appSchema, moduleManifestSchema } from "@chrona/contracts/steward";
-import { moduleIdentity } from "./module-identity";
+import { moduleIdentity } from "./modules/module-identity";
 import type { StewardPorts } from "./ports";
 
 export function createApps(ports: StewardPorts, workspaceId: string) {
