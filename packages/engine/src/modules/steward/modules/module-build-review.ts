@@ -1,3 +1,4 @@
+import { assertExactReleaseUpdateIn, ExactReleaseUpdateError } from "./module-exact-release";
 import { onApproved } from "./module-activation";
 import { assertExecutionModuleIdle } from "../execution/execution-module-guard";
 import { requiresCapabilityApproval } from "./module-owner";
@@ -75,12 +76,14 @@ function addsCredentials(version: ModuleVersion, active: ModuleVersion | null) {
 /** Checks passed and nothing needs the owner: activate now and tell them afterwards. */
 async function activateChecked(context: ModuleContext, { version, module }: Review, update: boolean, initialRelease = false) {
   const { hash } = version, manifest = moduleManifestSchema.parse(version.manifest);
-  await fenceExecutionVersionChange(context.ports, context.workspaceId, module.id, hash);
+  await fenceExecutionVersionChange(context.ports, context.workspaceId, module.id, hash,
+    (tx, current) => assertExactReleaseUpdateIn(context, tx, module.id, version.report as BuildReport, current));
   await context.db.$transaction(async tx => {
     if (await findCandidateSet({ ...context, db: tx as ModuleContext["db"] }, version)) throw new StewardError("conflict", "Fixed candidates activate only through their receipt");
     const candidate = await tx.moduleVersion.findUnique({ where: { id: version.id } });
     if (candidate?.status !== "pending_review") throw new StewardError("conflict", "Module candidate is no longer pending review");
     const current = await assertExternalModule(tx, context.workspaceId, module.id, "activate");
+    await assertExactReleaseUpdateIn(context, tx, module.id, candidate.report as BuildReport, current);
     if (current.status === "migrating" || current.activeHash !== module.activeHash || current.activationId !== module.activationId) throw new Error("Module changed during build; submit again");
     if (initialRelease && !await matchesInitialInstallation({ ...context, db: tx as ModuleContext["db"] }, version, current)) throw new StewardError("conflict", "Initial release installation changed before activation");
     await expireModuleApprovals(context, module.id, tx);
@@ -100,6 +103,7 @@ async function groupReview(context: ModuleContext, { version, module, report }: 
 }
 export async function requestReview(context: ModuleContext, review: Review): Promise<Proposal> {
   const { db } = context, { version, module, report } = review, { hash } = version;
+  await assertExactReleaseUpdateIn(context, db, module.id, report);
   const active = module.activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } }) : null;
   await assertExternalModule(db, context.workspaceId, module.id, "activate");
   const initialRelease = !active && addsCredentials(version, active) && await isTrustedInitialInstallation(context, version, module);
@@ -152,6 +156,7 @@ async function recoverReview(context: ModuleContext, version: ModuleVersion) {
     if (!set || set.state !== "submitted") return;
   }
   const module = await assertExternalModule(db, workspaceId, version.moduleId, "activate");
+  await assertExactReleaseUpdateIn(context, db, module.id, version.report as BuildReport, module);
   if (version.status !== "pending_review" || (!fixed && await isGroupCandidate(context, version))) return;
   const approvals = await db.approval.findMany({ where: { workspaceId, action: "activate_module" } });
   const covering = approvals.filter(row => row.moduleId === version.moduleId && approvalCoversVersion(row.payload, version));
@@ -195,7 +200,8 @@ export async function recoverReviews(context: ModuleContext) {
         if (version.status === "rejected") { await advanceFixedCandidateSet(context, version); continue; }
         await recoverReview(context, version);
       } catch (error) {
-        if (error instanceof ModuleIdentityError || error instanceof ModuleUnavailableError) {
+        if (error instanceof ModuleIdentityError || error instanceof ModuleUnavailableError || error instanceof ExactReleaseUpdateError) {
+          console.error(JSON.stringify({ component: "module-build", event: "review.rejected", versionId: version.id, error: error.message }));
           await db.moduleVersion.updateMany({ where: { id: version.id, status: "pending_review" }, data: { status: "rejected", report: json({ ...(version.report as BuildReport), errors: [error.message] }) } });
           await expireModuleApprovals(context, version.moduleId);
           continue;

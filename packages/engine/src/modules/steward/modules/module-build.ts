@@ -20,6 +20,7 @@ import { typecheckBuild, typecheckErrors } from "./module-typecheck";
 import { moduleOutputImpacts } from "./module-output-impact";
 import { moduleToolExampleError } from "./module-tool-contract";
 
+import { assertExactReleaseUpdateIn, ExactReleaseUpdateError } from "./module-exact-release";
 import { requestReview, recoverReviews, superseded } from "./module-build-review";
 
 async function stagingFiles(context: ModuleContext, version: ModuleVersion, report: BuildReport) {
@@ -149,10 +150,13 @@ async function finishBuild(input: { context: ModuleContext; module: Awaited<Retu
 }
 async function buildVersion(context: ModuleContext, version: ModuleVersion): Promise<Proposal> {
   const { db, platform } = context, { hash } = version;
-  const staging = join(platform, "staging", version.id), report: BuildReport = { tests: [], ...((version.report as BuildReport).git ? { git: (version.report as BuildReport).git } : {}) };
+  const staging = join(platform, "staging", version.id);
+  const { git, exactReleaseUpdate } = version.report as BuildReport;
+  const report: BuildReport = { tests: [], ...(git ? { git } : {}), ...(exactReleaseUpdate ? { exactReleaseUpdate } : {}) };
   assertBuildOwnership(context, staging);
   try {
     const module = await assertExternalModule(db, context.workspaceId, version.moduleId, "build");
+    await assertExactReleaseUpdateIn(context, db, module.id, report, module);
     const manifest = moduleManifestSchema.parse(version.manifest);
     intentSchema.parse(version.intent);
     const files = await stagingFiles(context, version, report);
@@ -208,9 +212,10 @@ export async function buildPending(context: ModuleContext, now = context.ports.n
     let result: Proposal, identityRejected = false;
     try { result = await buildVersion(context, version); }
     catch (error) {
-      if (!(error instanceof ModuleIdentityError || error instanceof ModuleUnavailableError)) throw error;
+      if (!(error instanceof ModuleIdentityError || error instanceof ModuleUnavailableError || error instanceof ExactReleaseUpdateError)) throw error;
       identityRejected = true;
-      const report: BuildReport = { tests: [], errors: [String(error).slice(0, 4000)] };
+      console.error(JSON.stringify({ component: "module-build", event: "candidate.rejected", versionId: version.id, error: error.message }));
+      const report: BuildReport = { ...(version.report as BuildReport), tests: [], errors: [String(error).slice(0, 4000)] };
       await db.moduleVersion.update({ where: { id: version.id }, data: { status: "rejected", report: json(report) } });
       result = { moduleId: version.moduleId, hash: version.hash, status: "rejected", report };
     }

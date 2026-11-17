@@ -9,6 +9,8 @@ import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 import { createStewardService } from "@chrona/engine";
 import { qqBindCode, removeSecret, runAdmin, setSecret } from "./admin";
 import { createProgram } from "./program";
+import { moduleContext } from "../../engine/src/modules/steward/modules/module-context";
+import { propose } from "../../engine/src/modules/steward/modules/module-proposal";
 import { seedTestModuleRelease } from "../../engine/src/modules/steward/modules/module-release-test-fixture";
 
 import { createQqBotState } from "../../engine/src/modules/steward/applications/qq/bot";
@@ -190,6 +192,35 @@ test("admin install queues trusted official code offline, preserves the lock and
     expect(log.mock.calls.some(call => String(call[0]).includes("Restart Chrona"))).toBe(true);
     await expect(runAdmin("install", ["../private", "install", "invalid"], f.options)).rejects.toThrow("Invalid");
     const released = acquireSqliteRuntimeLock(f.options.databaseUrl); released.release();
+  } finally {
+    if (previous === undefined) delete process.env.CHRONA_RESOURCE_DIR; else process.env.CHRONA_RESOURCE_DIR = previous;
+    log.mockRestore();
+  }
+});
+
+test("admin exact release requires update, takes the runtime lock and queues only the host-pinned commit", async () => {
+  await expect(createProgram().parseAsync(["admin", "install", "pi", "--exact-release", "--request-key", "invalid"], { from: "user" })).rejects.toThrow("requires --update");
+  const f = await fixture(), log = spyOn(console, "log").mockImplementation(() => {});
+  const previous = process.env.CHRONA_RESOURCE_DIR;
+  const root = await offlineResources(f.options.dataDir, "author");
+  process.env.CHRONA_RESOURCE_DIR = root;
+  try {
+    const context = moduleContext({ db: f.db, dataDir: f.options.dataDir, publicUrl: null, now: () => new Date() }, "ws_default");
+    const local = await propose(context, { root: join(root, "external"), dir: "author", intent: { changes: ["Owner source submission"] } }, "user");
+    await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: local.moduleId!, hash: local.hash } }, data: { status: "approved" } });
+    await f.db.module.update({ where: { id: local.moduleId! }, data: { activeHash: local.hash, dataSchema: 1 } });
+    const args = ["author", "update", "exact-cli", "exact-release"];
+    const lock = acquireSqliteRuntimeLock(f.options.databaseUrl);
+    try { await expect(runAdmin("install", args, f.options)).rejects.toThrow("already in use"); } finally { lock.release(); }
+    const lockFile = JSON.parse(readFileSync(join(root, "module-git/lock.json"), "utf8"));
+    const hash = lockFile.modules.find((entry: { name: string }) => entry.name === "author").commit;
+    expect(hash).not.toBe(local.hash);
+    const queued = await runAdmin("install", args, f.options);
+    expect(queued).toMatchObject({ status: "building", hash, moduleId: local.moduleId });
+    expect(await runAdmin("install", args, f.options)).toEqual(queued);
+    expect((await f.db.module.findUniqueOrThrow({ where: { id: local.moduleId! } })).activeHash).toBe(local.hash);
+    await expect(runAdmin("install", ["author", "update", "exact-cli"], f.options)).rejects.toMatchObject({ code: "conflict" });
+    await expect(runAdmin("install", ["author", "update", "forged", "arbitrary-commit"], f.options)).rejects.toThrow("Invalid install selection");
   } finally {
     if (previous === undefined) delete process.env.CHRONA_RESOURCE_DIR; else process.env.CHRONA_RESOURCE_DIR = previous;
     log.mockRestore();

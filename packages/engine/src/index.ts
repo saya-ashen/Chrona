@@ -12,7 +12,7 @@ export type { WorkspaceCleanupHost } from "./modules/steward/execution/execution
 export { resolveExecutionPrincipal } from "./modules/steward/execution/execution-principal";
 export { canonicalExecutionFinalDisplay, assertCanonicalExecutionFinalDisplay } from "./modules/steward/execution/execution-events";
 export { captureWorkspaceChanges } from "./modules/steward/execution/execution-result";
-export { createExternalModuleInstaller, refreshInstallationReceipts } from "./modules/steward/modules/module-install";
+export { createExternalModuleInstaller, installExactRelease, refreshInstallationReceipts } from "./modules/steward/modules/module-install";
 export { createExecutionEventStore } from "./modules/steward/execution/execution-event-store";
 export { callSync, enqueueCall } from "./modules/steward/modules/module-calls";
 export type { StewardPorts, StewardService, ApprovedAction, OnApproved } from "./modules/steward";

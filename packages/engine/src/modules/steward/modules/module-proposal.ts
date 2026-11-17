@@ -11,17 +11,20 @@ import type { ModuleFile } from "./module-files";
 import { versionSource } from "./module-source";
 import { adoptModuleGitCandidate, commitModuleSource, getModuleLocalHead, readModuleSource } from "./module-git";
 import { importModuleGitBundle } from "./module-git-upstream";
+import { assertExactReleaseUpdateIn, assertExactReleaseCandidate } from "./module-exact-release";
+import type { ExactReleaseBaseline } from "./module-install-types";
 import { assertExternalModule, assertExternalName } from "./module-identity";
 
 type Manifest = z.output<typeof moduleManifestSchema>;
 type ProposalInput = { dir: string; intent: z.input<typeof intentSchema>; root: string; allowed?: string[];
   /** Internal official installation/update path; never part of routed tool input. */
-  sourceCommit?: string; expectedLocal?: string; expectedModuleId?: string | null; gitBundle?: { bundlePath: string; commit: string; branch: string; repository: string | null; defaultRepository?: string } };
+  exactReleaseUpdate?: ExactReleaseBaseline; sourceCommit?: string; expectedLocal?: string; expectedModuleId?: string | null; gitBundle?: { bundlePath: string; commit: string; branch: string; repository: string | null; defaultRepository?: string } };
 type Submission = { moduleId: string; hash: string; versionId: string; manifest: Manifest; intent: z.output<typeof intentSchema>; source: ModuleSource; report: BuildReport };
 async function queueVersion(context: ModuleContext, submission: Submission) {
   const { db, ports } = context, { moduleId, hash, versionId, manifest, intent, source, report } = submission;
   return db.$transaction(async tx => {
-    await assertExternalModule(tx, context.workspaceId, moduleId, "propose");
+    const module = await assertExternalModule(tx, context.workspaceId, moduleId, "propose");
+    await assertExactReleaseUpdateIn(context, tx, moduleId, report, module);
     // Preserve submission order for failure streaks even within one millisecond.
     const latest = await tx.moduleVersion.findFirst({ where: { moduleId }, orderBy: { createdAt: "desc" } });
     const createdAt = new Date(Math.max(ports.now().getTime(), (latest?.createdAt.getTime() ?? 0) + 1));
@@ -108,10 +111,12 @@ async function submitStaging(context: ModuleContext, submission: Omit<Submission
   const { manifest } = parsed;
   assertDeclared(manifest.name, input.allowed);
   const module = await proposedModule(context, manifest, input.expectedModuleId);
+  await assertExactReleaseUpdateIn(context, db, module.id, report);
   const revision = await sourceRevision(context, module, files, submission, input);
   hash = revision.commit;
   report.git = revision;
   const existing = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash } } });
+  assertExactReleaseCandidate(existing, input.exactReleaseUpdate);
   const hasEntry = files.some(file => file.path === moduleMaterialEntryPath(manifest.entry));
   const hasMigrate = hasMigration(manifest, files);
   if (existing?.status === "approved") return { moduleId: module.id, hash, status: "approved", report: existing.report as BuildReport };
@@ -131,7 +136,7 @@ async function submitProposal(context: ModuleContext, input: ProposalInput, sour
   const { platform } = context;
   const intent = parseInput(intentSchema, input.intent);
   const files = await snapshotModuleMaterial(input.root, input.dir);
-  const hash = input.sourceCommit ?? "", report: BuildReport = { tests: [] };
+  const hash = input.sourceCommit ?? "", report: BuildReport = { tests: [], ...(input.exactReleaseUpdate ? { exactReleaseUpdate: input.exactReleaseUpdate } : {}) };
   const versionId = randomUUID(), staging = join(platform, "staging", versionId);
   let retained = false;
   await mkdir(staging, { recursive: true });

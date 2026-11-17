@@ -63,8 +63,12 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
   admin.command("catalog").description("List official external packages and saved installation receipts").action(async () => { await (await import("./admin")).runAdmin("catalog"); });
   admin.command("install <package>").description("Explicitly install an official external package while the service is stopped")
     .option("--update", "Explicitly update an already installed package", false)
+    .option("--exact-release", "Select the bundled release commit only when approved active source is identical (requires --update)", false)
     .requiredOption("--request-key <key>", "Stable key; reuse after an uncertain receipt")
-    .action(async (name: string, input: { update: boolean; requestKey: string }) => { await (await import("./admin")).runAdmin("install", [name, input.update ? "update" : "install", input.requestKey]); });
+    .action(async (name: string, input: { update: boolean; exactRelease: boolean; requestKey: string }) => {
+      if (input.exactRelease && !input.update) throw new Error("--exact-release requires --update");
+      await (await import("./admin")).runAdmin("install", [name, input.update ? "update" : "install", input.requestKey, ...(input.exactRelease ? ["exact-release"] : [])]);
+    });
   admin.command("diagnostics [module]").description("Read saved module faults and recovery attempts without starting Chrona").action(async (module?: string) => { await (await import("./admin")).runAdmin("diagnostics", module ? [module] : []); });
   admin.command("approvals").description("List pending approvals, including rescue-only items").action(async () => { await (await import("./admin")).runAdmin("approvals"); });
   admin.command("rollback <module> <hash>").description("Roll back an approved module version").action(async (module: string, hash: string) => { await (await import("./admin")).runAdmin("rollback", [module, hash]); });

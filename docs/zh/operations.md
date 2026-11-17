@@ -34,6 +34,8 @@ Agent 是唯一不可变内置应用；Web、Notify、QQ、Author 是普通默�
 
 ## 历史最小内核与本地升级（2026-11-08）
 
+若已批准应用源码与本机发行 tree 完全相同，但经 Author 提交后 commit 不同，可在停服后显式运行 `chrona admin install pi --update --exact-release --request-key <唯一键>`。该选择仅接受真实发行 lock/bundle 固定 commit，并复核当前已批准身份与源码全等，再走正常构建、测试及审批激活；旧 Git 历史保留。存在不同源码定制时拒绝，普通 `--update` 仍按 merge 处理。`building` 是候选入队，完成后用原 key 核对 `installed`；身份变化需重新审视并使用新 key。
+
 升级前后先运行 chrona doctor：它会报出迁移基线不兼容、Pi 版本与补全能力、以及需要 admin install --update 的外置应用。
 
 本节保留当时升级边界；应用类别、编码协议和安装支持以本页上方当前状态及永久内核合同为准。

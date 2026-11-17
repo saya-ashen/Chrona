@@ -13,12 +13,14 @@ import { moduleSourceFiles, storeModuleArtifacts } from "./module-artifacts";
 import { checkoutModule } from "./module-files";
 import { moduleInitializationStateSchema, moduleInstallRequestSchema, moduleInstallResultSchema, OFFICIAL_EXTERNAL_MODULE_NAMES, PREINSTALLED_MODULE_NAMES, type ModuleInstallRequest, type ModuleInstallResult } from "@chrona/contracts/steward";
 import type { StewardPorts } from "../ports";
-import type { ExternalModuleInstaller } from "./module-install-types";
+import type { ExternalModuleInstaller, InstallationRequest } from "./module-install-types";
 import { readReleaseMaterial, resolveExternalRelease, type ModuleRelease } from "./module-release";
 import { assertExternalName } from "./module-identity";
 import { parseInput, StewardError } from "../errors";
 import { isModulePaused, ModuleUnavailableError } from "./module-availability";
 import { rejectedUpdateNotice } from "./module-activation-notice";
+import { prepareExactReleaseUpdate, readExactReleaseBaselineIn } from "./module-exact-release";
+import type { Caller } from "./module-call-types";
 import { diagnosticText } from "./module-diagnostics";
 import type { BuildReport } from "./module-context";
 
@@ -52,7 +54,7 @@ function failure(result: ModuleInstallResult, reason: string, message: string, c
 }
 /** Queue only: tests, dependency installation and activation remain in the existing background build. */
 export function createExternalModuleInstaller(ports: StewardPorts): ExternalModuleInstaller {
-  return async ({ workspaceId, request, release }) => {
+  return async ({ workspaceId, request, release, exactReleaseUpdate }) => {
     // Re-resolve immediately before copying; never trust an adapter argument as a host path.
     const trusted = await revalidateInstallationRelease(ports, request.package, release);
     if (!trusted.git) throw new StewardError("invalid", "Official installation requires a pinned Git release");
@@ -71,7 +73,15 @@ export function createExternalModuleInstaller(ports: StewardPorts): ExternalModu
         await ports.db.moduleInstallationSubmission.update({ where: { id }, data: submission });
       };
       let proposal;
-      if (request.mode === "update" && submission.moduleId) {
+      if (request.mode === "exact-release" && submission.moduleId) {
+        if (!exactReleaseUpdate) throw new StewardError("forbidden", "Exact release selection requires an owner baseline");
+        const { baseline, expectedLocal } = await prepareExactReleaseUpdate(context, submission.moduleId, trusted, exactReleaseUpdate);
+        const associated = await ports.db.moduleUpstream.findUnique({ where: { moduleId: submission.moduleId } });
+        const bundle = { ...git, ...(associated?.repository ? { repository: null, defaultRepository: undefined } : {}) };
+        await prepared(git.commit);
+        proposal = await propose(context, { root, dir: request.package, intent, allowed: [request.package], sourceCommit: git.commit, gitBundle: bundle, expectedLocal, expectedModuleId: submission.moduleId, exactReleaseUpdate: baseline }, "user");
+        if (proposal.hash !== git.commit) throw new StewardError("conflict", "Proposal commit differs from the selected release");
+      } else if (request.mode === "update" && submission.moduleId) {
         proposal = await submitMergedCommit(context, { moduleId: submission.moduleId, commit: git.commit, bundle: git, intent, onPrepared: prepared });
       } else {
         await prepared(trusted.git.commit);
@@ -132,7 +142,7 @@ async function revalidateInstallationRelease(ports: StewardPorts, name: ModuleIn
   if (release.name !== trusted.name || release.origin !== "external" || release.codeDir !== trusted.codeDir || release.hash !== trusted.hash || JSON.stringify(release.git) !== JSON.stringify(trusted.git)) throw new StewardError("conflict", "External release changed before submission");
   return trusted;
 }
-async function prepareSubmission(ports: StewardPorts, workspaceId: string, request: ModuleInstallRequest, hash: string) {
+async function prepareSubmission(ports: StewardPorts, workspaceId: string, request: InstallationRequest, hash: string) {
   const id = submissionId(workspaceId, request.requestKey);
   const previous = await ports.db.moduleInstallationSubmission.findUnique({ where: { id } });
   if (previous) throw new StewardError("conflict", "Installation submission already exists; reconcile the original request");
@@ -240,28 +250,39 @@ async function recoverSubmission(ports: StewardPorts, workspaceId: string, row: 
   }
   return { moduleId: module.id, hash: version.hash };
 }
-async function resumeInstallation(tx: Prisma.TransactionClient, request: ModuleInstallRequest, previous: Prisma.ModuleInstallationGetPayload<object>) {
+async function resumeInstallation(tx: Prisma.TransactionClient, request: InstallationRequest, previous: Prisma.ModuleInstallationGetPayload<object>) {
   if (previous.package !== request.package || previous.mode !== request.mode) throw new StewardError("conflict", "Install requestKey already belongs to another request");
   const previousResult = installationResult(previous);
   const result = isModulePaused(request.package) ? installationFailure(previousResult, new ModuleUnavailableError(request.package)) : previousResult;
   if (isModulePaused(request.package)) await tx.moduleInstallation.update({ where: { id: previous.id }, data: resultData(result) });
-  return { result, claimed: false };
+  return { result, claimed: false, exactReleaseUpdate: undefined };
 }
 export async function installExternal(ports: StewardPorts, workspaceId: string, raw: ModuleInstallRequest): Promise<ModuleInstallResult> {
-  const request = parseInput(moduleInstallRequestSchema, raw), id = installationId(workspaceId, request.requestKey);
+  return installRequest(ports, workspaceId, parseInput(moduleInstallRequestSchema, raw));
+}
+/** Host-only stopped-service CLI selection. Routed install/Author inputs cannot select source commits. */
+export async function installExactRelease(ports: StewardPorts, workspaceId: string, raw: ModuleInstallRequest, caller: Caller): Promise<ModuleInstallResult> {
+  if (caller.kind !== "owner") throw new StewardError("forbidden", "Exact release selection requires local owner administration");
+  const request = parseInput(moduleInstallRequestSchema, raw);
+  if (request.mode !== "update") throw new StewardError("invalid", "Exact release selection requires update");
+  return installRequest(ports, workspaceId, { ...request, mode: "exact-release" });
+}
+async function installRequest(ports: StewardPorts, workspaceId: string, request: InstallationRequest): Promise<ModuleInstallResult> {
+  const id = installationId(workspaceId, request.requestKey);
   const claim = await ports.db.$transaction(async tx => {
     const previous = await tx.moduleInstallation.findUnique({ where: { id } });
     if (previous) return resumeInstallation(tx, request, previous);
     const module = await assertExternalName(tx, workspaceId, request.package, "install");
     const paused = isModulePaused(request.package);
     if (!paused && module && request.mode === "install") throw new StewardError("conflict", "Module already installed; explicitly select update");
-    if (!paused && !module && request.mode === "update") throw new StewardError("not_found", "Module not installed; explicitly select install");
+    if (!paused && !module && request.mode !== "install") throw new StewardError("not_found", "Module not installed; explicitly select install");
+    const exactReleaseUpdate = request.mode === "exact-release" ? await readExactReleaseBaselineIn(tx, module!) : undefined;
     const moduleId = module?.id ?? null;
     const pending: ModuleInstallResult = { package: request.package, requestKey: request.requestKey, status: "pending", moduleId, hash: null, approvalId: null, error: null };
     const result = paused ? installationFailure(pending, new ModuleUnavailableError(request.package)) : pending;
     await tx.moduleInstallation.create({ data: { id, workspaceId, mode: request.mode, ...resultData(result), createdAt: ports.now() } });
     await tx.moduleInstallationHead.upsert({ where: { workspaceId_package: { workspaceId, package: request.package } }, create: { workspaceId, package: request.package, installationId: id }, update: { installationId: id } });
-    return { result, claimed: !paused };
+    return { result, claimed: !paused, exactReleaseUpdate };
   });
   if (!claim.claimed) {
     if (["pending", "building", "pending_approval"].includes(claim.result.status)) {
@@ -277,11 +298,14 @@ export async function installExternal(ports: StewardPorts, workspaceId: string, 
   let result: ModuleInstallResult;
   try {
     const release = await resolveExternalRelease(ports, request.package);
-    result = ports.moduleExternalInstaller ? moduleInstallResultSchema.parse(await ports.moduleExternalInstaller({ workspaceId, request, release })) : {
+    result = ports.moduleExternalInstaller ? moduleInstallResultSchema.parse(await ports.moduleExternalInstaller({
+      workspaceId, request, release, exactReleaseUpdate: claim.exactReleaseUpdate,
+    })) : {
       ...claim.result, status: "unavailable", error: { code: "unavailable", reason: "installer_unavailable", message: "External proposal adapter is not configured" },
     };
     if (result.package !== request.package || result.requestKey !== request.requestKey) throw new StewardError("invalid", "Installer returned a different request identity");
   } catch (error) {
+    console.error(JSON.stringify({ component: "module-install", event: "submission.failed", package: request.package, requestKey: request.requestKey, error: redactSensitiveText(String(error)) }));
     const submission = await ports.db.moduleInstallationSubmission.findUnique({ where: { id: submissionId(workspaceId, request.requestKey) } });
     result = submission ? { ...claim.result, status: "pending", error: null } : installationFailure(claim.result, error);
   }
@@ -302,7 +326,7 @@ export async function recordInstallationResult(ports: StewardPorts, workspaceId:
     const row = await tx.moduleInstallation.findUniqueOrThrow({ where: { id } });
     if (row.package !== result.package) throw new StewardError("conflict", "Installation receipt identity mismatch");
     await tx.moduleInstallation.update({ where: { id }, data: resultData(result) });
-    if (row.mode === "update" && result.error?.reason === "installation_rejected" && result.moduleId && result.hash) {
+    if (row.mode !== "install" && result.error?.reason === "installation_rejected" && result.moduleId && result.hash) {
       const module = await tx.module.findFirst({ where: { id: result.moduleId, workspaceId, name: result.package, builtin: false } });
       if (module) await rejectedUpdateNotice({ ports, workspaceId, tx, module, hash: result.hash, error: result.error.message });
     }

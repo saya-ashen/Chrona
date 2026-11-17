@@ -77,11 +77,15 @@ export function createExecutionDeliveryControls(ports: StewardPorts) {
   };
 }
 
-/** A same-hash no-op leaves its activation untouched. The idle check remains in the final writer transaction. */
-export async function fenceExecutionVersionChange(ports: StewardPorts, workspaceId: string, moduleId: string, hash: string) {
+/** A same-hash no-op leaves its activation untouched. Candidate preconditions share the drain writer transaction. */
+export async function fenceExecutionVersionChange(
+  ports: StewardPorts, workspaceId: string, moduleId: string, hash: string,
+  beforeFence?: (tx: Prisma.TransactionClient, current: Prisma.ModuleGetPayload<object> | null) => Promise<void>,
+) {
   const result = await ports.db.$transaction(async tx => {
     await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${workspaceId}`;
     const current = await tx.module.findFirst({ where: { id: moduleId, workspaceId } });
+    await beforeFence?.(tx, current);
     if (current && current.activeHash !== hash) return fenceExecutionModuleIn(ports, tx, workspaceId, moduleId);
   });
   for (const runId of result?.localRunIds ?? []) await liveRuns.get(runId)?.abort().catch(error => console.error(JSON.stringify({ component: "execution-drain", event: "abort.failed", runId, error: String(error) })));

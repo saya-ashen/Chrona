@@ -13,6 +13,8 @@ import { activateFixedCandidateApprovedIn, activateGroupIn } from "./module-grou
 import { removeApproved } from "./module-remove";
 import { moduleRemovePayloadSchema } from "./module-remove-payload";
 import { assertExternalModule } from "./module-identity";
+import { assertExactReleaseUpdateIn } from "./module-exact-release";
+import type { BuildReport } from "./module-context";
 import { completeApprovedOperations, completeApprovedOperationsIn } from "./module-operation-result";
 
 function parseRestore(value: Prisma.JsonValue | undefined): Restore | undefined {
@@ -37,6 +39,7 @@ async function prepareApproved(context: ModuleContext, tx: Prisma.TransactionCli
   await checkApproval(context, tx, action, module.id);
   if (module.activeHash === hash) return null;
   const version = await approvedVersion(tx, moduleId, hash, restore);
+  if (!restore) await assertExactReleaseUpdateIn(context, tx, moduleId, version.report as BuildReport, module);
   await assertDynamicModuleActivation(tx, context.workspaceId, moduleId, { hash });
   const manifest = moduleManifestSchema.parse(version.manifest), from = module.dataSchema, to = manifest.data.schema;
   if (restore && (restore.schema !== to || await snapshotAt(context, moduleId, to) !== restore.snapshotAt)) throw new StewardError("conflict", "Module restore snapshot is missing or changed");
@@ -70,7 +73,13 @@ async function applyApproved(context: ModuleContext, action: ApprovedAction) {
   const approval = await context.db.approval.findFirst({ where: { id: action.approvalId, workspaceId: context.workspaceId, status: "approved" } });
   if (!approval || action.workspaceId !== context.workspaceId || JSON.stringify(approval.payload) !== JSON.stringify(action.payload)) throw new StewardError("conflict", "Module approval does not match");
   const versions = approvalVersions(action.payload);
-  for (const target of versions) await fenceExecutionVersionChange(context.ports, context.workspaceId, target.moduleId, target.hash);
+  for (const target of versions) {
+    const version = await context.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: target.moduleId, hash: target.hash } } });
+    await fenceExecutionVersionChange(context.ports, context.workspaceId, target.moduleId, target.hash,
+      version?.status === "pending_review"
+        ? (tx, current) => assertExactReleaseUpdateIn(context, tx, target.moduleId, version.report as BuildReport, current)
+        : undefined);
+  }
   if (isGroupPayload(action.payload)) { await context.db.$transaction(tx => activateGroupIn(context, tx, action)); return; }
   if (moduleRemovePayloadSchema.safeParse(action.payload).success) { await removeApproved(context, action); return; }
   const prepared = await context.db.$transaction(tx => activateApprovedIn(context, tx, action));

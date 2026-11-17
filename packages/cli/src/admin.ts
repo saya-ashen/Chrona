@@ -4,7 +4,7 @@ import { PrismaClient } from "@chrona/db/generated/prisma/client";
 import { acquireSqliteRuntimeLock } from "@chrona/db/sqlite-runtime-lock";
 import { sqlitePathFromFileUrl } from "@chrona/db/sqlite-url";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
-import { createSecrets, createStewardService, moduleSupervisor, refreshInstallationReceipts, type StewardPorts } from "@chrona/engine";
+import { createSecrets, createStewardService, moduleSupervisor, installExactRelease, refreshInstallationReceipts, type StewardPorts } from "@chrona/engine";
 import { getChronaDataDir } from "./start-server";
 import { createModuleRuntimePorts, resourcePath } from "../../integrations/src/steward/runtime/module-runtime";
 import { moduleInstallRequestSchema, moduleVersionHashSchema } from "@chrona/contracts/steward";
@@ -57,7 +57,12 @@ export async function runAdmin(command: AdminCommand, args: string[] = [], optio
       modules: async () => [...await api.modules.list(), { name: "rescue", status: "immutable" }],
       diagnostics: () => api.modules.diagnostics(args[0]),
       catalog: () => api.modules.catalog(),
-      install: () => api.modules.install(moduleInstallRequestSchema.parse({ package: args[0], mode: args[1], requestKey: args[2] })),
+      install: () => {
+        const selection = args.at(3);
+        if (args.length > 4 || (selection !== undefined && selection !== "exact-release")) throw new Error("Invalid install selection");
+        const request = moduleInstallRequestSchema.parse({ package: args[0], mode: args[1], requestKey: args[2] });
+        return selection === "exact-release" ? installExactRelease(ports, workspaceId, request, { kind: "owner", via: null }) : api.modules.install(request);
+      },
       approvals: () => api.approvals.list("open"),
       approve: async () => { const resolved = (await api.approvals.resolve(args[0]!, { decision: "approve", scope: "once" }, "cli")).approval; await refreshInstallationReceipts(ports, workspaceId); return resolved; },
       reject: async () => { const resolved = (await api.approvals.resolve(args[0]!, { decision: "deny", scope: "once" }, "cli")).approval; await refreshInstallationReceipts(ports, workspaceId); return resolved; },
