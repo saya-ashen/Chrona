@@ -14,6 +14,7 @@
         "@eslint/js": "^10.0.1",
         "@types/bun": "^1.3.14",
         "dependency-cruiser": "^18.1.1",
+        "enhanced-resolve": "^5.24.5",
         "eslint": "^10.8.0",
         "eslint-plugin-unused-imports": "^4.4.1",
         "globals": "^17.11.0",
@@ -34,7 +35,6 @@
       "dependencies": {
         "@chrona/db": "workspace:*",
         "@chrona/host": "workspace:*",
-        "@chrona/workspaces": "workspace:*",
         "commander": "^15.0.0",
       },
     },
@@ -43,11 +43,10 @@
       "dependencies": {
         "@chrona/contracts": "workspace:*",
         "@chrona/db": "workspace:*",
+        "@chrona/git-workspaces": "workspace:*",
         "@chrona/host": "workspace:*",
-        "@chrona/i18n": "workspace:*",
         "@chrona/kernel": "workspace:*",
         "@chrona/logging": "workspace:*",
-        "@chrona/workspaces": "workspace:*",
       },
     },
     "packages/app-common": {
@@ -78,6 +77,10 @@
         "@chrona/contracts": "workspace:*",
       },
     },
+    "packages/git-workspaces": {
+      "name": "@chrona/git-workspaces",
+      "version": "0.1.0",
+    },
     "packages/host": {
       "name": "@chrona/host",
       "version": "0.1.0",
@@ -87,13 +90,7 @@
         "@chrona/kernel": "workspace:*",
         "@chrona/pi": "workspace:*",
         "@chrona/process": "workspace:*",
-        "@chrona/workspaces": "workspace:*",
-        "chrona": "workspace:*",
       },
-    },
-    "packages/i18n": {
-      "name": "@chrona/i18n",
-      "version": "0.1.0",
     },
     "packages/kernel": {
       "name": "@chrona/kernel",
@@ -104,7 +101,6 @@
         "@chrona/domain": "workspace:*",
         "@chrona/logging": "workspace:*",
         "@chrona/process": "workspace:*",
-        "@chrona/shared": "workspace:*",
         "chrona": "workspace:*",
       },
     },
@@ -137,10 +133,10 @@
       },
       "dependencies": {
         "@chrona/contracts": "workspace:*",
+        "@chrona/git-workspaces": "workspace:*",
         "@chrona/pi": "workspace:*",
         "@chrona/process": "workspace:*",
         "@chrona/remote-model": "workspace:*",
-        "@chrona/workspaces": "workspace:*",
         "zod": "^4.4.3",
       },
     },
@@ -161,13 +157,8 @@
       "name": "@chrona/shared",
       "version": "0.1.0",
       "dependencies": {
-        "@chrona/contracts": "workspace:*",
         "zod": "^4.4.3",
       },
-    },
-    "packages/workspaces": {
-      "name": "@chrona/workspaces",
-      "version": "0.1.0",
     },
   },
   "trustedDependencies": [
@@ -206,9 +197,9 @@
 
     "@chrona/domain": ["@chrona/domain@workspace:packages/domain"],
 
-    "@chrona/host": ["@chrona/host@workspace:packages/host"],
+    "@chrona/git-workspaces": ["@chrona/git-workspaces@workspace:packages/git-workspaces"],
 
-    "@chrona/i18n": ["@chrona/i18n@workspace:packages/i18n"],
+    "@chrona/host": ["@chrona/host@workspace:packages/host"],
 
     "@chrona/kernel": ["@chrona/kernel@workspace:packages/kernel"],
 
@@ -225,8 +216,6 @@
     "@chrona/server": ["@chrona/server@workspace:apps/server"],
 
     "@chrona/shared": ["@chrona/shared@workspace:packages/shared"],
-
-    "@chrona/workspaces": ["@chrona/workspaces@workspace:packages/workspaces"],
 
     "@electric-sql/pglite": ["@electric-sql/pglite@0.4.3", "", {}, "sha512-ichuWTgtd4mOM1G4SpyGJa5trT03lWbMypDV0fUXUCXg5hiHqVAz/bZyV68NqmkLB7WcYmj1RMJVSp8HV/v/ZQ=="],
 

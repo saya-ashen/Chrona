@@ -1,12 +1,12 @@
 import { createPrivateKey, createPublicKey, generateKeyPairSync, randomBytes, randomUUID } from "node:crypto";
 import { join, resolve } from "node:path";
 import { z } from "zod";
-import { localDirectoryIdentity, privateRoot } from "@chrona/workspaces";
+import { localDirectoryIdentity, privateRoot } from "@chrona/git-workspaces";
 import { realpathSync, statSync } from "node:fs";
 import { deviceSchema } from "./protocol";
 import { readPrivate, writePrivate } from "./private-files";
 
-export const mappingSchema = z.object({ workspaceRef: z.string().min(1).max(200), targetRef: z.string().min(1), targetRevision: z.number().int().positive(), projectRef: z.string().min(1), canonicalPath: z.string().min(1), directoryIdentity: z.string().min(1), baseline: z.object({ kind: z.enum(["commit", "snapshot"]), digest: z.string().min(1) }).strict(), workspaceModes: z.array(z.enum(["existing", "independent_worktree"])).min(1).max(2) }).strict();
+const mappingSchema = z.object({ workspaceRef: z.string().min(1).max(200), targetRef: z.string().min(1), targetRevision: z.number().int().positive(), projectRef: z.string().min(1), canonicalPath: z.string().min(1), directoryIdentity: z.string().min(1), baseline: z.object({ kind: z.enum(["commit", "snapshot"]), digest: z.string().min(1) }).strict(), workspaceModes: z.array(z.enum(["existing", "independent_worktree"])).min(1).max(2) }).strict();
 export const piConfigSchema = z.object({ command: z.string().min(1), expectedVersion: z.literal("1.5.0") }).strict();
 export function localPi(input: unknown): z.infer<typeof piConfigSchema> {
   const config = piConfigSchema.parse(input);
@@ -15,7 +15,7 @@ export function localPi(input: unknown): z.infer<typeof piConfigSchema> {
   if (!stat.isFile() || !(stat.mode & 0o111) || (stat.mode & 0o022)) throw new Error("Pi executable must be executable and protected against shared writes");
   return { ...config, command };
 }
-export const configSchema = z.object({ version: z.literal(1), server: z.string().url(), credential: z.string().regex(/^[A-Za-z0-9_-]{43}$/), privateKey: z.string(), publicKey: z.string(), deviceId: z.string().min(1).max(128), incarnation: z.string().min(1).max(128), keyId: z.string().min(1).max(128), device: deviceSchema.nullable(), pairing: z.object({ code: z.string().regex(/^[A-Za-z0-9_-]{43}$/), requestId: z.string() }).strict().nullable(), mappings: z.array(mappingSchema).max(100), pi: piConfigSchema.nullable().default(null) }).strict();
+const configSchema = z.object({ version: z.literal(1), server: z.string().url(), credential: z.string().regex(/^[A-Za-z0-9_-]{43}$/), privateKey: z.string(), publicKey: z.string(), deviceId: z.string().min(1).max(128), incarnation: z.string().min(1).max(128), keyId: z.string().min(1).max(128), device: deviceSchema.nullable(), pairing: z.object({ code: z.string().regex(/^[A-Za-z0-9_-]{43}$/), requestId: z.string() }).strict().nullable(), mappings: z.array(mappingSchema).max(100), pi: piConfigSchema.nullable().default(null) }).strict();
 export type DeviceConfig = z.infer<typeof configSchema>;
 export type Mapping = z.infer<typeof mappingSchema>;
 export function serverURL(input: string): string {

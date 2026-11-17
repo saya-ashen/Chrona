@@ -1,8 +1,6 @@
-import { kernelExecutionStartSchema, kernelCleanupInputSchema, kernelCleanupReceiptSchema, type ExecutionPrincipal, type KernelExecutionStart, type KernelCleanupInput } from "@chrona/contracts/steward";
+import { kernelCleanupInputSchema, kernelCleanupReceiptSchema, type ExecutionPrincipal, type KernelCleanupInput } from "@chrona/contracts/steward";
 import type { Prisma } from "@chrona/db";
 import type { StewardPorts } from "./ports";
-import { createExecutionDelivery } from "./execution/execution-delivery";
-import { createExecutionV2Admission } from "./execution/execution-admission";
 import { assertExecutionPrincipal } from "./execution/execution-principal";
 import { executionCallerKey, executionScope } from "./execution/execution-state";
 import { receiptIn, replayIn, deliveryInclude, receiverIn } from "./execution/execution-delivery-records";
@@ -14,13 +12,6 @@ async function attemptIn(tx: Prisma.TransactionClient, p: ExecutionPrincipal, wo
   const row = await tx.executionAttempt.findFirst({ where: { ...executionScope(p), callerKey: executionCallerKey(p), workId }, include: { run: true } });
   if (!row) throw new CallError("not_found", "Execution not found");
   return row;
-}
-export async function startKernelExecution(ports: StewardPorts, p: ExecutionPrincipal, raw: KernelExecutionStart) {
-  const input = kernelExecutionStartSchema.parse(raw);
-  if (input.placement.kind === "application") return createExecutionDelivery(ports).admit(p, input);
-  // The private host workspace adapter retains its filesystem preparation/verification transaction.
-  const result = await createExecutionV2Admission(ports).start(p, { ...input, placement: { executorId: "server", projectRef: input.placement.projectRef, mappingRevision: input.placement.mappingRevision }, budget: input.budget });
-  return { execution: result.execution, placement: { ...result.placement, placement: input.placement, workspace: { workspaceRef: result.placement.workspace.workspaceRef, mode: result.placement.workspace.mode, baseline: result.placement.workspace.baseline, state: result.placement.workspace.state === "ready" ? "ready" : result.execution.stopConfirmed ? "retained" : result.execution.status === "unknown" ? "unknown" : "requested", retained: true } } };
 }
 export async function kernelExecutionCleanup(ports: StewardPorts, p: ExecutionPrincipal, raw: KernelCleanupInput) {
   const input = kernelCleanupInputSchema.parse(raw);

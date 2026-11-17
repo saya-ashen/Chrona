@@ -10,7 +10,7 @@
     "@chrona/pi": "workspace:*",
     "@chrona/remote-model": "workspace:*",
     "@chrona/process": "workspace:*",
-    "@chrona/workspaces": "workspace:*",
+    "@chrona/git-workspaces": "workspace:*",
     "@chrona/contracts": "workspace:*",
     "zod": "^4.4.3"
   }

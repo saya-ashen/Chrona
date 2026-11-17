@@ -14,10 +14,8 @@ import { testDb } from "../test-db";
 import type { StewardPorts } from "../ports";
 import { createModules } from "./modules";
 import { createApprovals } from "../approvals";
-import { createApps } from "../apps";
 import { createStewardService } from "../service";
-import { modulePermissions } from "./module-overview";
-import { moduleInterfaces } from "../system-apps";
+import { secrets } from "../system/secrets";
 import { createSecrets } from "../secrets";
 import { callSync, enqueueCall, kernelOrigin, runDueCalls } from "./module-calls";
 
@@ -171,19 +169,20 @@ test("queued callbacks reject same-name reinstalls and invalid arguments but sur
   }
 });
 
-test("credential readiness projects generic adapter and saved metadata without treating installation as readiness", async () => {
+test("credential list exposes saved and adapter metadata without values or readiness claims", async () => {
   const f = await fixture();
   const manifest = moduleManifestSchema.parse({ ...fixtures.external.manifest, secrets: [{ name: "test_credential", label: "Fixture", fields: [{ name: "token", label: "Token" }] }] });
   const module = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "alpha", activeHash: "a".repeat(64) } });
   await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: module.activeHash!, manifest, status: "approved", source: "user", intent: {}, report: {} } });
-  const permissions = () => modulePermissions(f.ports, f.workspaceId, "alpha") as Promise<{ secrets: { name: string; configured: boolean; fields: { saved: boolean }[] }[] }>;
-  expect((await permissions()).secrets[0]).toMatchObject({ name: "test_credential", configured: false });
+  const credentials = () => secrets.handle({ ports: f.ports, workspaceId: f.workspaceId, caller: { kind: "owner", via: null } }, "list", {}) as Promise<{ items: { name: string; configured: boolean; updatedAt: string | null }[] }>;
+  expect((await credentials()).items[0]).toMatchObject({ name: "test_credential", configured: false, updatedAt: null });
   f.ports.secretConfigured = async name => name === "test_credential";
-  expect((await permissions()).secrets[0]).toMatchObject({ configured: true, fields: [{ saved: false }] });
+  expect((await credentials()).items[0]).toMatchObject({ configured: true, updatedAt: null });
   f.ports.secretConfigured = async () => false;
   await createSecrets(f.dataDir).write("test_credential", { token: "synthetic-test-only" });
-  const projected = await permissions();
-  expect(projected.secrets[0]).toMatchObject({ configured: true, fields: [{ saved: true }] });
+  const projected = await credentials();
+  expect(projected.items[0]).toMatchObject({ configured: true, updatedAt: expect.any(String) });
+  expect(projected.items[0]).not.toHaveProperty("readiness");
   expect(JSON.stringify(projected)).not.toContain("synthetic-test-only");
 });
 
@@ -211,7 +210,7 @@ test("approval creation refuses reserved kernel identities without records and p
   expect((await approvals.create({ ...common, action: "delete_data", payload: { kind: "module_remove", moduleId: pi.id, name: pi.name, hash: pi.activeHash } })).status).toBe("open");
 });
 
-test.each(["pi", "web", "notify", "other-entry"])("list and interface projections expose ordinary entry %s removal without overwriting permission descriptions", async name => {
+test.each(["pi", "web", "notify", "other-entry"])("list exposes ordinary entry %s lifecycle rights", async name => {
   const f = await fixture(); createStewardService(f.ports);
   const row = await f.db.module.create({ data: { workspaceId: f.workspaceId, name, builtin: false, activeHash: "a".repeat(64) } });
   const manifest = moduleManifestSchema.parse({ ...fixtures.external.manifest, name, uses: ["*"],
@@ -220,10 +219,6 @@ test.each(["pi", "web", "notify", "other-entry"])("list and interface projection
   await f.db.moduleVersion.create({ data: { moduleId: row.id, hash: row.activeHash!, source: "user", status: "approved", manifest, intent: {}, report: {} } });
   const [list] = await createModules(f.ports, f.workspaceId).list();
   expect(list).toMatchObject({ origin: "external", capabilities: { build: true, rollback: true, remove: true, install: false } });
-  expect((await createApps(f.ports, f.workspaceId).list())[0]).toMatchObject({ origin: "external", capabilities: { remove: true } });
-  expect(await moduleInterfaces(f.ports, f.workspaceId, name)).toMatchObject({ origin: "external", capabilities: { build: true, remove: true } });
-  expect(Array.isArray((await modulePermissions(f.ports, f.workspaceId, name) as { capabilities: unknown }).capabilities)).toBe(true);
-  expect(await moduleInterfaces(f.ports, f.workspaceId, "modules")).toMatchObject({ origin: "kernel", capabilities: { build: false } });
   await expect(callSync(f.ports, { workspaceId: f.workspaceId, caller: { kind: "owner", via: null }, chain: [], path: [] }, "modules.catalog", {})).rejects.toMatchObject({ code: "not_found" });
   const catalog = await externalPackageCatalog(f.ports, f.workspaceId);
   expect(catalog.map(item => item.name)).toEqual(["pi", "web", "notify", "author", "mind", "chat", "qq", "memory-local", "mcp", "files", "events", "remind", "remote-execution"]);

@@ -6,7 +6,6 @@ import type { WorkspaceSource, WorkspaceState, WorkspaceSourceReceipt, LocalWork
 import { WORKSPACE_LIMITS } from "./limits";
 import { workspaceDigest as localDigest } from "./digest";
 import { localDirectoryIdentity, physicalLockIdentity, privateRoot } from "./workspace-identity";
-export { localDirectoryIdentity, physicalLockIdentity, privateRoot } from "./workspace-identity";
 
 export type VerifiedLocalMapping<Placement = unknown> = LocalWorkspaceInput<Placement>["mapping"];
 type WorkBaseline = LocalWorkspaceInput["work"]["baseline"];

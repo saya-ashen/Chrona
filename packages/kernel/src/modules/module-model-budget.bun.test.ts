@@ -2,9 +2,19 @@ import { afterEach, expect, test } from "bun:test";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "../ports";
 import type { CallScope } from "./module-supervisor";
-import { finishCompletion, reserveCompletion } from "./module-model-budget";
+import { finishCompletionIn, reserveCompletionIn } from "./module-model-budget";
 import { createSettings, modelUsage } from "../settings";
 import { testDb } from "../test-db";
+
+function reserveCompletion(ports: StewardPorts, scope: CallScope, params: Parameters<typeof reserveCompletionIn>[2], now: Date) {
+  return ports.db.$transaction(async tx => {
+    await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${scope.workspaceId}`;
+    return reserveCompletionIn(tx, scope, params, now);
+  });
+}
+function finishCompletion(ports: StewardPorts, workspaceId: string, completion: Parameters<typeof finishCompletionIn>[2], owner?: Parameters<typeof finishCompletionIn>[3]) {
+  return ports.db.$transaction(tx => finishCompletionIn(tx, workspaceId, completion, owner));
+}
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });

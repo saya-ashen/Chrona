@@ -4,7 +4,7 @@ import { references } from "./module-reference";
 import type { ModuleManifest } from "@chrona/contracts/steward";
 
 import type { ModuleCallContracts } from "./module-contract-types";
-export type { ModuleCallContracts, RuntimePrograms, ModuleRuntime, ModuleRuntimes } from "./module-contract-types";
+export type { ModuleCallContracts, ModuleRuntimes } from "./module-contract-types";
 
 /** Every module-callable target, using the same contracts as discovery and routing. */
 export async function callsContracts(ports: StewardPorts, workspaceId: string, candidate?: { moduleName: string; manifest: ModuleManifest }): Promise<ModuleCallContracts> {

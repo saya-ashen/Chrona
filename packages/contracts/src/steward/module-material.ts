@@ -3,7 +3,7 @@ import { z } from "zod";
 export const MODULE_MATERIAL_FILE = "chrona-material.json";
 export const MODULE_SOURCE_MAX_FILES = 200;
 export const MODULE_SOURCE_MAX_BYTES = 2 * 1024 * 1024;
-export const MODULE_ARTIFACT_MAX_FILES = 1000;
+const MODULE_ARTIFACT_MAX_FILES = 1000;
 export const MODULE_ARTIFACT_MAX_FILE_BYTES = 64 * 1024 * 1024;
 export const MODULE_ARTIFACT_MAX_BYTES = 256 * 1024 * 1024;
 
@@ -13,8 +13,8 @@ export function isModuleMaterialPath(path: string): boolean {
   return path.length <= 1024 && !path.includes("\\") && !Array.from(path).some(char => char.charCodeAt(0) <= 31 || char.charCodeAt(0) === 127) && !parts.some(part => !part || part === "." || part === ".." || part === ".git" || part.includes(":"))
     && !["node_modules", ".venv", ".chrona"].includes(parts[0]!);
 }
-export const moduleMaterialPathSchema = z.string().refine(isModuleMaterialPath, "Invalid module material path");
-export const moduleArtifactSchema = z.object({
+const moduleMaterialPathSchema = z.string().refine(isModuleMaterialPath, "Invalid module material path");
+const moduleArtifactSchema = z.object({
   path: moduleMaterialPathSchema,
   sha256: z.string().regex(/^[a-f0-9]{64}$/),
   executable: z.boolean().optional(),
@@ -40,5 +40,4 @@ export const moduleMaterialSchema = z.object({
 /** Shared by material consumers while runtime entry validation lives in the manifest contract. */
 export function moduleMaterialEntryPath(entry: string | { path: string }): string { return typeof entry === "string" ? entry : entry.path; }
 export type ModuleMaterial = z.infer<typeof moduleMaterialSchema>;
-export type ModuleArtifact = z.infer<typeof moduleArtifactSchema>;
 export function parseModuleMaterial(value: unknown): ModuleMaterial { return moduleMaterialSchema.parse(value); }

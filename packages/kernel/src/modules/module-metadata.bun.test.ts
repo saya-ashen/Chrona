@@ -1,9 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
-import { createApps } from "../apps";
 import { createModules } from "./modules";
-import { moduleInterfaces, moduleInterfacesOutputSchema } from "../system-apps";
-import { MODULE_DIAGNOSTICS_DOCUMENTATION, MODULE_HEALTH_DOCUMENTATION } from "./module-diagnostics";
+import { listSystemModules } from "./module-calls";
 import { modulesListOutput } from "../system-outputs";
 import { registerSystemModules } from "../system-modules";
 import { callSync } from "./module-calls";
@@ -27,16 +25,12 @@ async function fixture() {
 
 test("app and internal interface metadata use strict manifests without central configuration or host claims", async () => {
   const f = await fixture(); registerSystemModules();
-  const app = (await createApps(f.ports, f.workspaceId).list())[0]!;
+  const app = (await createModules(f.ports, f.workspaceId).list())[0]!;
   expect(app).toMatchObject({ id: f.module.id, name: "example", description: f.manifest.description, status: "active", activeHash: "active", origin: "external", capabilities: { configure: false } });
-  const entry = moduleInterfacesOutputSchema.parse(await moduleInterfaces(f.ports, f.workspaceId, "example"));
-  expect(entry).toMatchObject({ origin: "external", capabilities: { configure: false }, tools: [{ name: "settings", visibility: ["owner"] }] });
-  expect(entry).not.toHaveProperty("runtime");
-  const internal = await moduleInterfaces(f.ports, f.workspaceId);
-  expect(Array.isArray(internal)).toBe(true);
-  if (!Array.isArray(internal)) throw new Error("Expected the internal interface list");
+  const described = await callSync(f.ports, { workspaceId: f.workspaceId, caller: { kind: "owner", via: null }, chain: [], path: [] }, "modules.describe", { target: { moduleId: f.module.id, tool: "settings" } });
+  expect(described.output).toMatchObject({ target: { moduleId: f.module.id, tool: "settings" }, label: "example.settings", admission: { visibility: ["owner"] } });
+  const internal = listSystemModules();
   for (const host of ["runtime-callback", "workspace-local", "content-local"]) expect(internal.map(item => item.name)).not.toContain(host);
-  expect(internal.every(item => !("runtime" in item))).toBe(true);
   for (const removed of ["settings", "contributes", "healthCheck", "triggers"]) {
     expect(moduleManifestSchema.safeParse({ ...f.manifest, [removed]: removed === "healthCheck" ? true : {} }).success).toBe(false);
   }
@@ -74,7 +68,7 @@ test("modules list bounds history, retains the older active description and proj
     const serialized = JSON.stringify(app);
     for (const hidden of [secret, "private-candidate", "private-run", "private-build-stderr", "storePaths", "workspaceId", "dataSchema", "manifest", "intent", "report", "output"]) expect(serialized).not.toContain(hidden);
     expect([await f.db.moduleVersion.count(), await f.db.moduleRun.count(), await f.db.audit.count()]).toEqual(before);
-    for (const docs of [MODULE_DIAGNOSTICS_DOCUMENTATION, MODULE_HEALTH_DOCUMENTATION]) {
+    for (const docs of listSystemModules().find(module => module.name === "modules")!.tools.map(tool => tool.description)) {
       expect(docs).not.toContain("healthCheck"); expect(docs).not.toContain("module-reported readiness");
     }
   } finally { if (previous === undefined) delete process.env[key]; else process.env[key] = previous; }
@@ -101,7 +95,7 @@ test("unversioned and invalid active manifests remain visible without configurat
   const f = await fixture();
   await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: f.module.id, hash: "active" } }, data: { manifest: { ...f.manifest, settings: { secret: "private" } }, report: { errors: [42], git: { commit: "invalid", tree: "invalid" } } } });
   await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "draft", status: "paused" } });
-  const apps = await createApps(f.ports, f.workspaceId).list();
+  const apps = await createModules(f.ports, f.workspaceId).list();
   expect(apps.every(app => app.description === null && app.capabilities.configure === false)).toBe(true);
   const list = await createModules(f.ports, f.workspaceId).list();
   expect(list.find(app => app.name === "example")).toMatchObject({ description: null, versions: [{ errors: null, git: null }] });

@@ -28,7 +28,7 @@ export function nextLocalMidnight(now: Date, timezone: string) {
   return new Date(hi);
 }
 export { authenticateRun } from "./run-auth";
-export type EnqueueRun = { sessionId?: string; lane: RunLane; trigger: RunTrigger; prompt: string; label?: string | null; providerId?: string; providerOptions?: Prisma.InputJsonObject };
+type EnqueueRun = { sessionId?: string; lane: RunLane; trigger: RunTrigger; prompt: string; label?: string | null; providerId?: string; providerOptions?: Prisma.InputJsonObject };
 type RunRow = Prisma.RunGetPayload<{ include: { session: true } }>;
 type RunOutcome = Awaited<ReturnType<ProviderAdapter["start"]>["done"]>;
 

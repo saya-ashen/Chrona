@@ -1,8 +1,8 @@
 import { Database } from "bun:sqlite";
 
 export type StorageLimits = { maxPages: number; admissionPages: number };
-export const STORAGE_LIMITS: StorageLimits = { maxPages: 32768, admissionPages: 8192 };
-export class StorageAdmissionError extends Error {
+const STORAGE_LIMITS: StorageLimits = { maxPages: 32768, admissionPages: 8192 };
+class StorageAdmissionError extends Error {
   readonly code = "storage_exhausted";
   constructor(message = "Physical SQLite admission exhausted; retained evidence must not be deleted") { super(message); }
 }

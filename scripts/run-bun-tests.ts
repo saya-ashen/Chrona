@@ -38,8 +38,8 @@ function shouldInclude(path: string) {
 		"examples/desktop-demo/",
 		"apps/cli/", ".generated/applications/", "packages/app-common/", "packages/app-sdk/",
 		"packages/kernel/src/", "packages/domain/src/steward/",
-		"packages/host/src/", "packages/contracts/src/steward/", "packages/pi/", "packages/process/", "packages/workspaces/", "packages/remote-device/", "packages/remote-model/",
-		"packages/db/", "packages/shared/", "packages/logging/", "packages/i18n/",
+		"packages/host/src/", "packages/contracts/src/steward/", "packages/pi/", "packages/process/", "packages/git-workspaces/", "packages/remote-device/", "packages/remote-model/",
+		"packages/db/", "packages/shared/", "packages/logging/",
 	];
 	return retained.some(prefix => path.startsWith(prefix))
 		&& !path.split("/").some((segment) => ignoredSegments.has(segment));

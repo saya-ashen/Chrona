@@ -55,7 +55,7 @@ Remind 的暂停策略仍由现有 `module-availability.ts` 执行；恢复安�
 
 可复核命令为 `CHRONA_TEST_CONCURRENCY=1 bun scripts/run-bun-tests.ts`、`bun scripts/run-api-tests.ts`、`node node_modules/typescript/bin/tsc --noEmit --pretty false`、`LINT_RATCHET_BASE=b65e7ece bun scripts/lint-ratchet.ts`、Web 的 `shell.browser-test.ts` 与三个 `src/*.bun.test.tsx`。实际环境使用本机 Nix `CC` / Prisma engine，重型命令串行运行，`NODE_OPTIONS=--max-old-space-size=6144`。
 
-日志位于本 worktree `.tmp/application-migration/`：`full-bun-tests.log`、`final-retests.log`、`final-fixtures.log`、`remind-final.log`、`api-tests.log`、`rescue-api.log`、`ui-tests.log`、`browser-shell.log`、`typecheck.log`、`lint.log`、`package.log`、`release-smoke.log`、`kernel-health.log`。`bun-result.json` / `api-result.json` / `ui-result.json` 保存逐文件最终结果与实际日志归属；`material-ancestry.json` 保存材料版本父链证据，`result.json` 保存汇总。既有内核阶段的 891 项和上游整合的 122 项记录保留在 [内核迁移记录](kernel-agent-migration.md)，不重复计为本轮全量通过。
+日志位于本 worktree `.tmp/application-migration/`：`full-bun-tests.log`、`final-retests.log`、`final-fixtures.log`、`remind-final.log`、`api-tests.log`、`rescue-api.log`、`ui-tests.log`、`browser-shell.log`、`typecheck.log`、`lint.log`、`package.log`、`release-smoke.log`、`kernel-health.log`。`bun-result.json` / `api-result.json` / `ui-result.json` 保存逐文件最终结果与实际日志归属；`material-ancestry.json` 保存材料版本父链证据，`result.json` 保存汇总。既有内核阶段的 891 项和上游整合的 122 项记录从 Git 历史 `docs/zh/kernel-agent-migration.md` 查阅，不重复计为本轮全量通过。
 
 ## 合回原分支
 

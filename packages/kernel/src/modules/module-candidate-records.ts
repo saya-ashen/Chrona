@@ -11,9 +11,9 @@ import { assertExternalModule, assertExternalName } from "./module-identity";
 import { assertModuleAvailable } from "./module-availability";
 
 export type CandidateDb = Prisma.TransactionClient;
-export const admissionRecordSchema = z.object({ input: candidateAdmissionInputSchema, issuer: callerSchema, receiptId: z.string().nullable() }).strict();
+const admissionRecordSchema = z.object({ input: candidateAdmissionInputSchema, issuer: callerSchema, receiptId: z.string().nullable() }).strict();
 export type CandidateAdmissionRecord = z.infer<typeof admissionRecordSchema>;
-export const candidateSetSchema = candidateReceiptSchema.omit({ members: true }).extend({ members: z.array(candidateReceiptSchema.shape.members.element.omit({ status: true, selected: true })).min(1).max(4) }).strict();
+const candidateSetSchema = candidateReceiptSchema.omit({ members: true }).extend({ members: z.array(candidateReceiptSchema.shape.members.element.omit({ status: true, selected: true })).min(1).max(4) }).strict();
 export type CandidateSet = z.infer<typeof candidateSetSchema>;
 export function candidateDigest(value: unknown) {
   const canonical = JSON.stringify(value, (_key, item: unknown) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b))) : item);

@@ -8,8 +8,8 @@
 | --- | --- |
 | 为何开发、如何判断用户价值 | [产品目标](steward-goals.md) |
 | 后续公开合同是什么 | [API 规范](kernel-api-design.md)，已实现，尚未冻结；验证见[实施记录](kernel-api-implementation.md) |
-| 当前代码与接口是什么 | [当前架构](architecture.md)、[边界盘点](kernel-permanent-boundary-contract.md)和源码 |
-| 哪些检查实际完成 | [内核/Agent 记录](kernel-agent-migration.md)、[应用迁移记录](application-migration.md)及对应专题证据 |
+| 当前代码与接口是什么 | [当前架构](architecture.md)、[API 实施记录](kernel-api-implementation.md)和源码 |
+| 哪些检查实际完成 | [API 实施记录](kernel-api-implementation.md)、[应用迁移记录](application-migration.md)及对应专题证据 |
 | 如何操作和恢复 | [运维](operations.md) |
 
 ## 待推进事项

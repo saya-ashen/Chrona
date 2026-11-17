@@ -372,8 +372,8 @@ export function checkBoundaries(root = ROOT): GuardrailFinding[] {
 		[
 			"bunx", "dependency-cruiser", "--output-type", "json",
 			"apps", "packages/contracts", "packages/db", "packages/domain", "packages/kernel",
-			"packages/host", "packages/app-sdk", "packages/app-common", "packages/i18n", "packages/shared",
-			"packages/logging", "packages/pi", "packages/process", "packages/workspaces",
+			"packages/host", "packages/app-sdk", "packages/app-common", "packages/shared",
+			"packages/logging", "packages/pi", "packages/process", "packages/git-workspaces",
 			"packages/remote-device", "packages/remote-model",
 		],
 		{ cwd: root, stdout: "pipe", stderr: "pipe" },

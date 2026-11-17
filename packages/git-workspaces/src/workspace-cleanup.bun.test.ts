@@ -3,9 +3,9 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { cleanupLocalWorkspace } from "@chrona/workspaces";
-import { localDirectoryIdentity, prepareLockedLocalWorkspace } from "@chrona/workspaces";
-import { workspaceDigest as localDigest } from "@chrona/workspaces";
+import { cleanupLocalWorkspace } from "@chrona/git-workspaces";
+import { localDirectoryIdentity, prepareLockedLocalWorkspace } from "@chrona/git-workspaces";
+import { workspaceDigest as localDigest } from "@chrona/git-workspaces";
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });

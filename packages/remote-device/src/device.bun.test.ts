@@ -6,7 +6,7 @@ import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { executionDeliveryFinalSchema, executionSignedStopSchema, executionDeliverySourceSchema } from "@chrona/contracts/steward";
-import { privateRoot } from "@chrona/workspaces";
+import { privateRoot } from "@chrona/git-workspaces";
 import { PROMPT_PROTOCOL, type ModelInput } from "@chrona/remote-model";
 import { initializeConfig, loadConfig, localMapping, localPi, saveConfig, type DeviceConfig } from "./config";
 import { RemoteDevice } from "./device";

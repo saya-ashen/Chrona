@@ -1,5 +1,5 @@
 import { join, resolve } from "node:path";
-import { privateRoot } from "@chrona/workspaces";
+import { privateRoot } from "@chrona/git-workspaces";
 import { processCapability } from "@chrona/process";
 import { initializeConfig, loadConfig, localMapping, localPi, saveConfig, type DeviceConfig } from "./config";
 import { RemoteDevice } from "./device";

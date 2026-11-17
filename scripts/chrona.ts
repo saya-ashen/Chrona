@@ -11,8 +11,8 @@ const binary = (target?: string) => command("Build steward binary", ["scripts/bu
 const types = [["x", "tsc", "--noEmit", "--pretty", "false"]];
 const boundaries = [
   "x", "dependency-cruiser", "apps", "packages/contracts", "packages/db", "packages/domain",
-  "packages/kernel", "packages/host", "apps/cli", "packages/i18n", "packages/shared",
-  "packages/logging", "packages/pi", "packages/process", "packages/workspaces",
+  "packages/kernel", "packages/host", "apps/cli", "packages/shared",
+  "packages/logging", "packages/pi", "packages/process", "packages/git-workspaces",
   "packages/remote-device", "packages/remote-model",
 ];
 export const TEST_COMMANDS: Record<string, Command> = {

@@ -12,4 +12,4 @@ Issues and PRDs are tracked in `saya-ashen/Chrona` GitHub Issues. See `docs/agen
 
 ### Domain docs
 
-Domain documentation uses a multi-context layout. See `docs/agents/domain.md`.
+Use the current contracts and [documentation index](docs/README.md). Domain terminology and decision records follow `AGENTS.md`.

@@ -6,7 +6,7 @@
       "proposedRepository": "chrona-core/chrona-module-web",
       "localRepository": "../../../chrona-module-web",
       "branch": "main",
-      "commit": "bf33943f4b0bd304e45b530d6b42399318a1e632"
+      "commit": "8256d1dc73aeb44cb1c6049969b4dc36858fe573"
     },
     {
       "name": "notify",
@@ -27,7 +27,7 @@
       "proposedRepository": "chrona-core/chrona-module-qq",
       "localRepository": "../../../chrona-module-qq",
       "branch": "main",
-      "commit": "de32f903f65ed22c011c153a44b41a1697e5dfb6"
+      "commit": "85db9c3426c934fc4a813c45938b750cfeb7a02a"
     },
     {
       "name": "author",

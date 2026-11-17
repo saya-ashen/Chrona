@@ -3,7 +3,6 @@ import type { StewardPorts } from "../ports";
 import type { Caller, Json } from "./module-call-types";
 import type { SystemTool } from "./module-system-tool-types";
 export type { SystemTool } from "./module-system-tool-types";
-export type { Caller } from "./module-call-types";
 /**
  * A system module is in-process Chrona code, reached by the same routed calls and authenticated caller.
  * `unrecorded`: synchronous tools that omit invocation arguments and Run tool-result bodies.

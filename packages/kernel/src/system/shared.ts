@@ -4,7 +4,7 @@ import type { Caller, Json } from "../modules/module-call-types";
 import type { StewardPorts } from "../ports";
 import { isOwnerCaller } from "../modules/module-owner";
 
-export { tool, text } from "./tool-declaration";
+export { tool } from "./tool-declaration";
 /** Module identity for operations scoped to the caller's own resources. */
 export function entry(caller: Caller) {
   if (caller.kind !== "module") throw new CallError("forbidden", "Only an entry module may call this");

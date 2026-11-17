@@ -2,13 +2,12 @@ import { randomUUID } from "node:crypto";
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { Prisma } from "@chrona/db/generated/prisma/client";
-import { BUILTIN_MODULE_NAMES, listenPaths, moduleManifestSchema } from "@chrona/contracts/steward";
+import { listenPaths, moduleManifestSchema } from "@chrona/contracts/steward";
 import { audit } from "../audit";
 import { latestModuleEvolution, recordModuleActivation, updateModuleEvolution } from "./module-evolution";
 import { StewardError } from "../errors";
-import { type ModuleContext, type ModuleVersion } from "./module-context";
+import type { ModuleContext } from "./module-context";
 import { assertExternalModule, assertModuleOperation } from "./module-identity";
-import type { ModuleRelease } from "./module-release";
 import { pauseIn } from "./module-status";
 import { fenceExecutionModuleIn } from "../execution/execution-delivery-controls";
 import { assertExecutionModuleIdle } from "../execution/execution-module-guard";
@@ -54,38 +53,6 @@ export async function switchActiveIn(context: ModuleContext, tx: Prisma.Transact
   await tx.module.update({ where: { id: moduleId }, data: { activeHash: hash, status: "active", ...(module.activeHash !== hash ? { activationId: randomUUID(), executionFenceAt: null } : {}) } });
   if (preservePause && module.status === "paused") await pauseIn(context, tx, moduleId, { source: "chrona", reason: "版本切换保留原停用状态" });
   return module;
-}
-function assertBuiltinSeedRelease(release: ModuleRelease) {
-  if (release.origin !== "builtin" || !(BUILTIN_MODULE_NAMES as readonly string[]).includes(release.name) || !/^[a-f0-9]{40}$/.test(release.hash) || !release.git || release.git.commit !== release.hash) throw new StewardError("conflict", "Trusted release identity changed");
-}
-function assertBuiltinSeedVersion(version: ModuleVersion | null, release: ModuleRelease) {
-  const report = version?.report as { git?: { commit?: unknown } } | null;
-  if (version?.status !== "approved" || version.source !== "builtin" || report?.git?.commit !== release.hash || JSON.stringify(version.manifest) !== JSON.stringify(release.manifest)) throw new StewardError("conflict", "Trusted release metadata does not match");
-}
-async function assertAgentReleaseUpgrade(tx: Prisma.TransactionClient, module: { id: string; workspaceId: string; activeHash: string | null; dataSchema: number | null; status: string }, release: ModuleRelease, releaseUpgrade: boolean) {
-  if (!releaseUpgrade || release.name !== "agent") throw new StewardError("conflict", "Trusted release activation is only allowed for the initial seed");
-  if (module.dataSchema !== release.manifest.data.schema || module.status === "migrating") throw new StewardError("conflict", "Agent release requires compatible data");
-  if (await tx.run.count({ where: { workspaceId: module.workspaceId, OR: [{ status: "running" }, { stopStatus: "unknown" }] } }) || await tx.executionAttempt.count({ where: { workspaceId: module.workspaceId, stopConfirmedAt: null, run: { status: { not: "queued" } } } })) throw new StewardError("conflict", "Agent release waits for running or unconfirmed executions to stop");
-  const old = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } });
-  if (old?.source !== "builtin" || old.status !== "approved") throw new StewardError("conflict", "Agent release requires a trusted prior version");
-}
-/** Internal bootstrap only: registrar resolves and exports the trusted seed before this DB transaction; never pass routed input. */
-export async function activateBuiltinReleaseIn(context: ModuleContext, tx: Prisma.TransactionClient, release: ModuleRelease, releaseUpgrade = false) {
-  assertBuiltinSeedRelease(release);
-  const module = await tx.module.findUnique({ where: { workspaceId_name: { workspaceId: context.workspaceId, name: release.name } } });
-  if (!module?.builtin) throw new StewardError("conflict", "Trusted release requires a built-in module identity");
-  if (module.activeHash && module.activeHash !== release.hash) {
-    await assertAgentReleaseUpgrade(tx, module, release, releaseUpgrade);
-  }
-  const version = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: release.hash } } });
-  assertBuiltinSeedVersion(version, release);
-  const previous = await tx.generation.findFirst({ where: { workspaceId: context.workspaceId }, orderBy: { seq: "desc" } });
-  if (module.activeHash === release.hash && previous) return previous;
-  await tx.module.update({ where: { id: module.id }, data: { activeHash: release.hash, dataSchema: release.manifest.data.schema, status: "active" } });
-  if (module.status === "paused") await pauseIn(context, tx, module.id, { source: "chrona", reason: "版本切换保留原停用状态" });
-  const generation = await recordGeneration(context, tx, "activate");
-  await recordModuleActivation(context, tx, { moduleId: module.id, previousHash: module.activeHash, hash: release.hash, generationId: generation.id });
-  return generation;
 }
 type AutomaticRollbackInput = { tx: Prisma.TransactionClient; workspaceId: string; moduleId: string; hash: string; previousHash: string; moduleSchema: number; current: NonNullable<Awaited<ReturnType<typeof latestModuleEvolution>>> };
 function automaticRollbackDataError(candidate: ReturnType<typeof moduleManifestSchema.parse>, previous: ReturnType<typeof moduleManifestSchema.parse>, moduleSchema: number, current: AutomaticRollbackInput["current"]) {

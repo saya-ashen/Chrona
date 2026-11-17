@@ -28,6 +28,6 @@ bun scripts/pin-application.ts web /absolute/path/to/chrona-module-web
 
 此入口要求源码已提交、Git 树与声明的源码完全一致、材料通过原校验；发行应用还必须继承当前发行 commit。它更新 bundle、开发 lock、精确 artifact 输入，以及适用的发行 lock。它不提交主仓库、不推送、不设置远端、不发布应用。更新后移走对应旧 staging，再运行恢复及适用组合检查。需要修改共享生成源时，应将生成结果落实为相关应用的新提交后再固定，发行构建仍逐字核对，不自动替应用创建历史。
 
-应用纯逻辑测试归应用仓库；涉及真实 kernel、数据库、SDK 和跨应用行为的检查在宿主锁定组合中执行。Bun runner 明确发现恢复后的应用测试，三个 Chat 普通测试入口仍保留；API 与浏览器入口使用同一固定组合。逐文件归属和执行映射见 [应用测试映射](../tasks/cleanup-and-reorg/stage-4-test-mapping.json)与[宿主集成测试映射](../tasks/cleanup-and-reorg/stage-4-host-test-mapping.json)。lint ratchet 在基线含固定输入 lock 时，从该 Git 基线的 bundle 读取应用源码；迁移前基线才回退旧 external 路径。普通 errors/warnings 按文件比较数量，不允许数量增加；fatal parsing error 一律失败，完整诊断仍输出。staged hooks 核对 index 中 lock、bundle、artifact 和 main commit，且要求对应工作树字节一致，防止只暂存 lock 的不完整组合。
+应用纯逻辑测试归应用仓库；涉及真实 kernel、数据库、SDK 和跨应用行为的检查在宿主锁定组合中执行。Bun runner 明确发现恢复后的应用测试，三个 Chat 普通测试入口仍保留；API 与浏览器入口使用同一固定组合。当前发现入口为 `scripts/run-bun-tests.ts`、`scripts/run-api-tests.ts` 和 `scripts/verify-slice.ts`；阶段迁移时的逐文件映射从 Git 历史 `docs/tasks/cleanup-and-reorg/stage-4-*-mapping.json` 查阅。lint ratchet 在基线含固定输入 lock 时，从该 Git 基线的 bundle 读取应用源码；迁移前基线才回退旧 external 路径。普通 errors/warnings 按文件比较数量，不允许数量增加；fatal parsing error 一律失败，完整诊断仍输出。staged hooks 核对 index 中 lock、bundle、artifact 和 main commit，且要求对应工作树字节一致，防止只暂存 lock 的不完整组合。
 
 CLI 的 QQ 绑定维护通过随发行交付的 QQ 应用 `bind-code.ts` 执行，绑定格式继续由应用拥有。主程序不再通过 engine 反向导出 QQ 业务代码；绑定码只在维护结果中返回，应用仍只保存摘要。

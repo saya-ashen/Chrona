@@ -25,7 +25,7 @@ import type { Caller, Json, CallOrigin } from "./module-call-types";
 export type { Caller, Json, CallOrigin, Tool } from "./module-call-types";
 type Db = StewardPorts["db"] | Prisma.TransactionClient;
 import { CallError, publicCallError, publicCallReason } from "./module-call-error";
-export { CallError, type CallErrorCode } from "./module-call-error";
+export { CallError } from "./module-call-error";
 /**
  * Thrown by a system tool that waits for the user (v2-16 `approvals.request`): the async call stays `waiting`, untouched
  * by leases and retries, until `settleWaiting` gives its result, which goes back to the caller as a `call_result`.

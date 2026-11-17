@@ -9,7 +9,6 @@
     "@chrona/domain": "workspace:*",
     "@chrona/logging": "workspace:*",
     "@chrona/process": "workspace:*",
-    "@chrona/shared": "workspace:*",
     "chrona": "workspace:*"
   },
   "exports": {

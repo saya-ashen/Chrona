@@ -1,5 +1,5 @@
 import { verify } from "node:crypto";
-import { cleanupLocalWorkspace } from "@chrona/workspaces";
+import { cleanupLocalWorkspace } from "@chrona/git-workspaces";
 import { executionDeliveryFinalSchema, executionSignedStopSchema, kernelCleanupReceiptSchema, type KernelCleanupInput } from "@chrona/contracts/steward";
 import type { DeviceConfig } from "./config";
 import type { Attempt, Journal } from "./journal";

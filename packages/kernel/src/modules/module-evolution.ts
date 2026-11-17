@@ -57,7 +57,7 @@ export async function latestModuleEvolution(db: Db, workspaceId: string, moduleI
   const row = await db.moduleActivation.findFirst({ where: { moduleId, candidateHash: hash, module: { workspaceId } }, orderBy: [{ createdAt: "desc" }, { activationId: "desc" }] });
   return row ? moduleActivationOutcome(row) : null;
 }
-export function moduleActivationOutcome(row: Prisma.ModuleActivationGetPayload<object>) {
+function moduleActivationOutcome(row: Prisma.ModuleActivationGetPayload<object>) {
   const { createdAt: _createdAt, updatedAt: _updatedAt, grouped: _grouped, ...outcome } = row;
   return moduleEvolutionOutcomeSchema.parse(outcome);
 }

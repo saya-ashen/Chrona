@@ -140,7 +140,9 @@ async function restoreSeedRepository(repo: string, seedDir: string, old?: Module
   return parent;
 }
 
-async function writeSeedBundle(input: { repo: string; seedDir: string; name: string; commit: string; unchanged: boolean; old?: ModuleGitReleaseEntry }): Promise<ModuleGitReleaseEntry> {
+async function writeSeedBundle(input: {
+  repo: string; seedDir: string; name: string; commit: string; unchanged: boolean; old?: ModuleGitReleaseEntry;
+}): Promise<ModuleGitReleaseEntry> {
   const { repo, seedDir, name, commit, unchanged, old } = input;
   const bundle = `${name}.bundle`, bundlePath = resolve(seedDir, bundle);
   if (!unchanged || old?.commit !== commit) {
@@ -167,7 +169,9 @@ async function prepareModuleSeed(input: PreparedModuleInput, module: { name: str
 }
 
 /** Extract current sources, not rewritten monorepo history. A stable tree reuses its existing commit. */
-export async function prepareModuleGitRelease(input: { root: string; resourcesRoot: string; seedDir: string; hostCommit?: string; hostTimestamp?: string }): Promise<ReleaseLock> {
+export async function prepareModuleGitRelease(input: {
+  root: string; resourcesRoot: string; seedDir: string; hostCommit?: string; hostTimestamp?: string;
+}): Promise<ReleaseLock> {
   const hostCommit = input.hostCommit ?? git(input.root, ["rev-parse", "HEAD"]);
   const hostTimestamp = input.hostTimestamp ?? git(input.root, ["show", "-s", "--format=%ct", "HEAD"]);
   if (!oid.test(hostCommit) || !/^\d+$/.test(hostTimestamp)) throw new Error("Module seeds require a real Chrona base commit and commit timestamp");

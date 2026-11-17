@@ -2,8 +2,6 @@ import { Hono } from "hono";
 import { createStewardRuntime, type StewardRuntime } from "./steward-runtime";
 import { bodyLimit } from "hono/body-limit";
 
-import { getApiMessages, getPreferredLocale } from "@chrona/i18n";
-
 import { createApiRouter } from "./routes/api";
 import { createRemoteExecutionRouter, isRemoteExecutionDevicePath, isRemoteExecutionOwnerPath } from "./remote-execution-router";
 import { completeOAuth, OAUTH_CALLBACK_PATH } from "@chrona/kernel";
@@ -147,20 +145,17 @@ export async function createServerApp(options: { steward?: StewardRuntime } = {}
   });
 
   app.notFound((c) => {
-    const messages = getApiMessages(getPreferredLocale(c.req.header("accept-language")));
-    return c.json({ error: messages.notFound }, 404);
+    return c.json({ error: "Not found" }, 404);
   });
 
   app.onError((error, c) => {
-    const messages = getApiMessages(getPreferredLocale(c.req.header("accept-language")));
-
     // A malformed JSON request body surfaces as a SyntaxError thrown by
     // `c.req.json()`. That is a client mistake (400), not a server fault
     // (500) — mapping it here keeps a bad payload from masquerading as an
     // outage and from polluting error logs at the `error` level.
     if (error instanceof SyntaxError) {
       log.warn("malformed request body", { error: error.message });
-      return c.json({ error: messages.malformedJson }, 400);
+      return c.json({ error: "Malformed JSON request body" }, 400);
     }
 
     log.error("unhandled error", {
@@ -169,7 +164,7 @@ export async function createServerApp(options: { steward?: StewardRuntime } = {}
 
     return c.json(
       {
-        error: messages.internalServerError,
+        error: "Internal server error",
       },
       500,
     );

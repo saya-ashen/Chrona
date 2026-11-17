@@ -16,7 +16,7 @@ const operationSchemas = { setup: passwordInput, login: passwordInput, password:
 type AuthContext = Context<{ Bindings: ServerBindings }>;
 
 /** Cookie authority uses an explicitly configured public origin or the direct URL, never CORS or forwarding headers. */
-export function isBrowserAuthSameOrigin(request: Request, publicOrigin?: string) {
+function isBrowserAuthSameOrigin(request: Request, publicOrigin?: string) {
   const site = request.headers.get("sec-fetch-site");
   if (site && site !== "same-origin" && site !== "none") return false;
   const origin = request.headers.get("origin"), expected = publicOrigin ?? new URL(request.url).origin;

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
-import { prepareLockedLocalWorkspace, recoverWorkspaceLocks } from "@chrona/workspaces";
+import { prepareLockedLocalWorkspace, recoverWorkspaceLocks } from "@chrona/git-workspaces";
 import { executionDeliveryFinalSchema, type ExecutionDeliveryFinal, type ExecutionPayload } from "@chrona/contracts/steward";
 import { loadConfig, type DeviceConfig } from "./config";
 import { governedPiDriver, type LaunchDriver, type ProcessHandle } from "./driver";

@@ -80,8 +80,11 @@ describe("apiKeyAuth", () => {
     process.env.API_KEY = "test-key";
     resetEnvCacheForTests();
 
-    const missing = await app().request("http://local/api/protected");
+    const missing = await app().request("http://local/api/protected", {
+      headers: { "accept-language": "zh-CN,zh;q=0.9" },
+    });
     expect(missing.status).toBe(401);
+    expect(await missing.json()).toEqual({ error: "Unauthorized" });
 
     const invalid = await app().request("http://local/api/protected", {
       headers: { Authorization: "Bearer wrong" },

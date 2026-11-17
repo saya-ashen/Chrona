@@ -9,7 +9,7 @@ export function executionDisplayText(text: string, limit = 24_000): string {
     .replace(/\b(?:password|api[_-]?key|access[_-]?token|secret|token|credential|passwd|pwd|client_secret)\s*[:=]\s*(?:"[^"\n]*"|'[^'\n]*'|[^\s,;]+)/gi, "[redacted]"), [], limit, true);
 }
 
-export function projectExecutionQuestion(question: ExecutionSnapshot["questions"][number]) {
+function projectExecutionQuestion(question: ExecutionSnapshot["questions"][number]) {
   return { requestId: question.requestId, title: executionDisplayText(question.title, 200), method: question.method,
     options: question.options.map(option => executionDisplayText(option, 300)), expiresAt: question.expiresAt, status: question.status };
 }

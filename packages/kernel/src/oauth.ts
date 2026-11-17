@@ -12,7 +12,7 @@ const pending = new Map<string, Pending>();
 const cache = new Map<string, { accessToken: string; expires: number; fingerprint: string }>(), MAX_CACHED = 200;
 const refreshing = new Map<string, Promise<{ accessToken: string; expiresAt: string }>>();
 /** Set by the kernel when it writes a credential: `secrets.get` then hides the client secret and refresh tokens. */
-export const OAUTH_MANAGED = "oauthManaged";
+const OAUTH_MANAGED = "oauthManaged";
 export const hiddenField = (field: string, secret: Record<string, string>) => /^oauthBinding(_|$)/.test(field) || /^refreshToken_/.test(field) || (!!secret[OAUTH_MANAGED] && /^(refreshToken|clientSecret)$/.test(field));
 const locks = new Map<string, Promise<unknown>>();
 /** Kernel writes to one credential run one at a time and re-read it first, so a rotation or callback never overwrites a newer value. */

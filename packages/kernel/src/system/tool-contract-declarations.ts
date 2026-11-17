@@ -9,7 +9,7 @@ import { tool, text, declaredSystemTools } from "./tool-declaration";
 export const consumerInput = z.object({ moduleId: z.string().min(1).nullable().optional() }).strict();
 export const ackInput = z.object({ revision: z.string().min(1), ids: z.array(z.string().min(1)).min(1).max(100) }).strict();
 export const withdrawalsInput = z.object({ revision: z.string().min(1), keys: z.array(z.string().max(4000)).min(1).max(100) }).strict();
-export const consumerOutput = z.object({ moduleId: z.string().nullable(), revision: z.string() });
+const consumerOutput = z.object({ moduleId: z.string().nullable(), revision: z.string() });
 
 const readers = ["modules", "owner", "provider"] as const;
 const agentGuidance: Record<keyof typeof kernelAgentInputs, string> = {

@@ -14,7 +14,7 @@ import { assertModuleAvailable } from "./module-availability";
 
 export type ModuleReleaseGit = { repository: string | null; branch: string; commit: string; bundlePath: string };
 export type ModuleRelease = { name: string; origin: "builtin" | "external"; codeDir: string; hash: string; manifest: ModuleManifest; git: ModuleReleaseGit | null };
-export class ModuleReleaseError extends StewardError {
+class ModuleReleaseError extends StewardError {
   constructor(code: "not_found" | "invalid" | "forbidden" | "conflict", public readonly reason: "release_not_found" | "invalid_release" | "release_drift", message: string) { super(code, message); }
 }
 function releaseManifest(bytes: Buffer, name: string): ModuleManifest {

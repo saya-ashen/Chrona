@@ -16,7 +16,3 @@ export function markExecutionControlRejected(error: ValidationError): ExecutionC
   Object.defineProperty(error, rejected, { value: true });
   return error as ExecutionControlRejection;
 }
-
-export function isExecutionControlRejected(error: unknown): error is ExecutionControlRejection {
-  return isExecutionControlValidationError(error) && rejected in error;
-}

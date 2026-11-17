@@ -2,7 +2,7 @@ import { RUN_LIMITS, buildSettingsSchema, settingsSchema, updateSettingsSchema, 
 
 export const kernelModuleModelSettingsSchema = moduleModelSettingsSchema;
 export const kernelSettingsSchema = settingsSchema;
-export const kernelUpdateSettingsSchema = updateSettingsSchema;
+const kernelUpdateSettingsSchema = updateSettingsSchema;
 import type { StewardPorts } from "./ports";
 import { localDayKey } from "@chrona/domain/steward/local-day";
 type RecordContext = Pick<StewardPorts, "db" | "now"> & { workspaceId: string };
@@ -24,13 +24,6 @@ export function buildSettings(settings: unknown) {
 export function budgetTimezone(settings: unknown): string {
   const value = settings as { timezone?: unknown } | null;
   return settingsSchema.shape.timezone.parse(value?.timezone ?? "Asia/Shanghai");
-}
-/** Same local-day count for both admission and the owner's settings page. */
-export async function buildUsage(db: Pick<StewardPorts["db"], "session">, workspaceId: string, settings: unknown, at: Date) {
-  const timezone = budgetTimezone(settings), date = localDayKey(at, timezone);
-  const recent = await db.session.findMany({ where: { workspaceId, source: "build", createdAt: { gte: new Date(at.getTime() - 48 * 3600000), lte: at } }, select: { createdAt: true } });
-  const used = recent.filter(row => localDayKey(row.createdAt, timezone) === date).length;
-  return { date, timezone, used, remaining: Math.max(0, buildSettings(settings).dailyLimit - used) };
 }
 function validateTimezone(timezone: string, now: Date) {
   try { new Intl.DateTimeFormat("en", { timeZone: timezone }).format(now); } catch { throw new StewardError("invalid", "Invalid timezone"); }

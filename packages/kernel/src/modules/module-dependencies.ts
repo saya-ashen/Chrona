@@ -4,7 +4,7 @@ import type { ModuleManifest } from "@chrona/contracts/steward";
 import type { ModuleContext } from "./module-context";
 import { assertBuildOwnership, holdBuildOwnership } from "./module-build-ownership";
 
-export function requiredHostPrograms(manifest: Pick<ModuleManifest, "entry" | "packages">) {
+function requiredHostPrograms(manifest: Pick<ModuleManifest, "entry" | "packages">) {
   return [...new Set([...manifest.packages, ...(typeof manifest.entry === "object" && manifest.entry.runtime ? [manifest.entry.runtime] : [])])];
 }
 

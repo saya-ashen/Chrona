@@ -1,6 +1,6 @@
 # 模块源码与 Git 工作流
 
-当前发行包含十四个应用来源。Agent 是唯一不可普通替换的内置应用；其余应用通过现有检查与激活流程更新。发行 lock 中的 `repository` 表示该固定发行提交的公开核验结果，实例中的远端关联单独保存在 `ModuleUpstream`，两者不能混为一谈。发布种子流程见[模块 Git 种子与官方发布](module-git-release.md)。
+当前开发固定输入覆盖 13 个独立应用，发行选择其中七个；Pi 是普通 Provider 应用，更新使用相同受控生命周期。来源与恢复入口见[独立应用](independent-applications.md)。发行 lock 中的 `repository` 表示该固定发行提交的公开核验结果，实例中的远端关联单独保存在 `ModuleUpstream`，两者不能混为一谈。发布种子流程见[模块 Git 种子与官方发布](module-git-release.md)。
 
 ## 源码、运行版本与数据
 
@@ -20,28 +20,18 @@
 
 ## 应用身份与更新
 
-Agent 保留内置身份及动态替换限制。关联或导出 Git 源码不会解除该限制。普通应用通过源码提交、检查、审批和激活流程更新；Git fetch 或 push 不会切换运行代码。现有应用的本地修改与停用状态不会因远端关联而被覆盖。
+预装应用不因发行身份获得额外权限。普通应用通过源码提交、检查、审批和激活流程更新；Git fetch 或 push 不会切换运行代码。现有应用的本地修改与停用状态不会因远端关联而被覆盖。
 
 ## 取出、编辑、提交、检查
 
 通过已有模块工具操作，不要直接修改 bare repo 或 store：
 
-1. `modules.checkout` 将 active 或指定版本的源码取到调用方工作目录中的空目录。`source: "builtin"` 读取当前发行参考，不代表当前定制版本，也不会激活代码。
-2. 编辑取出的源码，使用 `modules.propose` 提交目录与变更意图。有效候选生成 Git commit，再进入既有构建、测试和检查队列。无效 manifest 可以返回 `rejected` 且没有模块身份，不构成有效版本。
-3. 用 `modules.check` 检查候选的状态、测试及错误。检查通过的普通更新自动激活；新增凭据或已有数据迁移继续要求现有用户决策。
-4. 激活后确认实际 active 版本和运行健康状态。`modules.build` 也使用同一受检生命周期。
+1. 通过 Author 读取准入覆盖的精确基线，或从独立应用仓库取得源码；在当前 Agent 已有工作区编写、构建和测试。
+2. Author 导入完整源码及运行材料，真实 owner 入口按当前合同签发绑定提交者、全部目标及基线的材料准入。
+3. Author 以实际应用身份提交整个固定集合，用原 request key 和 receipt 查询检查、审批与激活。丢失回复不换 key 重投。
+4. 激活后核对实际版本、页面及业务行为；检查通过和审批通过分别只有其自身证明范围。
 
-以下是工具参数示例，目录相对于调用方工作目录：
-
-```json
-{"module":"files","dir":"files-edit"}
-```
-
-上述参数用于 `modules.checkout`；编辑后向 `modules.propose` 传入：
-
-```json
-{"dir":"files-edit","intent":{"changes":["调整文件展示"],"preserves":["保留现有文件和数据"]}}
-```
+当前参数见[对话创作](author-current-conversation.md)、[版本材料](author-version-materials.md)及 [API 规范](kernel-api-design.md)。旧 `modules.checkout/propose/check/build` 不再是公开入口。
 
 同名卸载后重装的外部应用拥有新 `moduleId`，不会继承旧仓库、提交回执或安装身份。
 
@@ -78,9 +68,9 @@ chrona admin git-push notify --commit <完整源码提交SHA> --expected-remote 
 
 ## 离线更新与旧版本
 
-`modules.install` 仍只接受官方 external package 名称、`mode` 和 `requestKey`。首次 `mode: "install"` 从可信 bundle 的精确 commit 安装；已有外部应用的显式 `mode: "update"` 将离线发行候选交给相同的 Git merge / propose / 检查流程，不用发行快照直接覆盖本地定制。Agent 不能通过普通应用安装流程替换。
+离线安装使用停服 owner CLI `chrona admin install <package> --request-key <key>`；已有应用显式 `--update` 将固定发行候选交给正常 Git 合并与检查流程，不用发行快照覆盖本地定制。Pi 的 `--exact-release` 选择仅适用于真实发行固定 commit、批准身份及源码全等条件，仍经过正常检查与激活。详见[运维](operations.md)。
 
-新安装、提交、导入及上游操作需要可执行的系统 Git。Git 缺失时明确失败；已有 store 中的受检版本与仍有匹配可信资源的 legacy 内置运行不要求先完成源码 Git 导入。普通应用的启动登记不会为了跟进新发行而 fetch 或覆盖当前版本。Agent 是例外：它由可信发行管理，启动时可按现有停止证明和数据检查规则升级到发行版本，不能通过普通应用流程替换。
+新安装、提交、导入及上游操作需要可执行的系统 Git。Git 缺失时明确失败；已有 store 中的受检版本与仍有匹配可信资源的 legacy 内置运行不要求先完成源码 Git 导入。普通应用的启动登记不会为了跟进新发行而 fetch 或覆盖当前版本。预装 Pi 同样保留用户选择，不在启动时自动补装或覆盖。
 
 旧 64 位记录只有在原有源码能按原摘要规则验证时才可导入 Git；原 hash、审批和 active 身份保持不变。旧内置可能没有 store 源码，源码读取须核对原 hash 对应的可信发行资源。失源或摘要不匹配需要明确诊断，不能取当前新发行或 upstream 冒充旧历史；缺失旧源码也不能被描述为已经迁移成功。
 

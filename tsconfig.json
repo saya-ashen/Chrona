@@ -35,9 +35,6 @@
       "@chrona/logging": [
         "./packages/logging/src/index.ts"
       ],
-      "@chrona/i18n": [
-        "./packages/i18n/src/index.ts"
-      ],
       "@chrona/domain": [
         "./packages/domain/src/index.ts"
       ],
@@ -68,8 +65,8 @@
       "@chrona/kernel/test-support": [
         "./packages/kernel/src/test-support.ts"
       ],
-      "@chrona/workspaces": [
-        "./packages/workspaces/src/index.ts"
+      "@chrona/git-workspaces": [
+        "./packages/git-workspaces/src/index.ts"
       ],
       "@chrona/pi": [
         "./packages/pi/src/index.ts"

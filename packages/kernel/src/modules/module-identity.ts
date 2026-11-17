@@ -7,7 +7,7 @@ const kernelNames = new Set<string>(KERNEL_MODULE_NAMES);
 const builtinNames = new Set<string>(BUILTIN_MODULE_NAMES);
 const pausedOperations = ["build", "propose", "group", "activate", "update", "rollback", "install", "enable", "configure"] as const;
 const isKernelReservedName = (name: string) => kernelNames.has(name) || (LOCAL_CAPABILITY_NAMES as readonly string[]).includes(name) || (RESERVED_ENTRY_NAMES as readonly string[]).includes(name);
-export const isReservedModuleName = (name: string) => isKernelReservedName(name) || builtinNames.has(name);
+const isReservedModuleName = (name: string) => isKernelReservedName(name) || builtinNames.has(name);
 /** For persisted apps ONLY Module.builtin decides origin; source/manifest/hash never do. */
 export function moduleIdentity(row: { name: string; builtin: boolean }, options: { configurable?: boolean; removable?: boolean } = {}) {
   const origin: ModuleOrigin = row.builtin ? "builtin" : "external";

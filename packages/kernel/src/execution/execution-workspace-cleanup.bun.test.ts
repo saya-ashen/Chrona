@@ -1,4 +1,4 @@
-import { localDirectoryIdentity } from "@chrona/workspaces";
+import { localDirectoryIdentity } from "@chrona/git-workspaces";
 import { expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, writeFileSync } from "node:fs";

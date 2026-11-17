@@ -1,10 +1,10 @@
 import { join } from "node:path";
-import type { LocalWorkspaceInput } from "@chrona/workspaces";
+import type { LocalWorkspaceInput } from "@chrona/git-workspaces";
 import type { DeviceConfig } from "./config";
 import type { Attempt } from "./journal";
 import { executionDigest, type Delivery } from "./protocol";
 
-export function workspaceOwner(config: DeviceConfig, delivery: Delivery) {
+function workspaceOwner(config: DeviceConfig, delivery: Delivery) {
   return { device: config.device, deliveryId: delivery.deliveryId, launchDigest: delivery.launchDigest };
 }
 /** One exact local binding is shared by preparation and later explicit cleanup. */

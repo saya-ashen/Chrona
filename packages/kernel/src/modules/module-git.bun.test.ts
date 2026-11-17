@@ -4,7 +4,9 @@ import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { commitModuleSource, ensureModuleGit, exportModuleSource, getModuleLocalHead, importLegacyModuleSource, moduleGitPath, readModuleSource, type ModuleGitFile } from "./module-git";
+import { commitModuleSource, ensureModuleGit, getModuleLocalHead, importLegacyModuleSource, moduleGitPath, readModuleSource, readModuleMaterial, type ModuleGitFile } from "./module-git";
+
+import { checkoutModule } from "./module-files";
 
 const roots: string[] = [];
 afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
@@ -20,9 +22,9 @@ test("module Git roundtrips bytes and exports only fixed source into an empty de
   const base = await fixture(), revision = await save(base, "v1");
   expect(revision.commit).toMatch(/^[a-f0-9]{40}$/);
   expect((await readModuleSource({ ...base, commit: revision.commit })).map(file => [file.path, Buffer.from(file.bytes)])).toEqual(files.map(file => [file.path, Buffer.from(file.bytes)]));
-  await exportModuleSource({ ...base, commit: revision.commit, root: base.platform, dir: "candidate" });
+  await checkoutModule(base.platform, "candidate", await readModuleMaterial({ ...base, commit: revision.commit }));
   expect(await readFile(join(base.platform, "candidate/nested/binary"))).toEqual(Buffer.from([0, 128, 255]));
-  await expect(exportModuleSource({ ...base, commit: revision.commit, root: base.platform, dir: "candidate" })).rejects.toMatchObject({ code: "conflict" });
+  await expect(checkoutModule(base.platform, "candidate", await readModuleMaterial({ ...base, commit: revision.commit }))).rejects.toMatchObject({ code: "conflict" });
 });
 test("same tree reuses commit; changed source preserves parent, deletion and candidate pins", async () => {
   const base = await fixture(), first = await save(base, "v1"), duplicate = await save(base, "v2", [...files].reverse());

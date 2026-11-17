@@ -20,7 +20,7 @@ export async function executionGrant(ports: StewardPorts, tx: Prisma.Transaction
   return grant;
 }
 /** Started-but-unconfirmed attempts keep capacity regardless of Run's terminal/lease/cancel label. */
-export async function codingCapacity(tx: Prisma.TransactionClient, row: Attempt) {
+async function codingCapacity(tx: Prisma.TransactionClient, row: Attempt) {
   const occupied: Prisma.ExecutionAttemptWhereInput = { stopConfirmedAt: null, run: { startedAt: { not: null } } };
   const bucket = row.moduleId ? { moduleId: row.moduleId } : { moduleId: null, workspaceId: row.workspaceId, ownerId: row.ownerId };
   return await tx.executionAttempt.count({ where: occupied }) < KERNEL_EXECUTION_LIMITS.codingGlobal

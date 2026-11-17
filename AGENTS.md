@@ -7,7 +7,7 @@ Chrona 是随用户需求生长的个人工具。默认中文，代码、命令�
 
 - 先检查当前目录及更具体的 `AGENTS.md`、`git status` 和相关 diff，保留用户未提交改动。
 - 产品依据：[设计目标](docs/zh/steward-goals.md)。设计 API 时再读[目标规范](docs/zh/kernel-api-design.md)。
-- 当前实现：[架构](docs/zh/architecture.md)及 `packages/contracts/src/steward`（[边界盘点](docs/zh/kernel-permanent-boundary-contract.md)为前期历史快照）。目标不等于实现，当前边界 **UNFROZEN**。
+- 当前实现：[架构](docs/zh/architecture.md)及 `packages/contracts/src/steward`。目标不等于实现，当前边界 **UNFROZEN**。
 - 按任务从[文档索引](docs/README.md)读取专题；不要求通读历史方案、部署记录或工具手册。
 - 代码存在、测试通过、隔离验收、实际部署和真实使用分别报告；不以旧版本验收证明当前能力。
 - 后续 API 目标不是立即改代码的授权；任务范围、优先级和外部操作以本次用户指令为准。

@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { closeSync, constants, fstatSync, fsyncSync, lstatSync, openSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { privateRoot } from "@chrona/workspaces";
+import { privateRoot } from "@chrona/git-workspaces";
 import { bundledPlatform, bundledResources } from "./bundled-resources";
 import { syncDirectory } from "./private-files";
 const hash = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");

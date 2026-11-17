@@ -10,7 +10,7 @@ import { MODULE_MATERIAL_FILE, MODULE_SOURCE_MAX_BYTES, MODULE_SOURCE_MAX_FILES,
 // Engine imports must never inherit a developer/live database URL.
 const databaseRoot = mkdtempSync(join(tmpdir(), "chrona-material-test-db-"));
 process.env.DATABASE_URL = `file:${join(databaseRoot, "test.db")}`;
-const [{ snapshotModuleMaterial, moduleMaterialDigest, moduleSourceFiles, storeModuleArtifacts }, { commitModuleSource, importLegacyModuleSource, moduleGitPath, readModuleSource, readModuleMaterial, exportModuleSource }, { snapshotModule, ModuleDirectory }, { admitCandidates, submitCandidates, candidateSource }, { testDb }, { moduleContext }, { buildPending }, { ensureVersionMaterial }, { rollback }, { testModuleProcess }, { createExternalModuleInstaller, installExternal }] = await Promise.all([
+const [{ snapshotModuleMaterial, moduleMaterialDigest, moduleSourceFiles, storeModuleArtifacts }, { commitModuleSource, importLegacyModuleSource, moduleGitPath, readModuleSource, readModuleMaterial }, { snapshotModule, ModuleDirectory, checkoutModule }, { admitCandidates, submitCandidates, candidateSource }, { testDb }, { moduleContext }, { buildPending }, { ensureVersionMaterial }, { rollback }, { testModuleProcess }, { createExternalModuleInstaller, installExternal }] = await Promise.all([
   import("./module-artifacts"), import("./module-git"), import("./module-files"), import("./module-candidates"), import("../test-db"), import("./module-context"), import("./module-build"), import("./module-source"), import("./module-activation"), import("./module-test-process"), import("./module-install"),
 ]);
 const roots: string[] = [];
@@ -44,7 +44,7 @@ test("explicit material keeps ignored source inputs in Git and binary bytes outs
   // The mutable submitted output can disappear; immutable restoration does not rebuild it.
   await rm(f.dir, { recursive: true });
   expect(moduleMaterialDigest(await readModuleMaterial({ ...f.repository, commit: revision.commit }))).toBe(moduleMaterialDigest(files));
-  await exportModuleSource({ ...f.repository, commit: revision.commit, root: f.root, dir: "checkout" });
+  await checkoutModule(f.root, "checkout", await readModuleMaterial({ ...f.repository, commit: revision.commit }));
   expect(await readFile(join(f.root, "checkout/bin/program"))).toEqual(f.binary);
   expect((await stat(join(f.root, "checkout/bin/program"))).mode & 0o777).toBe(0o755);
   expect((await stat(blob)).nlink).toBe(1);
@@ -103,7 +103,7 @@ test("explicit source at 2 MiB roundtrips through Git and export; one extra byte
   expect(moduleSourceFiles(files).reduce((total, file) => total + file.bytes.byteLength, 0)).toBe(2 * 1024 * 1024);
   const revision = await commitModuleSource({ ...f.repository, versionId: "boundary", files, message: "source budget" });
   expect(await readModuleSource({ ...f.repository, commit: revision.commit })).toEqual(moduleSourceFiles(files));
-  await exportModuleSource({ ...f.repository, commit: revision.commit, root: f.root, dir: "exported" });
+  await checkoutModule(f.root, "exported", await readModuleMaterial({ ...f.repository, commit: revision.commit }));
   expect(moduleMaterialDigest(await snapshotModuleMaterial(f.root, "exported"))).toBe(moduleMaterialDigest(files));
   const oversized = Buffer.concat([bytes, Buffer.from("x")]);
   await writeFile(join(f.dir, "index.ts"), oversized);
@@ -120,7 +120,7 @@ test("legacy snapshots and imports share the 2 MiB budget and Git reads reject o
   expect(files.reduce((total, file) => total + file.bytes.byteLength, 0)).toBe(2 * 1024 * 1024);
   const revision = await importLegacyModuleSource({ ...f.repository, legacyHash: moduleMaterialDigest(files), files });
   expect(await readModuleSource({ ...f.repository, commit: revision.commit })).toEqual(files);
-  await exportModuleSource({ ...f.repository, commit: revision.commit, root: f.root, dir: "exported" });
+  await checkoutModule(f.root, "exported", await readModuleMaterial({ ...f.repository, commit: revision.commit }));
   expect(await snapshotModule(f.root, "exported")).toEqual(files);
   await writeFile(join(f.dir, "index.ts"), Buffer.concat([bytes, Buffer.from("x")]));
   await expect(snapshotModule(f.root, "submitted")).rejects.toMatchObject({ code: "invalid" });

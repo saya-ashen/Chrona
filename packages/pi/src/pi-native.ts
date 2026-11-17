@@ -6,7 +6,7 @@ type RecordValue = Record<string, unknown>;
 export const nativeError = (code: "unsupported" | "invalid" | "unavailable" | "unknown" | "too_large", message: string) => Object.assign(new Error(message), { code });
 const sensitiveKey = /^(?:authorization|proxy-authorization|cookie|set-cookie|password|passwd|secret|api[_-]?key|access[_-]?token|refresh[_-]?token|token|credentials)$/i;
 /** Preserve complete JSON structure; redact values and keys without clipping strings or arrays. */
-export function safeRecord(record: RecordValue, secrets: string[]): RecordValue {
+function safeRecord(record: RecordValue, secrets: string[]): RecordValue {
   const text = (value: string) => providerText(value, secrets, Number.MAX_SAFE_INTEGER, true);
   const visit = (value: unknown, depth = 0): unknown => {
     if (depth > 128) throw nativeError("too_large", "Pi record exceeds 128 levels; full record was not returned");

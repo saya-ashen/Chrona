@@ -2,7 +2,7 @@ import type { StewardPorts } from "./ports";
 import { lifecycleNotice } from "../../../.generated/applications/notify/lifecycle";
 import { kernelFactSchema } from "./notification-facts";
 
-export type Notice = { title: string; body: string; level: string; idempotencyKey: string; moduleId: string | null; sessionId: string | null; approvalId: string | null; recipient: string | null; caller: string; status: string };
+type Notice = { title: string; body: string; level: string; idempotencyKey: string; moduleId: string | null; sessionId: string | null; approvalId: string | null; recipient: string | null; caller: string; status: string };
 /** Test-only presentation: application sends plus finite kernel facts, without a live notification app. */
 export async function notices(db: StewardPorts["db"], filter: Partial<Notice> = {}) {
   const calls = await db.moduleInvocation.findMany({ where: { target: "notify", tool: "send" }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });

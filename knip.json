@@ -1,5 +1,11 @@
 {
   "$schema": "https://unpkg.com/knip@latest/schema.json",
+  "ignoreBinaries": ["cc", "mkfifo"],
+  "ignoreUnresolved": ["scripts/chrona.ts"],
+  "ignoreDependencies": ["dependency-cruiser"],
+  "ignoreIssues": {
+    "packages/contracts/src/steward/module-candidates.ts": ["duplicates"]
+  },
   "ignore": [
     "apps/cli/src/bun-entry.ts",
     "packages/db/src/generated/**"
@@ -7,45 +13,35 @@
   "workspaces": {
     ".": {
       "entry": [
-        "scripts/**/*.ts"
+        "scripts/**/*.ts",
+        "build/**/*.ts"
       ],
       "project": [
         "scripts/**/*.{ts,tsx}",
-        "!**/*.test.ts",
-        "!**/*.test.tsx",
-        "!**/__tests__/**",
-        "!**/*.spec.ts"
+        "build/**/*.ts"
       ]
     },
     "apps/server": {
-      "project": [
-        "src/**/*.{ts,tsx}",
-        "!**/*.test.ts",
-        "!**/*.test.tsx",
-        "!**/__tests__/**"
-      ]
+      "entry": ["src/**/*.bun.test.ts", "src/**/*.fixture.ts", "src/__tests__/fixtures/*.ts"],
+      "project": ["src/**/*.{ts,tsx}"]
+    },
+    "packages/remote-device": {
+      "entry": ["src/cli.ts", "src/**/*.bun.test.ts", "scripts/*.ts"],
+      "project": ["src/**/*.ts", "scripts/*.ts"]
+    },
+    ".generated/applications/*": {
+      "entry": ["index.ts", "build.ts", "src/**/*.tsx", "**/*.bun.test.ts", "test.ts"],
+      "project": ["**/*.{ts,tsx}", "!vendor/**", "!runtime/**", "!node_modules/**"]
     },
     "packages/*": {
-      "project": [
-        "src/**/*.{ts,tsx}",
-        "!**/*.test.ts",
-        "!**/*.test.tsx",
-        "!**/__tests__/**"
-      ]
-    },
-    "packages/skills/chrona-node": {
-      "entry": [
-        "SKILL.md",
-        "README.md",
-        "package.json",
-        "bin/chrona"
-      ],
-      "project": []
+      "entry": ["src/**/*.bun.test.ts", "src/**/*.fixture.ts"],
+      "project": ["src/**/*.{ts,tsx}"]
     },
     "apps/cli": {
       "entry": [
         "src/index.ts",
-        "src/bun-entry.ts"
+        "src/bun-entry.ts",
+        "src/**/*.bun.test.ts"
       ],
       "project": [
         "src/**/*.ts",
@@ -55,6 +51,7 @@
     "packages/app-sdk": {
       "entry": [
         "sdk.ts",
+        "preview.ts",
         "testing.ts",
         "process.ts",
         "transport.ts",

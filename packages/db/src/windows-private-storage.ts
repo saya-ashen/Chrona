@@ -4,20 +4,20 @@ import { spawnSync } from "node:child_process";
 const SYSTEM_SID = "S-1-5-18";
 const FULL_CONTROL = 2_032_127;
 
-export type WindowsAclRule = {
+type WindowsAclRule = {
   sid: string;
   accessType: string;
   rights: number;
   inherited: boolean;
 };
 
-export type WindowsAclAudit = {
+type WindowsAclAudit = {
   owner: string;
   currentUser: string;
   rules: WindowsAclRule[];
 };
 
-export type WindowsAclCommand = {
+type WindowsAclCommand = {
   command: string;
   args: string[];
   env?: Record<string, string>;

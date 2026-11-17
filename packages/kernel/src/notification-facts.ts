@@ -11,7 +11,7 @@ type Db = StewardPorts["db"] | Prisma.TransactionClient;
 const text = z.string().max(4000), identity = z.string().min(1).max(256);
 const links = { module: identity.optional(), session: identity.optional() };
 /** Closed runtime vocabulary: application content and notification policy belong to the consumer. */
-export const lifecycleFactSchema = z.discriminatedUnion("kind", [
+const lifecycleFactSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.enum(["module-paused", "module-build-failed"]), app: identity }).strict(),
   z.object({ kind: z.literal("module-activated"), app: identity, update: z.boolean(), hash: identity }).strict(),
   z.object({ kind: z.literal("module-update-rejected"), app: identity, hash: identity, activeHash: identity, error: z.string().max(300) }).strict(),
@@ -21,7 +21,7 @@ export const lifecycleFactSchema = z.discriminatedUnion("kind", [
 ]);
 export type LifecycleFact = z.infer<typeof lifecycleFactSchema>;
 // The question and response protocol remain in provider interactions; this is only its runtime identity.
-export const noticeSchema = z.object({ key: identity, kind: z.literal("provider-input-required"), run: identity, session: identity.optional() }).strict();
+const noticeSchema = z.object({ key: identity, kind: z.literal("provider-input-required"), run: identity, session: identity.optional() }).strict();
 export const kernelFactSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("notice"), data: noticeSchema }).strict(),
   z.object({ type: z.literal("lifecycle"), data: z.object({ key: identity, ...links, fact: lifecycleFactSchema }).strict() }).strict(),

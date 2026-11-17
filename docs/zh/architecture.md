@@ -1,6 +1,6 @@
 # Chrona 当前架构
 
-本文概述当前源码边界。公开 API 按[目标规范](kernel-api-design.md)调整为七命名空间、显式 authority 与统一回执；验证状态见[API 实施记录](kernel-api-implementation.md)，尚未冻结。旧[边界盘点](kernel-permanent-boundary-contract.md)描述上一阶段。
+本文概述当前源码边界。公开 API 按[目标规范](kernel-api-design.md)调整为七命名空间、显式 authority 与统一回执；验证状态见[API 实施记录](kernel-api-implementation.md)，尚未冻结。上一阶段的边界盘点从 Git 历史查阅。
 
 ## 1. 用途与信任模型
 
@@ -31,7 +31,7 @@ Chrona 是单一 owner 的个人工具：用户自然交流，Agent 选择方法
 - 当前材料创作复用现有 Agent Run，经 Author 导入源码和产物，再按精确准入提交；Author 不启动模型或编译器。pending 回执不表示激活。
 - 内核事务保存有限事实，唯一选定应用持久接收、ack 后负责通知；恢复投递前核对撤回。没有 Notify 不取消审批本体。
 
-相关合同：[Agent](agent-builtin-application.md)、[结构化状态与恢复](kernel-agent-migration.md)、[版本材料](author-version-materials.md)、[有限事实](kernel-notification-facts.md)。
+相关合同：[Agent](agent-builtin-application.md)、[结构化状态与恢复](kernel-api-implementation.md)、[版本材料](author-version-materials.md)、[有限事实](kernel-notification-facts.md)。
 
 ## 4. 存储
 
@@ -64,8 +64,8 @@ Mind 的组件和三类执行日志共用 `mind.sqlite`，执行预算与恢复�
 
 数据为 SQLite 加 dataDir 下的 platform、sessions 和 secrets；停机完整备份，不能只复制数据库。开发及验收使用全新临时数据，初始迁移不兼容旧库。实际操作见[运维](operations.md)。
 
-内核/Agent 和普通应用的当前阶段证据分别见[内核迁移](kernel-agent-migration.md)、[应用迁移](application-migration.md)。源码、离线测试、隔离验收、部署及真实使用分开判断；文档中的完成不自动覆盖后续代码或既有实例。
+内核/Agent 和普通应用的当前阶段证据分别见[API 实施记录](kernel-api-implementation.md)、[应用迁移](application-migration.md)。源码、离线测试、隔离验收、部署及真实使用分开判断；文档中的完成不自动覆盖后续代码或既有实例。
 
-上一阶段的源码归属及发行消费者盘点保留在[工程清理记录](../tasks/cleanup-and-reorg/application-boundaries.md)，其中的旧路径以本文代码地图为准。阶段验证记录见[阶段 1 基线](../tasks/cleanup-and-reorg/stage-1-summary.md)；其中的隔离发行包未部署，不能替代现有实例取证。
+源码归属、固定开发输入及测试分工见[独立应用](independent-applications.md)。上一阶段的清单、测试映射、发行和部署记录从 Git 历史 `docs/tasks/cleanup-and-reorg/` 查阅；其中的隔离发行包及历史部署不证明当前版本已经部署。
 
 旧系统接口、构建和健康自报机制的正文从本文件的 Git 历史查阅，不再作为当前开发规则。

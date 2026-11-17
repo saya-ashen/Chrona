@@ -1,6 +1,6 @@
-# @chrona/workspaces
+# @chrona/git-workspaces
 
-Public host library for physical Git workspaces. Import from `@chrona/workspaces`.
+Public host library for physical Git workspaces. Import from `@chrona/git-workspaces`.
 It has no Chrona kernel, executor protocol, journal, model, or transport dependencies.
 The server host and device adapters share this implementation.
 
@@ -25,5 +25,5 @@ of any transport's limits.
 Run offline tests with:
 
 ```sh
-bun test packages/workspaces/src
+bun test packages/git-workspaces/src
 ```

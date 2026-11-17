@@ -11,7 +11,6 @@
 | [内核 API 实施记录](zh/kernel-api-implementation.md) | 当前实现、自动检查及未覆盖范围 |
 | [持续关注与恢复](zh/continuous-steward-journey.md) | timer、来源、记忆纠正、恢复与用量的实施证据及未完成项 |
 | [当前架构](zh/architecture.md) | 当前源码边界、所有权和代码地图 |
-| [现有边界盘点](zh/kernel-permanent-boundary-contract.md) | 前一阶段工具与边界盘点；新版接口见 API 规范与实施记录 |
 | [开发路线](zh/development-roadmap.md) | 待推进工作及证据入口，不重复阶段流水账 |
 | [开发指引](../AGENTS.md) | 必守规则、最小实现和检查方式 |
 
@@ -31,11 +30,13 @@
 | 应用开发与材料 | [依赖方向](zh/module-dependency-direction.md)、[版本材料](zh/author-version-materials.md)、[当前对话创作](zh/author-current-conversation.md)、[Git 发行](zh/module-git-release.md) |
 | Web 与设置 | [外壳与组合](zh/web-components-and-shell.md)、[可执行页面](zh/web-executable-components.md)、[应用设置](zh/application-settings.md) |
 | 通知与自动化 | [有限内核事实](zh/kernel-notification-facts.md)、[Mind](zh/mind-implementation.md)、[应用迁移](zh/application-migration.md) |
-| 源码验收证据 | [内核/Agent 迁移](zh/kernel-agent-migration.md)、[普通应用迁移](zh/application-migration.md)、[边界实施](zh/kernel-permanent-boundary-implementation.md) |
+| 源码验收证据 | [API 实施记录](zh/kernel-api-implementation.md)、[普通应用迁移](zh/application-migration.md) |
 | 退役与历史证据 | [Coding 退役](zh/coding-retirement.md)、[Editor 退役](zh/editor-retirement.md)；旧 Coding 协议、实施与工作台验证从 Git 历史查阅 |
 | 可选代理工具 | [context-mode / CodeGraph](agents/tooling.md)：仅在当前会话提供对应工具时按需读取 |
 | 历史背景 | 已归档的早期方案从 Git 历史查阅，不作为当前开发规则 |
 
 安全简化的历史依据见[安全机制简化](zh/security-simplification.md)，跨平台范围及证据见[可移植方案](zh/kernel-portability-plan.md)和[验证记录](zh/kernel-portability-verification.md)；两者都按各自版本和验收范围阅读。贡献说明见[Contributing](../CONTRIBUTING.md)。
+
+工程清理阶段材料 `docs/tasks/cleanup-and-reorg/`、旧 Workbench 合同、统一宿主及早期内核边界方案已从工作树删除。当前约束归入架构、API 规范、独立应用及运维专题；旧测试计数、部署时间线和逐文件映射用 Git 历史查阅。
 
 早期归档已从工作树删除，可用 `git log --all -- docs/zh/history/` 定位，再用 `git show <revision>:<path>` 查阅。清理前的架构及路线正文分别查其原文件历史。阶段验收与验证记录（M1–M3、kernel-minimization 各阶段、portability S0 等）同样从工作树删除，从 git 历史查阅。

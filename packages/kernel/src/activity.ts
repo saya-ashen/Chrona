@@ -7,9 +7,6 @@ import type { Json } from "./modules/module-call-types";
 const KINDS = ["approval_created", "approval_resolved", "module_build_started", "module_submission", "module_build_settled", "module_build_rejection",
   "module_activate", "module_auto_activated", "module_rollback", "admin_rollback", "module_migration_started", "module_runtime_incident", "module_disabled", "module_enabled",
   "grant_created", "grant_revoked", "settings_updated", "secret_set", "secret_removed", "reflection_started", "reflection_suggested", "module_settings_updated"] as const;
-export const activityItemSchema = z.object({ id: z.string(), at: z.string(), kind: z.string(), module: z.string().nullable(), text: z.string(), session: z.object({ id: z.string(), source: z.enum(["reflect", "build"]) }).optional() });
-export const activityListOutput = z.object({ items: z.array(activityItemSchema), before: z.string().nullable() });
-export type Activity = z.infer<typeof activityItemSchema>;
 const recordSchema = z.object({ id: z.string(), at: z.string(), kind: z.string(), subject: z.string().nullable(), module: z.string().nullable(), hash: z.string().nullable(), approvalTitle: z.string().nullable(), details: z.record(z.string(), z.json()) });
 export const activityRecordsOutput = z.object({ rows: z.array(recordSchema).max(200), before: z.string().nullable() });
 const fields = ["id", "source", "decision", "hash", "succeeded", "automatic", "status", "deliveryUnknown", "failures", "from", "to", "reason", "unrestoredLegacyPause", "title", "why", "action", "mode", "name"];

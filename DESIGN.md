@@ -138,7 +138,11 @@ motion:
 
 ## 1. Product character
 
-Chrona is an operational workspace for planning time, running tasks, reviewing AI-assisted work, and resolving blocked states. It should feel calm and approachable without looking decorative or passive.
+Chrona is a local-first personal steward for ongoing matters. It keeps context, runs approved apps, reminds and reports, and keeps the user in control. Product goals live in [steward goals](docs/zh/steward-goals.md); implementation boundaries live in [architecture](docs/zh/architecture.md).
+
+The brand is calm, precise and accountable. Show decisions, meaningful changes, results and the next action before execution detail. Keep ownership, failure and recovery visible. Suggestions do not grant permission, generated tools are not enabled tools, and a sent notification does not acknowledge a commitment. Dense panels are useful when they help the user decide; decorative dashboards and inflated claims are not.
+
+Use WCAG AA as the accessibility baseline, with keyboard access, visible focus, readable contrast, reduced motion and state indicators that do not rely on color alone.
 
 The visual character is **operational calm**:
 

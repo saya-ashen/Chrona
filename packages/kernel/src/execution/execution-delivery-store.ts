@@ -20,7 +20,7 @@ export async function approveExecutionAuthority(ports: StewardPorts, principal: 
     return tx.executionAuthority.create({ data: { workspaceId: principal.workspaceId, ownerId: principal.ownerId, receiverModuleId: input.receiver.moduleId, receiverHash: input.receiver.hash, receiverActivationId: input.receiver.activationId, subjectId: input.subjectId, epoch: input.epoch, keyId: input.keyId, publicKey: input.publicKey, verifierId: input.verifierId, verifierVersion: input.verifierVersion, scope: input.scope, approvalId: input.approvalId, approvedAt: ports.now() } });
   });
 }
-export function kernelPlacementView(a: DeliveryRow["attempt"]): KernelPlacementView {
+function kernelPlacementView(a: DeliveryRow["attempt"]): KernelPlacementView {
   return { ...executionRef(a), placement: a.placement as KernelPlacementView["placement"], queueExpiresAt: a.queueExpiresAt!.toISOString(), online: !a.capabilityRevokedAt,
     workspace: { workspaceRef: a.workspaceRef!, mode: a.workspaceMode as "existing" | "independent_worktree", baseline: executionBaseline(a.baseline), retained: true, state: a.stopConfirmedAt ? "retained" : a.capabilityRevokedAt ? "unknown" : a.run.startedAt ? "ready" : "requested" } };
 }

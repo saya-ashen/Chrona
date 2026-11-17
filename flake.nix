@@ -109,7 +109,7 @@
         nativeBuildInputs = [pkgs.bun];
         outputHashMode = "recursive";
         outputHashAlgo = "sha256";
-        outputHash = "sha256-LpYWxPx1Gylm6KnKZTAxHM4eBgO1WF3ZVRs0S2TMt/4=";
+        outputHash = "sha256-L64cmtpCQ4B0J0ynrCxlfItou7O88tSVwDZ0mMBMu2I=";
         dontCheckForBrokenSymlinks = true;
         dontPatchShebangs = true;
         dontFixup = true;

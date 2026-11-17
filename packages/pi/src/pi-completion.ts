@@ -19,7 +19,7 @@ const childOf = (state: CompletionState) => state.child;
 // cap; a proxy that ignores the cap is still refused by validMessage). There is
 // no CLI max-token flag. Explicit -e still loads with --no-extensions; extension
 // load errors abort print mode. Add a version only after the same check.
-export const TOKEN_LIMIT_PI_VERSIONS = ["1.5.0", "1.5.2"];
+const TOKEN_LIMIT_PI_VERSIONS = ["1.5.0", "1.5.2"];
 
 /** Completion needs a version whose actual provider request cap has been verified. */
 export function piCompletionVersionError(version: string): string | null {

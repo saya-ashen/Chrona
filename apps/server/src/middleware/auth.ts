@@ -1,6 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
 import type { MiddlewareHandler } from "hono";
-import { getApiMessages, getPreferredLocale } from "@chrona/i18n";
 import { readEnv } from "../config/env";
 import type { createBrowserAuth } from "../browser-auth";
 
@@ -20,14 +19,6 @@ function matchesApiKey(providedKey: string | null, expectedKey: string) {
   const provided = Buffer.from(providedKey);
   const expected = Buffer.from(expectedKey);
   return provided.byteLength === expected.byteLength && timingSafeEqual(provided, expected);
-}
-
-/** New owner-only surfaces must not reinterpret a scoped bearer as anonymous
- * local authority when API_KEY is unset. The ordinary API middleware is unchanged. */
-export function isLocalOwnerAuthorized(authorization: string | undefined) {
-  const expected = readEnv().API_KEY;
-  if (!expected) return authorization === undefined;
-  return matchesApiKey(authorization?.startsWith("Bearer ") ? authorization.slice(7) : null, expected);
 }
 
 function skipsOwnerAuth(path: string, method: string, options: ApiKeyAuthOptions) {
@@ -56,7 +47,6 @@ export function apiKeyAuth(
     }
     if (!expectedKey && !options.browserAuth?.passwordSet()) return next();
 
-    const messages = getApiMessages(getPreferredLocale(c.req.header("accept-language")));
-    return c.json({ error: messages.unauthorized }, 401);
+    return c.json({ error: "Unauthorized" }, 401);
   };
 }

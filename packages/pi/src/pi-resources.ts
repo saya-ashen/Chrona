@@ -2,7 +2,7 @@ import { readFileSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, relative, sep } from "node:path";
 import { z } from "zod";
 const name = z.string().regex(/^[\w:.-]{1,100}$/);
-export const piResourcesSchema = z.object({
+const piResourcesSchema = z.object({
   skills: z.array(z.string().min(1).max(2000)).max(30).default([]),
   extensions: z.array(z.string().min(1).max(2000)).max(20).default([]),
   /** Describes manifest tools; admission belongs to the bridge catalog and Pi's native settings. */

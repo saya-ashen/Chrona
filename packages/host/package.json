@@ -4,13 +4,11 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@chrona/workspaces": "workspace:*",
     "@chrona/contracts": "workspace:*",
     "@chrona/pi": "workspace:*",
     "@chrona/process": "workspace:*",
     "@chrona/kernel": "workspace:*",
-    "@chrona/db": "workspace:*",
-    "chrona": "workspace:*"
+    "@chrona/db": "workspace:*"
   },
   "exports": {
     ".": "./src/index.ts"

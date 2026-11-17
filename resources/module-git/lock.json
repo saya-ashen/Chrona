@@ -5,9 +5,9 @@
       "name": "web",
       "repository": null,
       "branch": "main",
-      "commit": "bf33943f4b0bd304e45b530d6b42399318a1e632",
+      "commit": "8256d1dc73aeb44cb1c6049969b4dc36858fe573",
       "bundle": "web.bundle",
-      "bundleSha256": "f00fc5283c8123a456da49576ad9944892f3f97e7720cb88c8c3ea21104675f9"
+      "bundleSha256": "0e36581771065f32be497ccbad2eba07c48e42425ba5826f9d0f2e5c5d135da9"
     },
     {
       "name": "notify",
@@ -29,9 +29,9 @@
       "name": "qq",
       "repository": null,
       "branch": "main",
-      "commit": "de32f903f65ed22c011c153a44b41a1697e5dfb6",
+      "commit": "85db9c3426c934fc4a813c45938b750cfeb7a02a",
       "bundle": "qq.bundle",
-      "bundleSha256": "b4e038127eb74a62207491f6590ebda14506abf923687fbf7ab1fd45d6d0eb91"
+      "bundleSha256": "e072906d278f0b2d4b4a394b5d1341ca8906a5ccb0390505a557ea7f290c077a"
     },
     {
       "name": "author",

@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@chrona/db";
 import { localDayKey } from "@chrona/domain/steward/local-day";
-import type { StewardPorts } from "../ports";
 import type { CallScope } from "./module-supervisor";
 import { moduleModelSettings, budgetTimezone } from "../settings";
 import { audit } from "../audit";
@@ -10,7 +9,7 @@ import { CallError } from "./module-call-error";
 type ModelParams = { system?: string; prompt: string; maxOutputTokens: number };
 type CompletionLimitsOverride = { maxCalls: number; maxOutputTokens: number; timeoutMs: number };
 export type ModelError = "undeclared" | "unconfigured" | "budget_exceeded" | "provider_error" | "timeout";
-export type EffectiveHardLimits = { maxCallsPerEvent: number; maxOutputTokens: number; eventTimeoutMs: number };
+type EffectiveHardLimits = { maxCallsPerEvent: number; maxOutputTokens: number; eventTimeoutMs: number };
 export type CompletionReservation = { id: string; declaredTier: string | null; effectiveHardLimits: EffectiveHardLimits | null; error: ModelError | null };
 export type CompletionOwner = { moduleId: string; hash: string };
 /** The call error for a refused or failed completion: its message starts with the SDK's ModelError code. */
@@ -41,13 +40,6 @@ async function completionBudgetError({ tx, scope, params, workspace, settings, l
     || (own !== undefined && todays.filter(row => (row.accountingModuleId ?? row.moduleId) === scope.moduleId).length >= own)
     || params.maxOutputTokens > limits.maxOutputTokens ? "budget_exceeded" : null;
 }
-/** Count and reserve together in SQLite before execution leaves the kernel. */
-export async function reserveCompletion(ports: StewardPorts, scope: CallScope, params: ModelParams, now: Date): Promise<CompletionReservation> {
-  return ports.db.$transaction(async tx => {
-    await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${scope.workspaceId}`;
-    return reserveCompletionIn(tx, scope, params, now);
-  });
-}
 export async function reserveCompletionIn(tx: Prisma.TransactionClient, scope: CallScope, params: ModelParams, now: Date, extra?: CompletionLimitsOverride): Promise<CompletionReservation> {
     const workspace = await tx.workspace.findUniqueOrThrow({ where: { id: scope.workspaceId } });
     const module = await tx.module.findFirst({ where: { id: scope.moduleId, workspaceId: scope.workspaceId } });
@@ -59,10 +51,6 @@ export async function reserveCompletionIn(tx: Prisma.TransactionClient, scope: C
     const record = await tx.moduleCall.create({ data: { moduleId: scope.moduleId, accountingModuleId: scope.moduleId, workspaceId: scope.workspaceId, moduleName: module.name, hash: scope.hash, moduleRunId: scope.moduleRunId, eventKey: scope.eventKey, method: "model", key: randomUUID(), status: error ? "rejected" : "pending", error, createdAt: now } });
     if (error) await audit(tx, { workspaceId: scope.workspaceId, kind: "module_model_call", actor: "module", subjectId: scope.moduleId, details: { callId: record.id, inputTokens: null, outputTokens: null, error } });
     return { id: record.id, declaredTier: declaration?.tier ?? null, effectiveHardLimits, error };
-}
-/** Only the first pending settlement can mutate the reservation or emit its audit. */
-export async function finishCompletion(ports: StewardPorts, workspaceId: string, completion: { id: string; result?: { inputTokens: number | null; outputTokens: number | null }; error: ModelError | null; model?: string }, expectedOwner?: CompletionOwner) {
-  return ports.db.$transaction(tx => finishCompletionIn(tx, workspaceId, completion, expectedOwner));
 }
 /** Shares the caller's settlement transaction with a durable gateway result receipt. */
 export async function finishCompletionIn(tx: Prisma.TransactionClient, workspaceId: string, completion: { id: string; result?: { inputTokens: number | null; outputTokens: number | null }; error: ModelError | null; model?: string }, expectedOwner?: CompletionOwner) {

@@ -8,8 +8,7 @@ export const controlSchema = z.discriminatedUnion("operation", [
   z.object({ requestKey: z.string().min(1).max(200), operation: z.literal("control"), payload: z.discriminatedUnion("operation", [z.object({ operation: z.literal("cancel") }).strict(), z.object({ operation: z.literal("write"), text: z.string().max(20000) }).strict(), z.object({ operation: z.literal("answer"), requestId: z.string(), answer: providerAnswerSchema }).strict()]) }).strict(),
   z.object({ requestKey: z.string().min(1).max(200), operation: z.literal("cleanup"), payload: kernelCleanupInputSchema }).strict(),
 ]);
-export const packetSchema = z.object({ target: executionDeliveryTargetSchema, launch: executionLaunchSchema, launchable: z.boolean(), controls: z.array(controlSchema).max(100) }).strict();
-export type Packet = z.infer<typeof packetSchema>;
+const packetSchema = z.object({ target: executionDeliveryTargetSchema, launch: executionLaunchSchema, launchable: z.boolean(), controls: z.array(controlSchema).max(100) }).strict();
 export const deliverySchema = z.object({ version: z.literal(1), requestId: z.string().min(1).max(128), deliveryId: z.string().min(1).max(200), launchDigest: z.string().regex(/^[a-f0-9]{64}$/), packet: packetSchema }).strict();
 export type Delivery = z.infer<typeof deliverySchema>;
 export const controlEnvelopeSchema = deliverySchema.omit({ packet: true }).extend({ control: controlSchema }).strict();

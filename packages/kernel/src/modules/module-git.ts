@@ -4,7 +4,7 @@ import { lstat, mkdir, realpath } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { MODULE_SOURCE_MAX_BYTES, MODULE_SOURCE_MAX_FILES } from "../../../contracts/src/steward/module-material";
 import { StewardError } from "../errors";
-import { checkoutModule, INSTALLED_DIRS, type ModuleFile } from "./module-files";
+import { INSTALLED_DIRS, type ModuleFile } from "./module-files";
 import { restoreModuleArtifacts, storeModuleArtifacts, validateModuleSourceRecord } from "./module-artifacts";
 
 export type ModuleGitFile = ModuleFile;
@@ -160,9 +160,6 @@ export async function readModuleSource(input: Repository & { commit: string }): 
 /** Full runtime material: Git sources plus digest-verified immutable artifacts. */
 export async function readModuleMaterial(input: Repository & { commit: string }): Promise<ModuleGitFile[]> {
   return restoreModuleArtifacts(input.platform, await readModuleSource(input));
-}
-export async function exportModuleSource(input: Repository & { commit: string; root: string; dir: string }) {
-  await checkoutModule(input.root, input.dir, await readModuleMaterial(input));
 }
 export async function importLegacyModuleSource(input: Repository & { legacyHash: string; files: ModuleGitFile[] }): Promise<ModuleGitRevision> {
   if (!/^[a-f0-9]{64}$/.test(input.legacyHash)) throw new StewardError("invalid", "Invalid legacy module hash");

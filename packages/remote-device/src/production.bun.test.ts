@@ -13,7 +13,7 @@ import { registerLocalModule } from "../../kernel/src/modules/module-registry";
 import { createServerApp } from "../../../apps/server/src/app";
 import { createStewardRuntime } from "../../../apps/server/src/steward-runtime";
 import { resetEnvCacheForTests } from "../../../apps/server/src/config/env";
-import { privateRoot } from "@chrona/workspaces";
+import { privateRoot } from "@chrona/git-workspaces";
 import { initializeConfig, localMapping, localPi, saveConfig } from "./config";
 import { DeviceHTTP } from "./transport";
 import { RemoteDevice } from "./device";

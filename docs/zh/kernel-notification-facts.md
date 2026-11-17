@@ -1,8 +1,8 @@
 # 内核通知事实契约
 
-状态：2026-11-10 本 worktree 已迁移有限事实的独立存储，当前检查见[内核与 Agent 重构](kernel-agent-migration.md)。阶段 2 历史检查（已从工作树删除，见 git 历史 docs/zh/kernel-minimization-stage2-validation.md）不构成本次迁移验收。不是新的投递队列，不表示生产部署或真实账号验收。
+状态：2026-11-10 已迁移有限事实的独立存储；该次检查从 Git 历史 `docs/zh/kernel-agent-migration.md` 查阅，当前合同见[API 实施记录](kernel-api-implementation.md)。阶段 2 历史检查（已从工作树删除，见 git 历史 docs/zh/kernel-minimization-stage2-validation.md）不构成本次迁移验收。不是新的投递队列，不表示生产部署或真实账号验收。
 
-- 内核在业务状态事务中向 `KernelFact` 写有限事实；`KernelFactConsumer` 保存单消费者选择，消费身份和时间与事实分开存储。当前迁移状态见[内核与 Agent 重构](kernel-agent-migration.md)。事实包括：审批、有限的应用生命周期、Provider 待输入标识及撤回。不记录投递目标应用名、工具名，也不提供通用调用参数或任意输出的转发接口。通知措辞和渠道投递仍属于应用，渠道调用沿用既有 `ModuleInvocation`。
+- 内核在业务状态事务中向 `KernelFact` 写有限事实；`KernelFactConsumer` 保存单消费者选择，消费身份和时间与事实分开存储。当前迁移状态见[API 实施记录](kernel-api-implementation.md)。事实包括：审批、有限的应用生命周期、Provider 待输入标识及撤回。不记录投递目标应用名、工具名，也不提供通用调用参数或任意输出的转发接口。通知措辞和渠道投递仍属于应用，渠道调用沿用既有 `ModuleInvocation`。
 - 事实按 workspace + 类型 + 业务键确定身份，重写不能重新打开已确认事实。`consumedAt` 是否为空表示是否已被消费，`consumedBy` 保留接收应用身份，不表示消息已送达。事实不设置 TTL，也不自动删未确认事实；确认后保留事实及消费回执，当前无自动清理。
 - 每个 workspace 仅一个选定应用 ID；首次可信预装选择随发行版提供的 notify。运行时不按 notify 名称查找消费者。用户可经 `activity.consumer` 读取/更换或清空选择；显式清空后预装不覆盖。切换前须暂停原消费者，避免两个活进程交接投递。切换增加 revision，不重放任何已确认事实，不转移原应用已经接收的通知及投递回执。
 - `activity.facts` 仅选定的、当前真实 SDK 调用者可读；返回最多 50 条有限投影与 revision。未选中、停用、哈希过期的调用者不能消费。没有通知应用不影响审批本体，任意有权限入口仍可调用 `approvals.list/resolve`。

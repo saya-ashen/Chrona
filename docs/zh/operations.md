@@ -2,6 +2,14 @@
 
 适用于重构后的单一 owner 版本。先读[快速开始与配置表](../../README.zh.md)。所有命令均在仓库根目录执行，或使用对应版本的打包 CLI；不要用旧版本可执行文件操作新库。
 
+## 历史部署恢复材料
+
+2026-11-17 工程清理的阶段流水账从 Git 历史 `docs/tasks/cleanup-and-reorg/` 查阅，不作为当前实例健康声明。该次 chino 部署记录中的恢复根为 `/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa`；实际生产动作目录为其下 `production-20261117T0243Z-8ce927b2-r2`，完整备份为 `backup/before.db`、`before.db.tar`、`external-roots.tar`，并保留新旧 package/unit/archive 的 GC roots。恢复前须重新核对实际服务、最新数据和兼容性，不能直接恢复旧快照。
+
+当时七个应用经 Author 正常候选流程升级，保留旧 Apps/MCP 与原 Git 历史；HTTP、资源和数据连续性检查通过，但最终产品验收未完成：Pi 的同源码新 commit 未满足精确发行身份要求，旧 Apps 仍调用 `web.component-set`。后续源码增加 `admin install pi --update --exact-release`，仅选择真实固定发行 commit、复核批准身份及源码全等，并走正常检查与激活；旧 Apps 页面迁移也已有兼容材料。源码修复及离线检查不证明这些现场问题已解决；当次完整 slice 仍有 Web `settings-timeout.bun.test.ts` 失败，不能记为全绿。
+
+两条精确保留的 unknown 回执 `146941c1-2da2-4864-83c4-4b7a8a3aa44d` 与 `840dfcfd-8ee9-46d5-b142-6ce7babc2810` 的原 key、状态及行摘要在历史部署记录中固定；它们不是后续重放或扩大例外的授权。本轮清理不操作该服务、真实数据库、回退材料或一次性转换输入。
+
 ## 模块远端仓库
 
 模块远端关联和显式推送由本机所有者 CLI 执行：`chrona admin git-associate`、`git-status` 和 `git-push`。写操作先停止使用同一数据目录的服务；推送需要明确的源码提交和预期远端提交，不随启动或激活自动执行。参见[模块源码与 Git 工作流](module-git.md)。实例备份应同时保留数据库中的来源登记和 `platform/repos` 中的 Git 历史与配置。
@@ -63,7 +71,7 @@ Agent 是唯一不可变内置应用；Web、Notify、QQ、Author 是普通默�
 
 ## M1 历史开发集成边界（2026-11-05）
 
-当前开发契约见 [P0 契约](chrona-workbench-p0-contract.md)。官方外置资源已移至 external；发行包需同时含 resources/builtin 与 resources/external，缺发行资源不得回退源码。`chrona admin catalog` 只读目录，`admin install <package> --request-key <key> [--update]` 在停服锁下仅持久受理/入队；运行时与停服 admin 共用真实官方安装适配器，不启动额外 Provider；受理后由原受检构建流水线处理。未配置适配器时返回 unavailable，收到 building/pending 不代表安装完成。失败重试要明确新 key；未知回执复用原 key 查询；初始化完成后不补装已删预装。只用全新开发数据目录，旧生产转换、迁移与部署另行授权。开发完整套件、三尺寸浏览器与 Linux x64 发行验证已完成，协调者已签署 M1 开发验收；精确树、归档散列与未覆盖环境见 M1 验收记录（已从工作树删除，见 git 历史 docs/zh/chrona-workbench-m1-acceptance.md）。当时的内置划分已被上方最小内核划分取代；该节仅保留历史验收边界。
+当时的 P0 开发契约从 Git 历史 `docs/zh/chrona-workbench-p0-contract.md` 查阅。官方外置资源已移至 external；发行包需同时含 resources/builtin 与 resources/external，缺发行资源不得回退源码。`chrona admin catalog` 只读目录，`admin install <package> --request-key <key> [--update]` 在停服锁下仅持久受理/入队；运行时与停服 admin 共用真实官方安装适配器，不启动额外 Provider；受理后由原受检构建流水线处理。未配置适配器时返回 unavailable，收到 building/pending 不代表安装完成。失败重试要明确新 key；未知回执复用原 key 查询；初始化完成后不补装已删预装。只用全新开发数据目录，旧生产转换、迁移与部署另行授权。开发完整套件、三尺寸浏览器与 Linux x64 发行验证已完成，协调者已签署 M1 开发验收；精确树、归档散列与未覆盖环境见 M1 验收记录（已从工作树删除，见 git 历史 docs/zh/chrona-workbench-m1-acceptance.md）。当时的内置划分已被上方最小内核划分取代；该节仅保留历史验收边界。
 
 ## M2 历史编码开发集成边界
 

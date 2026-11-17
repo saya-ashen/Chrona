@@ -206,7 +206,7 @@ flowchart LR
    - `module-wire.json`：模块线消息，包括 §7.2 新增的握手。
 
    运行时的 hash 计算和工具发现结果都读取这些 JSON，删除运行时的 `z.toJSONSchema` 分支。zod 继续负责运行时校验，并作为生成源头。测试要求重新生成的结果与已提交文件一致。
-3. **书面算法**：在[永久内核合同](kernel-permanent-boundary-contract.md) §2 补充 `contractHash` 的计算方法：输入哪些字段、`parameters` 如何规范化、对象键按 UTF-16 码元排序、数组保持原顺序、按 ECMAScript `JSON.stringify` 的语义输出、取 SHA-256 十六进制。同时注明 golden 测试的位置。
+3. **书面算法**：当时在永久内核合同（Git 历史 `docs/zh/kernel-permanent-boundary-contract.md`）§2 补充 `contractHash` 的计算方法：输入哪些字段、`parameters` 如何规范化、对象键按 UTF-16 码元排序、数组保持原顺序、按 ECMAScript `JSON.stringify` 的语义输出、取 SHA-256 十六进制。同时注明 golden 测试的位置。
 
 ## 9. 故障与生命周期规则（远程）
 
@@ -342,8 +342,8 @@ flowchart LR
 ## 13. 相关文档
 
 - [可移植性验证记录](kernel-portability-verification.md)：本轮实际证据、平台矩阵、复现命令与未完成验收。
-- [内核永久边界合同](kernel-permanent-boundary-contract.md)、[实施记录](kernel-permanent-boundary-implementation.md)：当前内核职责与应用生命周期的基线。
+- [当前 API 规范](kernel-api-design.md)及[实施记录](kernel-api-implementation.md)：当前职责与生命周期。旧永久边界合同及实施记录从 Git 历史查阅。
 - [当前架构](architecture.md)、[模块依赖方向](module-dependency-direction.md)：依赖与所有权规则。
 - [Coding 退役说明](coding-retirement.md)：业务调用面；不借远程拆分重建 Coding 协议。
-- [统一模块协议与本地／远端宿主](unified-module-runtime-plan.md)：历史与阶段背景；本文不重启已推迟的通用远程宿主工作。
+- 统一模块协议与本地／远端宿主方案从 Git 历史 `docs/zh/unified-module-runtime-plan.md` 查阅；本文不重启已推迟的通用远程宿主工作。
 - 合并前的《可信本地跨平台运行与远程执行应用化方案》：`git show fbc4464a:docs/zh/history/cross-platform-runtime-and-remote-execution-plan.md`。

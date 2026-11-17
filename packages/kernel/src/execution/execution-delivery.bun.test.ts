@@ -24,6 +24,15 @@ import { registerAgentProvider } from "../agent/agent-provider";
 import { CallError } from "../modules/module-call-error";
 import { moduleSupervisor } from "../modules/module-supervisor";
 
+import { reserveCompletionIn } from "../modules/module-model-budget";
+
+function reserveCompletion(ports: StewardPorts, scope: Parameters<typeof reserveCompletionIn>[1], params: Parameters<typeof reserveCompletionIn>[2], now: Date) {
+  return ports.db.$transaction(async tx => {
+    await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${scope.workspaceId}`;
+    return reserveCompletionIn(tx, scope, params, now);
+  });
+}
+
 const databases: ReturnType<typeof testDb>[] = [];
 const modelCleanups: (() => Promise<void>)[] = [];
 afterEach(async () => {
@@ -330,7 +339,6 @@ test("model reservation survives unknown gateway outcome and same-key replay nev
   expect(calls).toBe(1);
 });
 test("model gateway shares ordinary module accounting and receives minimum execution limits", async () => {
-  const { reserveCompletion } = await import("../modules/module-model-budget");
   for (const remainingMs of [60_000, 1000]) {
     let calls = 0, observed: ModelRequest | undefined;
     const f = await modelFixture(async args => { calls++; observed = args; return { text: "fake", inputTokens: 3, outputTokens: 4 }; });
@@ -399,7 +407,6 @@ test.each(["unknown closure", "missing result"] as const)("registered completion
   expect(await createExecutionDelivery(f.ports).model(f.receiver, f.d.target, "unknown", input)).toMatchObject({ status: "pending" });
   expect(await f.db.moduleCall.findFirstOrThrow({ where: { method: "model" } })).toMatchObject({ status: "pending", outputTokens: null });
   expect(f.requests.some(row => row.name === "release")).toBe(false);
-  const { reserveCompletion } = await import("../modules/module-model-budget");
   await reserveCompletion(f.ports, { workspaceId: f.principal.workspaceId, moduleId: f.caller.id, hash: f.caller.activeHash!, manifest: f.manifest, eventKey: "execution:ordinary" }, input, f.ports.now());
   expect(await f.service.model(f.receiver, f.d.target, "another-key", input)).toMatchObject({ status: "rejected", error: "budget_exceeded" });
   expect(calls).toBe(1);
@@ -515,7 +522,6 @@ test("stopped application workspace cleanup is durable, scoped, preview-bound an
 
 test("shared model reservations survive caller removal and cannot refund the workspace allowance", async () => {
   const f = await modelFixture(async () => ({ text: "bounded", inputTokens: 1, outputTokens: 1 }));
-  const { reserveCompletion } = await import("../modules/module-model-budget");
   const spender = await f.db.module.create({ data: { workspaceId: f.principal.workspaceId, name: "removed-spender", activeHash: "spent" } });
   const scope = { workspaceId: f.principal.workspaceId, moduleId: spender.id, hash: spender.activeHash!, manifest: { ...f.manifest, name: spender.name }, eventKey: "execution:first" };
   expect((await reserveCompletion(f.ports, scope, { prompt: "one", maxOutputTokens: 10 }, f.ports.now())).error).toBeNull();

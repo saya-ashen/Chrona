@@ -86,19 +86,22 @@ async function load(dataDir: string, id?: string, selection: Selection = {}): Pr
   }
   finally { db.close(); }
   const state = { sessions: rows.map(row => JSON.parse(row.data)) } as { sessions: (Conversation | null)[] };
-  if (state.sessions.some(s => {
-    if (!s || !isAgentConversation(s.id)) return true;
-    if (!selection.summaries && (!Array.isArray(s.messages) || !Array.isArray(s.turns))) return true;
-    const turns = s.turns ?? [];
-    return (s.memory !== undefined && !isMemoryJournal(s.memory))
-      || turns.some(turn => turn.pendingToolResults !== undefined && (!Array.isArray(turn.pendingToolResults)
-        || turn.pendingToolResults.some(id => typeof id !== "string" || !id || id.length > 128)))
-      || turns.some(turn => turn.runRequest !== undefined && !isRunRequest(turn.runRequest))
-      || turns.some(turn => turn.applicationDelivery !== undefined && !validApplicationDelivery(turn.applicationDelivery))
-      || turns.some(turn => turn.deliveryCheckedAt !== undefined && !Number.isFinite(Date.parse(turn.deliveryCheckedAt)))
-      || turns.some(turn => turn.memoryContext !== undefined && (typeof turn.memoryContext !== "string" || turn.memoryContext.length > 31_000));
-  })) throw failure("conflict", "Web conversation journal is invalid");
+  if (state.sessions.some(s => !validSession(s, !!selection.summaries))) throw failure("conflict", "Web conversation journal is invalid");
   return state as State;
+}
+function validSession(session: Conversation | null, summary: boolean) {
+  if (!session || !isAgentConversation(session.id)) return false;
+  if (!summary && (!Array.isArray(session.messages) || !Array.isArray(session.turns))) return false;
+  if (session.memory !== undefined && !isMemoryJournal(session.memory)) return false;
+  return summary || session.turns.every(validTurn);
+}
+function validTurn(turn: Turn) {
+  return (turn.pendingToolResults === undefined || (Array.isArray(turn.pendingToolResults)
+      && turn.pendingToolResults.every(id => typeof id === "string" && !!id && id.length <= 128)))
+    && (turn.runRequest === undefined || isRunRequest(turn.runRequest))
+    && (turn.applicationDelivery === undefined || validApplicationDelivery(turn.applicationDelivery))
+    && (turn.deliveryCheckedAt === undefined || Number.isFinite(Date.parse(turn.deliveryCheckedAt)))
+    && (turn.memoryContext === undefined || (typeof turn.memoryContext === "string" && turn.memoryContext.length <= 31_000));
 }
 async function save(dataDir: string, state: State) {
   const db = journalDatabase(dataDir);
@@ -397,7 +400,9 @@ export function createAgentConversations(inputOptions: Options) {
   const { dataDir, call, now, source } = options;
   let queue = Promise.resolve<unknown>(undefined);
   function serial<T>(work: () => Promise<T>): Promise<T> {
-    const next = queue.then(work); queue = next.catch(() => {}); return next;
+    const next = queue.then(work);
+    queue = next.catch(error => console.error(JSON.stringify({ component: source, event: "conversation_operation_failed", error: String(error) })));
+    return next;
   }
   return {
     // SQLite readers see committed session rows; snapshots need not wait behind
@@ -453,9 +458,7 @@ export function createAgentConversations(inputOptions: Options) {
       session ??= newConversation(options, state, input);
       if (session.status === "ended") throw failure("conflict", "会话已结束，请新建会话。");
       const prepared = { ...request, prompt: messagePrompt(session, input) };
-      const continued = await continueActiveTurn(options, state, session, prepared);
-      if (continued) return continued;
-      return enqueueTurn(options, state, session, prepared);
+      return await continueActiveTurn(options, state, session, prepared) ?? enqueueTurn(options, state, session, prepared);
     }),
     externalId: (messageId: string, externalId: string) => serial(async () => {
       const state = await load(dataDir, undefined, { messageId, externalId }), message = state.sessions.flatMap(session => session.messages).find(message => message.id === messageId);

@@ -10,9 +10,8 @@ import type { StewardPorts } from "../ports";
 import { callSync, listSystemModules, moduleCallbackContractHash, type Caller } from "./module-calls";
 import { registerSystemModules } from "../system-modules";
 import { callsContracts } from "./module-contracts";
-import { BUILD_MODULE_TOOLS, BUILD_REFERENCE_PROMPT, references, interfaceReference } from "./module-reference";
+import { references, interfaceReference } from "./module-reference";
 import { committedToolContract } from "./module-tool-contract";
-import { moduleInterfaces } from "../system-apps";
 import { catalogEntry } from "./module-tools";
 
 const cleanups: (() => Promise<unknown>)[] = [];
@@ -68,19 +67,14 @@ test("references expose the current public contracts without runtime execution",
   expect(await f.db.audit.count({ where: { kind: "module_runtime_incident" } })).toBe(0);
 });
 
-test("system reference, internal inspection, catalogs and calls use the same committed contracts", async () => {
+test("system references, catalogs and calls use the same committed contracts", async () => {
   const f = await fixture();
   const calls = await callsContracts(f.ports, f.workspace.id);
-  const interfaces = await moduleInterfaces(f.ports, f.workspace.id);
-  if (!Array.isArray(interfaces)) throw new Error("Expected the internal interface directory");
   for (const system of listSystemModules()) for (const tool of system.tools) {
     const target = `${system.name}.${tool.name}`, contract = committedToolContract(target);
     const reference = await interfaceReference(f.ports, f.workspace.id, target);
     expect(reference).toMatchObject({ inputSchema: contract.input, outputSchema: contract.output });
     expect(reference).not.toHaveProperty("contractHash");
-    const inspected = interfaces.find(item => item.name === system.name)!.tools.find(item => item.name === tool.name)!;
-    expect(inspected.inputSchema).toEqual(contract.input);
-    expect(inspected.outputSchema).toEqual(contract.output);
     const catalog = catalogEntry({ name: target, module: { id: `system:${system.name}`, name: system.name, activeHash: "system" }, manifest: { tools: system.tools }, tool, direct: true, system: true });
     expect(catalog.inputSchema).toEqual({ ...contract.input, description: `[Chrona ${system.name}] ${tool.description}` });
     expect(catalog.outputSchema).toEqual(contract.output);
@@ -145,12 +139,14 @@ test("discovery stays workspace scoped and honors the current caller admission",
   await expect(f.call("modules.describe", { target: "approvals.resolve" }, caller)).rejects.toMatchObject({ code: "not_found" });
 });
 
-test("private build guidance advertises live discovery and fixed material authoring", () => {
-  registerSystemModules();
-  const names = new Set(listSystemModules().flatMap(module => module.tools.map(tool => `m_${module.name}_${tool.name.replaceAll("-", "_")}`)));
-  expect(BUILD_MODULE_TOOLS.every(name => names.has(name))).toBe(true);
-  for (const removed of ["m_modules_checkout", "m_modules_propose", "m_modules_check", "m_modules_request_group", "build_request"]) expect(BUILD_REFERENCE_PROMPT).not.toContain(removed);
-  for (const current of ["modules.describe", "modules.health", "modules.submit", "modules.receipt", "ordinary", "fixed candidate"]) expect(BUILD_REFERENCE_PROMPT).toContain(current);
+test("live directory exposes discovery and fixed material authoring without retired build tools", async () => {
+  const f = await fixture();
+  const module = await active(f);
+  const caller: Caller = { kind: "module", module: "target", moduleId: module.id, hash: "v1" };
+  const directory = await f.call("modules.describe", {}, caller) as { items: { target: string }[] };
+  const targets = directory.items.map(item => item.target);
+  for (const current of ["modules.describe", "modules.health", "modules.submit", "modules.receipt"]) expect(targets).toContain(current);
+  for (const removed of ["modules.checkout", "modules.propose", "modules.check", "modules.request-group", "build.request"]) expect(targets).not.toContain(removed);
 });
 
 test("exact references do not enumerate unrelated modules or manifests", async () => {

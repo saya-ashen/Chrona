@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { lstatSync } from "node:fs";
 import { z } from "zod";
 import { kernelCleanupInputSchema, kernelCleanupReceiptSchema, type KernelCleanupInput } from "@chrona/contracts/steward";
-import { privateRoot } from "@chrona/workspaces";
+import { privateRoot } from "@chrona/git-workspaces";
 import { receiptSchema as modelReceiptSchema } from "@chrona/remote-model";
 import { appCanonical, appDigest, controlSchema, deliverySchema, executionDigest, receiptSchema, reportSchema, validateReport, type Delivery, type Report } from "./protocol";
 import { privateFile, syncDirectory } from "./private-files";

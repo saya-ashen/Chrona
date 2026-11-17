@@ -1,4 +1,4 @@
-import { moduleManifestSchema, moduleInstallRequestSchema, moduleInstallResultSchema, PREINSTALLED_MODULE_NAMES, type ModuleInitializationState } from "@chrona/contracts/steward";
+import { moduleManifestSchema, moduleInstallRequestSchema, moduleInstallResultSchema } from "@chrona/contracts/steward";
 import { moduleIdentity, moduleCapabilities } from "./module-identity";
 
 /** Synthetic only: no credentials, accounts, network clients or real execution resources. */
@@ -18,6 +18,3 @@ export const moduleLifecycleFixtures = {
   callbackBefore: { moduleId: "fixture-alpha", hash: "b".repeat(64), target: "alpha.receive", input: { type: "object", properties: { value: { type: "string" } }, required: ["value"] }, output: { type: "string" }, visibility: ["modules"] },
   callbackChanged: { moduleId: "fixture-alpha", hash: "d".repeat(64), target: "alpha.receive", input: { type: "object", properties: { count: { type: "number" } }, required: ["count"] }, output: { type: "number" }, visibility: ["owner"] },
 };
-export function completedInitializationFixture(): ModuleInitializationState {
-  return { version: 1, status: "complete", packages: Object.fromEntries(PREINSTALLED_MODULE_NAMES.map(name => [name, { requestKey: `initialize:v1:${name}:1`, attempts: 1, status: "installed", moduleId: `fixture-${name}`, hash: "a".repeat(64), approvalId: null, error: null }])) as ModuleInitializationState["packages"] };
-}

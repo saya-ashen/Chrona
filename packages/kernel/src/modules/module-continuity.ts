@@ -10,7 +10,7 @@ import type { ModuleContext, ContinuityReport, TestReport, requireModule } from 
 type Manifest = z.output<typeof moduleManifestSchema>;
 type Module = Awaited<ReturnType<typeof requireModule>>;
 async function copyTestData(source: string | undefined, target: string) { return source ? copyData(source, target) : true; }
-export const moduleParams = (manifest: Manifest) => Object.fromEntries(Object.entries(manifest.params).map(([key, param]) => [key, param.value]));
+const moduleParams = (manifest: Manifest) => Object.fromEntries(Object.entries(manifest.params).map(([key, param]) => [key, param.value]));
 async function prepareTestContent(data: string, manifest: Manifest) {
   if (!manifest.content) return undefined;
   const contentDir = join(data, ".build-content");

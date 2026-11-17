@@ -30,6 +30,9 @@ test("health and database readiness do not require an execution engine", async (
 
 test("the owner HTTP API and workspace discovery are gone (v2-9): modules serve the user", async () => {
   const app = await createServerApp();
+  const missing = await app.request("/missing-page", { headers: { ...owner, "accept-language": "zh-CN" } });
+  expect(missing.status).toBe(404);
+  expect(await missing.json()).toEqual({ error: "Not found" });
   for (const path of ["/api/workspaces", "/api/steward/today?workspaceId=x", "/api/steward/settings?workspaceId=x"]) expect((await app.request(path, { headers: owner })).status).toBe(404);
 });
 

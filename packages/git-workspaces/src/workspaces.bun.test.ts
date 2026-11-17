@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { localDirectoryIdentity, physicalLockIdentity, prepareLockedLocalWorkspace, recoverWorkspaceLocks, verifyLocalSource, workspaceDigest, type WorkspaceLock } from "@chrona/workspaces";
+import { localDirectoryIdentity, physicalLockIdentity, prepareLockedLocalWorkspace, recoverWorkspaceLocks, verifyLocalSource, workspaceDigest, type WorkspaceLock } from "@chrona/git-workspaces";
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });

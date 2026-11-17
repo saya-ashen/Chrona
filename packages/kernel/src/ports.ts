@@ -1,4 +1,3 @@
-import type { VerifiedExecutionStop } from "./execution/execution-delivery-stop-types";
 import type { Prisma, PrismaClient } from "@chrona/db";
 import type { ProviderAdapter, ExecutionPrincipal, ExecutionRef, ExecutionSnapshot, ExecutionControl, ExecutionEventStore, ExecutionPorts, ExecutionProjectGrant, ModuleEntry } from "@chrona/contracts/steward";
 import type { ExternalModuleInstaller } from "./modules/module-install-types";
@@ -8,10 +7,6 @@ export type ExecutionV2Admission = {
   start(principal: ExecutionPrincipal, input: ExecutionStartV2): Promise<{ execution: import("@chrona/contracts/steward").ExecutionView; placement: import("@chrona/contracts/steward").ExecutionPlacementView }>;
 };
 export type ExecutionClaimSelection = { kind: "ordinary" } | { kind: "application" } | { kind: "execution"; executorId: string };
-export type ExecutionRunTransactions = {
-  finishRunIn(tx: Prisma.TransactionClient, runId: string, outcome: Awaited<ReturnType<ProviderAdapter["start"]>["done"]>, now: Date,
-    evidence?: "provider_exited" | "never_started" | VerifiedExecutionStop): Promise<boolean>;
-};
 /** Authorized server preparation runs outside a DB transaction; its lock spans the final admission/claim transaction. */
 export type ServerWorkspaceRequest = {
   principal: ExecutionPrincipal;
@@ -34,7 +29,7 @@ export type PreparedServerWorkspace = {
   release(): void;
 };
 /** U keeps parent/dependency state privately; these are requests against fixed authorized leaf workspaces. */
-export type ExecutionWorkspaces = {
+type ExecutionWorkspaces = {
   cleanup(principal: ExecutionPrincipal, input: import("@chrona/contracts/steward").WorkCleanupInput): Promise<import("@chrona/contracts/steward").WorkCleanupReceipt>;
 };
 /** Only trusted owner routes may resolve. The caller executes the returned payload,
@@ -45,7 +40,7 @@ export type ApprovedAction = { workspaceId: string; approvalId: string; payload:
 export type OnApproved = (action: ApprovedAction) => Promise<void>;
 
 /** G participates in F's existing SQLite transaction; these methods never open/commit their own transaction. */
-export type ExecutionEventTransactions = {
+type ExecutionEventTransactions = {
   /** Reserve active final/control headroom before F commits its Run/receipt. Full capacity throws and rolls back admission. */
   admit(tx: Prisma.TransactionClient, principal: ExecutionPrincipal, ref: ExecutionRef): Promise<void>;
   /** Fixed bounded control fact; F commits before aborting/revoking externally. */

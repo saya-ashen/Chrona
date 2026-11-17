@@ -16,7 +16,7 @@ import { liveRuns } from "../execution/run-live";
 import { EXECUTION_DELIVERY_CARRIER, callExecutionDeliveryCarrier } from "../execution/execution-delivery-carrier";
 export type { CallScope } from "./module-supervisor";
 
-export type ModuleExecution = { workspaceId: string; moduleId: string; hash: string; activationId: string | null; triggerId: string; firedAt: Date };
+type ModuleExecution = { workspaceId: string; moduleId: string; hash: string; activationId: string | null; triggerId: string; firedAt: Date };
 type Reply = ReturnType<typeof moduleCallReplySchema.parse>;
 
 function originOf(scope: CallScope): CallOrigin {

@@ -1,8 +1,8 @@
 /** JSON Schema travels unchanged across the runtime boundary; null means undeclared. */
 export type ModuleCallContracts = Record<string, { input: Record<string, unknown> | boolean | null; output: Record<string, unknown> | boolean | null }>;
 
-export type RuntimePrograms = { default: string[]; [platform: string]: string[] };
-export type ModuleRuntime = {
+type RuntimePrograms = { default: string[]; [platform: string]: string[] };
+type ModuleRuntime = {
   extensions: string[];
   programs: RuntimePrograms;
   argv: string[];
