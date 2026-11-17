@@ -24,19 +24,10 @@ test-results/
 artifacts/
 e2e/
 dist/
-build/*
-!build/manifest.ts
-!build/portable-elf.ts
-!build/agent-declaration-bundle.ts
-!build/agent-dependencies.ts
-!build/entry-conversations.ts
-!build/release-identity.ts
+build/
 *.tsbuildinfo
 .env*
 !.env.example
-prisma/dev.db
-prisma/*.db
-prisma/*.db-journal
 *.tgz
 .vercel
 .DS_Store
@@ -51,9 +42,3 @@ yarn-error.log*
 .pnpm-debug.log*
 Dockerfile*
 .dockerignore
-
-!build/application-pages.ts
-!build/application-ui.ts
-
-# Reconstruct applications from pinned offline inputs inside the image build.
-.generated/applications/

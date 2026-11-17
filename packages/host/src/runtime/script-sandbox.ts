@@ -61,7 +61,7 @@ function moduleCommand(code: string, entry: ModuleEntry, typecheck: string): { p
     argv: [...declared.argv, ...(declared.preload ? ["--preload", join(typecheck, declared.preload)] : []), moduleEntryFile(code, entry)] };
 }
 function moduleEnvironment(dirs: ModuleDirs, sdkEnabled: boolean, interpreter: string, sdk: string, helper: string): Record<string, string> {
-  const excluded = new Set(["CHRONA_SOCKET", "CHRONA_HTTP_SOCKET", "CHRONA_IPC_ENDPOINT", "CHRONA_IPC_TOKEN", "CHRONA_HOST_GENERATION"]);
+  const excluded = new Set(["CHRONA_SOCKET", "CHRONA_HTTP_SOCKET", "CHRONA_IPC_ENDPOINT", "CHRONA_IPC_TOKEN", "CHRONA_HOST_GENERATION", "CHRONA_HOST_STOP_RECEIPT"]);
   const extra = Object.fromEntries(Object.entries(dirs.env ?? {}).filter(([key]) => /^CHRONA_[A-Z_]+$/.test(key) && !excluded.has(key)));
   // Desktop connection paths come only from the host session, never module extras.
   const hostKeys = ["HOME", ...(process.platform === "win32" ? ["SystemRoot", "WINDIR", "TEMP", "TMP", "USERPROFILE", "PATHEXT"]
@@ -73,14 +73,16 @@ function moduleEnvironment(dirs: ModuleDirs, sdkEnabled: boolean, interpreter: s
     ...(dirs.ipcEndpoint ? { CHRONA_IPC_ENDPOINT: dirs.ipcEndpoint, CHRONA_IPC_TOKEN: dirs.ipcToken! } : {}),
     ...(sdkEnabled ? { CHRONA_SDK: sdk } : {}) };
 }
-/** Bind a trusted Provider module generation to the outer guardian. */
-function providerHostReceipt(dirs: ModuleDirs, data: string, env: Record<string, string>) {
-  if (process.platform !== "linux" || !dirs.env?.CHRONA_PROVIDER_CONFIGURATION) return undefined;
+/** The guardian records descendant stop evidence for each application generation. */
+function moduleHostReceipt(hostData: string, env: Record<string, string>) {
+  if (process.platform !== "linux") return undefined;
   const generation = randomBytes(32).toString("hex");
-  const receipts = join(data, ".host-stops");
+  const receipts = join(resolve(hostData), "platform", "host-stops");
   mkdirSync(receipts, { recursive: true, mode: 0o700 });
+  const path = join(receipts, generation + ".json");
   env.CHRONA_HOST_GENERATION = generation;
-  return { path: join(receipts, generation + ".json"), generation };
+  env.CHRONA_HOST_STOP_RECEIPT = path;
+  return { path, generation };
 }
 /** Trusted local processes retain OS permissions; routed declarations govern only Chrona calls. */
 export function createScriptSandbox({ executionMode = "trusted-local", dataDir, timeoutMs = 60_000, maxOutputBytes = 64 * 1024, moduleSdk = fileURLToPath(new URL("../../../app-sdk", import.meta.url)), moduleTypecheck = fileURLToPath(new URL("../../../app-sdk/typecheck", import.meta.url)), processHelper }: {
@@ -102,7 +104,7 @@ export function createScriptSandbox({ executionMode = "trusted-local", dataDir, 
     if (command.sdk) env.CHRONA_SDK_LOADER = join(moduleTypecheck, "chrona-sdk-loader.ts");
     const supervision = processCapability({ helperPath: processHelper });
     if (!supervision.available || supervision.scope !== "descendants") throw new Error(supervision.reason ?? "Full descendant supervision is not verified for this platform");
-    const stopReceipt = providerHostReceipt(dirs, data, env);
+    const stopReceipt = dirs.ipcEndpoint ? moduleHostReceipt(dataDir ?? dirname(data), env) : undefined;
     return spawnSupervised(interpreter, command.argv, { cwd: code, env, helperPath: processHelper, stopReceipt });
   }
   const supervision = processCapability({ helperPath: processHelper });
@@ -138,7 +140,7 @@ export function createScriptSandbox({ executionMode = "trusted-local", dataDir, 
       void stopEvidence.catch(() => {});
       return { pid: child.pid!, ready: task.ready, exited, stopEvidence, stderr: () => errors.toString("utf8") + (dropping ? "[oversized stderr line omitted]" : line ? "[incomplete stderr line omitted]" : ""), kill: task.stop };
     },
-    /** One-shot run with JSON on stdin: author tests and data migrations. */
+    /** One-shot run with JSON on stdin for version tests and data migrations. */
     async runModule({ codeDir, dataDir: moduleData, contentDir, entry, input, timeoutMs: runTimeout = timeoutMs, maxOutputBytes: outputLimit = maxOutputBytes }: { codeDir: string; dataDir: string; contentDir?: string; entry: string; input: unknown; network?: boolean; timeoutMs?: number; maxOutputBytes?: number }): Promise<ScriptSandboxResult> {
       limits(runTimeout, outputLimit);
       runtime(entry);

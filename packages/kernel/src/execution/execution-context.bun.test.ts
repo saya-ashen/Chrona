@@ -2,7 +2,7 @@ import { afterEach, expect, mock, test } from "bun:test";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { testDb } from "../test-db";
+import { testDb } from "../__testing__/test-db";
 import type { StewardPorts } from "../ports";
 import { createExecutions } from "./execution";
 import { createRuns } from "./runs";
@@ -18,7 +18,7 @@ async function fixture() {
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "hash", manifest: moduleManifestSchema.parse({ name: "coding", entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true }), source: "user", status: "approved", intent: {}, report: {} } });
   const project = await mkdtemp(join(tmpdir(), "chrona-coding-context-project-"));
   await writeFile(join(project, "AGENTS.md"), "Fixture project rules");
-  await db.session.create({ data: { workspaceId, source: "web", key: "web:secret", providerSessionId: "unrelated-provider" } });
+  await db.session.create({ data: { workspaceId, source: "owner", key: "web:secret", providerSessionId: "unrelated-provider" } });
   const ports: StewardPorts = { db, now: () => new Date("2026-11-05T12:00:00Z"), publicUrl: null, dataDir: await mkdtemp(join(tmpdir(), "chrona-coding-context-data-")),
     resolveExecutionProject: async (_, projectRef) => ({ projectRef, executor: "server", canonicalPath: project, baseline: "commit:fixture" }) };
   ports.executionEvents = createExecutionEventStore(ports);

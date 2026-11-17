@@ -4,7 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExecutionPrincipal, ExecutionReceiver, KernelExecutionStart, ExecutionDeliveryFinal, ExecutionSignedStop, ProviderAdapter } from "@chrona/contracts/steward";
-import { testDb } from "../test-db";
+import { testDb } from "../__testing__/test-db";
 import type { StewardPorts } from "../ports";
 import { createExecutionDelivery } from "./execution-delivery";
 import { createExecutionEventStore } from "./execution-event-store";
@@ -18,8 +18,8 @@ import { recordModuleExecution } from "../modules/module-failure-policy";
 import { executionLaunchSchema, runtimeOutcomeSchema, moduleManifestSchema } from "@chrona/contracts/steward";
 import { verifyExecutionStop } from "./execution-delivery-stop";
 import { enqueueCall } from "../modules/module-calls";
-import { testProviderManifest } from "../test-provider-process";
-import { testModuleProcess } from "../modules/module-test-process";
+import { testProviderManifest } from "../__testing__/test-provider-process";
+import { testModuleProcess } from "../__testing__/module-test-process";
 import { registerAgentProvider } from "../agent/agent-provider";
 import { CallError } from "../modules/module-call-error";
 import { moduleSupervisor } from "../modules/module-supervisor";
@@ -492,7 +492,7 @@ test("public pause fences caller and receiver before idle conflict, then exact d
 });
 
 test("stopped application workspace cleanup is durable, scoped, preview-bound and drains before lifecycle completion", async () => {
-  const { kernelExecutionCleanup } = await import("../kernel-execution-tools");
+  const { kernelExecutionCleanup } = await import("./kernel-execution-tools");
   const f = await fixture(); await f.service.admit(f.principal, { ...f.input, workspace: { ...f.input.workspace, mode: "independent_worktree" } });
   const d = (await f.service.poll(f.receiver)).deliveries[0]!;
   await expect(kernelExecutionCleanup(f.ports, f.principal, { op: "preview", workId: "work", commandKey: "early" })).rejects.toMatchObject({ code: "conflict" });

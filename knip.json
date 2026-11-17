@@ -13,25 +13,15 @@
   "workspaces": {
     ".": {
       "entry": [
-        "scripts/**/*.ts",
-        "build/**/*.ts"
+        "scripts/**/*.ts"
       ],
       "project": [
-        "scripts/**/*.{ts,tsx}",
-        "build/**/*.ts"
+        "scripts/**/*.{ts,tsx}"
       ]
     },
     "apps/server": {
       "entry": ["src/**/*.bun.test.ts", "src/**/*.fixture.ts", "src/__tests__/fixtures/*.ts"],
       "project": ["src/**/*.{ts,tsx}"]
-    },
-    "packages/remote-device": {
-      "entry": ["src/cli.ts", "src/**/*.bun.test.ts", "scripts/*.ts"],
-      "project": ["src/**/*.ts", "scripts/*.ts"]
-    },
-    ".generated/applications/*": {
-      "entry": ["index.ts", "build.ts", "src/**/*.tsx", "**/*.bun.test.ts", "test.ts"],
-      "project": ["**/*.{ts,tsx}", "!vendor/**", "!runtime/**", "!node_modules/**"]
     },
     "packages/*": {
       "entry": ["src/**/*.bun.test.ts", "src/**/*.fixture.ts"],
@@ -61,16 +51,6 @@
       ],
       "project": [
         "**/*.ts",
-        "!**/*.test.ts"
-      ]
-    },
-    "packages/app-common": {
-      "entry": [
-        "src/*.ts",
-        "src/*.tsx"
-      ],
-      "project": [
-        "src/**/*.{ts,tsx}",
         "!**/*.test.ts"
       ]
     }

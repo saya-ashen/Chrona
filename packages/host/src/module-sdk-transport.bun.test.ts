@@ -50,7 +50,7 @@ test("distributed SDK/testing use authenticated IPC and HTTP, with no Unix socke
   await expect(module.fetch("//localhost:1/")).rejects.toThrow("local path");
 });
 
-test("preview strips browser credentials, private headers and module-set cookies", async () => {
+test("preview forwards application credentials and cookies while stripping private transport headers", async () => {
   const root = await fixture();
   const child = spawn(process.execPath, ["--no-install", join(root, "node_modules/chrona/preview.ts"), root], { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
   const exited = new Promise<void>(resolve => child.once("close", () => resolve()));
@@ -67,10 +67,10 @@ test("preview strips browser credentials, private headers and module-set cookies
   });
   const response = await fetch(endpoint, { headers: { authorization: "Bearer owner-secret", cookie: "owner=secret", "x-chrona-module-token": "fake-token" } });
   expect(response.status).toBe(200);
-  expect(response.headers.get("set-cookie")).toBeNull();
+  expect(response.headers.get("set-cookie")).toBe("owner=untrusted; Path=/");
   expect(response.headers.get("x-chrona-module-token")).toBeNull();
   const body = await response.json() as { headers: Record<string, string> };
-  expect(body.headers.authorization).toBeUndefined();
-  expect(body.headers.cookie).toBeUndefined();
+  expect(body.headers.authorization).toBe("Bearer owner-secret");
+  expect(body.headers.cookie).toBe("owner=secret");
   expect(body.headers["x-chrona-module-token"]).toBeUndefined();
 });

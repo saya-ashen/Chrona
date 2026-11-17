@@ -7,8 +7,8 @@ import { registerAgentProvider } from "./agent-provider";
 import { startLocalProvider } from "../execution/local-runtime";
 import { createRuns } from "../execution/runs";
 import { moduleSupervisor } from "../modules/module-supervisor";
-import { testModuleProcess } from "../modules/module-test-process";
-import { testDb } from "../test-db";
+import { testModuleProcess } from "../__testing__/module-test-process";
+import { testDb } from "../__testing__/test-db";
 import type { StewardPorts } from "../ports";
 import "../modules/module-effects";
 

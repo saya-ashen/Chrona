@@ -1,23 +1,22 @@
 import { createHash } from "node:crypto";
 import type { Prisma } from "@chrona/db";
 import { z } from "zod";
-import { mkdtemp, realpath, rm } from "node:fs/promises";
+import { mkdtemp, readdir, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { redactSensitiveText } from "@chrona/logging/redaction";
 import { recordModuleUpstream, submitMergedCommit } from "./module-upstream";
-import { moduleContext, type ModuleContext, type ModuleVersion } from "./module-context";
+import { moduleContext, type ModuleContext } from "./module-context";
 import { verifyModuleGitBundle } from "./module-git-upstream";
 import { propose } from "./module-proposal";
 import { moduleSourceFiles, storeModuleArtifacts } from "./module-artifacts";
 import { checkoutModule } from "./module-files";
-import { moduleInitializationStateSchema, moduleInstallRequestSchema, moduleInstallResultSchema, OFFICIAL_EXTERNAL_MODULE_NAMES, PREINSTALLED_MODULE_NAMES, type ModuleInstallRequest, type ModuleInstallResult } from "@chrona/contracts/steward";
+import { moduleInstallRequestSchema, moduleInstallResultSchema, type ModuleInstallRequest, type ModuleInstallResult } from "@chrona/contracts/steward";
 import type { StewardPorts } from "../ports";
 import type { ExternalModuleInstaller, InstallationRequest } from "./module-install-types";
 import { readReleaseMaterial, resolveExternalRelease, type ModuleRelease } from "./module-release";
 import { assertExternalName } from "./module-identity";
 import { parseInput, StewardError } from "../errors";
-import { isModulePaused, ModuleUnavailableError } from "./module-availability";
 import { rejectedUpdateNotice } from "./module-activation-notice";
 import { prepareExactReleaseUpdate, readExactReleaseBaselineIn } from "./module-exact-release";
 import type { Caller } from "./module-call-types";
@@ -57,10 +56,8 @@ export function createExternalModuleInstaller(ports: StewardPorts): ExternalModu
   return async ({ workspaceId, request, release, exactReleaseUpdate }) => {
     // Re-resolve immediately before copying; never trust an adapter argument as a host path.
     const trusted = await revalidateInstallationRelease(ports, request.package, release);
-    if (!trusted.git) throw new StewardError("invalid", "Official installation requires a pinned Git release");
-    // The update destination is independent of whether this exact offline commit has been published.
-    const shipped = PREINSTALLED_MODULE_NAMES.some(name => name === request.package) || request.package === "qq";
-    const git = { ...trusted.git, ...(shipped ? { defaultRepository: `https://github.com/chrona-core/chrona-module-${request.package}` } : {}) };
+    if (!trusted.git) throw new StewardError("invalid", "Installation requires a pinned Git release");
+    const git = trusted.git;
     const { id, marker, submission } = await prepareSubmission(ports, workspaceId, request, release.hash);
     const root = await realpath(await mkdtemp(join(tmpdir(), "chrona-install-")));
     try {
@@ -77,7 +74,7 @@ export function createExternalModuleInstaller(ports: StewardPorts): ExternalModu
         if (!exactReleaseUpdate) throw new StewardError("forbidden", "Exact release selection requires an owner baseline");
         const { baseline, expectedLocal } = await prepareExactReleaseUpdate(context, submission.moduleId, trusted, exactReleaseUpdate);
         const associated = await ports.db.moduleUpstream.findUnique({ where: { moduleId: submission.moduleId } });
-        const bundle = { ...git, ...(associated?.repository ? { repository: null, defaultRepository: undefined } : {}) };
+        const bundle = { ...git, ...(associated?.repository ? { repository: null } : {}) };
         await prepared(git.commit);
         proposal = await propose(context, { root, dir: request.package, intent, allowed: [request.package], sourceCommit: git.commit, gitBundle: bundle, expectedLocal, expectedModuleId: submission.moduleId, exactReleaseUpdate: baseline }, "user");
         if (proposal.hash !== git.commit) throw new StewardError("conflict", "Proposal commit differs from the selected release");
@@ -89,7 +86,7 @@ export function createExternalModuleInstaller(ports: StewardPorts): ExternalModu
         if (proposal.hash !== trusted.git.commit) throw new StewardError("conflict", "Proposal commit differs from the selected release");
       }
       if (proposal.moduleId) {
-        await recordModuleUpstream(ports, workspaceId, proposal.moduleId, { ...git, repository: git.repository ?? git.defaultRepository ?? null });
+        await recordModuleUpstream(ports, workspaceId, proposal.moduleId, git);
       }
       submission.moduleId = proposal.moduleId ?? submission.moduleId;
       submission.phase = "submitted";
@@ -104,38 +101,6 @@ export function createExternalModuleInstaller(ports: StewardPorts): ExternalModu
       throw error;
     } finally { await rm(root, { recursive: true, force: true }); }
   };
-}
-/** Mutable bootstrap evidence is rechecked in the activation transaction; names/intent alone grant nothing. */
-export async function matchesInitialInstallation(context: ModuleContext, version: ModuleVersion, module: { id: string; name: string; activeHash: string | null; status: string }) {
-  const { db, workspaceId } = context;
-  const name = PREINSTALLED_MODULE_NAMES.find(name => name === module.name);
-  if (!name || module.activeHash !== null || module.status !== "active" || version.source !== "user") return false;
-  const workspace = await db.workspace.findUniqueOrThrow({ where: { id: workspaceId } });
-  const settings = workspace.settings as { moduleInitialization?: unknown } | null;
-  const state = moduleInitializationStateSchema.safeParse(settings?.moduleInitialization).data;
-  const initial = state?.packages[name], requestKey = `initialize:v1:${name}:1`;
-  if (state?.status !== "pending" || initial?.attempts !== 1 || initial.requestKey !== requestKey || !["pending", "building", "pending_approval"].includes(initial.status)) return false;
-  if (initial.moduleId !== module.id || initial.hash !== version.hash) return false;
-  const receipt = await db.moduleInstallation.findUnique({ where: { id: installationId(workspaceId, requestKey) }, include: { submission: true } });
-  const submission = submissionSchema.safeParse(receipt?.submission).data;
-  if (receipt?.workspaceId !== workspaceId || receipt.requestKey !== requestKey || receipt.mode !== "install" || receipt.package !== name || receipt.moduleId !== module.id || receipt.hash !== version.hash || !["building", "pending_approval"].includes(receipt.status) || receipt.approvalId !== null) return false;
-  if (!submission || submission.phase !== "submitted" || submission.moduleId !== module.id || submission.hash !== version.hash || submission.existingVersionId !== null || !attributedVersion(version, submission)) return false;
-  // An unselected/previously active version must not regain release authority through bootstrap.
-  if (await db.moduleActivation.findFirst({ where: { moduleId: module.id } }) || await db.moduleVersion.findFirst({ where: { moduleId: module.id, status: "approved" } })) return false;
-  // A receipt may refresh to pending_approval before a card exists; an actual review/decision remains authoritative.
-  return !await db.approval.findFirst({ where: { workspaceId, moduleId: module.id, action: "activate_module" } });
-}
-/** Only the host's checksum/tree-verified pinned release can carry first-install approval. */
-export async function isTrustedInitialInstallation(context: ModuleContext, version: ModuleVersion, module: Parameters<typeof matchesInitialInstallation>[2]) {
-  if (!await matchesInitialInstallation(context, version, module)) return false;
-  try {
-    // Reuse checksum, pinned commit, source tree, artifact and executable-mode verification.
-    const release = await resolveExternalRelease(context.ports, module.name as ModuleInstallRequest["package"], version.hash);
-    return release.git?.commit === version.hash && JSON.stringify(release.manifest) === JSON.stringify(version.manifest);
-  } catch (error) {
-    console.error(JSON.stringify({ component: "module-install", event: "initial_release.verification_failed", moduleId: module.id, hash: version.hash, error: redactSensitiveText(String(error)) }));
-    return false;
-  }
 }
 async function revalidateInstallationRelease(ports: StewardPorts, name: ModuleInstallRequest["package"], release: Parameters<ExternalModuleInstaller>[0]["release"]) {
   const trusted = await resolveExternalRelease(ports, name);
@@ -189,8 +154,8 @@ async function installationApproval(ports: StewardPorts, workspaceId: string, mo
 }
 /** Recover from persisted proposal/version facts, never repeat a possibly executed proposal. */
 export async function refreshInstallationReceipts(ports: StewardPorts, workspaceId: string): Promise<void> {
-  // Refresh official packages' latest receipts in ticks. Older keys reconcile on explicit lookup.
-  const pointers = await ports.db.moduleInstallationHead.findMany({ where: { workspaceId, package: { in: [...OFFICIAL_EXTERNAL_MODULE_NAMES] } }, select: { installationId: true } });
+  // Refresh latest receipts in ticks. Older keys reconcile on explicit lookup.
+  const pointers = await ports.db.moduleInstallationHead.findMany({ where: { workspaceId }, select: { installationId: true } });
   const ids = pointers.map(pointer => pointer.installationId);
   await refreshReceipts(ports, workspaceId, ids);
 }
@@ -199,10 +164,6 @@ async function refreshReceipts(ports: StewardPorts, workspaceId: string, ids: st
   for (const row of rows) {
     const result = installationResult(row);
     if (!["pending", "building", "pending_approval"].includes(result.status) || activeSubmissions.get(ports.db)?.has(row.id)) continue;
-    if (isModulePaused(result.package)) {
-      await recordInstallationResult(ports, workspaceId, installationFailure(result, new ModuleUnavailableError(result.package)));
-      continue;
-    }
     if (result.status === "pending") {
       const recovered = await recoverSubmission(ports, workspaceId, row, result);
       if (!recovered) continue;
@@ -250,11 +211,9 @@ async function recoverSubmission(ports: StewardPorts, workspaceId: string, row: 
   }
   return { moduleId: module.id, hash: version.hash };
 }
-async function resumeInstallation(tx: Prisma.TransactionClient, request: InstallationRequest, previous: Prisma.ModuleInstallationGetPayload<object>) {
+function resumeInstallation(request: InstallationRequest, previous: Prisma.ModuleInstallationGetPayload<object>) {
   if (previous.package !== request.package || previous.mode !== request.mode) throw new StewardError("conflict", "Install requestKey already belongs to another request");
-  const previousResult = installationResult(previous);
-  const result = isModulePaused(request.package) ? installationFailure(previousResult, new ModuleUnavailableError(request.package)) : previousResult;
-  if (isModulePaused(request.package)) await tx.moduleInstallation.update({ where: { id: previous.id }, data: resultData(result) });
+  const result = installationResult(previous);
   return { result, claimed: false, exactReleaseUpdate: undefined };
 }
 export async function installExternal(ports: StewardPorts, workspaceId: string, raw: ModuleInstallRequest): Promise<ModuleInstallResult> {
@@ -271,18 +230,17 @@ async function installRequest(ports: StewardPorts, workspaceId: string, request:
   const id = installationId(workspaceId, request.requestKey);
   const claim = await ports.db.$transaction(async tx => {
     const previous = await tx.moduleInstallation.findUnique({ where: { id } });
-    if (previous) return resumeInstallation(tx, request, previous);
+    if (previous) return resumeInstallation(request, previous);
     const module = await assertExternalName(tx, workspaceId, request.package, "install");
-    const paused = isModulePaused(request.package);
-    if (!paused && module && request.mode === "install") throw new StewardError("conflict", "Module already installed; explicitly select update");
-    if (!paused && !module && request.mode !== "install") throw new StewardError("not_found", "Module not installed; explicitly select install");
+    if (module && request.mode === "install") throw new StewardError("conflict", "Module already installed; explicitly select update");
+    if (!module && request.mode !== "install") throw new StewardError("not_found", "Module not installed; explicitly select install");
     const exactReleaseUpdate = request.mode === "exact-release" ? await readExactReleaseBaselineIn(tx, module!) : undefined;
     const moduleId = module?.id ?? null;
     const pending: ModuleInstallResult = { package: request.package, requestKey: request.requestKey, status: "pending", moduleId, hash: null, approvalId: null, error: null };
-    const result = paused ? installationFailure(pending, new ModuleUnavailableError(request.package)) : pending;
+    const result = pending;
     await tx.moduleInstallation.create({ data: { id, workspaceId, mode: request.mode, ...resultData(result), createdAt: ports.now() } });
     await tx.moduleInstallationHead.upsert({ where: { workspaceId_package: { workspaceId, package: request.package } }, create: { workspaceId, package: request.package, installationId: id }, update: { installationId: id } });
-    return { result, claimed: !paused, exactReleaseUpdate };
+    return { result, claimed: true, exactReleaseUpdate };
   });
   if (!claim.claimed) {
     if (["pending", "building", "pending_approval"].includes(claim.result.status)) {
@@ -333,12 +291,14 @@ export async function recordInstallationResult(ports: StewardPorts, workspaceId:
   });
 }
 export async function externalPackageCatalog(ports: StewardPorts, workspaceId: string) {
-  return Promise.all(OFFICIAL_EXTERNAL_MODULE_NAMES.map(async name => {
+  const entries = ports.moduleExternalResources ? await readdir(ports.moduleExternalResources, { withFileTypes: true }) : [];
+  const names = entries.filter(entry => entry.isDirectory() && moduleInstallRequestSchema.shape.package.safeParse(entry.name).success).map(entry => entry.name).sort();
+  return Promise.all(names.map(async name => {
     const module = await ports.db.module.findUnique({ where: { workspaceId_name: { workspaceId, name } } });
     const pointer = await ports.db.moduleInstallationHead.findUnique({ where: { workspaceId_package: { workspaceId, package: name } }, include: { installation: true } });
     const receipt = pointer ? installationResult(pointer.installation) : null;
     // Read current candidate facts even before the next tick reconciles the stored receipt.
-    const installation = receipt && ["building", "pending_approval"].includes(receipt.status) && !isModulePaused(name)
+    const installation = receipt && ["building", "pending_approval"].includes(receipt.status)
       ? await installationFacts(ports, workspaceId, receipt) : receipt;
     try {
       const release = await resolveExternalRelease(ports, name);
@@ -354,5 +314,5 @@ function releaseCatalogDetails(release: ModuleRelease) {
 }
 
 function installationFailure(result: ModuleInstallResult, error: unknown): ModuleInstallResult {
-  return { ...result, status: error instanceof ModuleUnavailableError ? "unavailable" : "failed", error: { code: error instanceof ModuleUnavailableError ? "unavailable" : error instanceof StewardError ? error.code : "failed", reason: error instanceof Error && "reason" in error ? String(error.reason) : "installation_failed", message: error instanceof Error ? redactSensitiveText(error.message).slice(0, 1000) : "Installation failed" } };
+  return { ...result, status: "failed", error: { code: error instanceof StewardError ? error.code : "failed", reason: error instanceof Error && "reason" in error ? String(error.reason) : "installation_failed", message: error instanceof Error ? redactSensitiveText(error.message).slice(0, 1000) : "Installation failed" } };
 }

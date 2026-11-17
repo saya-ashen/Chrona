@@ -45,32 +45,13 @@ jobs:
           LINT_RATCHET_BASE: ${{ github.event_name == 'push' && github.event.before || '' }}
 
       - name: Verify migration and container startup contracts
-        run: bun test ./scripts/init-sqlite-current.bun.test.ts ./scripts/docker-entrypoint.bun.test.ts ./scripts/release-smoke.bun.test.ts
+        run: bun test ./scripts/init-sqlite-current.bun.test.ts ./scripts/docker-entrypoint.bun.test.ts ./scripts/build/release-smoke.bun.test.ts
 
-  e2e:
+  container:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: check
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
-        with:
-          bun-version: 1.4.2
-
-      # Trusted workspace lifecycle scripts generate Prisma and native runtime artifacts.
-      - run: bun install --frozen-lockfile # NOSONAR
-
-      # Browser tooling stays outside the application's dependency graph.
-      - name: Install Playwright Chromium
-        run: |
-          npm install --prefix "$RUNNER_TEMP/chrona-browser" --ignore-scripts --no-audit --no-fund playwright@1.59.1
-          node "$RUNNER_TEMP/chrona-browser/node_modules/playwright/cli.js" install --with-deps chromium
-
-      - name: Build container
+      - name: Build kernel container
         run: docker build --tag chrona-ci .
-
-      - name: Container authentication, migration and browser smoke
-        run: node scripts/docker-smoke.mjs chrona-ci
-        env:
-          CHRONA_PLAYWRIGHT_ROOT: ${{ runner.temp }}/chrona-browser

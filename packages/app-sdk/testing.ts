@@ -126,7 +126,6 @@ export async function startModule(entry: string | ExplicitModuleEntry, { stubs =
       const url = new URL(path, endpoint);
       if (!path.startsWith("/") || url.origin !== endpoint) throw new Error("Module fetch requires a local path");
       const headers = new Headers(options.headers);
-      headers.delete("authorization"); headers.delete("cookie");
       headers.set("x-chrona-module-token", token);
       return globalThis.fetch(url, { ...options, headers, redirect: "manual" });
     },

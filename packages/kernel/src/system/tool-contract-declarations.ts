@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { kernelAgentInputs, kernelAgentOutputs, APPROVAL_STATUSES, settingsSchema as kernelSettingsSchema, candidateAdmissionInputSchema, candidateAdmissionOutputSchema, candidateSourceInputSchema, candidateSourceOutputSchema, candidateSubmitInputSchema, candidateSubmitOutputSchema, candidateCheckOutputSchema, modulesToolInputSchemas, pageInput, pageOutput, timerSetInput, timerViewSchema, lifecycleOperationSchema, updateSettingsSchema } from "@chrona/contracts/steward";
-import * as outputs from "../system-outputs";
+import * as outputs from "./system-outputs";
 import { moduleDiagnosticsOutputSchema, moduleHealthSummarySchema } from "../modules/module-diagnostics";
 import { activityRecordsOutput } from "../activity";
 import { kernelFactSchema } from "../notification-facts";

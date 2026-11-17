@@ -1,4 +1,5 @@
 import { copyFileSync, existsSync } from "node:fs";
+import { chronaDataDir } from "@chrona/runtime-config";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { ensurePrivateDirectory, secureGeneratedPrivateFile } from "@chrona/db/sqlite-url";
@@ -13,7 +14,7 @@ export type ChronaStartOptions = {
 export type BootChronaServer = () => Promise<void>;
 
 const packageDir = process.env.CHRONA_PACKAGE_DIR
-  ?? resolve(dirname(import.meta.dirname), "..");
+  ?? resolve(import.meta.dirname, "../../..");
 
 type ResourceDirectoryInput = {
   cwd: string;
@@ -37,7 +38,7 @@ export function findResourceDir(input: ResourceDirectoryInput = {
   ].filter((value): value is string => Boolean(value));
 
   for (const candidate of candidates) {
-    if (existsSync(resolve(input.cwd, candidate, "prisma", "migrations"))) return candidate;
+    if (existsSync(resolveMigrationsDir(resolve(input.cwd, candidate)))) return candidate;
   }
 
   if (input.packageDir === undefined) throw new Error("Cannot determine resource root: no observed resource directory contains prisma/migrations and the process package path is unavailable");
@@ -48,15 +49,13 @@ function getHome(): string {
   return process.env.HOME ?? process.env.USERPROFILE ?? homedir();
 }
 
-export function getChronaDataDir(): string {
-  if (process.env.CHRONA_DATA_DIR) return process.env.CHRONA_DATA_DIR;
-  const home = getHome();
-  if (process.platform === "darwin") return join(home, "Library", "Application Support", "chrona");
-  if (process.platform === "win32") return join(process.env.APPDATA ?? join(home, "AppData", "Roaming"), "chrona");
-  return process.env.XDG_DATA_HOME
-    ? join(process.env.XDG_DATA_HOME, "chrona")
-    : join(home, ".local", "share", "chrona");
+export function resolveMigrationsDir(resourceDir: string): string {
+  const packaged = join(resourceDir, "prisma", "migrations");
+  if (existsSync(packaged)) return packaged;
+  return join(resourceDir, "packages", "db", "prisma", "migrations");
 }
+
+export function getChronaDataDir(): string { return chronaDataDir(); }
 
 export function getChronaConfigDir(): string {
   if (process.env.CHRONA_CONFIG_DIR) return process.env.CHRONA_CONFIG_DIR;
@@ -122,7 +121,7 @@ export async function startChronaServer(bootServer: BootChronaServer, options: C
   ensureDirs();
 
   const resourceDir = findResourceDir();
-  const migrationsDir = join(resourceDir, "prisma", "migrations");
+  const migrationsDir = resolveMigrationsDir(resourceDir);
   ensureEnv(resourceDir);
 
   process.env.CHRONA_MIGRATIONS_DIR ??= migrationsDir;
@@ -136,8 +135,7 @@ export async function startChronaServer(bootServer: BootChronaServer, options: C
   console.log(`  Config: ${configDir}`);
   console.log("");
 
-  // The server entrypoint owns the runtime lock and migration lifecycle. Keeping
-  // this launcher side-effect free prevents a packaged start from acquiring twice.
+  // CLI runtime assembly owns the sole storage lock and migration lifecycle.
 
   const host = process.env.HOST ?? "127.0.0.1";
   const port = Number.parseInt(process.env.PORT ?? "3101", 10);

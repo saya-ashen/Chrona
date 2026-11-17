@@ -1,5 +1,4 @@
 {
-  "$schema": "https://json.schemastore.org/json",
   "server": {
     "host": "127.0.0.1",
     "port": 3101,
@@ -7,14 +6,7 @@
     "unsafePublicBind": false
   },
   "database": {
-    "url": "file:./prisma/dev.db",
-    "migrationsDir": "prisma/migrations"
-  },
-  "web": {
-    "dist": null
-  },
-  "experimental": {
-    "dashboardAiSummary": false
+    "migrationsDir": "packages/db/prisma/migrations"
   },
   "security": {
     "apiKey": null

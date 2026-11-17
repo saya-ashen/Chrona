@@ -8,10 +8,10 @@ import { moduleEventSchema, moduleManifestSchema, type AgentProviderRegistration
 import type { Trigger } from "../../../app-sdk/sdk";
 import { callSync, kernelOrigin, runDueCalls } from "./module-calls";
 import { moduleSupervisor } from "./module-supervisor";
-import { registerSystemModules } from "../system-modules";
-import { testModuleProcess } from "./module-test-process";
-import { testProviderManifest } from "../test-provider-process";
-import { testDb } from "../test-db";
+import { registerSystemModules } from "../system/system-modules";
+import { testModuleProcess } from "../__testing__/module-test-process";
+import { testProviderManifest } from "../__testing__/test-provider-process";
+import { testDb } from "../__testing__/test-db";
 import { createRuns } from "../execution/runs";
 import { createTools } from "../tools";
 import type { StewardPorts } from "../ports";

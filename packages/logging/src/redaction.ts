@@ -1,5 +1,5 @@
 import { REDACTED, redactSensitiveText } from "./redaction-text";
-export { REDACTED, redactSensitiveText, truncateSafeText } from "./redaction-text";
+export { REDACTED, redactSensitiveText } from "./redaction-text";
 
 const MAX_STRING_LENGTH = 400;
 const MAX_ARRAY_LENGTH = 20;
@@ -42,18 +42,4 @@ export function redactSensitiveValue(value: unknown, options: RedactionOptions =
     if (isSensitiveKey(key) || SENSITIVE_CONTAINER_KEY.test(key)) return [key, REDACTED];
     return [key, redactSensitiveValue(nested, { maxLength, seen })];
   }));
-}
-
-export function serializeSafeError(error: unknown, maxLength = MAX_STRING_LENGTH): Record<string, unknown> {
-  const serialized = redactSensitiveValue(error, { maxLength });
-  return serialized && typeof serialized === "object" && !Array.isArray(serialized)
-    ? serialized as Record<string, unknown>
-    : { name: "Error", message: typeof serialized === "string" ? serialized : "Unknown error" };
-}
-
-const clip = (text: string, max: number) => text.length > max ? `${text.slice(0, max)}…（已截断）` : text;
-/** Redaction is a kernel boundary, independent of the selected Provider. Always redact before clipping. */
-export function transcriptRedactor() {
-  const values = Object.entries(process.env).filter(([key, value]) => /(KEY|TOKEN|SECRET|PASSWORD)/i.test(key) && value && value.length >= 8).map(([, value]) => value!);
-  return (text: string, limit: number) => clip(redactSensitiveText(values.reduce((out, value) => out.replaceAll(value, "[redacted]"), text).replace(/\bxox[abp]-[A-Za-z0-9_-]{16,}/g, "[redacted]"), Number.MAX_SAFE_INTEGER), limit);
 }

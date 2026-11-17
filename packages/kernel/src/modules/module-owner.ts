@@ -1,5 +1,5 @@
 import { moduleManifestSchema, secretNames, type ModuleManifest } from "@chrona/contracts/steward";
-import { addsOAuthDefinitions } from "../oauth-definition";
+import { addsOAuthDefinitions } from "../secrets/oauth-definition";
 import type { Prisma } from "@chrona/db";
 import type { Caller } from "./module-call-types";
 import type { StewardPorts } from "../ports";

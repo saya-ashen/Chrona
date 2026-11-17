@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findResourceDir, getChronaDataDir, startChronaServer } from "./start-server";
+import { findResourceDir, getChronaDataDir, resolveMigrationsDir, startChronaServer } from "./start-server";
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -28,6 +28,19 @@ describe("findResourceDir", () => {
       expect(() => findResourceDir({ ...input, packageDir: undefined })).toThrow("process package path is unavailable");
       mkdirSync(join(root, "resources/prisma/migrations"), { recursive: true });
       expect(findResourceDir({ ...input, packageDir: "" })).toBe("resources");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it("resolves checkout migrations and keeps packaged resources ahead of source definitions", () => {
+    const root = mkdtempSync(join(tmpdir(), "chrona-source-migrations-"));
+    const source = join(root, "packages/db/prisma/migrations");
+    const packaged = join(root, "prisma/migrations");
+    try {
+      mkdirSync(source, { recursive: true });
+      expect(findResourceDir({ cwd: root, argv0: "missing/chrona", executable: "missing/chrona", packageDir: root })).toBe(root);
+      expect(resolveMigrationsDir(root)).toBe(source);
+      mkdirSync(packaged, { recursive: true });
+      expect(resolveMigrationsDir(root)).toBe(packaged);
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 
@@ -61,11 +74,11 @@ describe("startChronaServer", () => {
         expect(process.env.HOST).toBe("0.0.0.0");
         expect(process.env.PORT).toBe("4310");
         expect(process.env.DATABASE_URL).toBe(`file:${join(getChronaDataDir(), "chrona.db")}`);
-        expect(process.env.CHRONA_MIGRATIONS_DIR).toBe(join(resourceDir, "prisma", "migrations"));
+        expect(process.env.CHRONA_MIGRATIONS_DIR).toBe(join(resourceDir, "packages/db/prisma/migrations"));
       }, { host: "0.0.0.0", port: "4310", open: false });
 
       expect(booted).toBe(true);
-      // Packaged launch delegates the sole lock/migration ownership to startBunServer.
+      // Packaged launch delegates the sole lock/migration ownership to prepareChronaRuntime.
       expect(existsSync(join(getChronaDataDir(), "chrona.db"))).toBe(false);
       expect(output).toContain("🚀 Starting Chrona on http://localhost:4310");
       expect(output).toContain("⚡ Chrona — personal steward");

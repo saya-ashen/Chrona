@@ -9,7 +9,7 @@ import { createApprovals } from "../approvals";
 import { createModules } from "./modules";
 import { moduleSupervisor } from "./module-supervisor";
 import type { StewardPorts } from "../ports";
-import { testDb } from "../test-db";
+import { testDb } from "../__testing__/test-db";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await close(); });

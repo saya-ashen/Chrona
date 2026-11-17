@@ -1,9 +1,9 @@
 import { afterEach, expect, test } from "bun:test";
 import type { Prisma } from "@chrona/db";
-import { testDb } from "./test-db";
+import { testDb } from "./__testing__/test-db";
 import { pruneHistory } from "./retention";
 import { appendRunEventIn } from "./execution/run-events";
-import { createTick } from "./tick";
+import { createTick } from "./runtime/tick";
 import { moduleFailurePolicy, recordModuleExecution } from "./modules/module-failure-policy";
 import { settleRunCompletion } from "./agent/agent-completion-settlement";
 

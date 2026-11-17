@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { collectStore } from "./store-gc";
 import { moduleSupervisor } from "./modules/module-supervisor";
 import { commitModuleSource } from "./modules/module-git";
-import { testDb } from "./test-db";
+import { testDb } from "./__testing__/test-db";
 import type { StewardPorts } from "./ports";
 
 const DAY_MS = 24 * 3600_000;

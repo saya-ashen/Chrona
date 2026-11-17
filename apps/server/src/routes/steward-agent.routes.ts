@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { createStewardService, StewardError, CallError, type StewardPorts, type StewardService } from "@chrona/kernel";
-import { createLogger } from "@chrona/logging";
+import { createLogger } from "../logger";
 
 import { hasLoopbackPeer, type ServerBindings } from "../request-peer";
 

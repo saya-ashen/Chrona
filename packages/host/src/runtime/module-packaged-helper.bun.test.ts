@@ -30,8 +30,8 @@ appendFileSync(${JSON.stringify(log)}, JSON.stringify({ name: ${JSON.stringify(n
     const integration = join(source, "packages/host/src"), engine = join(source, "packages/kernel/src");
     const entry = join(root, "fixture.ts"), executable = join(root, "compiled-fixture");
     await writeFile(entry, `import { createModulePackages } from ${JSON.stringify(join(integration, "packages/module-packages.ts"))};
-import { typecheckBuild } from ${JSON.stringify(join(engine, "modules/module-typecheck.ts"))};
-import { writeBuildHelpers } from ${JSON.stringify(join(engine, "modules/module-build-helpers.ts"))};
+import { typecheckBuild } from ${JSON.stringify(join(engine, "modules/checks/module-typecheck.ts"))};
+import { writeBuildHelpers } from ${JSON.stringify(join(engine, "modules/checks/module-build-helpers.ts"))};
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 const [helper, sdk, typecheck, registry] = process.argv.slice(2);

@@ -24,18 +24,7 @@ node_modules/
 /out/
 
 # production
-/build/*
-!/build/agent-dependencies.ts
-!/build/agent-declaration-bundle.ts
-!/build/portable-elf.ts
-!/build/entry-conversations.ts
-!/build/release-identity.ts
-!/build/application-pages.ts
-!/build/application-ui.ts
-!/build/manifest.ts
-!/build/manifest.bun.test.ts
-!/build/release-smoke.ts
-!/build/release-smoke.bun.test.ts
+/build/
 # misc
 .DS_Store
 *.pem
@@ -68,12 +57,6 @@ __pycache__/
 .worktrees/
 agent-dashboard-app/
 .direnv/
-prisma/dev.db
-prisma/dev.db-shm
-prisma/dev.db-wal
-prisma/dev.db.*
-prisma/dev.db-shm.*
-prisma/dev.db-wal.*
 .env
 .env.local
 
@@ -150,11 +133,10 @@ progress.txt
 /.opencode/
 
 # SQLite runtime sidecars are never release fixtures
-prisma/migrations/fixtures/*.sqlite-shm
-prisma/migrations/fixtures/*.sqlite-wal
+packages/db/prisma/migrations/fixtures/*.sqlite-shm
+packages/db/prisma/migrations/fixtures/*.sqlite-wal
 
 /.pi-subagents/
-prisma/*.sync-conflict-*.db*
 /outputs
 
 # Local agent working notes, deployment receipts and screenshots
@@ -165,6 +147,3 @@ prisma/*.sync-conflict-*.db*
 /.serena/
 /HANDOFF.md
 /plans/
-
-# Pinned application sources restored from offline inputs, never authoritative checkouts.
-/.generated/applications/

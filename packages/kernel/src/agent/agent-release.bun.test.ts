@@ -2,8 +2,7 @@ import { test, expect } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
-import { testDb } from "../test-db";
-import { registerBuiltins } from "../modules/module-builtin";
+import { testDb } from "../__testing__/test-db";
 import { createModuleSupervisor } from "../modules/module-supervisor";
 import type { StewardPorts } from "../ports";
 
@@ -13,7 +12,6 @@ test("empty bootstrap creates no builtin Agent and needs no builtin resources", 
   const supervisor = createModuleSupervisor(ports);
   try {
     const workspace = await db.workspace.create({ data: { name: "empty" } });
-    await registerBuiltins(ports, workspace.id);
     await supervisor.start();
     expect(await db.module.count()).toBe(0);
     expect(await db.moduleVersion.count()).toBe(0);

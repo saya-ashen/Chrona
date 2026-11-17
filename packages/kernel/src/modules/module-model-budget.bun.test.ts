@@ -4,7 +4,7 @@ import type { StewardPorts } from "../ports";
 import type { CallScope } from "./module-supervisor";
 import { finishCompletionIn, reserveCompletionIn } from "./module-model-budget";
 import { createSettings, modelUsage } from "../settings";
-import { testDb } from "../test-db";
+import { testDb } from "../__testing__/test-db";
 
 function reserveCompletion(ports: StewardPorts, scope: CallScope, params: Parameters<typeof reserveCompletionIn>[2], now: Date) {
   return ports.db.$transaction(async tx => {

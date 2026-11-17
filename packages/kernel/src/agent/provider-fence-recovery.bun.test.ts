@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
-import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+
+import { mkdtemp, rm} from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { moduleManifestSchema, type AgentProviderRegistration, type ProviderRunInput } from "@chrona/contracts/steward";
@@ -10,12 +10,12 @@ import { admitContextPrimitive } from "./agent-context";
 import { moduleContext } from "../modules/module-context";
 import { requestStatus, setStatusIn } from "../modules/module-status";
 import { moduleSupervisor } from "../modules/module-supervisor";
-import { testModuleProcess } from "../modules/module-test-process";
-import { testDb } from "../test-db";
+import { testModuleProcess } from "../__testing__/module-test-process";
+import { testDb } from "../__testing__/test-db";
 import { startLocalProvider } from "../execution/local-runtime";
 import { createRuns } from "../execution/runs";
 import { agent } from "../system/agent";
-import { registerSystemModules } from "../system-modules";
+import { registerSystemModules } from "../system/system-modules";
 import { CallError } from "../modules/module-call-error";
 import type { StewardPorts } from "../ports";
 import "../modules/module-effects";
@@ -147,59 +147,6 @@ test.each(["owner", "chrona"] as const)("%s enable clears a drained active fence
   await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: f.backend.id, hash: f.binding.hash } }, data: { status: "approved" } });
   await enable();
   expect(await f.db.module.findUniqueOrThrow({ where: { id: f.backend.id } })).toMatchObject({ status: "active", executionFenceAt: null, activationId: "original-activation" });
-});
-
-test.skipIf(process.platform !== "linux")("cold actual Pi SDK rejects fenced activation yet reconciles only the original host's descendant-stop receipt", async () => {
-  const f = await fixture({ activated: true });
-  const data = join(f.ports.dataDir, "platform/data", f.backend.id), profile = join(data, "profile");
-  await mkdir(profile, { recursive: true });
-  await mkdir(join(data, "operations"));
-  await mkdir(join(data, ".host-stops"));
-  await writeFile(join(profile, "settings.json"), JSON.stringify({ defaultProvider: "fixture", defaultModel: "fixture" }));
-  const generation = "a".repeat(64), key = createHash("sha256").update(JSON.stringify(f.run.id)).digest("hex");
-  const journal = join(data, "operations", `${key}.json`), stopReceipt = join(data, ".host-stops", `${generation}.json`);
-  await writeFile(journal, JSON.stringify({ digest: "c".repeat(64), hostGeneration: generation }), { mode: 0o600 });
-  const receipt = (treeClean: boolean) => JSON.stringify({ version: 1, generation, state: "stopped", scope: "descendants", treeClean });
-  await writeFile(stopReceipt, receipt(false), { mode: 0o600 });
-  const children: ReturnType<typeof Bun.spawn>[] = [];
-  f.ports.sandbox!.startModule = input => {
-    const child = Bun.spawn([process.execPath, "--no-install", join(import.meta.dir, "../../../../.generated/applications/pi/runtime.ts")], {
-      cwd: join(import.meta.dir, "../../../.."), stdin: "ignore", stdout: "ignore", stderr: "pipe",
-      env: { ...process.env, CHRONA_IPC_ENDPOINT: input.ipcEndpoint, CHRONA_IPC_TOKEN: input.ipcToken, CHRONA_DATA: input.dataDir,
-        CHRONA_MODULE_BINDINGS: "{}", CHRONA_HOST_GENERATION: "b".repeat(64),
-        CHRONA_PROVIDER_CONFIGURATION: JSON.stringify({ command: "/must-not-launch-pi", agentDir: profile, chronaExtension: "/fixture/bridge", agentUrl: "http://fixture.invalid" }), CHRONA_PROVIDER_MODEL_ENV: "{}" },
-    });
-    children.push(child);
-    return { pid: child.pid, exited: child.exited.then(code => ({ code, signal: null })), stderr: () => "", kill: () => { child.kill(); } };
-  };
-  // The production SDK preserves the forbidden category for failed registration,
-  // so the supervisor treats activation rejection as a nonfatal handler response.
-  const now = f.ports.now().toISOString();
-  await expect(moduleSupervisor(f.ports).deliver(f.backend.id, f.binding.hash, { now, params: {}, trigger: { kind: "activated", id: "activated", firedAt: now } })).rejects.toMatchObject({ code: "forbidden" });
-  expect(await f.control("status")).toMatchObject({ operationId: f.run.id, outcome: null, failure: true });
-  await expect(f.control("release")).rejects.toMatchObject({ code: "conflict" });
-  await reconcileAgentStops(f.ports, f.workspaceId);
-  await expect(requestStatus(f.context, f.backend.id, "active", "no descendant proof")).rejects.toMatchObject({ code: "conflict" });
-  // An abort on an orphaned operation is unknown, and cannot invent stop proof.
-  await expect(f.control("abort")).rejects.toMatchObject({ code: "unknown" });
-  expect((await f.db.run.findUniqueOrThrow({ where: { id: f.run.id } })).stopStatus).toBe("unknown");
-  expect(JSON.parse(await readFile(journal, "utf8"))).not.toHaveProperty("outcome");
-  // That unknown reply intentionally retires this SDK process. Wait only for its
-  // actual exit before the next cold host reads the trusted original receipt.
-  await children[0]!.exited;
-  await writeFile(stopReceipt, receipt(true));
-  await reconcileAgentStops(f.ports, f.workspaceId);
-  expect((await f.db.run.findUniqueOrThrow({ where: { id: f.run.id } })).stopStatus).toBe("confirmed");
-  expect(JSON.parse(await readFile(journal, "utf8"))).toMatchObject({ hostGeneration: generation, outcome: { outcome: "failed", error: expect.stringContaining("work was not replayed") } });
-  await f.control("abort");
-  await f.control("release");
-  await requestStatus(f.context, f.backend.id, "active", "trusted descendant stop");
-  expect((await f.db.module.findUniqueOrThrow({ where: { id: f.backend.id } })).executionFenceAt).toBeNull();
-  expect(f.requests.filter(request => request.name === "start")).toHaveLength(1);
-  expect(await f.db.providerLaunch.count({ where: { runId: f.run.id } })).toBe(1);
-  expect(children).toHaveLength(2);
-  expect(children[1]!.exitCode).toBeNull();
-  expect(await f.db.moduleRun.count({ where: { moduleId: f.backend.id, triggerId: "activated", error: { not: null } } })).toBe(1);
 });
 
 test.each(["queued", "running"] as const)("fenced application can stop only its existing %s Run through both principal checks", async stage => {

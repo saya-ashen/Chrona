@@ -1,12 +1,10 @@
 #!/usr/bin/env bun
 
-import { restoredApplicationSources, restoreApplications } from "./restore-applications";
 
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { dirname, extname, basename, relative, resolve } from "node:path";
 import { type GuardrailCheckName, runGuardrails, selectGuardrailChecksForPaths } from "./check-guardrails";
 
-await restoreApplications();
 const ROOT = resolve(import.meta.dirname, "..");
 const decoder = new TextDecoder();
 const CODE_EXT_RE = /\.(?:[cm]?[jt]sx?)$/u;
@@ -51,7 +49,7 @@ function expandInputPaths(inputs: string[]): string[] {
 async function discoverWorkspaceChangedFiles(): Promise<string[]> {
 	const tracked = gitLines(["diff", "--name-only", "-z", "--diff-filter=ACMR", "HEAD"]);
 	const untracked = gitLines(["ls-files", "--others", "--exclude-standard", "-z"]);
-	return [...new Set([...tracked, ...untracked, ...await restoredApplicationSources()])]
+	return [...new Set([...tracked, ...untracked])]
 		.filter((p) => !p.startsWith("plans/") && !p.startsWith(".serena/") && existsSync(resolve(ROOT, p)))
 		.sort();
 }
@@ -175,7 +173,7 @@ function runGuardrailsStep(targetFiles: string[], scoped: boolean): StepResult {
 			name: "guardrails",
 			ok: true,
 			durationMs,
-			summary: only ? `passed (${only.join(",")})` : "passed (hygiene,contracts,docker-closure,materials,migrations,boundaries)",
+			summary: only ? `passed (${only.join(",")})` : "passed (hygiene,contracts,docker-closure,migrations,boundaries)",
 		};
 	}
 	const details = findings

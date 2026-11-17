@@ -9,6 +9,8 @@
   "dependencies": {
     "@chrona/db": "workspace:*",
     "@chrona/host": "workspace:*",
+    "@chrona/logging": "workspace:*",
+    "@chrona/runtime-config": "workspace:*",
     "commander": "^15.0.0"
   }
 }

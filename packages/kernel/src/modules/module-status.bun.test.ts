@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
-import { testDb } from "../test-db";
-import { notices } from "../test-notices";
+import { testDb } from "../__testing__/test-db";
+import { notices } from "../__testing__/test-notices";
 import { moduleContext } from "./module-context";
 import { pauseFailedModule } from "./module-effects";
 import { requestStatus, setStatusIn } from "./module-status";
@@ -52,7 +52,7 @@ test("three failures pause the module, preserving timers and incident evidence",
     expect.objectContaining({ id: timer.id, status: "active" }),
     expect.objectContaining({ id: paused.id, status: "paused", nextAt: null }),
   ]));
-  expect(await notices(f.db, { title: "模块连续失败，已暂停" })).toHaveLength(1);
+  expect(await notices(f.db, { kind: "module-paused" })).toHaveLength(1);
   await f.status("active");
   expect(await f.db.timer.count({ where: { status: "active" } } )).toBe(1);
   expect((await f.audit("module_enabled")).details).toEqual({ source: "owner" });

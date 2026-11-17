@@ -35,7 +35,7 @@ async function unique(tx: Prisma.TransactionClient, principal: ExecutionPrincipa
 /** Bind a fresh context or the exact caller's stopped context; owner read authority alone cannot resume it. */
 async function executionSessionIn(ports: StewardPorts, tx: Prisma.TransactionClient, principal: ExecutionPrincipal, ref: ExecutionStart["resumeFrom"], project: ExecutionProjectGrant) {
   if (!ref) {
-    const session = await createRunSession(tx, principal.workspaceId, principal.caller.kind === "module" ? "module" : "web", ports.now(), principal.caller.kind === "module" ? { moduleId: principal.caller.moduleId } : {});
+    const session = await createRunSession(tx, principal.workspaceId, principal.caller.kind === "module" ? "module" : "owner", ports.now(), principal.caller.kind === "module" ? { moduleId: principal.caller.moduleId } : {});
     return { sessionId: session.id, logDir: join(ports.dataDir, "sessions", session.id) };
   }
   const source = await unique(tx, principal, { id: ref.attemptId, runId: ref.runId, workId: ref.workId,

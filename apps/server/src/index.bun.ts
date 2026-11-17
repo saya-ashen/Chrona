@@ -1,83 +1,14 @@
-import { resolve } from "node:path";
-import type { PrismaClient } from "@chrona/db";
-import { ensureSqliteDatabase } from "@chrona/db/sqlite-migrations";
-import { recoverInterruptedSqliteRestore } from "@chrona/db/sqlite-backup";
-import { acquireSqliteRuntimeLock } from "@chrona/db/sqlite-runtime-lock";
-import { secureGeneratedSqliteSidecars } from "@chrona/db/sqlite-url";
-import { createLogger } from "@chrona/logging";
-import { redactSensitiveText } from "@chrona/logging/redaction";
-import { assertSafeBind, isUnsafePublicBindOverride, readEnv, resolveAllowedOrigins, resolvePort } from "./config/env";
+import type { StewardRuntime } from "./steward-runtime";
+import { createLogger } from "./logger";
+import { createServerApp } from "./app";
+import { isUnsafePublicBindOverride, readEnv, resolveAllowedOrigins, resolvePort } from "./config/env";
 
 const log = createLogger("apps.server");
 
-let isShuttingDown = false;
-
-export async function ensureDefaultWorkspace(db: PrismaClient) {
-  await db.workspace.upsert({ where: { id: "ws_default" }, create: { id: "ws_default", name: "Personal" }, update: {} });
-}
-
-async function loadApplicationGraph(databaseUrl: string, port: number) {
-  const [{ db }, { createServerApp }] = await Promise.all([
-    import("@chrona/db/db"),
-    import("./app"),
-  ]);
-  await db.$executeRawUnsafe("PRAGMA foreign_keys = ON");
-  await db.$queryRawUnsafe("SELECT 1");
-  await ensureDefaultWorkspace(db);
-  secureGeneratedSqliteSidecars(databaseUrl);
-  const { createStewardRuntime } = await import("./steward-runtime");
-  const steward = createStewardRuntime(db, { port, onError: error => log.error("steward tick failed", {
-    code: "STEWARD_TICK_FAILED",
-    name: redactSensitiveText(error instanceof Error ? error.name : typeof error),
-    message: redactSensitiveText(error instanceof Error ? error.message : typeof error === "string" ? error : "Unknown error"),
-  }) });
-  return { createServerApp, steward };
-}
-
-function shutdownDeadline() {
-  return setTimeout(() => {
-    log.error("shutdown timed out; interrupted work will require recovery", { code: "SHUTDOWN_TIMEOUT" });
-    process.exit(1);
-  }, 30_000);
-}
-
-export async function startBunServer() {
-  const env = readEnv();
-  const host = env.HOST;
-  const port = resolvePort(env);
-
-  await assertSafeBind(env);
-  const databaseLock = acquireSqliteRuntimeLock(env.DATABASE_URL);
-  // Covers normal process exits that do not arrive through SIGINT/SIGTERM.
-  process.once("exit", () => databaseLock.release());
-  try {
-    recoverInterruptedSqliteRestore(env.DATABASE_URL);
-    ensureSqliteDatabase({
-      databaseUrl: env.DATABASE_URL,
-      migrationsDir: process.env.CHRONA_MIGRATIONS_DIR ?? resolve("prisma", "migrations"),
-      log: (message) => log.info("database migration", { message }),
-    });
-  } catch (error) {
-    databaseLock.release();
-    throw error;
-  }
-  // Load the Prisma-backed app graph only after migrations and storage permissions settle.
-  let applicationGraph: Awaited<ReturnType<typeof loadApplicationGraph>>;
-  try {
-    applicationGraph = await loadApplicationGraph(env.DATABASE_URL, port);
-  } catch (error) {
-    databaseLock.release();
-    throw error;
-  }
-  const { createServerApp, steward } = applicationGraph;
-  let app: Awaited<ReturnType<typeof createServerApp>>;
-  try {
-    app = await createServerApp({ steward });
-  } catch (error) {
-    await steward.stop().catch(() => undefined);
-    databaseLock.release();
-    throw error;
-  }
+export async function startBunHttp(steward: StewardRuntime, env: ReturnType<typeof readEnv>) {
+  const host = env.HOST, port = resolvePort(env);
+  const app = await createServerApp({ steward });
+  let stopping = false;
   if (await isUnsafePublicBindOverride(env)) {
     log.warn("unsafe public bind enabled", {
       host,
@@ -102,7 +33,7 @@ export async function startBunServer() {
     port,
     idleTimeout: 120,
     fetch: (request, server) => {
-      if (isShuttingDown) {
+      if (stopping) {
         return new Response(JSON.stringify({ error: "Server is shutting down" }), {
           status: 503,
           headers: { "content-type": "application/json" },
@@ -113,45 +44,6 @@ export async function startBunServer() {
     },
   });
 
-  steward.start();
   log.info("listening", { host, port });
-
-  async function shutdown(signal: string) {
-    if (isShuttingDown) return;
-    isShuttingDown = true;
-    log.info("shutdown started", { signal });
-    // Do not disconnect a database still used by background work. A hard timeout is an interrupted shutdown.
-    const deadline = shutdownDeadline();
-
-    server.stop(true);
-    try {
-      await steward.stop();
-    } catch (err) {
-      log.error("runtime shutdown failed", { error: String(err) });
-      clearTimeout(deadline);
-      process.exit(1);
-    }
-
-    try {
-      const { db } = await import("@chrona/db/db");
-      await db.$disconnect();
-    } catch (err) {
-      log.error("db disconnect failed", { error: String(err) });
-    } finally {
-      databaseLock.release();
-    }
-
-    clearTimeout(deadline);
-    log.info("shutdown complete", { signal });
-    process.exit(0);
-  }
-
-  process.on("SIGTERM", () => shutdown("SIGTERM"));
-  process.on("SIGINT", () => shutdown("SIGINT"));
-
-  return server;
-}
-
-if (process.argv[1]?.endsWith("apps/server/src/index.bun.ts")) {
-  void startBunServer();
+  return { server, stop() { stopping = true; server.stop(true); } };
 }

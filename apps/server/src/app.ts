@@ -3,12 +3,10 @@ import { createStewardRuntime, type StewardRuntime } from "./steward-runtime";
 import { bodyLimit } from "hono/body-limit";
 
 import { createApiRouter } from "./routes/api";
-import { createRemoteExecutionRouter, isRemoteExecutionDevicePath, isRemoteExecutionOwnerPath } from "./remote-execution-router";
 import { completeOAuth, OAUTH_CALLBACK_PATH } from "@chrona/kernel";
-import { createLogger } from "@chrona/logging";
+import { createLogger } from "./logger";
 import { apiKeyAuth } from "./middleware/auth";
 import { loopbackHostGuard } from "./middleware/host";
-import { createBrowserAuth } from "./browser-auth";
 import { isLoopbackBindHost, isTrustedRequestOrigin, readEnv, resolveAllowedOrigins } from "./config/env";
 
 import type { ServerBindings } from "./request-peer";
@@ -32,19 +30,17 @@ function resolveOrigin(origin: string | undefined, allowed: string[]) {
   return allowed.includes(origin) ? origin : null;
 }
 
-/** Forwards a request to a module's authenticated HTTP endpoint without the user's credentials (v2-4 `listen`). */
+/** The listener owner authenticates its browser sessions; the transport token authenticates this proxy. */
 async function proxy(endpoint: { endpoint: string; token: string }, request: Request) {
   const url = new URL(request.url), headers = new Headers(request.headers);
-  headers.delete("authorization");
-  headers.delete("cookie");
   headers.set("x-chrona-module-token", endpoint.token);
   try {
     const response = await fetch(`${endpoint.endpoint}${url.pathname}${url.search}`, { method: request.method, headers, body: request.body, redirect: "manual", signal: request.signal });
     const out = new Headers(response.headers);
-    out.delete("set-cookie");
     out.delete("x-chrona-module-token");
     return new Response(response.body, { status: response.status, headers: out });
-  } catch {
+  } catch (error) {
+    log.error("module proxy failed", { error: String(error) });
     return Response.json({ code: "MODULE_UNAVAILABLE" }, { status: 503 });
   }
 }
@@ -55,21 +51,13 @@ function mountHealthRoutes(app: Hono<{ Bindings: ServerBindings }>,  steward: St
     try {
       await steward.ports.db.$queryRawUnsafe("SELECT 1");
       return c.json({ status: "ready" });
-    } catch {
+    } catch (error) {
+      log.error("database readiness failed", { error: String(error) });
       return c.json({ status: "not_ready" }, 503);
     }
   });
 }
 
-/**
- * Creates the Hono server app with all middleware and routes mounted.
- *
- * Returns a fresh app instance (factory pattern). The returned type is used
- * by the frontend hono/client RPC — import via:
- *   import type { AppType } from "@chrona/server/app";
- *   import { hc } from "hono/client";
- *   const client = hc<AppType>("/api");
- */
 export async function createServerApp(options: { steward?: StewardRuntime } = {}) {
   const app = new Hono<{ Bindings: ServerBindings }>();
   if (await isLoopbackBindHost(readEnv().HOST)) {
@@ -81,8 +69,6 @@ export async function createServerApp(options: { steward?: StewardRuntime } = {}
   await steward.initialize();
   const api = createApiRouter({ steward });
   const allowedOrigins = getAllowedOrigins();
-  const browserAuth = await createBrowserAuth({ dataDir: steward.ports.dataDir, apiKey: readEnv().API_KEY, publicUrl: process.env.CHRONA_PUBLIC_URL });
-  app.route("/api/auth", browserAuth.router);
 
   app.use("/api/*", async (c, next) => {
     const origin = c.req.header("origin");
@@ -101,12 +87,7 @@ export async function createServerApp(options: { steward?: StewardRuntime } = {}
     if (c.req.method === "OPTIONS") return c.body(null, 204);
     await next();
   });
-  app.use("/api/*", async (c, next) => {
-    if (isRemoteExecutionOwnerPath(c.req.path, c.req.method) && !readEnv().API_KEY?.trim()) return c.json({ code: "REMOTE_EXECUTION_OWNER_AUTH_UNCONFIGURED" }, 503);
-    await next();
-  });
-  app.use("/api/*", apiKeyAuth({ browserAuth, isExempt: (path, method) => isStewardAgentPath(path, method) || isRemoteExecutionDevicePath(path, method) }));
-  app.route("/", createRemoteExecutionRouter(steward.ports));
+  app.use("/api/steward-agent/*", apiKeyAuth({ isExempt: isStewardAgentPath }));
   app.use(
     "/api/*",
     bodyLimit({
@@ -137,7 +118,7 @@ export async function createServerApp(options: { steward?: StewardRuntime } = {}
     const socket = await steward.listener(`/api/${c.req.param("name")}`);
     return socket ? proxy(socket, c.req.raw) : c.json({ code: "NOT_FOUND" }, 404);
   });
-  // Everything else is the web page, served by the module declaring `listen: "/"`; pages carry no user data.
+  // Static document requests use the application explicitly declaring the root listener.
   app.on(["GET", "HEAD"], "/*", async (c, next) => {
     if (c.req.path.startsWith("/api/")) return next();
     const socket = await steward.listener("/");

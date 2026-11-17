@@ -36,7 +36,7 @@ export const approvals: SystemModule = {
     const owner = await requireOwner(ports.db, workspaceId, caller);
     const modules = createModules(ports, workspaceId);
     const service = createApprovals({ db: ports.db, workspaceId, now: ports.now }, async action => {
-      // Same routing as the service: pause/resume and removal approved in chat (QQ, MCP) must take effect too.
+      // Approved lifecycle actions use the same dispatcher regardless of the application that requested them.
       if (isModuleApproval(action.payload)) await modules.onApproved(action);
       else await ports.onApproved?.(action);
     }, ports);

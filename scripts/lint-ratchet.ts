@@ -1,14 +1,11 @@
 #!/usr/bin/env bun
 
-import { applicationBaselineSources, checkStagedApplicationInputs } from "./application-git-inputs";
 import pathRenames from "./lint-path-renames.json";
-import { restoredApplicationSources, restoreApplications } from "./restore-applications";
 
 import { ESLint } from "eslint";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-await restoreApplications();
 const ROOT = resolve(import.meta.dirname, "..");
 const textDecoder = new TextDecoder();
 const lintableExtensions = new Set([
@@ -118,10 +115,7 @@ const args = process.argv.slice(2);
 const stagedOnly = args.includes("--staged");
 const explicitFiles = args.filter((arg) => !arg.startsWith("-"));
 const baseRef = resolveBaseRef(stagedOnly);
-if (stagedOnly) checkStagedApplicationInputs(ROOT);
-const applicationBaseline = applicationBaselineSources(ROOT, baseRef);
 const eslint = new ESLint({ cwd: ROOT });
-const applicationPrefix = ".generated/applications/";
 const baselineRenames: Record<string, string> = {};
 for (const [path, previous] of Object.entries(pathRenames)) {
 	let source = previous;
@@ -130,11 +124,10 @@ for (const [path, previous] of Object.entries(pathRenames)) {
 	}
 	baselineRenames[path] = source;
 }
-const applicationFiles = (await restoredApplicationSources()).filter(path => isLintablePath(path));
 const candidates =
 	explicitFiles.length > 0
 		? explicitFiles.filter(path => isLintablePath(path, stagedOnly))
-		: [...new Set([...changedLintableFiles(baseRef, stagedOnly), ...applicationFiles])];
+		: changedLintableFiles(baseRef, stagedOnly);
 const renamedSources = new Set(candidates.map(path => (pathRenames as Record<string, string>)[path]).filter(Boolean));
 for (const [next, previous] of Object.entries(pathRenames)) {
 	if (renamedSources.has(previous) && isLintablePath(next, stagedOnly) && !candidates.includes(next)) candidates.push(next);
@@ -154,10 +147,6 @@ async function collectCurrentResults(eslintInstance: ESLint, targetPaths: string
 	if (!useStagedIndex) return eslintInstance.lintFiles(targetPaths);
 	const results = [];
 	for (const path of targetPaths) {
-		if (path.startsWith(applicationPrefix)) {
-			results.push(...await eslintInstance.lintFiles([path]));
-			continue;
-		}
 		const stagedText = git(["show", `:${path}`]);
 		if (stagedText === null) continue;
 		results.push(...await eslintInstance.lintText(stagedText, { filePath: resolve(ROOT, path) }));
@@ -173,14 +162,10 @@ const currentByPath = new Map(
 	]),
 );
 const regressions: string[] = [];
-const inheritedApplicationDebt = new Set<string>();
 const comparedRenames = new Set<string>();
 
 for (const path of files) {
-	const baselinePath = path.replace(applicationPrefix, "packages/engine/src/modules/steward/external/");
-	const directSource = path.startsWith(applicationPrefix) && applicationBaseline
-		? applicationBaseline.get(path) ?? null
-		: git(["show", `${baseRef}:${baselinePath}`]);
+	const directSource = git(["show", `${baseRef}:${path}`]);
 	const previousPath = directSource === null ? baselineRenames[path] : undefined;
 	// The old tree keeps its own debt until its deletion is part of the checked tree.
 	const oldPathRemains = previousPath && isLintablePath(previousPath, stagedOnly);
@@ -205,9 +190,6 @@ for (const path of files) {
 		filePath: resolve(ROOT, path),
 	});
 	const baseline = debt(baselineResult);
-	if (path.startsWith(applicationPrefix) && current.errors <= baseline.errors && current.warnings <= baseline.warnings) {
-		inheritedApplicationDebt.add(resolve(ROOT, path));
-	}
 	if (
 		current.errors > baseline.errors ||
 		current.warnings > baseline.warnings
@@ -228,7 +210,7 @@ if (regressions.length > 0) {
 }
 
 if (currentResults.some((result) => result.fatalErrorCount > 0 ||
-	result.errorCount > 0 && !inheritedApplicationDebt.has(resolve(ROOT, result.filePath)))) process.exit(1);
+	result.errorCount > 0)) process.exit(1);
 console.log(
 	`Lint ratchet passed: ${files.length} changed file(s) did not increase lint debt relative to ${baseRef}.`,
 );

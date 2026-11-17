@@ -1,7 +1,7 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { z } from "zod";
-import { applyChronaRuntimeConfigToEnv } from "@chrona/shared/runtime-config";
+import { applyChronaRuntimeConfigToEnv, chronaDatabaseUrl } from "@chrona/runtime-config";
 // Kept local after removal of providers-foundation; exact classifier semantics unchanged.
 function normalizeNetworkHost(host: string): string {
   return host.trim().replace(/^\[/, "").replace(/\]$/, "").split("%")[0]?.toLowerCase() ?? "";
@@ -21,7 +21,7 @@ const envSchema = z.object({
     .refine((v) => /^\d+$/.test(v) && Number.isFinite(Number(v)), {
       message: "PORT must be a valid integer string",
     }),
-  DATABASE_URL: z.string().default("file:./prisma/dev.db"),
+  DATABASE_URL: z.string().default(() => chronaDatabaseUrl()),
   ALLOWED_ORIGINS: z.string().optional(),
   API_KEY: z.string().optional(),
   CHRONA_UNSAFE_PUBLIC_BIND: z.string().optional(),

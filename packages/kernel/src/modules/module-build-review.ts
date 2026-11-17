@@ -2,13 +2,11 @@ import { assertExactReleaseUpdateIn, ExactReleaseUpdateError } from "./module-ex
 import { onApproved } from "./module-activation";
 import { assertExecutionModuleIdle } from "../execution/execution-module-guard";
 import { requiresCapabilityApproval } from "./module-owner";
-import { isTrustedInitialInstallation, matchesInitialInstallation } from "./module-install";
 import { activationNotice } from "./module-activation-notice";
 import { fenceExecutionVersionChange } from "../execution/execution-delivery-controls";
 import { StewardError } from "../errors";
 import { readVersionSource, versionSource } from "./module-source";
 import { assertExternalModule, ModuleIdentityError } from "./module-identity";
-import { ModuleUnavailableError } from "./module-availability";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
@@ -74,7 +72,7 @@ function addsCredentials(version: ModuleVersion, active: ModuleVersion | null) {
   return requiresCapabilityApproval(manifest, previous);
 }
 /** Checks passed and nothing needs the owner: activate now and tell them afterwards. */
-async function activateChecked(context: ModuleContext, { version, module }: Review, update: boolean, initialRelease = false) {
+async function activateChecked(context: ModuleContext, { version, module }: Review, update: boolean) {
   const { hash } = version, manifest = moduleManifestSchema.parse(version.manifest);
   await fenceExecutionVersionChange(context.ports, context.workspaceId, module.id, hash,
     (tx, current) => assertExactReleaseUpdateIn(context, tx, module.id, version.report as BuildReport, current));
@@ -85,7 +83,6 @@ async function activateChecked(context: ModuleContext, { version, module }: Revi
     const current = await assertExternalModule(tx, context.workspaceId, module.id, "activate");
     await assertExactReleaseUpdateIn(context, tx, module.id, candidate.report as BuildReport, current);
     if (current.status === "migrating" || current.activeHash !== module.activeHash || current.activationId !== module.activationId) throw new Error("Module changed during build; submit again");
-    if (initialRelease && !await matchesInitialInstallation({ ...context, db: tx as ModuleContext["db"] }, version, current)) throw new StewardError("conflict", "Initial release installation changed before activation");
     await expireModuleApprovals(context, module.id, tx);
     await tx.moduleVersion.update({ where: { id: version.id }, data: { status: "approved" } });
     await tx.module.update({ where: { id: module.id }, data: { dataSchema: manifest.data.schema } });
@@ -106,9 +103,8 @@ export async function requestReview(context: ModuleContext, review: Review): Pro
   await assertExactReleaseUpdateIn(context, db, module.id, report);
   const active = module.activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } }) : null;
   await assertExternalModule(db, context.workspaceId, module.id, "activate");
-  const initialRelease = !active && addsCredentials(version, active) && await isTrustedInitialInstallation(context, version, module);
-  if (!await isGroupCandidate(context, version) && !review.needsMigration && (!addsCredentials(version, active) || initialRelease)) {
-    try { await activateChecked(context, review, !!active, initialRelease); }
+  if (!await isGroupCandidate(context, version) && !review.needsMigration && !addsCredentials(version, active)) {
+    try { await activateChecked(context, review, !!active); }
     catch (error) {
       // Only unresolved execution is a retryable wait; keep this exact checked version.
       if (!(error instanceof StewardError) || error.code !== "conflict") throw error;
@@ -200,7 +196,7 @@ export async function recoverReviews(context: ModuleContext) {
         if (version.status === "rejected") { await advanceFixedCandidateSet(context, version); continue; }
         await recoverReview(context, version);
       } catch (error) {
-        if (error instanceof ModuleIdentityError || error instanceof ModuleUnavailableError || error instanceof ExactReleaseUpdateError) {
+        if (error instanceof ModuleIdentityError || error instanceof ExactReleaseUpdateError) {
           console.error(JSON.stringify({ component: "module-build", event: "review.rejected", versionId: version.id, error: error.message }));
           await db.moduleVersion.updateMany({ where: { id: version.id, status: "pending_review" }, data: { status: "rejected", report: json({ ...(version.report as BuildReport), errors: [error.message] }) } });
           await expireModuleApprovals(context, version.moduleId);

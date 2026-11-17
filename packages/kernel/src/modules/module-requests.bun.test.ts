@@ -3,13 +3,13 @@ import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { isEntryModule, moduleManifestSchema, moduleCallSchema, type ModuleEvent } from "@chrona/contracts/steward";
-import { createStewardService } from "../service";
+import { createStewardService } from "../runtime/service";
 import { callStatus, enqueueCall, kernelOrigin, callsSettled, runDueCalls } from "./module-calls";
 import { handleModuleCall } from "./module-effects";
 import type { StewardPorts } from "../ports";
-import { testDb } from "../test-db";
+import { testDb } from "../__testing__/test-db";
 import { assertInterleavedSettlementConverges } from "../__testing__/state-machine-invariants";
-import { testModuleProcess } from "./module-test-process";
+import { testModuleProcess } from "../__testing__/module-test-process";
 import { moduleSupervisor } from "./module-supervisor";
 
 const cleanups: (() => Promise<unknown>)[] = [];

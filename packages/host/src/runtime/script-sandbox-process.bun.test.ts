@@ -48,6 +48,22 @@ describe.skipIf(process.platform !== "linux")("sandbox native supervision withou
       const result = await sandbox.runModule({ ...f, entry: "test.ts", input: {}, timeoutMs: 300 });
       expect(result).toMatchObject({ status: mode === "exit" ? "succeeded" : "timed_out", stopEvidence: { state: "stopped", scope: "descendants", treeClean: true } });
       expect(alive(Number(readFileSync(join(f.dataDir, "child"), "utf8")))).toBe(false);
+      expect(existsSync(join(f.dataDir, ".host-stops"))).toBe(false);
+    } finally { cleanup(f.root, f.dataDir); }
+  });
+
+  test("application stop evidence stays outside business data", async () => {
+    const f = fixture(), record = join(f.root, "launch.json");
+    try {
+      writeFileSync(join(f.codeDir, "index.ts"), `import { writeFileSync } from "node:fs";
+writeFileSync(${JSON.stringify(record)}, JSON.stringify({ path: process.env.CHRONA_HOST_STOP_RECEIPT, generation: process.env.CHRONA_HOST_GENERATION }));`);
+      const sandbox = createScriptSandbox({ dataDir: f.root, processHelper: helper });
+      const child = sandbox.startModule({ ...f, entry: "index.ts", ipcEndpoint: "tcp://127.0.0.1:1", ipcToken: "a".repeat(64) });
+      await child.exited;
+      const launch = JSON.parse(readFileSync(record, "utf8")) as { path: string; generation: string };
+      expect(launch.path).toBe(join(f.root, "platform", "host-stops", `${launch.generation}.json`));
+      expect(JSON.parse(readFileSync(launch.path, "utf8"))).toMatchObject({ generation: launch.generation, state: "stopped", scope: "descendants", treeClean: true });
+      expect(existsSync(join(f.dataDir, ".host-stops"))).toBe(false);
     } finally { cleanup(f.root, f.dataDir); }
   });
 

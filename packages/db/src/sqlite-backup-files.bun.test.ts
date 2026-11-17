@@ -27,7 +27,6 @@ describe("in-process restricted ustar backup", () => {
       sourceFile(data, "platform/run.sh", "#!/bin/sh\n");
       if (process.platform !== "win32") chmodSync(join(data, "platform/run.sh"), 0o755);
       mkdirSync(join(data, "secrets/empty/nested"), { recursive: true });
-      mkdirSync(join(data, "qq-bot"));
       expect(backupDataFiles(data, archive)).toEqual([]);
       const stage = stageDataFiles(join(data, "restore"), archive);
       for (const size of sizes) expect(readFileSync(join(stage, `sessions/size-${size}`))).toEqual(readFileSync(join(data, `sessions/size-${size}`)));

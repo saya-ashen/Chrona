@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { lstat, readFile, realpath } from "node:fs/promises";
 import { basename, dirname, join, sep } from "node:path";
-import { BUILTIN_MODULE_NAMES, OFFICIAL_EXTERNAL_MODULE_NAMES, moduleManifestSchema, type ModuleManifest } from "@chrona/contracts/steward";
+import { BUILTIN_MODULE_NAMES, moduleInstallRequestSchema, moduleManifestSchema, type ModuleManifest } from "@chrona/contracts/steward";
 import { z } from "zod";
 import { verifyModuleGitBundle } from "./module-git-upstream";
 import type { StewardPorts } from "../ports";
@@ -10,7 +10,6 @@ import { moduleSourceFiles, snapshotModuleMaterial } from "./module-artifacts";
 import { openModuleDirectory, type ModuleFile } from "./module-files";
 import { MODULE_MATERIAL_FILE, MODULE_SOURCE_MAX_BYTES } from "../../../contracts/src/steward/module-material";
 import { StewardError } from "../errors";
-import { assertModuleAvailable } from "./module-availability";
 
 export type ModuleReleaseGit = { repository: string | null; branch: string; commit: string; bundlePath: string };
 export type ModuleRelease = { name: string; origin: "builtin" | "external"; codeDir: string; hash: string; manifest: ModuleManifest; git: ModuleReleaseGit | null };
@@ -48,9 +47,8 @@ export async function readReleaseMaterial(codeDir: string): Promise<ModuleFile[]
 }
 /** Host-configured resources only. Neither a manifest nor a routed request can supply the root. */
 async function resolveRelease(rootPath: string | undefined, name: string, origin: ModuleRelease["origin"], expectedHash?: string): Promise<ModuleRelease> {
-  const names: readonly string[] = origin === "builtin" ? BUILTIN_MODULE_NAMES : OFFICIAL_EXTERNAL_MODULE_NAMES;
-  assertModuleAvailable(name);
-  if (!names.includes(name)) throw new ModuleReleaseError("not_found", "release_not_found", `Unknown ${origin} release ${name}`);
+
+  if (!moduleInstallRequestSchema.shape.package.safeParse(name).success || origin === "builtin" && !(BUILTIN_MODULE_NAMES as readonly string[]).includes(name)) throw new ModuleReleaseError("not_found", "release_not_found", `Unknown ${origin} release ${name}`);
   if (!rootPath) throw new ModuleReleaseError("not_found", "release_not_found", `${origin} release resources are not configured`);
   try {
     const codeDir = await releaseDirectory(rootPath, name);

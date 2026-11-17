@@ -94,7 +94,7 @@ function assertOutsideDataRoots(dataDir: string, ...paths: string[]): void {
   for (const root of backupDataRoots) {
     const directory = resolve(dataDir, root);
     if (paths.some(path => path === directory || path.startsWith(`${directory}${sep}`))) {
-      throw new Error("Database and backup paths must be outside platform, sessions, secrets and qq-bot directories.");
+      throw new Error("Database and backup paths must be outside platform, sessions and secrets directories.");
     }
   }
 }

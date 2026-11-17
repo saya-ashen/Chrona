@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
-import { agentFixture } from "../../../../scripts/agent-integration/agent-application.fixtures";
+import { agentContextFixture as agentFixture } from "../__testing__/agent-context.fixture";
 import { callSync, kernelOrigin, type CallOrigin } from "../modules/module-calls";
 
 async function fixture() {
@@ -15,7 +15,7 @@ async function fixture() {
     }
     const origin = await caller("context-owner");
     const call = async (tool: string, args: unknown, key?: string, who = origin) => (await callSync(f.ports, who, "agent." + tool, args, { key })).output as { runId: string; contextId: string };
-    const input = { providerId: "pi", prompt: "Offline caller fixture" };
+    const input = { providerId: "fixture-provider", prompt: "Offline caller fixture" };
     const admitted = await call("run", input, "initial");
     return { ...f, origin, caller, call, input, admitted };
   } catch (error) { await f.close(); throw error; }

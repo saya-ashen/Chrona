@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
-import { testDb } from "./test-db";
-import { acknowledgeKernelFacts, factConsumer, readKernelFacts, recordApprovalFact, recordKernelFact, recordWithdrawal, seedFactConsumer, selectFactConsumer } from "./notification-facts";
+import { testDb } from "./__testing__/test-db";
+import { acknowledgeKernelFacts, factConsumer, readKernelFacts, recordApprovalFact, recordKernelFact, recordWithdrawal, selectFactConsumer } from "./notification-facts";
 
 const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(); });
@@ -12,7 +12,7 @@ async function fixture() {
     return { kind: "module" as const, module: row.name, moduleId: row.id, hash: row.activeHash! };
   }
   const first = await app("first"), second = await app("second"), now = new Date("2026-11-08T00:00:00Z");
-  await seedFactConsumer(db, workspaceId, first.moduleId, now);
+  await selectFactConsumer(db, workspaceId, first.moduleId, now);
   return { db, workspaceId, first, second, now };
 }
 test("facts outlive a paused or absent consumer, require current identity and keep one global consumption receipt", async () => {
@@ -36,16 +36,17 @@ test("facts outlive a paused or absent consumer, require current identity and ke
   expect((await recordKernelFact(db, workspaceId, "result", { type: "lifecycle", data: { key: "result", fact: { kind: "module-paused", app: "result" } } }, now)).consumedBy).toBe(second.moduleId);
   expect(await db.moduleInvocation.count({ where: { workspaceId } })).toBe(0);
 });
-test("an explicit no-consumer selection survives trusted seeding and preserves pending facts", async () => {
+test("an explicit no-consumer selection preserves pending facts", async () => {
   const { db, workspaceId, first, now } = await fixture();
+  const fact = await recordKernelFact(db, workspaceId, "pending", { type: "withdraw", data: { key: "pending" } }, now);
   await db.module.update({ where: { id: first.moduleId }, data: { status: "paused" } });
-  await selectFactConsumer(db, workspaceId, null, now);
-  await seedFactConsumer(db, workspaceId, first.moduleId, now);
-  expect((await factConsumer(db, workspaceId)).moduleId).toBeNull();
-  const workspace = await db.workspace.create({ data: { name: "explicit-none-before-seed" } });
-  await selectFactConsumer(db, workspace.id, null, now);
-  await seedFactConsumer(db, workspace.id, first.moduleId, now);
-  expect((await factConsumer(db, workspace.id)).moduleId).toBeNull();
+  const selected = await selectFactConsumer(db, workspaceId, null, now);
+  expect(await factConsumer(db, workspaceId)).toEqual(selected);
+  expect(await selectFactConsumer(db, workspaceId, null, now)).toEqual(selected);
+  await expect(readKernelFacts(db, workspaceId, first)).rejects.toThrow("Only the selected");
+  await db.module.update({ where: { id: first.moduleId }, data: { status: "active" } });
+  await selectFactConsumer(db, workspaceId, first.moduleId, now);
+  expect((await readKernelFacts(db, workspaceId, first)).facts.map(row => row.id)).toEqual([fact.id]);
 });
 test("approval facts and withdrawal commit with state, exclude private payload and redact bounded text", async () => {
   const { db, workspaceId, first, now } = await fixture();

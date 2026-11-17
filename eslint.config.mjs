@@ -13,11 +13,6 @@ const eslintConfig = defineConfig([
     rules: { "@typescript-eslint/no-require-imports": "off" },
   },
   {
-    // The built-in web module executes in a browser.
-    files: [".generated/applications/web/*.js"],
-    languageOptions: { globals: globals.browser },
-  },
-  {
     // TypeScript files: the compiler already checks for undefined identifiers
     // and redeclarations, so the JS-oriented core rules here only produce
     // false positives (e.g. `no-undef` on `window`/`fetch`/`setTimeout`).
@@ -111,7 +106,6 @@ const eslintConfig = defineConfig([
       "apps/**/*.{ts,tsx,mts,cts,js,jsx,mjs}",
       "packages/**/*.{ts,tsx,mts,cts,js,jsx,mjs}",
       "scripts/**/*.{ts,tsx,mts,cts,js,jsx,mjs}",
-      "build/**/*.{ts,tsx,mts,cts,js,jsx,mjs}",
     ],
     ignores: [
       "**/*.test.{ts,tsx,js,mjs}",
@@ -210,8 +204,6 @@ const eslintConfig = defineConfig([
     },
   },
   globalIgnores([
-    // Pi extension: loaded by Pi (jiti + typebox), not part of the Chrona TypeScript build.
-    "packages/pi/resources/**",
     "**/.git/**",
     "**/.worktrees/**",
     "**/node_modules/**",
@@ -219,15 +211,6 @@ const eslintConfig = defineConfig([
     "**/dist/**",
     "**/coverage/**",
     "**/*.min.js",
-    // Generated browser bundle; lint its src/pages.tsx source instead.
-    ".generated/applications/web/pages.js",
-    // Portable registration helper; lint external/web/registration-test.ts instead.
-    ".generated/applications/chat/test-support/registration-test.mjs",
-    // Generated Pi dependency artifacts; validate their fixed bytes as module material.
-    ".generated/applications/pi/vendor/**",
-    // Generated Pi Provider bundles; lint their TypeScript sources instead.
-    ".generated/applications/pi/runtime.js",
-    ".generated/applications/pi/test.js",
     // Historical plans, frozen candidate snapshots, and throwaway scratch dirs are not live source.
     "plans/**",
     "playwright-report/**",

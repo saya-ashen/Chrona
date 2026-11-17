@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { testDb } from "../test-db";
+import { testDb } from "../__testing__/test-db";
 import { moduleContext } from "./module-context";
 import { moduleEvolutionOutcomes, recordModuleActivation, updateModuleEvolution } from "./module-evolution";
 import { moduleIncidents, recordModuleFailure, recordModuleOutputMismatch, recordModuleRecovery } from "./module-diagnostics";

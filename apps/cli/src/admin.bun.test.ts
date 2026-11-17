@@ -7,19 +7,18 @@ import { ensureSqliteDatabase } from "@chrona/db/sqlite-migrations";
 import { acquireSqliteRuntimeLock } from "@chrona/db/sqlite-runtime-lock";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 import { createStewardService } from "@chrona/kernel";
-import { qqBindCode, removeSecret, runAdmin, setSecret } from "./admin";
+import { removeSecret, runAdmin, setSecret } from "./admin";
 import { createProgram } from "./program";
 import { moduleContext } from "../../../packages/kernel/src/modules/module-context";
 import { propose } from "../../../packages/kernel/src/modules/module-proposal";
-import { seedTestModuleRelease } from "../../../packages/kernel/src/modules/module-release-test-fixture";
+import { seedTestModuleRelease } from "../../../packages/kernel/src/__testing__/module-release-test-fixture";
 
-import { createQqBotState } from "../../../.generated/applications/qq/bot";
 
 const dbs: PrismaClient[] = [];
 afterEach(async () => { for (const db of dbs.splice(0)) await db.$disconnect(); });
 async function fixture(hashLength = 64, name = "entry") {
   const dataDir = mkdtempSync(join(tmpdir(), "chrona-admin-test-")), databaseUrl = `file:${join(dataDir, "chrona.db")}`;
-  ensureSqliteDatabase({ databaseUrl, migrationsDir: resolve("prisma/migrations") });
+  ensureSqliteDatabase({ databaseUrl, migrationsDir: resolve("packages/db/prisma/migrations") });
   const db = new PrismaClient({ adapter: new PrismaBunSqlite({ url: databaseUrl }) }); dbs.push(db);
   await db.workspace.create({ data: { id: "ws_default", name: "Personal" } });
   const module = await db.module.create({ data: { workspaceId: "ws_default", name, status: "active", activeHash: "a".repeat(hashLength), dataSchema: 1 } });
@@ -53,7 +52,7 @@ test("admin reads while runtime locked but refuses writes; approval audit source
   const lock = acquireSqliteRuntimeLock(f.options.databaseUrl);
   try {
     expect(await runAdmin("approvals", [], f.options)).toContainEqual(expect.objectContaining({ id: approval.id }));
-    expect(await runAdmin("modules", [], f.options)).toContainEqual({ name: "rescue", status: "immutable" });
+    expect(await runAdmin("modules", [], f.options)).not.toContainEqual(expect.objectContaining({ name: "rescue" }));
     const before = await f.db.audit.count();
     expect(await runAdmin("diagnostics", [f.module.name], f.options)).toContainEqual(expect.objectContaining({ module: f.module.name, runtime: { state: "unobserved", pid: null }, incidents: [] }));
     expect(await f.db.audit.count()).toBe(before);
@@ -254,22 +253,10 @@ test.each(["author", "files", "events", "mcp", "mind"])("stopped-service officia
   }
 });
 
-test.each(["remind"])("offline admin cannot reinstall paused %s", async name => {
-  const f = await fixture(), log = spyOn(console, "log").mockImplementation(() => {});
-  try {
-    expect(await runAdmin("catalog", [], f.options)).toContainEqual(expect.objectContaining({ name, available: false, error: expect.stringContaining("paused") }));
-    await expect(runAdmin("install", [name, "install", `paused-${name}`], f.options)).rejects.toMatchObject({ code: "unavailable", reason: "module_paused" });
-    expect(await f.db.module.count()).toBe(1);
-    expect(await f.db.moduleVersion.count()).toBe(2);
-    expect(await f.db.run.count()).toBe(0);
-  } finally { log.mockRestore(); }
-});
-
 test("secret-set saves a module credential from stdin as a private file and never prints it", async () => {
   const dataDir = mkdtempSync(join(tmpdir(), "chrona-admin-secret-")), log = spyOn(console, "log").mockImplementation(() => {});
   try {
     await expect(setSecret("okx_demo", "not json", { dataDir })).rejects.toThrow("JSON object");
-    await expect(setSecret("qq_bot", '{"a":"b"}', { dataDir })).rejects.toThrow("Invalid credential name");
     await setSecret("okx_demo", JSON.stringify({ apiKey: "k-secret" }), { dataDir });
     expect(statSync(join(dataDir, "secrets", "okx_demo.json")).mode & 0o777).toBe(0o600);
     expect(JSON.parse(readFileSync(join(dataDir, "secrets", "okx_demo.json"), "utf8"))).toEqual({ apiKey: "k-secret" });
@@ -277,26 +264,4 @@ test("secret-set saves a module credential from stdin as a private file and neve
     await removeSecret("okx_demo", { dataDir });
     expect(existsSync(join(dataDir, "secrets", "okx_demo.json"))).toBe(false);
   } finally { log.mockRestore(); }
-});
-
-
-test("stopped-service QQ binding uses the application entry and its redeemable private state", async () => {
-  const f = await fixture(40, "qq");
-  await f.db.module.update({ where: { id: f.module.id }, data: { activeHash: null } });
-  const previous = process.env.CHRONA_QQ_APP_ID;
-  process.env.CHRONA_QQ_APP_ID = "12345678";
-  try {
-    const challenge = await qqBindCode({ workspace: "ws_default", ttlMinutes: 10, replace: false }, f.options);
-    expect(challenge.appId).toBe("12345678");
-    expect(challenge.code).toMatch(/^[A-Z0-9]{8}$/);
-    const directory = join(f.options.dataDir, "platform/data", f.module.id);
-    expect(readFileSync(join(directory, "challenge.json"), "utf8")).not.toContain(challenge.code);
-    expect(statSync(join(directory, "challenge.json")).mode & 0o777).toBe(0o600);
-    const state = createQqBotState(directory, challenge.appId);
-    expect(await state.redeem("owner", challenge.code, new Date())).toMatchObject({ ok: true, binding: { openid: "owner", workspaceId: "ws_default" } });
-    await expect(qqBindCode({ workspace: "ws_default", ttlMinutes: 10, replace: false }, f.options)).rejects.toThrow("Already bound");
-  } finally {
-    if (previous === undefined) delete process.env.CHRONA_QQ_APP_ID;
-    else process.env.CHRONA_QQ_APP_ID = previous;
-  }
 });

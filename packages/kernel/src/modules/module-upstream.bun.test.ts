@@ -4,11 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "../ports";
-import { testDb } from "../test-db";
+import { testDb } from "../__testing__/test-db";
 import { moduleContext } from "./module-context";
 import { propose } from "./module-proposal";
 import { moduleUpstream, recordModuleUpstream, submitMergedCommit } from "./module-upstream";
-import { seedTestModuleRelease } from "./module-release-test-fixture";
+import { seedTestModuleRelease } from "../__testing__/module-release-test-fixture";
 import { getModuleLocalHead, moduleGitCommand, moduleGitPath } from "./module-git";
 import { importModuleGitBundle } from "./module-git-upstream";
 

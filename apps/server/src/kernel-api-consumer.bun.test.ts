@@ -32,7 +32,7 @@ chrona.serve(async request => {
 test("independent consumer crosses HTTP and real SDK, then resumes persisted receipts after host restart", async () => {
   const saved = process.env.API_KEY, dataDir = await mkdtemp("/tmp/chrona-consumer-");
   const databaseUrl = `file:${join(dataDir, "platform.db")}`;
-  ensureSqliteDatabase({ databaseUrl, migrationsDir: join(process.cwd(), "prisma/migrations") });
+  ensureSqliteDatabase({ databaseUrl, migrationsDir: join(process.cwd(), "packages/db/prisma/migrations") });
   const connect = () => new PrismaClient({ adapter: new PrismaBunSqlite({ url: databaseUrl }) });
   let db = connect();
   let runtime: ReturnType<typeof createStewardRuntime> | undefined;

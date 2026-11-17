@@ -12,7 +12,7 @@ if (paths.length !== 1 || paths[0].startsWith("--")) {
 const databaseUrl = `file:${resolve(paths[0])}`;
 const lock = acquireSqliteRuntimeLock(databaseUrl);
 try {
-  ensureSqliteDatabase({ databaseUrl, migrationsDir: resolve(import.meta.dirname, "../prisma/migrations") });
+  ensureSqliteDatabase({ databaseUrl, migrationsDir: resolve(import.meta.dirname, "../packages/db/prisma/migrations") });
 } finally {
   lock.release();
 }

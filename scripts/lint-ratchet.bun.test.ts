@@ -24,10 +24,6 @@ test("renamed and split files share the original lint budget, then use their own
     await writeFile(join(fixture, "eslint.config.mjs"),
       'export default [{ files: ["*.js"], rules: { "max-len": ["warn", 20] } }];');
     await writeFile(join(fixture, "scripts/lint-ratchet.ts"), await readFile(join(root, "scripts/lint-ratchet.ts")));
-    await writeFile(join(fixture, "scripts/restore-applications.ts"),
-      "export async function restoreApplications() {}\nexport async function restoredApplicationSources() { return []; }\n");
-    await writeFile(join(fixture, "scripts/application-git-inputs.ts"),
-      "export function applicationBaselineSources() { return null; }\nexport function checkStagedApplicationInputs() {}\n");
     await writeFile(join(fixture, "scripts/lint-path-renames.json"), JSON.stringify({ "left.js": "old.js", "right.js": "old.js" }));
     await writeFile(join(fixture, "old.js"), line + line);
     git(["init", "--quiet"]);

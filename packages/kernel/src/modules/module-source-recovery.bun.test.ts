@@ -10,7 +10,7 @@ import type { StewardPorts } from "../ports";
 const databaseRoot = mkdtempSync(join(tmpdir(), "chrona-recovery-db-"));
 process.env.DATABASE_URL = `file:${join(databaseRoot, "test.db")}`;
 const [{ moduleContext }, { commitModuleSource, readModuleMaterial }, { ensureVersionMaterial }, { moduleMaterialDigest }, { ModuleDirectory }, { testDb }, { testModuleProcess }] = await Promise.all([
-  import("./module-context"), import("./module-git"), import("./module-source"), import("./module-artifacts"), import("./module-files"), import("../test-db"), import("./module-test-process"),
+  import("./module-context"), import("./module-git"), import("./module-source"), import("./module-artifacts"), import("./module-files"), import("../__testing__/test-db"), import("../__testing__/module-test-process"),
 ]);
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });

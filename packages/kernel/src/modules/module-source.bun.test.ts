@@ -7,8 +7,8 @@ import { moduleContext } from "./module-context";
 import { commitModuleSource } from "./module-git";
 import { readVersionSource } from "./module-source";
 import { propose } from "./module-proposal";
-import { seedTestModuleRelease } from "./module-release-test-fixture";
-import { testDb } from "../test-db";
+import { seedTestModuleRelease } from "../__testing__/module-release-test-fixture";
+import { testDb } from "../__testing__/test-db";
 import type { StewardPorts } from "../ports";
 
 const cleanups: (() => Promise<unknown>)[] = [];

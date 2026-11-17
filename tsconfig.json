@@ -33,7 +33,7 @@
         "./apps/server/src/*"
       ],
       "@chrona/logging": [
-        "./packages/logging/src/index.ts"
+        "./packages/logging/src/redaction.ts"
       ],
       "@chrona/domain": [
         "./packages/domain/src/index.ts"
@@ -53,32 +53,23 @@
       "@chrona/db/*": [
         "./packages/db/src/*"
       ],
-      "@chrona/shared": [
-        "./packages/shared/src/index.ts"
-      ],
-      "@chrona/shared/*": [
-        "./packages/shared/src/*"
+      "@chrona/runtime-config": [
+        "./packages/runtime-config/src/runtime-config.ts"
       ],
       "@chrona/kernel": [
         "./packages/kernel/src/index.ts"
       ],
       "@chrona/kernel/test-support": [
-        "./packages/kernel/src/test-support.ts"
+        "./packages/kernel/src/__testing__/test-support.ts"
       ],
       "@chrona/git-workspaces": [
         "./packages/git-workspaces/src/index.ts"
-      ],
-      "@chrona/pi": [
-        "./packages/pi/src/index.ts"
       ],
       "@chrona/host": [
         "./packages/host/src/index.ts"
       ],
       "chrona": [
         "./packages/app-sdk/sdk.ts"
-      ],
-      "/pages.js": [
-        "./.generated/applications/web/src/pages.tsx"
       ],
       "chrona/*": [
         "./packages/app-sdk/*"
@@ -97,7 +88,6 @@
     "result",
     "dist",
     "artifacts",
-    "plans",
-    "packages/pi/resources"
+    "plans"
   ]
 }

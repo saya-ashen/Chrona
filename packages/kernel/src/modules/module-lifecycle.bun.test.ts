@@ -3,15 +3,14 @@ import { cp, mkdtemp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promi
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { callSync, type Caller } from "./module-calls";
-import { registerSystemModules } from "../system-modules";
+import { registerSystemModules } from "../system/system-modules";
 import { moduleSupervisor } from "./module-supervisor";
 import { createModules } from "./modules";
-import { testModuleProcess } from "./module-test-process";
-import { testDb } from "../test-db";
-import { seedTestModuleRelease } from "./module-release-test-fixture";
+import { testModuleProcess } from "../__testing__/module-test-process";
+import { testDb } from "../__testing__/test-db";
+import { seedTestModuleRelease } from "../__testing__/module-release-test-fixture";
 import { moduleContext } from "./module-context";
 import { propose } from "./module-proposal";
-import { createPages } from "../../../../.generated/applications/web/pages";
 import type { StewardPorts } from "../ports";
 import "./module-effects";
 
@@ -84,8 +83,6 @@ test("web removal approval backs up data, removes the app and schedules, and cle
   const f = await fixture(), data = join(f.dataDir, "platform", "data", f.target.id);
   await mkdir(data, { recursive: true }); await writeFile(join(data, "mail.json"), "[1]");
   const timer = await f.db.timer.create({ data: { workspaceId: f.workspace.id, moduleId: f.target.id, timerId: "retained mail timer", rule: { kind: "every", minutes: 60 }, status: "active", nextAt: f.ports.now() } });
-  const pages = createPages({ dataDir: join(f.dataDir, "pages"), modules: () => f.db.module.findMany({ where: { workspaceId: f.workspace.id }, select: { id: true, name: true, status: true, activeHash: true } }), tools: async () => new Map() });
-  await pages.tool("page-set", { id: "inbox", title: "收件箱", javascript: "export default function mount() { return () => {}; }" }, { kind: "module", module: "gmail", moduleId: f.target.id, hash: f.target.activeHash! });
   const result = await f.call("modules.remove", { moduleId: f.target.id, reason: "用户在网页申请删除应用" }) as { status: string; approvalId: string };
   expect(result.status).toBe("pending_approval");
   expect(await f.db.module.findUnique({ where: { id: f.target.id } })).not.toBeNull();
@@ -98,8 +95,6 @@ test("web removal approval backs up data, removes the app and schedules, and cle
   expect(await stat(data).catch(() => null)).toBeNull();
   const apps = (await f.call("modules.list", {}) as { items: { name: string; status: string }[] }).items;
   expect(apps.some(app => app.name === "gmail")).toBe(false);
-  expect(await pages.list()).toEqual([]);
-  expect(await pages.get("gmail", "inbox")).toBeNull();
   const audit = await f.db.audit.findFirstOrThrow({ where: { kind: "module_removed", subjectId: f.target.id } });
   expect(await readFile(join((audit.details as { backup: string }).backup, "data", "mail.json"), "utf8")).toBe("[1]");
   const pi = await f.app("pi", [], true);

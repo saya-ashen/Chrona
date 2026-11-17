@@ -2,7 +2,7 @@ import { chmodSync, existsSync, mkdirSync } from "node:fs";
 import { assertWindowsPrivateStorage, ensureWindowsPrivateDirectory, secureWindowsGeneratedStorage } from "./windows-private-storage";
 import { basename, dirname, resolve, sep } from "node:path";
 
-const DEFAULT_DEV_DATABASE_URL = "file:./prisma/dev.db";
+import { chronaDatabaseUrl } from "@chrona/runtime-config";
 const DEFAULT_TEST_DATABASE_URL = "file:./.tmp/bun-test.db";
 export const AUTO_TEST_DATABASE_ENV = "CHRONA_AUTO_TEST_DATABASE_URL";
 
@@ -21,7 +21,7 @@ export function resolveRuntimeDatabaseUrl(env: NodeJS.ProcessEnv): string {
     return env.DATABASE_URL;
   }
 
-  return DEFAULT_DEV_DATABASE_URL;
+  return chronaDatabaseUrl(env);
 }
 
 export function isSafeTestDatabaseUrl(databaseUrl: string | undefined, cwd = process.cwd()): boolean {

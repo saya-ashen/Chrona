@@ -15,7 +15,7 @@ type WireTrigger = { kind: "timer"; id: string; eventId: string; timerId: string
   | { kind: "schedule"; id: string; firedAt: string; scheduleId?: string; payload?: Record<string, unknown> }
   | { kind: "tool"; id: string; firedAt: string; args: Record<string, unknown>; caller?: Caller; call?: { id: string; key: string | null; attempt: number; chain: string[]; /** Kernel-bound original Agent run, absent for ordinary module calls. */ executionRunId?: string } }
   | { kind: "call_result"; id: "call"; firedAt: string; callId: string; target: CallTarget; key: string; status: "succeeded" | "failed" | "unknown"; output?: unknown; error?: string }
-  /** Once per active version, and again when a module this one `uses` changes version: register with it here (e.g. web.page-set). */
+  /** Once per active version, and again when a declared dependency changes version: renew its registrations here. */
   | { kind: "activated"; id: "activated"; firedAt: string };
 export type Trigger = Exclude<WireTrigger, { kind: "schedule" }>;
 type EventResult = { result?: unknown };

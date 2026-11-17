@@ -12,19 +12,14 @@ ENV CHRONA_DATA_DIR=/data
 
 # Workspace manifests must exist before install; module checks need TypeScript at runtime.
 COPY bun.lock package.json prisma.config.ts tsconfig.json ./
-COPY apps/server apps/server
+COPY apps apps
 COPY packages packages
-COPY prisma prisma
-COPY scripts/docker-entrypoint.sh scripts/restore-applications.ts scripts/module-git-release.ts scripts/
-COPY build build
-COPY resources/module-git resources/module-git
-COPY resources/application-inputs resources/application-inputs
+COPY scripts/docker-entrypoint.sh scripts/
+COPY scripts/build scripts/build
 RUN bun install --frozen-lockfile --ignore-scripts \
     && bun run db:generate
-COPY scripts/build-binaries.ts scripts/
 COPY .env.example .env.example
-RUN bun scripts/build-binaries.ts --resources-only /app \
-    && rm -rf /app/resources/application-inputs /app/.generated/applications \
+RUN bun scripts/build/build-binaries.ts --resources-only /app \
     && apt-get purge -y --auto-remove build-essential
 ENV CHRONA_RESOURCE_DIR=/app/resources
 ENV NODE_ENV=production
@@ -39,4 +34,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD bun -e "const response = await fetch('http://localhost:' + (process.env.PORT || '3101') + '/health'); process.exit(response.ok ? 0 : 1)"
 
 ENTRYPOINT ["sh", "/app/scripts/docker-entrypoint.sh"]
-CMD ["bun", "run", "apps/server/src/index.bun.ts"]
+CMD ["bun", "run", "apps/cli/src/run.ts"]

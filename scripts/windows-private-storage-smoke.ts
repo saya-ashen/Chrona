@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { buildTargets } from "../build/manifest";
+import { buildTargets } from "./build/manifest";
 import { sqliteRuntimeLockPath } from "../packages/db/src/sqlite-runtime-lock";
 
 if (process.platform !== "win32") {

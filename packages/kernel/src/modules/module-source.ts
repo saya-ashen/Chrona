@@ -7,25 +7,12 @@ import { z } from "zod";
 import { StewardError } from "../errors";
 import { json, type ModuleContext, type ModuleVersion, type BuildReport } from "./module-context";
 import { importLegacyModuleSource, readModuleSource } from "./module-git";
-import { readModuleFiles } from "./module-preview";
-import { resolveBuiltinRelease, resolveExternalRelease } from "./module-release";
 import { moduleMaterialDigest, moduleMaterialRecord, restoreModuleArtifacts, snapshotModuleMaterial } from "./module-artifacts";
 import { checkoutModule, openModuleDirectory, snapshotModule } from "./module-files";
-import { installDependencies } from "./module-dependencies";
-import { buildOwnershipError } from "./module-build-ownership";
+import { installDependencies } from "./checks/module-dependencies";
+import { buildOwnershipError } from "./checks/module-build-ownership";
 
 const revisionSchema = z.object({ commit: z.string().regex(/^[a-f0-9]{40}$/), tree: z.string().regex(/^[a-f0-9]{40}$/) });
-
-async function legacyFiles(context: ModuleContext, version: ModuleVersion, dir: string) {
-  try { return await snapshotModule(context.platform, relative(context.platform, dir)); }
-  catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT" || version.source !== "builtin") throw error;
-    const module = await context.db.module.findFirst({ where: { id: version.moduleId, workspaceId: context.workspaceId } });
-    if (!module || (!module.builtin && !["mcp", "files", "events"].includes(module.name))) throw new StewardError("conflict", "Legacy release source requires a release module identity");
-    const release = module.builtin ? await resolveBuiltinRelease(context.ports, module.name, version.hash) : await resolveExternalRelease(context.ports, module.name, version.hash);
-    return readModuleFiles(release.codeDir, "Unsafe legacy release source");
-  }
-}
 
 /** Old approval hashes stay unchanged; only verified legacy source enters Git. */
 export async function versionSource(context: ModuleContext, version: ModuleVersion, legacyDir = join(context.store, version.hash)) {
@@ -36,7 +23,7 @@ export async function versionSource(context: ModuleContext, version: ModuleVersi
       if (!revision || revision.commit !== version.hash) throw new StewardError("conflict", "Git source provenance does not match module version");
     } else if (!revision) {
       if (!/^[a-f0-9]{64}$/.test(version.hash)) throw new StewardError("invalid", "Invalid legacy module hash");
-      const files = await legacyFiles(context, version, legacyDir);
+      const files = await snapshotModule(context.platform, relative(context.platform, legacyDir));
       revision = await importLegacyModuleSource({ platform: context.platform, moduleId: version.moduleId, legacyHash: version.hash, files });
       const imported = revision;
       await context.db.$transaction(async tx => {

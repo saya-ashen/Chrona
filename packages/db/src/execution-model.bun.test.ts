@@ -7,7 +7,7 @@ import { ensureSqliteDatabase } from "./sqlite-migrations";
 
 test("fresh execution schema: Run admission and evidence share rollback, unique receipts/occupancy and bounded retention columns", async () => {
   const dir = await mkdtemp("/tmp/chrona-execution-schema-"), url = `file:${join(dir, "db.sqlite")}`;
-  ensureSqliteDatabase({ databaseUrl: url, migrationsDir: resolve("prisma/migrations") });
+  ensureSqliteDatabase({ databaseUrl: url, migrationsDir: resolve("packages/db/prisma/migrations") });
   const db = new PrismaClient({ adapter: new PrismaBunSqlite({ url }) });
   try {
     const workspace = await db.workspace.create({ data: { name: "fresh schema" } });

@@ -6,7 +6,6 @@ import type { Caller } from "../modules/module-call-types";
 import type { StewardPorts } from "../ports";
 import { CallError } from "../modules/module-call-error";
 import { moduleCallbackContractHash } from "../modules/module-tool-contract";
-import { assertModuleAvailable } from "../modules/module-availability";
 import { callSync, kernelOrigin } from "../modules/module-calls";
 
 export const providerCompletionBudgetSchema = z.object({ reservationId: z.string(), maxOutputTokens: z.number().int().positive(), limits: z.object({ eventTimeoutMs: z.number().int().positive(), maxOutputTokens: z.number().int().positive() }).passthrough() });
@@ -23,7 +22,7 @@ async function declaredProvider(tx: Prisma.TransactionClient, workspaceId: strin
   const module = await tx.module.findFirst({ where: { id: moduleId, workspaceId, activeHash: hash, status: "active", ...(allowFenced ? {} : { executionFenceAt: null }) } });
   const version = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash } } });
   if (!module || version?.status !== "approved") throw new CallError("forbidden", "Provider registration requires its approved active module");
-  assertModuleAvailable(module.name);
+
   const manifest = moduleManifestSchema.parse(version.manifest), contracts: Record<string, string> = {};
   if (!declaration.capabilities.conversation && !declaration.capabilities.completion) throw new CallError("invalid", "Provider must offer conversation or completion");
   for (const capability of ["native", "completion"] as const) {

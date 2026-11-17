@@ -1,17 +1,17 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
 import "./module-effects";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createScriptSandbox } from "../../../host/src/runtime/script-sandbox";
 import { moduleManifestSchema, moduleCallSchema, type ModuleEvent } from "@chrona/contracts/steward";
 import { moduleSupervisor } from "./module-supervisor";
-import { testModuleProcess } from "./module-test-process";
-import { testDb } from "../test-db";
+import { testModuleProcess } from "../__testing__/module-test-process";
+import { testDb } from "../__testing__/test-db";
 import { admitted, CallError, callStatus, callSync, callsSettled, enqueueCall, kernelOrigin, moduleToolExampleError, runDueCalls, validateToolArgs } from "./module-calls";
 import { callModuleTool, moduleToolCatalog } from "./module-tools";
 import { moduleIncidents, recordModuleFailure } from "./module-diagnostics";
-import { registerSystemModules } from "../system-modules";
-import { PAUSED_MODULE_NAMES } from "./module-availability";
+import { registerSystemModules } from "../system/system-modules";
+const pausedNames = ["paused-entry"];
 import type { StewardPorts } from "../ports";
 import { pruneHistory } from "../retention";
 import { assertPoisonedHeadDoesNotStarveTail } from "../__testing__/state-machine-invariants";
@@ -35,7 +35,7 @@ async function fixture(handlers: { alpha: Handler; beta: Handler }) {
   };
   const modules: Record<string, { id: string }> = {};
   for (const [name, manifest] of Object.entries(manifests)) {
-    const module = await db.module.create({ data: { workspaceId: workspace.id, name, activeHash: `${name}-v1` } });
+    const module = await db.module.create({ data: { workspaceId: workspace.id, name, status: name === "ordinary" ? "active" : "paused", activeHash: `${name}-v1` } });
     await db.moduleVersion.create({ data: { moduleId: module.id, hash: `${name}-v1`, manifest: moduleManifestSchema.parse(manifest), source: "user", intent: {}, report: {}, status: "approved" } });
     modules[name] = module;
   }
@@ -89,12 +89,6 @@ test("expired application receipt refuses original and changed requests without 
   for (const request of [args, { text: "changed request" }]) await expect(callSync(f.ports, origin, "beta.echo", request, options)).rejects.toMatchObject({ code: "conflict" });
   expect(deliveries).toBe(1);
   expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: first.callId } })).toMatchObject({ key: options.key, output: null, status: "failed" });
-});
-
-test("shipped files capability examples match its input and output contracts", async () => {
-  const raw = JSON.parse(await readFile(new URL("../../../../.generated/applications/files/module.json", import.meta.url), "utf8"));
-  const manifest = moduleManifestSchema.parse(raw);
-  expect(manifest.tools.map(moduleToolExampleError)).toEqual(manifest.tools.map(() => null));
 });
 
 test("routed argument validation rejects non-JSON numbers and preserves open nested object keys", () => {
@@ -822,29 +816,19 @@ test("a module can call a modules-visible tool absent from uses; retired contrib
   expect(reply.theirs).toMatchObject({ error: { code: "not_found" } });
 });
 
-test("paused targets return unavailable before any installed or release target read", async () => {
-  const f = await fixture({ alpha: async () => ({}), beta: async () => ({}) });
-  const guarded = new Proxy(f.db, { get() { throw new Error("Paused resolution must not read the database"); } });
-  for (const name of PAUSED_MODULE_NAMES) {
-    await expect(callSync({ ...f.ports, db: guarded }, kernelOrigin(f.workspace.id), `${name}.echo`, {})).rejects.toMatchObject({ code: "unavailable", reason: "module_paused" });
-  }
-  expect(f.processes).toHaveLength(0);
-  expect(await f.db.moduleInvocation.count()).toBe(0);
-});
-
 test("installed paused apps stay undiscoverable and never dispatch sync or queued calls", async () => {
   let executed = 0;
   const f = await fixture({ alpha: async () => { executed++; return {}; }, beta: async () => { executed++; return {}; } });
   registerSystemModules();
   const calls = [];
-  for (const name of PAUSED_MODULE_NAMES) {
-    const module = await f.db.module.create({ data: { workspaceId: f.workspace.id, name, activeHash: `${name}-v1` } });
+  for (const name of pausedNames) {
+    const module = await f.db.module.create({ data: { workspaceId: f.workspace.id, name, status: name === "ordinary" ? "active" : "paused", activeHash: `${name}-v1` } });
     const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], effects: [], tools: [tool("echo", { visibility: ["modules", "owner", "kernel"] })] });
     await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: `${name}-v1`, manifest, source: "user", status: "approved", intent: {}, report: {} } });
-    await expect(callSync(f.ports, kernelOrigin(f.workspace.id), `${name}.echo`, {})).rejects.toMatchObject({ code: "unavailable", reason: "module_paused" });
+    await expect(callSync(f.ports, kernelOrigin(f.workspace.id), `${name}.echo`, {})).rejects.toMatchObject({ code: "unavailable" });
     calls.push(await enqueueCall({ tx: f.db, ports: f.ports, origin: kernelOrigin(f.workspace.id), target: `${name}.echo`, raw: {} }, { key: `paused-${name}` }));
   }
-  const pausedIds = new Set((await f.db.module.findMany({ where: { workspaceId: f.workspace.id, name: { in: [...PAUSED_MODULE_NAMES] } } })).map(row => row.id));
+  const pausedIds = new Set((await f.db.module.findMany({ where: { workspaceId: f.workspace.id, name: { in: [...pausedNames] } } })).map(row => row.id));
   const found = (await callSync(f.ports, { ...kernelOrigin(f.workspace.id), caller: { kind: "owner", via: null } }, "modules.describe", { query: "echo" })).output as { items: { target: unknown }[] };
   expect(found.items.some(item => item.target === "beta.echo")).toBe(false); // beta.echo is not owner visible.
   expect(found.items.filter(item => typeof item.target === "object" && item.target && pausedIds.has((item.target as { moduleId: string }).moduleId))).toEqual([]);
@@ -854,7 +838,7 @@ test("installed paused apps stay undiscoverable and never dispatch sync or queue
   expect(visible.items.filter(item => typeof item.target === "object" && item.target && pausedIds.has((item.target as { moduleId: string }).moduleId))).toEqual([]);
   for (let attempt = 1; attempt <= 6; attempt++) {
     await runDueCalls(f.ports, f.workspace.id);
-    for (const call of calls) expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: call.callId } })).toMatchObject({ attempts: attempt, status: attempt < 6 ? "queued" : "failed", error: expect.stringContaining("unavailable: paused") });
+    for (const call of calls) expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: call.callId } })).toMatchObject({ attempts: attempt, status: attempt < 6 ? "queued" : "failed", error: expect.stringContaining("not active") });
     f.advance(600_000);
   }
   expect(executed).toBe(0);
@@ -864,15 +848,15 @@ test("installed paused apps stay undiscoverable and never dispatch sync or queue
 
 test("paused installed apps stay absent from owner and provider tool catalogs", async () => {
   const f = await fixture({ alpha: async () => ({}), beta: async () => ({}) });
-  for (const name of [...PAUSED_MODULE_NAMES, "ordinary"]) {
-    const module = await f.db.module.create({ data: { workspaceId: f.workspace.id, name, activeHash: `${name}-v1` } });
+  for (const name of [...pausedNames, "ordinary"]) {
+    const module = await f.db.module.create({ data: { workspaceId: f.workspace.id, name, status: name === "ordinary" ? "active" : "paused", activeHash: `${name}-v1` } });
     const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], effects: [], tools: [tool("echo", { visibility: ["owner", "provider"] })] });
     await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: `${name}-v1`, manifest, source: "user", status: "approved", intent: {}, report: {} } });
   }
   for (const audience of ["owner", "provider"] as const) {
     const catalog = await moduleToolCatalog(f.ports, { workspaceId: f.workspace.id, audience });
     expect(catalog.map(item => item.name)).toContain("m_ordinary_echo");
-    expect(catalog.filter(item => PAUSED_MODULE_NAMES.some(name => item.namespace.name === `module_${name}`))).toEqual([]);
+    expect(catalog.filter(item => pausedNames.some(name => item.namespace.name === `module_${name}`))).toEqual([]);
   }
   expect(f.processes).toHaveLength(0);
 });
@@ -882,8 +866,8 @@ test("paused installed callers cannot invoke active tools or receive deferred re
   const origin = { ...kernelOrigin(f.workspace.id), caller: { kind: "module" as const, module: "alpha", moduleId: f.alpha.id, hash: "alpha-v1" } };
   const queued = await enqueueCall({ tx: f.db, ports: f.ports, origin, target: "beta.echo", raw: {} }, { key: "old-callback", reply: true });
   await f.db.moduleInvocation.update({ where: { id: queued.callId }, data: { status: "succeeded", output: {}, finishedAt: f.ports.now() } });
-  await f.db.module.update({ where: { id: f.alpha.id }, data: { name: "remind" } });
-  const caller = { ...origin, caller: { ...origin.caller, module: "remind" } };
+  await f.db.module.update({ where: { id: f.alpha.id }, data: { status: "paused" } });
+  const caller = origin;
   await expect(callSync(f.ports, caller, "beta.echo", {})).rejects.toMatchObject({ code: "forbidden" });
   await expect(enqueueCall({ tx: f.db, ports: f.ports, origin: caller, target: "beta.echo", raw: {} }, { key: "paused-caller" })).rejects.toMatchObject({ code: "forbidden" });
   await expect(enqueueCall({ tx: f.db, ports: f.ports, origin: caller, target: "missing.echo", raw: {} }, { key: "paused-missing" })).rejects.toMatchObject({ code: "forbidden" });

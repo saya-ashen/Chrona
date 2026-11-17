@@ -15,6 +15,6 @@
     ".": "./src/index.ts",
     "./executor": "./src/executor.ts",
     "./catalog": "./src/catalog.ts",
-    "./test-support": "./src/test-support.ts"
+    "./test-support": "./src/__testing__/test-support.ts"
   }
 }

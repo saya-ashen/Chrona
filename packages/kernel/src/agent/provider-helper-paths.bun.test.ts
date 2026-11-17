@@ -6,10 +6,10 @@ import { tmpdir } from "node:os";
 import { moduleManifestSchema, type AgentProviderRegistration, type ProviderTranscriptItem } from "@chrona/contracts/steward";
 import { registerAgentProvider } from "./agent-provider";
 import { assertExecutionModuleIdle } from "../execution/execution-module-guard";
-import { runtimeHealth } from "../runtime-health";
+import { runtimeHealth } from "../runtime/runtime-health";
 import { moduleSupervisor } from "../modules/module-supervisor";
-import { testModuleProcess } from "../modules/module-test-process";
-import { testDb } from "../test-db";
+import { testModuleProcess } from "../__testing__/module-test-process";
+import { testDb } from "../__testing__/test-db";
 import type { StewardPorts } from "../ports";
 import "../modules/module-effects";
 

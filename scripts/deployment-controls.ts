@@ -8,9 +8,9 @@ import { backupSqliteDatabase, restoreSqliteDatabase } from "../packages/db/src/
 import { inspectSqliteRuntimeLock } from "../packages/db/src/sqlite-runtime-lock";
 import { checksumSql } from "../packages/db/src/sqlite-migrations";
 import { sqlitePathFromFileUrl } from "../packages/db/src/sqlite-url";
-import { verifyReleaseIdentity } from "../build/release-identity";
-import { buildTargets, type BuildTargetName } from "../build/manifest";
-import { smokeRelease } from "../build/release-smoke";
+import { verifyReleaseIdentity } from "./build/release-identity";
+import { buildTargets, type BuildTargetName } from "./build/manifest";
+import { smokeRelease } from "./build/release-smoke";
 import { findResourceDir } from "../apps/cli/src/start-server";
 
 const TERMINAL_RUNS = ["finished", "failed", "cancelled", "timed_out", "provider_unavailable"];
@@ -26,7 +26,7 @@ export type DeploymentReport = {
   dataDir: string;
   databasePath: string;
   process: { pid: number; executable: string; resourceRoot: string };
-  activeModules: { name: string; activeHash: string | null; expectedHash: string | null; status: string }[];
+  activeModules: { name: string; activeHash: string | null; status: string }[];
   checks: DeploymentCheck[];
   passed: boolean;
 };
@@ -45,12 +45,6 @@ function required(args: string[], name: string): string {
 function absolute(value: string, label: string): string {
   if (!isAbsolute(value)) throw new Error(`${label} must be an absolute path`);
   return resolve(value);
-}
-
-function jsonFile(path: string): Record<string, unknown> {
-  const value: unknown = JSON.parse(readFileSync(path, "utf8"));
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${path} must contain a JSON object`);
-  return value as Record<string, unknown>;
 }
 
 function tables(db: Database): Set<string> {
@@ -132,15 +126,6 @@ function migrationCheck(db: Database, releaseDir: string): DeploymentCheck {
   return { key: "migrationCompatibility", status: "ok", message: `${candidate.length - applied.length} candidate migration(s) remain; no conversion or replay is performed.` };
 }
 
-function releaseModules(releaseDir: string): Map<string, string> {
-  const lock = jsonFile(join(releaseDir, "resources/module-git/lock.json"));
-  if (!Array.isArray(lock.modules)) throw new Error("Candidate module lock has no modules array");
-  return new Map(lock.modules.map(module => {
-    if (!module || typeof module !== "object" || typeof (module as { name?: unknown }).name !== "string" || typeof (module as { commit?: unknown }).commit !== "string") throw new Error("Candidate module lock contains an invalid identity");
-    return [(module as { name: string }).name, (module as { commit: string }).commit];
-  }));
-}
-
 // eslint-disable-next-line complexity -- this is the single read-only deployment gate aggregating independent evidence.
 export async function runPreflight(args: string[]): Promise<DeploymentReport> {
   const releaseDir = absolute(required(args, "--release-dir"), "release directory");
@@ -170,9 +155,8 @@ export async function runPreflight(args: string[]): Promise<DeploymentReport> {
       + state.unsettledDeliveries + state.unsettledCommands + state.pendingCallbacks
       + state.unacceptedOutboundReceipts + state.unsettledExecutions + state.unresolvedWorkspaceCleanup;
     checks.push({ key: "unsettledWork", status: unsettled === 0 ? "ok" : "error", message: unsettled === 0 ? "Runs, invocations, calls, deliveries, commands, callbacks and cleanup receipts are settled." : `${unsettled} unsettled row(s) remain; deployment is blocked.` , details: state });
-    const expected = releaseModules(releaseDir);
-    const activeModules = db.query<{ name: string; activeHash: string | null; status: string }, []>('SELECT name, activeHash, status FROM "Module" ORDER BY name').all().map(module => ({ ...module, expectedHash: expected.get(module.name) ?? null }));
-    checks.push({ key: "activeHashes", status: "ok", message: "Active module hashes were read from the target database; differences are reported for controlled activation.", details: activeModules.map(module => ({ name: module.name, activeHash: module.activeHash, expectedHash: module.expectedHash, status: module.status })) });
+    const activeModules = db.query<{ name: string; activeHash: string | null; status: string }, []>('SELECT name, activeHash, status FROM "Module" ORDER BY name').all();
+    checks.push({ key: "activeHashes", status: "ok", message: "Active module versions were read from the target database.", details: activeModules.map(module => ({ name: module.name, activeHash: module.activeHash, status: module.status })) });
     const report: DeploymentReport = { schema: 1, operation: "preflight", releaseDir, dataDir, databasePath: resolvedDatabasePath, process, activeModules, checks, passed: checks.every(check => check.status !== "error") };
     const reportPath = option(args, "--report");
     if (reportPath) {

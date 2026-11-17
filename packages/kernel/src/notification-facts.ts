@@ -53,10 +53,7 @@ export async function factConsumer(db: Db, workspaceId: string) {
   const row = await db.kernelFactConsumer.findUnique({ where: { workspaceId } });
   return row ? consumerSchema.parse({ moduleId: row.moduleId, revision: row.revision }) : { moduleId: null, revision: "unselected" };
 }
-/** Release installer alone chooses the initial app. An explicit null selection is never overwritten. */
-export function seedFactConsumer(db: Db, workspaceId: string, moduleId: string, at: Date) {
-  return db.kernelFactConsumer.upsert({ where: { workspaceId }, create: { workspaceId, moduleId, revision: randomUUID(), updatedAt: at }, update: {} });
-}
+
 export async function selectFactConsumer(db: StewardPorts["db"], workspaceId: string, moduleId: string | null, at: Date) {
   return db.$transaction(async tx => {
     const current = await factConsumer(tx, workspaceId);

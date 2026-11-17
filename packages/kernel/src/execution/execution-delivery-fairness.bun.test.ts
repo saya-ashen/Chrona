@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { generateKeyPairSync } from "node:crypto";
 import type { ExecutionPrincipal, KernelExecutionStart } from "@chrona/contracts/steward";
-import { testDb } from "../test-db";
+import { testDb } from "../__testing__/test-db";
 import { createExecutionDelivery } from "./execution-delivery";
 import { createExecutionEventStore } from "./execution-event-store";
 import { createRuns } from "./runs";

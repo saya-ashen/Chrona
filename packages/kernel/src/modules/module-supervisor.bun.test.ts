@@ -1,23 +1,23 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
 import "./module-effects";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm} from "node:fs/promises";
 import { join } from "node:path";
-import { createHash } from "node:crypto";
-import { readModuleFiles } from "./module-preview";
+
+
 import { moduleManifestSchema, type ModuleEvent } from "@chrona/contracts/steward";
 import { createModuleSupervisor, moduleSupervisor } from "./module-supervisor";
-import { registerSystemModules } from "../system-modules";
+import { registerSystemModules } from "../system/system-modules";
 import { callsSettled, callSync, kernelOrigin } from "./module-calls";
-import { installNotifyTarget } from "../test-notify-target";
-import { testModuleProcess } from "./module-test-process";
-import { testDb } from "../test-db";
+import { installNotifyTarget } from "../__testing__/test-notify-target";
+import { testModuleProcess } from "../__testing__/module-test-process";
+import { testDb } from "../__testing__/test-db";
 import type { StewardPorts } from "../ports";
-import { notices } from "../test-notices";
+import { notices } from "../__testing__/test-notices";
 import { moduleIncidents } from "./module-diagnostics";
 import { moduleContext } from "./module-context";
 import { recordModuleActivation, moduleEvolutionOutcomes, updateModuleEvolution } from "./module-evolution";
 import { moduleFailurePolicy, recordModuleExecution } from "./module-failure-policy";
-import { seedTestModuleRelease } from "./module-release-test-fixture";
+
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -289,7 +289,7 @@ test("keepAlive starts at runtime start, restarts with backoff and pauses after 
     if (i < 2) await until(() => f.processes.length === i + 2);
   }
   await until(async () => (await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).status === "paused");
-  expect((await notices(f.db, { title: "模块连续失败，已暂停" })).length).toBe(1);
+  expect((await notices(f.db, { kind: "module-paused" })).length).toBe(1);
   expect(await moduleIncidents(f.db, f.module.workspaceId, f.module.id)).toMatchObject([{ status: "unresolved", failures: 3, evidence: { phase: "process", exitCode: 1 } }]);
   f.advance(60_000); await Bun.sleep(20); expect(f.processes).toHaveLength(3);
 });
@@ -616,7 +616,7 @@ test("old-version failures cannot pause the newly activated version", async () =
   await f.db.module.update({ where: { id: f.module.id }, data: { activeHash: "v2" } });
   fail(); await expect(request).rejects.toThrow("old version failed");
   expect(await f.db.module.findUnique({ where: { id: f.module.id } })).toMatchObject({ status: "active", activeHash: "v2" });
-  expect(await notices(f.db, { title: "模块连续失败，已暂停" })).toHaveLength(0);
+  expect(await notices(f.db, { kind: "module-paused" })).toHaveLength(0);
 });
 
 test("normal lazy idle stop and administrative stop do not produce faults", async () => {
@@ -712,38 +712,6 @@ test("activation failures proven unsent remain retryable without recording succe
     expect(await file.exists() ? JSON.parse(await file.text())[f.module.id] : undefined).toBeUndefined();
     expect(failures()).toBe(3);
   } finally { logs.mockRestore(); }
-});
-
-
-test.each(["trusted", "renamed", "fork", "unapproved", "drift", "manifest-drift", "missing-seed", "legacy-snapshot"] as const)("Provider host bindings require approved exact release identity (%s)", async kind => {
-  const f = await fixture({ keepAlive: true });
-  const root = join(f.ports.dataDir, "external"), codeDir = join(root, "pi");
-  await mkdir(codeDir, { recursive: true });
-  const manifest = moduleManifestSchema.parse({ ...f.manifest, name: "pi" });
-  await writeFile(join(codeDir, "module.json"), JSON.stringify(manifest));
-  await writeFile(join(codeDir, "index.ts"), "export {};");
-  const release = await seedTestModuleRelease(root, "pi");
-  const snapshot = createHash("sha256");
-  for (const file of (await readModuleFiles(codeDir, "Host identity fixture")).sort((a, b) => a.path.localeCompare(b.path))) snapshot.update(file.path).update("\0").update(file.bytes).update("\0");
-  const hash = kind === "fork" ? "b".repeat(40) : kind === "legacy-snapshot" ? snapshot.digest("hex") : release.commit;
-  await f.db.module.update({ where: { id: f.module.id }, data: { name: kind === "renamed" ? "another-provider" : "pi", builtin: false, activeHash: hash } });
-  await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash, manifest: kind === "manifest-drift" ? { ...manifest, description: "different" } : manifest, source: "user", status: kind === "unapproved" ? "pending_review" : "approved", intent: {}, report: {} } });
-  await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.module.workspaceId), tx, { moduleId: f.module.id, hash, previousHash: "v1", generationId: "release" }));
-  const privileged = testModuleProcess(async () => ({}));
-  f.ports.moduleExternalResources = root;
-  f.ports.providerModules = { pi: { env: { CHRONA_PROVIDER_CONFIGURATION: "trusted-host-fixture" }, startModule: privileged.startModule } };
-  if (kind === "drift") await writeFile(join(codeDir, "index.ts"), "changed after approval");
-  if (kind === "missing-seed") await rm(join(f.ports.dataDir, "module-git"), { recursive: true });
-  await f.supervisor.reconcile();
-  expect(privileged.processes).toHaveLength(kind === "trusted" ? 1 : 0);
-  if (kind === "trusted") {
-    expect(privileged.processes[0]!.input.env?.CHRONA_PROVIDER_CONFIGURATION).toBe("trusted-host-fixture");
-    expect(privileged.processes[0]!.input.codeDir).toBe(join(f.ports.dataDir, "platform/store", hash));
-  } else {
-    expect(f.processes).toHaveLength(kind === "unapproved" || kind === "renamed" ? 0 : 1);
-    for (const process of f.processes) expect(process.input.env).not.toHaveProperty("CHRONA_PROVIDER_CONFIGURATION");
-  }
-  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ activeHash: hash });
 });
 
 

@@ -70,7 +70,7 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
       await (await import("./admin")).runAdmin("install", [name, input.update ? "update" : "install", input.requestKey, ...(input.exactRelease ? ["exact-release"] : [])]);
     });
   admin.command("diagnostics [module]").description("Read saved module faults and recovery attempts without starting Chrona").action(async (module?: string) => { await (await import("./admin")).runAdmin("diagnostics", module ? [module] : []); });
-  admin.command("approvals").description("List pending approvals, including rescue-only items").action(async () => { await (await import("./admin")).runAdmin("approvals"); });
+  admin.command("approvals").description("List pending approvals, including recovery decisions").action(async () => { await (await import("./admin")).runAdmin("approvals"); });
   admin.command("rollback <module> <hash>").description("Roll back an approved module version").action(async (module: string, hash: string) => { await (await import("./admin")).runAdmin("rollback", [module, hash]); });
   admin.command("disable <module>").description("Pause a module").action(async (module: string) => { await (await import("./admin")).runAdmin("disable", [module]); });
   admin.command("enable <module>").description("Resume a paused module").action(async (module: string) => { await (await import("./admin")).runAdmin("enable", [module]); });
@@ -79,14 +79,5 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
   for (const command of ["approve", "reject"] as const) admin.command(`${command} <approvalId>`).description(`${command} a pending approval`).action(async (id: string) => { await (await import("./admin")).runAdmin(command, [id]); });
   admin.command("secret-set <name>").description("Save a module credential from a JSON object on stdin (never echoed)").action(async (name: string) => { await (await import("./admin")).setSecret(name, await Bun.stdin.text()); });
   admin.command("secret-remove <name>").description("Delete a saved module credential").action(async (name: string) => { await (await import("./admin")).removeSecret(name); });
-  const qq = program.command("qq").description("Chrona QQ bot local administration");
-  qq.command("bind-code").description("Create a one-time owner binding code (only its hash is stored)")
-    .requiredOption("--workspace <id>", "Workspace the bound QQ owner acts in")
-    .option("--ttl <minutes>", "Validity in minutes (1-60)", "10")
-    .option("--replace", "Allow replacing an existing owner binding")
-    .action(async (input: { workspace: string; ttl: string; replace?: boolean }) => {
-      const { qqBindCode } = await import("./admin");
-      console.log(JSON.stringify(await qqBindCode({ workspace: input.workspace, ttlMinutes: Number(input.ttl), replace: Boolean(input.replace) })));
-    });
   return program;
 }

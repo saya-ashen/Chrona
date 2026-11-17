@@ -18,7 +18,7 @@ import { assertExternalModule, assertExternalName } from "./module-identity";
 type Manifest = z.output<typeof moduleManifestSchema>;
 type ProposalInput = { dir: string; intent: z.input<typeof intentSchema>; root: string; allowed?: string[];
   /** Internal official installation/update path; never part of routed tool input. */
-  exactReleaseUpdate?: ExactReleaseBaseline; sourceCommit?: string; expectedLocal?: string; expectedModuleId?: string | null; gitBundle?: { bundlePath: string; commit: string; branch: string; repository: string | null; defaultRepository?: string } };
+  exactReleaseUpdate?: ExactReleaseBaseline; sourceCommit?: string; expectedLocal?: string; expectedModuleId?: string | null; gitBundle?: { bundlePath: string; commit: string; branch: string; repository: string | null } };
 type Submission = { moduleId: string; hash: string; versionId: string; manifest: Manifest; intent: z.output<typeof intentSchema>; source: ModuleSource; report: BuildReport };
 async function queueVersion(context: ModuleContext, submission: Submission) {
   const { db, ports } = context, { moduleId, hash, versionId, manifest, intent, source, report } = submission;

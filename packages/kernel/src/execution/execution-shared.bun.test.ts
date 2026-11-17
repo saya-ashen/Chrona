@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { createScriptSandbox } from "../../../host/src/runtime/script-sandbox";
-import { testDb } from "../test-db";
+import { testDb } from "../__testing__/test-db";
 import { callSync } from "../modules/module-calls";
 import { moduleSupervisor } from "../modules/module-supervisor";
 import type { StewardPorts } from "../ports";

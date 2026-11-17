@@ -6,7 +6,7 @@ import { sqlitePathFromFileUrl } from "@chrona/db/sqlite-url";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 import { createSecrets, createStewardService, moduleSupervisor, installExactRelease, refreshInstallationReceipts, type StewardPorts } from "@chrona/kernel";
 import { getChronaDataDir } from "./start-server";
-import { createModuleRuntimePorts, resourcePath } from "@chrona/host";
+import { createModuleRuntimePorts } from "@chrona/host";
 import { moduleInstallRequestSchema, moduleVersionHashSchema } from "@chrona/contracts/steward";
 
 export type AdminCommand = "diagnostics" | "modules" | "catalog" | "install" | "rollback" | "disable" | "enable" | "remove" | "approvals" | "approve" | "reject";
@@ -54,7 +54,7 @@ export async function runAdmin(command: AdminCommand, args: string[] = [], optio
     const workspaceId = "ws_default";
     const api = createStewardService(ports).forWorkspace(workspaceId);
     const handlers: Partial<Record<AdminCommand, () => Promise<unknown>>> = {
-      modules: async () => [...await api.modules.list(), { name: "rescue", status: "immutable" }],
+      modules: () => api.modules.list(),
       diagnostics: () => api.modules.diagnostics(args[0]),
       catalog: () => api.modules.catalog(),
       install: () => {
@@ -79,34 +79,9 @@ export async function runAdmin(command: AdminCommand, args: string[] = [], optio
   }
 }
 
-/** A one-time QQ owner binding code, written into the qq module's data directory (only its hash is stored). */
-export async function qqBindCode(input: { workspace: string; ttlMinutes: number; replace: boolean }, options: { dataDir?: string; databaseUrl?: string } = {}) {
-  const appId = process.env.CHRONA_QQ_APP_ID?.trim() ?? "";
-  if (!/^\d{5,20}$/.test(appId)) throw new Error("CHRONA_QQ_APP_ID is required");
-  const dataDir = options.dataDir ?? getChronaDataDir();
-  const databaseUrl = options.databaseUrl ?? process.env.DATABASE_URL ?? `file:${join(dataDir, "chrona.db")}`;
-  const path = sqlitePathFromFileUrl(databaseUrl);
-  if (!path || !existsSync(path)) throw new Error("Chrona database not found. Start Chrona once first.");
-  const db = new PrismaClient({ adapter: new PrismaBunSqlite({ url: databaseUrl }) });
-  try {
-    const module = await db.module.findFirst({ where: { workspaceId: input.workspace, name: "qq" } });
-    if (!module) throw new Error("The qq module is not registered in this workspace. Start Chrona once first.");
-    const codeDir = join(resourcePath("external", ".generated/applications"), "qq");
-    const child = Bun.spawn(["bun", "--no-install", join(codeDir, "bind-code.ts")], {
-      cwd: codeDir, stdin: "pipe", stdout: "pipe", stderr: "pipe",
-    });
-    child.stdin.write(JSON.stringify({ dataDir: join(dataDir, "platform", "data", module.id), appId, workspaceId: input.workspace, ttlMinutes: input.ttlMinutes, replace: input.replace }));
-    child.stdin.end();
-    const [stdout, stderr, exitCode] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
-    if (exitCode !== 0) throw new Error(`QQ binding maintenance failed: ${stderr.trim()}`);
-    const challenge = JSON.parse(stdout) as { code: string; expiresAt: string };
-    return { appId, ...challenge };
-  } finally { await db.$disconnect(); }
-}
-
 /** Module credentials (v2-16), written to `<dataDir>/secrets` with the same rules as the page; the value is never printed. */
 export async function setSecret(name: string, input: string, options: { dataDir?: string } = {}) {
-  if (!/^[a-z][a-z0-9_]{1,40}$/.test(name) || name === "qq_bot") throw new Error("Invalid credential name");
+  if (!/^[a-z][a-z0-9_]{1,40}$/.test(name)) throw new Error("Invalid credential name");
   let value: unknown;
   try { value = JSON.parse(input); } catch { throw new Error("stdin must be a JSON object of string fields"); }
   if (!value || typeof value !== "object" || Array.isArray(value) || !Object.keys(value).length || !Object.values(value).every(field => typeof field === "string" && field.length > 0)) {
@@ -116,7 +91,7 @@ export async function setSecret(name: string, input: string, options: { dataDir?
   console.log(`Saved credential ${name} (${Object.keys(value).join(", ")}).`);
 }
 export async function removeSecret(name: string, options: { dataDir?: string } = {}) {
-  if (!/^[a-z][a-z0-9_]{1,40}$/.test(name) || name === "qq_bot") throw new Error("Invalid credential name");
+  if (!/^[a-z][a-z0-9_]{1,40}$/.test(name)) throw new Error("Invalid credential name");
   await createSecrets(adminLocation(options).dataDir).remove(name);
   console.log(`Removed credential ${name}.`);
 }

@@ -30,7 +30,7 @@ function listDetails(details: Record<string, unknown>): Record<string, Json> {
   for (const [key, allowed] of [["attempts", ["action"]], ["signals", ["kind", "module"]]] as const) if (Array.isArray(details[key])) result[key] = details[key].map(value => Object.fromEntries(allowed.flatMap(field => value && typeof value === "object" && typeof value[field] === "string" ? [[field, redactSensitiveText(value[field], 4000)]] : [])));
   return result;
 }
-/** Bounded, workspace-scoped persistence query; presentation and incident aggregation live in notify. */
+/** Bounded, workspace-scoped persistence query; presentation and incident aggregation belong to applications. */
 export async function activityRecords(ports: StewardPorts, workspaceId: string, { before, after, limit = 200, ascending = false }: { before?: string; after?: { at: Date; id: string }; limit?: number; ascending?: boolean }) {
   const { db } = ports, at = before ? new Date(before) : undefined, cursor = at && !Number.isNaN(at.getTime()) ? at : undefined;
   const rows = await db.audit.findMany({ where: { workspaceId, kind: { in: [...KINDS] }, ...(cursor ? { createdAt: { lt: cursor } } : {}), ...(after ? { OR: [{ createdAt: { gt: after.at } }, { createdAt: after.at, id: { gt: after.id } }] } : {}) }, orderBy: [{ createdAt: ascending ? "asc" : "desc" }, { id: ascending ? "asc" : "desc" }], take: limit });

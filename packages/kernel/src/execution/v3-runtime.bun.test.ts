@@ -1,0 +1,72 @@
+import { afterEach, beforeEach, expect, test } from "bun:test";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { RUN_LIMITS } from "@chrona/contracts/steward";
+import { createRuns } from "./runs";
+import { testDb } from "../__testing__/test-db";
+import type { StewardPorts } from "../ports";
+let db: ReturnType<typeof testDb>, ports: StewardPorts, workspaceId: string, sessionId: string;
+beforeEach(async () => {
+  db = testDb(); workspaceId = (await db.workspace.create({ data: { name: "runtime" } })).id;
+  sessionId = (await db.session.create({ data: { workspaceId, key: "web:first", source: "owner" } })).id;
+  ports = { db, dataDir: await mkdtemp(join(tmpdir(), "chrona-runtime-")), now: () => new Date("2026-10-15T04:00:00Z"), publicUrl: null };
+});
+afterEach(async () => { await db.$disconnect(); });
+test("run cwd and context belong to the session", async () => {
+  const run = await createRuns(ports, workspaceId).enqueue({ sessionId, lane: "foreground", trigger: "message", prompt: "Work" });
+  expect(run.cwd).toBe(join(ports.dataDir, "sessions", sessionId));
+});
+test.each(["foreground", "background"] as const)("%s defaults to no deadline past the former limits", async lane => {
+  const runs = createRuns(ports, workspaceId), started = ports.now();
+  await runs.enqueue({ sessionId, lane, trigger: "message", prompt: "Long work" });
+  const run = (await runs.claimNext(lane))!;
+  expect(run).toMatchObject({ deadlineAt: null, leaseUntil: null });
+  ports.now = () => new Date(started.getTime() + 21 * 60_000);
+  expect(await runs.expireLeases()).toBe(0);
+  expect((await runs.authenticate(run.token)).run.id).toBe(run.id);
+  expect(await db.run.findUniqueOrThrow({ where: { id: run.id } })).toMatchObject({ status: "running", deadlineAt: null, leaseUntil: null });
+});
+test.each(["foreground", "background"] as const)("%s uses the setting at claim; clearing only affects new claims", async lane => {
+  const runs = createRuns(ports, workspaceId), started = ports.now();
+  await runs.enqueue({ sessionId, lane, trigger: "message", prompt: "Configured work" });
+  await db.workspace.update({ where: { id: workspaceId }, data: { settings: { runTimeoutMinutes: 2 } } });
+  const bounded = (await runs.claimNext(lane))!;
+  const boundary = new Date(started.getTime() + 2 * 60_000);
+  expect(bounded).toMatchObject({ deadlineAt: boundary, leaseUntil: boundary });
+  await db.workspace.update({ where: { id: workspaceId }, data: { settings: { runTimeoutMinutes: null } } });
+  expect(await db.run.findUniqueOrThrow({ where: { id: bounded.id } })).toMatchObject({ deadlineAt: boundary, leaseUntil: boundary });
+  ports.now = () => new Date(boundary.getTime() - 1);
+  expect((await runs.authenticate(bounded.token)).run.id).toBe(bounded.id);
+  expect(await runs.expireLeases()).toBe(0);
+  ports.now = () => boundary;
+  await expect(runs.authenticate(bounded.token)).rejects.toMatchObject({ code: "forbidden" });
+  expect(await runs.expireLeases()).toBe(1);
+  expect((await db.run.findUniqueOrThrow({ where: { id: bounded.id } })).status).toBe("timed_out");
+  await runs.enqueue({ sessionId, lane, trigger: "message", prompt: "Unlimited work" });
+  const unlimited = (await runs.claimNext(lane))!;
+  expect(unlimited).toMatchObject({ deadlineAt: null, leaseUntil: null });
+  await db.workspace.update({ where: { id: workspaceId }, data: { settings: { runTimeoutMinutes: 1 } } });
+  ports.now = () => new Date(boundary.getTime() + 21 * 60_000);
+  expect(await runs.expireLeases()).toBe(0);
+  expect((await runs.authenticate(unlimited.token)).run.id).toBe(unlimited.id);
+});
+test("one session never runs two lanes concurrently; other sessions remain independent", async () => {
+  const runs = createRuns(ports, workspaceId);
+  await runs.enqueue({ sessionId, lane: "foreground", trigger: "message", prompt: "One" });
+  await runs.enqueue({ sessionId, lane: "background", trigger: "schedule", prompt: "Two" });
+  expect(await runs.claimNext("foreground")).not.toBeNull();
+  expect(await runs.claimNext("background")).toBeNull();
+  const other = await db.session.create({ data: { workspaceId, key: "web:second", source: "owner" } });
+  await runs.enqueue({ sessionId: other.id, lane: "background", trigger: "schedule", prompt: "Separate" });
+  expect((await runs.claimNext("background"))?.sessionId).toBe(other.id);
+});
+for (const scope of ["session", "global"] as const) test(`${scope} daily run limit defers until local midnight`, async () => {
+  const runs = createRuns(ports, workspaceId);
+  const other = await db.session.create({ data: { workspaceId, key: "web:other", source: "owner" } });
+  const count = scope === "session" ? RUN_LIMITS.maxRunsPerSessionPerDay : RUN_LIMITS.maxRunsPerDay;
+  await db.run.createMany({ data: Array.from({ length: count }, (_, index) => ({ workspaceId, sessionId: scope === "session" ? sessionId : other.id, lane: "foreground", trigger: "message", status: "finished", provider: "fixture", tokenHash: `history-${index}`, cwd: "unused", prompt: "", startedAt: ports.now(), endedAt: ports.now() })) });
+  const queued = await runs.enqueue({ sessionId, lane: "foreground", trigger: "message", prompt: "Limited" });
+  expect(await runs.claimNext("foreground")).toBeNull();
+  expect((await db.run.findUniqueOrThrow({ where: { id: queued.id } })).leaseUntil?.toISOString()).toBe("2026-10-15T16:00:00.000Z");
+});

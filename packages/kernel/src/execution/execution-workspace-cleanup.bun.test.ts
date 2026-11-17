@@ -5,7 +5,7 @@ import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type ExecutionPrincipal, type LocalExecutionProjectGrant } from "@chrona/contracts/steward";
-import { testDb } from "../test-db";
+import { testDb } from "../__testing__/test-db";
 import type { StewardPorts } from "../ports";
 import { executionDigest } from "./execution-state";
 import { createExecutionWorkspaceCleanup } from "./execution-workspace-cleanup";
@@ -28,7 +28,7 @@ async function setup() {
   const executorId = "server", placement = { executorId, projectRef: "project", mappingRevision: 1 };
   let grant: LocalExecutionProjectGrant = { ...placement, executor: "server", executorId: "server", executorGeneration: 1, directoryIdentity: project.identity, canonicalPath: project.root, baseline: project.baseline, label: "Fixture" };
   ports.resolveExecutionPlacement = async () => grant;
-  const session = await db.session.create({ data: { workspaceId: workspace.id, key: crypto.randomUUID(), source: "web" } });
+  const session = await db.session.create({ data: { workspaceId: workspace.id, key: crypto.randomUUID(), source: "owner" } });
   const run = await db.run.create({ data: { workspaceId: workspace.id, sessionId: session.id, lane: "background", trigger: "execution", provider: "fixture", prompt: "cleanup", cwd: dataDir, status: "finished", startedAt: now, deadlineAt: new Date(now.getTime() + 60000), tokenHash: "fixture" } });
   const a = await db.executionAttempt.create({ data: { workspaceId: workspace.id, ownerId: "owner", callerKey: "owner", workId: "work", commandKey: "start", requestDigest: "fixture", runId: run.id, executorId, executorGeneration: 1, projectRef: "project", mappingRevision: 1, projectDigest: executionDigest(grant), directoryIdentity: project.identity, logDir: dataDir, baseline: `commit:${project.baseline.digest}`, budget: { timeoutMs: 60000, maxToolCalls: 2 }, workspaceRef: "workspace", workspaceMode: "independent_worktree", queueExpiresAt: new Date(now.getTime() + 60000), stopConfirmedAt: now, stopEvidence: { kind: "provider_exited" } } });
   const cleanup = createExecutionWorkspaceCleanup(ports, createExecutionWorkspaceCleanupHost(dataDir)); ports.executionWorkspaces = cleanup;

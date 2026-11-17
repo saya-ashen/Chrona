@@ -2,11 +2,11 @@ import { afterEach, expect, test } from "bun:test";
 import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
-import { testDb } from "../test-db";
+import { testDb } from "../__testing__/test-db";
 import { moduleContext } from "./module-context";
 import { activateIn } from "./module-generation";
 import { propose } from "./module-proposal";
-import { seedTestModuleRelease } from "./module-release-test-fixture";
+import { seedTestModuleRelease } from "../__testing__/module-release-test-fixture";
 
 const cleanup: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); });

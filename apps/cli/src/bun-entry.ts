@@ -1,8 +1,8 @@
 import type { StartCommandOptions } from "./program.js";
 
 async function bootServer() {
-  const { startBunServer } = await import("@server/index.bun");
-  await startBunServer();
+  const { startChrona } = await import("./run");
+  await startChrona();
 }
 
 function startServer(options: StartCommandOptions) {

@@ -8,7 +8,7 @@ import { createProgram, type StartCommandOptions } from "./program";
 test("Chrona retains its local commands and explicit start options", async () => {
   const starts: StartCommandOptions[] = [];
   const program = createProgram({ startServer: async options => { starts.push(options); } });
-  expect(program.commands.map(command => command.name())).toEqual(["start", "backup", "restore", "doctor", "admin", "qq"]);
+  expect(program.commands.map(command => command.name())).toEqual(["start", "backup", "restore", "doctor", "admin"]);
   await program.parseAsync(["start", "--host", "0.0.0.0", "--port", "4310", "--no-open"], { from: "user" });
   expect(starts).toEqual([{ host: "0.0.0.0", port: "4310", open: false }]);
 });

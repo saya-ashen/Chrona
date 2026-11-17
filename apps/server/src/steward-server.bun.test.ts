@@ -38,9 +38,9 @@ test("the owner HTTP API and workspace discovery are gone (v2-9): modules serve 
 
 test("origin policy and body limit apply to /api routes", async () => {
   const app = await createServerApp();
-  expect((await app.request("/api/web/today", { method: "OPTIONS", headers: { origin: "https://untrusted.example" } })).status).toBe(403);
-  expect((await app.request("/api/web/today", { method: "OPTIONS", headers: { origin: "https://trusted.example" } })).status).toBe(204);
-  expect((await app.request("/api/web/chat", { method: "POST", headers: owner, body: "x".repeat(21 * 1024 * 1024 + 1) })).status).toBe(413);
+  expect((await app.request("/api/fixture/today", { method: "OPTIONS", headers: { origin: "https://untrusted.example" } })).status).toBe(403);
+  expect((await app.request("/api/fixture/today", { method: "OPTIONS", headers: { origin: "https://trusted.example" } })).status).toBe(204);
+  expect((await app.request("/api/fixture/input", { method: "POST", headers: owner, body: "x".repeat(21 * 1024 * 1024 + 1) })).status).toBe(413);
 });
 
 test("only exact capability endpoints bypass owner auth, retaining their own proxy guard", async () => {

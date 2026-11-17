@@ -8,7 +8,6 @@ import { type ModuleContext, type ModuleVersion } from "./module-context";
 import { StewardError } from "../errors";
 import { isOwnerCaller } from "./module-owner";
 import { assertExternalModule, assertExternalName } from "./module-identity";
-import { assertModuleAvailable } from "./module-availability";
 
 export type CandidateDb = Prisma.TransactionClient;
 const admissionRecordSchema = z.object({ input: candidateAdmissionInputSchema, issuer: callerSchema, receiptId: z.string().nullable() }).strict();
@@ -41,8 +40,7 @@ export async function readCandidateAdmissionIn(context: ModuleContext, db: Candi
   const row = await db.candidateAdmission.findFirst({ where: { id: admissionId, workspaceId: context.workspaceId }, include: { receipt: { select: { id: true } } } });
   if (!row) throw new StewardError("not_found", "Candidate admission not found");
   const admission = admissionRecordSchema.parse({ input: { requestKey: row.requestKey, submitter: { moduleId: row.submitterModuleId, hash: row.submitterHash }, targets: row.targets }, issuer: row.issuer, receiptId: row.receipt?.id ?? null });
-  // Replays read this record without repeating the baseline fence; availability still applies.
-  for (const target of admission.input.targets) assertModuleAvailable(target.name);
+  // Replays read this record without repeating the baseline fence.
   return admission;
 }
 export async function assertCandidateAdmissionIn(context: ModuleContext, db: CandidateDb, admission: CandidateAdmissionRecord, caller?: Caller) {

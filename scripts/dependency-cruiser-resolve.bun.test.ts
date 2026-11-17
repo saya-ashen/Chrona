@@ -26,6 +26,6 @@ test("boundary resolution uses the declared local version and public exports bef
     expect(resolvePackage(consumer, "@chrona/domain/steward/provider")).toBe(join(dependency, "src/steward/provider.ts"));
     expect(() => resolvePackage(consumer, "@chrona/domain/src/private.ts")).toThrow("not exported");
     expect(() => resolvePackage(consumer, "@chrona/pi")).toThrow("Cannot resolve declared local dependency");
-    expect(resolvePackage(resolve("packages/pi/src"), "@chrona/domain/steward/provider")).toBe(resolve("packages/domain/src/steward/provider.ts"));
+    expect(resolvePackage(resolve("packages/host/src"), "@chrona/domain/steward/provider")).toBe(resolve("packages/domain/src/steward/provider.ts"));
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

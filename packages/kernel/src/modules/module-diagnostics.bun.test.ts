@@ -1,8 +1,8 @@
 import { afterEach, expect, test } from "bun:test";
-import { testDb } from "../test-db";
+import { testDb } from "../__testing__/test-db";
 import { moduleIncidents, recordModuleFailure, recordModuleRecovery, incidentNextAction, moduleDiagnosticsOutputSchema, moduleHealthOutputSchema, recordModuleOutputMismatch, type ModuleFailureEvidence } from "./module-diagnostics";
 import { createModules, moduleHealthSummary } from "./modules";
-import { registerSystemModules } from "../system-modules";
+import { registerSystemModules } from "../system/system-modules";
 import { callSync } from "./module-calls";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { moduleContext } from "./module-context";

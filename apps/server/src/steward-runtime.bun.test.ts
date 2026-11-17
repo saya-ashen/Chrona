@@ -1,5 +1,5 @@
 import { expect, spyOn, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { testDb } from "@chrona/kernel/test-support";
@@ -29,34 +29,14 @@ test("released runtime never selects a test Provider from environment flags", as
   }
 });
 
-test("runtime configures optional Pi without launching it or forcing a private profile", async () => {
-  const db = testDb({ injectedAgent: false }), dataDir = mkdtempSync(join(tmpdir(), "chrona-pi-runtime-"));
-  const command = join(dataDir, "fake-pi");
-  const keys = ["CHRONA_STEWARD_AGENT", "CHRONA_STEWARD_PI_COMMAND", "CHRONA_STEWARD_PI_AGENT_DIR", "CHRONA_STEWARD_PI_VERSION"] as const;
-  const previous = keys.map(key => process.env[key]);
+test("runtime exposes only the kernel origin and starts without application configuration", async () => {
+  const db = testDb({ injectedAgent: false }), dataDir = mkdtempSync(join(tmpdir(), "chrona-kernel-runtime-"));
+  const runtime = createStewardRuntime(db, { dataDir, port: 48130 });
   try {
-    process.env.CHRONA_STEWARD_AGENT = "pi"; process.env.CHRONA_STEWARD_PI_COMMAND = command;
-    for (const custom of [false, true]) {
-      const profile = join(dataDir, custom ? "explicit-profile" : "providers/pi"); mkdirSync(profile, { recursive: true, mode: 0o700 });
-      if (custom) process.env.CHRONA_STEWARD_PI_AGENT_DIR = profile; else delete process.env.CHRONA_STEWARD_PI_AGENT_DIR;
-      process.env.CHRONA_STEWARD_PI_VERSION = "0.85.0";
-      const runtime = createStewardRuntime(db, { dataDir, port: 48130 });
-      try {
-        expect(runtime.ports.provider?.name).toBe("registered");
-        expect(JSON.parse(runtime.ports.providerModules!.pi!.env.CHRONA_PROVIDER_CONFIGURATION)).toMatchObject({ command, ...(custom ? { agentDir: profile } : {}), expectedVersion: "0.85.0", agentUrl: "http://127.0.0.1:48130/api/steward-agent" });
-        if (!custom) expect(JSON.parse(runtime.ports.providerModules!.pi!.env.CHRONA_PROVIDER_CONFIGURATION).agentDir).toBeUndefined();
-        expect(await db.module.count()).toBe(0);
-      } finally { await runtime.stop(); }
-    }
-    process.env.CHRONA_STEWARD_PI_VERSION = "1.3.0";
-    const mismatch = createStewardRuntime(db, { dataDir, port: 48130 });
-    try { expect(JSON.parse(mismatch.ports.providerModules!.pi!.env.CHRONA_PROVIDER_CONFIGURATION).expectedVersion).toBe("1.3.0"); }
-    finally { await mismatch.stop(); }
-  } finally {
-    keys.forEach((key, i) => { if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i]; });
-    await db.$disconnect();
-    rmSync(dataDir, { recursive: true, force: true });
-  }
+    expect(runtime.ports.kernelUrl).toBe("http://127.0.0.1:48130");
+    expect(runtime.ports.moduleExternalResources).toBeUndefined();
+    expect(await db.module.count()).toBe(0);
+  } finally { await runtime.stop(); await db.$disconnect(); rmSync(dataDir, { recursive: true, force: true }); }
 });
 
 test("trusted host injection preserves Provider history through the lifecycle wrapper", async () => {
@@ -71,7 +51,6 @@ test("trusted host injection preserves Provider history through the lifecycle wr
     const input = { sessionDir: join(dataDir, "sessions", "fixture", ".chrona/sessions"), limit: 10 };
     expect(await runtime.ports.provider!.transcript!(input)).toEqual([{ kind: "text", at: "2026-11-07T00:00:00.000Z", text: "Retained conversation" }]);
     expect(selected).toEqual(input);
-    expect(runtime.ports.providerModules).toBeUndefined();
     expect(await db.module.count()).toBe(0);
   } finally { await runtime.stop(); await db.$disconnect(); rmSync(dataDir, { recursive: true, force: true }); }
 });
@@ -149,7 +128,7 @@ test("runtime data directory follows explicit setting then database directory", 
   expect(stewardDataDir({ DATABASE_URL: "file:/tmp/db/test.db" })).toBe("/tmp/db");
   expect(() => stewardDataDir({ DATABASE_URL: "file::memory:" })).toThrow();
 });
-// Fresh runtime initializes ordinary preinstall receipts; no builtin application is seeded.
+// A fresh runtime processes kernel work without seeding applications.
 test("runtime ticks every 30 seconds, wakes immediately and stops cleanly", async () => {
   const db = testDb({ injectedAgent: false });
   let interval = 0, cleared = false;

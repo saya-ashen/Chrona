@@ -5,9 +5,9 @@
   "type": "module",
   "dependencies": {
     "@chrona/contracts": "workspace:*",
-    "@chrona/pi": "workspace:*",
     "@chrona/process": "workspace:*",
     "@chrona/kernel": "workspace:*",
+    "@chrona/logging": "workspace:*",
     "@chrona/db": "workspace:*"
   },
   "exports": {

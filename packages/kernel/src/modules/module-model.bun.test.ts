@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { budgetTimezone, createSettings, kernelModuleModelSettingsSchema, kernelSettingsSchema, moduleModelSettings } from "../settings";
-import { testDb } from "../test-db";
+import { testDb } from "../__testing__/test-db";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });

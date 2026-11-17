@@ -8,13 +8,8 @@ on:
       - ".github/workflows/windows-release-smoke.yml"
       - ".env.example"
       - "apps/**"
-      - "build/**"
-      - "external-plugins/**"
-      - "features/**"
       - "packages/**"
-      - "prisma/**"
       - "scripts/**"
-      - "shared/**"
       - "bun.lock"
       - "package.json"
       - "prisma.config.ts"
@@ -50,7 +45,7 @@ jobs:
         uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
 
       - name: Verify native release helper and staged SDK
-        run: bun test scripts/build-binaries.bun.test.ts
+        run: bun test scripts/build/build-binaries.bun.test.ts
 
       - name: Build Windows binary
         run: bun scripts/chrona.ts build windows-x64

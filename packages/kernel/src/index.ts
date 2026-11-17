@@ -1,7 +1,7 @@
-export { createSecrets } from "./secrets";
+export { createSecrets } from "./secrets/secrets";
 // Stopped-service CLI maintenance uses the engine's checked export and bounded file reader.
 export { readBoundedFile } from "./workspace-files";
-export { completeOAuth, OAUTH_CALLBACK_PATH } from "./oauth";
+export { completeOAuth, OAUTH_CALLBACK_PATH } from "./secrets/oauth";
 export { createRegisteredProviderClient, stopAgentRuns, createStewardService, createTools, StewardError, CallError } from "./api";
 export { moduleSupervisor } from "./modules/module-supervisor";
 export { createModuleChannel } from "./modules/module-channel";
@@ -18,6 +18,6 @@ export { callSync, enqueueCall } from "./modules/module-calls";
 export type { StewardPorts, StewardService, ApprovedAction, OnApproved } from "./api";
 
 export { createExecutionDelivery } from "./execution/execution-delivery";
-export { kernelExecutionCleanup } from "./kernel-execution-tools";
+export { kernelExecutionCleanup } from "./execution/kernel-execution-tools";
 export { fenceExecutionModule } from "./execution/execution-delivery-controls";
 export { deliverExecutionApplication, assertExecutionReceiver } from "./execution/execution-delivery-carrier";

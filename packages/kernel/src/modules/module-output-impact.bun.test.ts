@@ -19,7 +19,7 @@ async function fixture(tools = [tool()]) {
   const root = mkdtempSync(join(tmpdir(), "chrona-impact-test-"));
   cleanups.push(async () => rmSync(root, { recursive: true, force: true }));
   const databaseUrl = `file:${join(root, "test.db")}`;
-  ensureSqliteDatabase({ databaseUrl, migrationsDir: resolve(import.meta.dirname, "../../../../prisma/migrations") });
+  ensureSqliteDatabase({ databaseUrl, migrationsDir: resolve(import.meta.dirname, "../../../../packages/db/prisma/migrations") });
   const db = new PrismaClient({ adapter: new PrismaBunSqlite({ url: databaseUrl }) });
   cleanups.push(() => db.$disconnect());
   const workspace = await db.workspace.create({ data: { name: "contract impacts" } });

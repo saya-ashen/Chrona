@@ -21,7 +21,7 @@
   };
 in {
   options.services.chrona = {
-    enable = lib.mkEnableOption "Chrona local AI task server";
+    enable = lib.mkEnableOption "Chrona kernel runtime";
 
     package = lib.mkOption {
       type = lib.types.package;
@@ -64,7 +64,7 @@ in {
       type = (pkgs.formats.json {}).type;
       default = {};
       example = {
-        experimental.dashboardAiSummary = true;
+        server.allowedOrigins = ["https://chrona.example.com"];
       };
       description = "Chrona config.json contents. Do not place secrets here because the Nix store is world-readable.";
     };
@@ -102,7 +102,7 @@ in {
 
     systemd.user.services.chrona = lib.mkIf pkgs.stdenv.isLinux {
       Unit = {
-        Description = "Chrona local AI task server";
+        Description = "Chrona kernel runtime";
         After = ["network.target"];
       };
       Service = {

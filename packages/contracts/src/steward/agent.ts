@@ -3,7 +3,7 @@ import { routedTargetSchema } from "./kernel-api";
 import { runtimeStartSchema, runtimeOperationSchema, runtimeOutcomeSchema, runtimeHealthSchema, runtimeCompletionSchema, runtimeTranscriptSchema } from "./local-runtime";
 import { executionIdSchema } from "./execution";
 
-/** Pi's thinking levels (`pi --thinking`). */
+/** Requested reasoning effort; each Provider validates the levels it supports. */
 export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
 export const hardLimitsSchema = z.object({ maxCallsPerEvent: z.number().int().positive(), maxOutputTokens: z.number().int().positive().max(32_000), eventTimeoutMs: z.number().int().positive().max(600_000) }).strict();
 export type HardLimits = z.infer<typeof hardLimitsSchema>;

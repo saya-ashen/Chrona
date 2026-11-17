@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { appendRunEventIn, retainedToolOutput } from "./run-events";
-import { testDb } from "../test-db";
+import { testDb } from "../__testing__/test-db";
 
 let db: ReturnType<typeof testDb> | undefined;
 afterEach(async () => { await db?.$disconnect(); db = undefined; });

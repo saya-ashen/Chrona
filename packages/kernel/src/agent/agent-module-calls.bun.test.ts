@@ -2,8 +2,7 @@ import { expect, test } from "bun:test";
 import { join } from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
-import { agentFixture as fixture } from "../../../../scripts/agent-integration/agent-application.fixtures";
-import { eventually } from "../../../../scripts/agent-integration/registered-run.fixtures";
+import { agentContextFixture as fixture } from "../__testing__/agent-context.fixture";
 import { assertExecutionModuleIdle } from "../execution/execution-module-guard";
 import { callSync, kernelOrigin } from "../modules/module-calls";
 import { createRuns, liveRuns } from "../execution/runs";
@@ -34,7 +33,7 @@ test("SDK Agent contexts preserve ownership, selected tools, scoped reads, inter
     f.ports.onQueued = () => new Promise<void>(() => {});
     const consumer = await install(f, "context-consumer", relaySource);
     const relay = async (tool: string, args: unknown, key = tool): Promise<unknown> => (await callSync(f.ports, owner(f), "context-consumer.relay", { tool, args: JSON.stringify(args), key })).output;
-    const request = { providerId: "pi", prompt: "Module-owned explicit prompt", lane: "background" };
+    const request = { providerId: "fixture-provider", prompt: "Module-owned explicit prompt", lane: "background" };
     expect(await relay("run", { ...request, cwd: "/host" }, "forged-path")).toMatchObject({ error: "invalid" });
     const first = (await relay("run", request, "first")) as { runId: string; contextId: string };
     expect(first).toMatchObject({ status: "queued", active: true });
@@ -83,17 +82,6 @@ test("SDK Agent contexts preserve ownership, selected tools, scoped reads, inter
     expect(await relay("write", write, "live-write")).toEqual({ accepted: true });
     expect(await relay("write", { ...write, input: { kind: "message", text: "changed" } }, "live-write")).toMatchObject({ error: "conflict" });
     for (let i = 0; i < 2; i++) await f.ports.db.$transaction(tx => appendRunEventIn(tx, running.runId, "progress", { type: "progress", value: { phase: "working" } }, f.ports.now()));
-    const logDir = join(claimed.cwd, ".chrona", "sessions");
-    await mkdir(logDir, { recursive: true });
-    await writeFile(join(logDir, "fixture.jsonl"), [
-      { type: "message", timestamp: "2026-11-07T00:00:00Z", message: { role: "user", content: "private user prompt" } },
-      { type: "message", timestamp: "2026-11-07T00:00:01Z", message: { role: "assistant", content: [{ type: "thinking", text: "private reasoning" }, { type: "text", text: "Visible model reply" }] } },
-    ].map(row => JSON.stringify(row)).join("\n"));
-    const textPage = (await relay("read", activeTarget)) as Read;
-    const userRecord = { type: "message", timestamp: "2026-11-07T00:00:00Z", message: { role: "user", content: "private user prompt" } };
-    const offset = Buffer.byteLength(JSON.stringify(userRecord) + "\n");
-    expect(textPage.transcript).toEqual([{ id: `fixture.jsonl:${offset}:0`, at: "2026-11-07T00:00:01Z", kind: "text", text: "Visible model reply" }]);
-    for (const privateText of [f.ports.dataDir, "private reasoning", "private user prompt"]) expect(JSON.stringify(textPage)).not.toContain(privateText);
     let questionReady!: (id: string) => void;
     const ready = new Promise<string>(resolve => { questionReady = resolve; });
     const channel = createProviderChannel(f.ports, claimed, async request => { questionReady(request.id); });
@@ -131,42 +119,3 @@ test("SDK Agent contexts preserve ownership, selected tools, scoped reads, inter
     expect(await f.ports.db.run.count({ where: { sessionId: first.contextId } })).toBe(4);
   } finally { liveRuns.clear(); await f.close(); }
 }, 45000);
-
-for (const readOnly of [false, true]) test(`SDK completion preserves event budgets and private content (readOnly=${readOnly})`, async () => {
-  const f = await fixture();
-  try {
-    await f.ports.db.run.update({ where: { id: f.input.runId }, data: { status: "cancelled", stopStatus: "confirmed" } });
-    await f.ports.db.workspace.update({ where: { id: f.workspaceId }, data: { settings: { moduleModel: { maxCallsPerEvent: 1, maxOutputTokens: 100, dailyCalls: 10, eventTimeoutMs: 10000 } } } });
-    await callSync(f.ports, owner(f), "pi.configure", { config: { model: "fake/fast" } });
-    const source = `import {chrona,on} from 'chrona';on('tool',async event=>{
-const args={providerId:'pi',kind:'completion',prompt:'private SDK prompt',providerOptions:{maxOutputTokens:100}};
-const key=event.id+':'+event.firedAt;
-const started=await chrona.call('agent.run',args,{key});
-const replay=await chrona.call('agent.run',args,{key});
-if(replay.runId!==started.runId)throw new Error('Run receipt changed');
-let page;const deadline=Date.now()+10000;do{page=await chrona.call('agent.read',{runId:started.runId,waitMs:100});}while(!page.ended&&Date.now()<deadline);
-if(!page.ended)throw new Error('completion remains unconfirmed');
-let second;try{await chrona.call('agent.run',{...args,prompt:'second private SDK prompt'},{key:key+':second'});}catch(e){second={code:e.code,message:e.message};}
-return {result:{first:page.items.find(item=>item.kind==='completion')?.payload,second}};});`;
-    const consumer = await install(f, "sdk-model-consumer", source, ["exercise"], undefined, readOnly);
-    const result = callSync(f.ports, owner(f), "sdk-model-consumer.exercise", {});
-    void result.catch(() => {});
-    const queued = await eventually(() => f.ports.db.run.findFirst({ where: { workspaceId: f.workspaceId, status: "queued" } }), value => !!value);
-    const runs = createRuns(f.ports, f.workspaceId), claimed = (await runs.claimNext("background"))!;
-    expect(claimed.id).toBe(queued!.id);
-    const handle = await startLocalProvider(f.ports, f.workspaceId, { ...f.input, runId: claimed.id, token: claimed.token, cwd: claimed.cwd, lane: "background", deadline: claimed.deadlineAt });
-    await runs.finish(claimed.id, await handle.done, { stopEvidence: "provider_exited" });
-    expect((await result).output).toMatchObject({ first: { text: "fixture completion", inputTokens: 3, outputTokens: 4 }, second: { code: "failed", message: expect.stringContaining("budget_exceeded: module model call") } });
-    const calls = await f.ports.db.moduleCall.findMany({ where: { method: "model" }, orderBy: { createdAt: "asc" } });
-    // Failed admission rolls its reservation back; the original event cannot buy a second Run.
-    expect(calls.map(row => [row.moduleId, row.hash, row.status])).toEqual([[consumer.module.id, consumer.hash, "executed"]]);
-    expect(calls.every(row => row.moduleRunId && row.eventKey)).toBe(true);
-    if (readOnly) expect(await f.ports.db.moduleRun.findMany({ where: { moduleId: consumer.module.id } })).toEqual([
-      expect.objectContaining({ id: calls[0]!.moduleRunId, exitCode: 0, output: null }),
-    ]);
-    expect(await f.ports.db.run.count({ where: { session: { moduleId: consumer.module.id } } })).toBe(1);
-    expect(await f.ports.db.providerLaunch.count()).toBe(1);
-    const logs = JSON.stringify({ invocations: await f.ports.db.moduleInvocation.findMany({ where: { target: { in: ["agent", "pi", "runtime-callback"] } } }), audits: await f.ports.db.audit.findMany(), calls });
-    for (const privateText of ["private SDK prompt", "fixture completion", claimed.token]) expect(logs).not.toContain(privateText);
-  } finally { await f.close(); }
-}, 30000);

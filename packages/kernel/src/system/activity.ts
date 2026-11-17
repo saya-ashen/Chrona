@@ -5,7 +5,7 @@ import { publicSystemTools, consumerInput, ackInput, withdrawalsInput } from "./
 import { z } from "zod";
 import { CallError, type Caller, type SystemModule } from "../modules/module-calls";
 import type { StewardPorts } from "../ports";
-import { runtimeHealth } from "../runtime-health";
+import { runtimeHealth } from "../runtime/runtime-health";
 import { createProviderControl } from "../agent/provider-channel";
 import { activityRecords } from "../activity";
 import { acknowledgeKernelFacts, factConsumer, readKernelFacts, selectFactConsumer, withdrawnKernelKeys } from "../notification-facts";

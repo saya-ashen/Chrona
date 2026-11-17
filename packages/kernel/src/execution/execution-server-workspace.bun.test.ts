@@ -7,7 +7,7 @@ import { moduleManifestSchema, type ExecutionPrincipal, type ExecutionStartV2 } 
 import type { PreparedServerWorkspace, ServerWorkspaceRequest, StewardPorts } from "../ports";
 import { localDirectoryIdentity, prepareLockedLocalWorkspace } from "@chrona/git-workspaces";
 import { createServerWorkspacePreparer } from "../../../../apps/server/src/execution-server-workspace";
-import { testDb } from "../test-db";
+import { testDb } from "../__testing__/test-db";
 import { createExecutionV2Admission } from "./execution-admission";
 import { createExecutionEventStore } from "./execution-event-store";
 import { createExecutions } from "./execution";

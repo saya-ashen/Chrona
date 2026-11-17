@@ -12,7 +12,7 @@ import { handleModuleCall } from "./modules/module-effects";
 import { createModules } from "./modules/modules";
 import { completeApprovedOperationsIn } from "./modules/module-operation-result";
 import { moduleSupervisor } from "./modules/module-supervisor";
-import { registerSystemModules } from "./system-modules";
+import { registerSystemModules } from "./system/system-modules";
 import type { StewardPorts } from "./ports";
 
 const cleanup: (() => Promise<unknown> | void)[] = [];
@@ -21,7 +21,7 @@ async function fixture() {
   registerSystemModules();
   const dataDir = await mkdtemp(join(tmpdir(), "chrona-api-receipts-"));
   const databaseUrl = `file:${join(dataDir, "test.db")}`;
-  ensureSqliteDatabase({ databaseUrl, migrationsDir: resolve(import.meta.dirname, "../../../prisma/migrations") });
+  ensureSqliteDatabase({ databaseUrl, migrationsDir: resolve(import.meta.dirname, "../../../packages/db/prisma/migrations") });
   const connect = () => new PrismaClient({ adapter: new PrismaBunSqlite({ url: databaseUrl }) });
   const ports: StewardPorts = { db: connect(), dataDir, publicUrl: null, now: () => new Date("2026-11-10T12:00:00Z") };
   cleanup.push(async () => {

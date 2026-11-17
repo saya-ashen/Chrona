@@ -7,9 +7,9 @@ import { registerAgentProvider } from "../agent/agent-provider";
 import { startLocalProvider } from "./local-runtime";
 import { createRuns } from "./runs";
 import { callSync, kernelOrigin } from "../modules/module-calls";
-import { testModuleProcess } from "../modules/module-test-process";
+import { testModuleProcess } from "../__testing__/module-test-process";
 import { moduleSupervisor } from "../modules/module-supervisor";
-import { testDb } from "../test-db";
+import { testDb } from "../__testing__/test-db";
 import type { StewardPorts } from "../ports";
 import "../modules/module-effects";
 
@@ -41,7 +41,7 @@ test.each([
     await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest, source: "user", status: "approved", intent: {}, report: {} } });
     const caller = { kind: "module" as const, module: module.name, moduleId: module.id, hash: "v1" };
     await registerAgentProvider(ports, workspaceId, caller, declaration);
-    const sessionId = (await db.session.create({ data: { workspaceId, key: "web:deadline", source: "web" } })).id;
+    const sessionId = (await db.session.create({ data: { workspaceId, key: "web:deadline", source: "owner" } })).id;
     const runs = createRuns(ports, workspaceId);
     await runs.enqueue({ sessionId, lane: "foreground", trigger: "message", prompt: "Work" });
     const run = (await runs.claimNext("foreground"))!;

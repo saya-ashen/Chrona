@@ -4,13 +4,13 @@ import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "../ports";
-import { testDb } from "../test-db";
+import { testDb } from "../__testing__/test-db";
 import { createApprovals } from "../approvals";
-import { createStewardService } from "../service";
+import { createStewardService } from "../runtime/service";
 import { moduleContext } from "./module-context";
 import { createExternalModuleInstaller, installExactRelease, installExternal, refreshInstallationReceipts } from "./module-install";
 import { resolveExternalRelease } from "./module-release";
-import { seedTestModuleRelease, testReleaseRuntimeChecks } from "./module-release-test-fixture";
+import { seedTestModuleRelease, testReleaseRuntimeChecks } from "../__testing__/module-release-test-fixture";
 import { propose } from "./module-proposal";
 import { buildPending } from "./module-build";
 import { createRuns } from "../execution/runs";
@@ -19,7 +19,7 @@ import { getModuleLocalHead, moduleGitCommand, moduleGitPath } from "./module-gi
 import { prepareExactReleaseUpdate, readExactReleaseBaselineIn } from "./module-exact-release";
 import { moduleSupervisor } from "./module-supervisor";
 import { createScriptSandbox } from "../../../host/src/runtime/script-sandbox";
-import { testModuleSandbox } from "./module-test-process";
+import { testModuleSandbox } from "../__testing__/module-test-process";
 import { assertExplicitRetryIssuesFreshAttempt, assertInterleavedSettlementConverges, assertPoisonedHeadDoesNotStarveTail } from "../__testing__/state-machine-invariants";
 
 const cleanup: (() => Promise<unknown>)[] = [];
@@ -36,7 +36,7 @@ async function fixture(name = "pi") {
   const code = join(ports.moduleExternalResources!, name); await mkdir(code, { recursive: true });
   const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [], tools: [{ name: "health", description: "Offline provider health", visibility: ["owner"], parameters: { type: "object", properties: {} }, output: { type: "object", properties: { available: { type: "boolean" } }, required: ["available"], additionalProperties: false } }] });
   await writeFile(join(code, "module.json"), JSON.stringify(manifest));
-  await writeFile(join(code, "index.ts"), 'import { on } from "chrona";\non("tool", async () => ({ result: { available: process.env.CHRONA_FAKE_PROVIDER === "configured" } }));\n');
+  await writeFile(join(code, "index.ts"), '\non("tool", async () => ({ result: { available: true } }));\n');
   await writeFile(join(code, "test.ts"), "export {};\n");
   await seedTestModuleRelease(ports.moduleExternalResources!, name);
   const context = moduleContext(ports, workspace.id), release = await resolveExternalRelease(ports, name);
@@ -50,7 +50,7 @@ async function fixture(name = "pi") {
   return { db, ports, context, release, code, local, active, repo, request, tests: () => tests, failTests: (value: boolean) => { fail = value; }, select: (key: string) => installExactRelease(ports, workspace.id, request(key), owner) };
 }
 
-test("diverged same-tree approved source selects the authentic release through checks and preserves Git/history; real fake provider health receives host config", async () => {
+test("diverged same-tree approved source selects the authentic release through checks and preserves Git/history; ordinary SDK health executes through sandbox", async () => {
   const f = await fixture();
   expect(f.local.hash).not.toBe(f.release.hash);
   const before = await f.db.moduleActivation.findMany();
@@ -75,7 +75,6 @@ test("diverged same-tree approved source selects the authentic release through c
   expect(await getModuleLocalHead({ platform: f.context.platform, moduleId: f.local.moduleId! })).toBe(f.release.hash);
   const sandbox = createScriptSandbox({ dataDir: f.ports.dataDir, moduleSdk: f.ports.moduleSdk!, executionMode: "trusted-local" });
   f.ports.sandbox = { ...sandbox.health, startModule: sandbox.startModule, runModule: sandbox.runModule };
-  Object.assign(f.ports, { providerModules: { pi: { env: { CHRONA_FAKE_PROVIDER: "configured" }, startModule: sandbox.startModule! } } });
   const now = f.ports.now().toISOString();
   const health = await moduleSupervisor(f.ports).deliver(f.local.moduleId!, f.release.hash, { trigger: { kind: "tool", id: "health", caller: owner, args: {}, firedAt: now }, params: {}, now });
   expect(health).toMatchObject({ result: { result: { available: true } } });

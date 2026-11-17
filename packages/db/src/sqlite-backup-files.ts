@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { Database } from "bun:sqlite";
 import { ensurePrivateDirectory, secureGeneratedPrivateFile } from "./sqlite-url";
 
-export const backupDataRoots = ["platform", "sessions", "secrets", "qq-bot"] as const;
+export const backupDataRoots = ["platform", "sessions", "secrets"] as const;
 
 // Installed module dependencies are reproducible, and may contain package-manager symlinks.
 const installedDirs = ["node_modules", ".venv", ".chrona"];
@@ -16,14 +16,14 @@ function isReproducibleDirectory(parts: string[]): boolean {
 }
 
 // Links and special files cannot be archived. In platform and sessions they point outside the data or are recreated
-// (gcroots, content/chat, package-manager bins), so they are left out and listed; in secrets and qq-bot they refuse.
+// (gcroots and package-manager bins), so they are left out and listed; credential roots refuse them.
 function assertRegularTree(dataDir: string, path: string, files: string[], omitted: string[]): void {
   const stat = lstatSync(join(dataDir, path));
   const parts = path.split("/");
   if (stat.isDirectory() && isReproducibleDirectory(parts)) return;
   if (!stat.isDirectory() && !stat.isFile()) {
     if (parts[0] === "platform" || parts[0] === "sessions") { omitted.push(path); return; }
-    throw new Error("Backup refuses symlinks and special files in secrets or qq-bot.");
+    throw new Error("Backup refuses symlinks and special files in secrets.");
   }
   files.push(path);
   if (stat.isDirectory()) for (const name of readdirSync(join(dataDir, path))) assertRegularTree(dataDir, `${path}/${name}`, files, omitted);

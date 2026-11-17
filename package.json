@@ -2,7 +2,7 @@
   "name": "@chrona-org/cli",
   "version": "0.3.1",
   "private": true,
-  "description": "Chrona \u2014 local AI work executor for governed planning, scheduling, recovery, and results",
+  "description": "Chrona kernel, host, CLI and application SDK",
   "license": "MIT",
   "type": "module",
   "repository": {
@@ -20,36 +20,31 @@
     "bun": ">=1.4.2"
   },
   "scripts": {
-    "dev": "bun run applications:restore && bun --watch apps/server/src/index.bun.ts",
-    "server:start": "bun run applications:restore && bun run apps/server/src/index.bun.ts",
+    "dev": "bun --watch apps/cli/src/run.ts",
+    "server:start": "bun run apps/cli/src/run.ts",
     "build": "bun scripts/chrona.ts build",
     "start": "bun run server:start",
-    "typecheck": "bun run applications:restore && bunx tsc --noEmit --pretty false",
-    "typecheck:app": "bun run applications:restore && bunx tsc --noEmit --pretty false",
+    "typecheck": "bunx tsc --noEmit --pretty false",
     "lint": "bun run lint:ratchet",
-    "lint:warn": "bun run applications:restore && eslint .",
+    "lint:warn": "eslint .",
     "lint:ratchet": "bun run scripts/lint-ratchet.ts",
     "smoke:entrypoints": "bun run scripts/smoke-entrypoints.ts",
     "test": "bun scripts/chrona.ts test all",
     "test:api": "bun run scripts/run-api-tests.ts",
     "test:bun": "bun run scripts/run-bun-tests.ts",
     "db:generate": "prisma generate",
-    "postinstall": "bun run applications:install && prisma generate && bun run scripts/install-git-hooks.ts",
-    "setup": "bun run db:generate && bun run db:seed",
-    "db:seed": "bun prisma/seed.ts",
+    "postinstall": "prisma generate && bun run scripts/install-git-hooks.ts",
     "check:boundaries": "bun scripts/chrona.ts check boundaries",
     "check:guardrails": "bun run scripts/check-guardrails.ts",
     "verify:slice": "bun run scripts/verify-slice.ts",
-    "verify:release": "bun run scripts/verify-release.ts",
+    "verify:release": "bun run scripts/build/verify-release.ts",
     "deployment:preflight": "bun scripts/deployment-controls.ts preflight",
     "deployment:backup": "bun scripts/deployment-controls.ts backup",
     "deployment:accept": "bun scripts/deployment-controls.ts accept",
     "ci:local": "bun run scripts/local-ci.ts",
     "hooks:install": "bun run scripts/install-git-hooks.ts",
     "build:smoke": "bun scripts/chrona.ts build smoke",
-    "audit:security": "bun run scripts/audit-security.ts",
-    "applications:restore": "bun scripts/restore-applications.ts",
-    "applications:install": "bun scripts/install-application-dependencies.ts"
+    "audit:security": "bun run scripts/audit-security.ts"
   },
   "dependencies": {
     "@prisma/client": "7.9.1",
@@ -68,41 +63,19 @@
     "knip": "^6.32.0",
     "lefthook": "^2.1.10",
     "prisma": "7.9.1",
-    "puppeteer-core": "25.3.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.66.0"
   },
   "overrides": {
-    "@grpc/grpc-js": "1.14.5",
-    "@modelcontextprotocol/sdk": "1.32.1",
-    "@xmldom/xmldom": "0.8.15",
-    "adm-zip": "0.6.1",
     "brace-expansion": "5.0.12",
-    "browserslist": "4.28.7",
     "deepmerge-ts": "8.0.0",
     "fast-uri": "3.1.7",
-    "fast-xml-parser": "5.10.1",
-    "ip-address": "10.4.0",
-    "js-yaml": "4.3.2",
-    "mysql2": "3.22.0",
-    "nanoid": "5.1.16",
-    "postcss": "8.5.26",
-    "proxy-addr": "2.0.8",
-    "sharp": "0.35.5",
-    "source-map-js": "1.2.2",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "undici": "7.29.1"
+    "mysql2": "3.22.0"
   },
-  "ignoreScripts": [
-    "sharp",
-    "unrs-resolver"
-  ],
+  "ignoreScripts": [],
   "trustedDependencies": [
     "@prisma/engines",
-    "esbuild",
-    "prisma",
-    "sharp",
-    "unrs-resolver"
+    "prisma"
   ],
   "workspaces": [
     "apps/*",

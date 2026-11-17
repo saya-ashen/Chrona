@@ -13,7 +13,7 @@
     && cfg.settings.security.apiKey != null;
 in {
   options.services.chrona = {
-    enable = lib.mkEnableOption "Chrona local AI task server";
+    enable = lib.mkEnableOption "Chrona kernel runtime";
 
     package = lib.mkOption {
       type = lib.types.package;
@@ -75,7 +75,6 @@ in {
       default = {};
       example = {
         server.allowedOrigins = ["https://chrona.example.com"];
-        experimental.dashboardAiSummary = true;
       };
       description = "Chrona config.json contents. Do not place secrets here because the Nix store is world-readable.";
     };
@@ -119,7 +118,7 @@ in {
     networking.firewall.allowedTCPPorts = lib.optionals cfg.openFirewall [cfg.port];
 
     systemd.services.chrona = {
-      description = "Chrona local AI task server";
+      description = "Chrona kernel runtime";
       preStart = ''
         install -d -m 0700 ${lib.escapeShellArg (toString cfg.dataDir)} ${lib.escapeShellArg (toString cfg.configDir)}
       '';

@@ -6,8 +6,8 @@
     "./routes": "./src/routes/api.ts"
   },
   "scripts": {
-    "dev": "bun --watch src/index.bun.ts",
-    "start": "bun run src/index.bun.ts"
+    "dev": "bun --watch ../cli/src/run.ts",
+    "start": "bun run ../cli/src/run.ts"
   },
   "dependencies": {
     "@chrona/git-workspaces": "workspace:*",
@@ -15,6 +15,8 @@
     "@chrona/db": "workspace:*",
     "@chrona/host": "workspace:*",
     "@chrona/logging": "workspace:*",
-    "@chrona/kernel": "workspace:*"
+    "@chrona/kernel": "workspace:*",
+    "@chrona/runtime-config": "workspace:*",
+    "pino": "^10.3.1"
   }
 }

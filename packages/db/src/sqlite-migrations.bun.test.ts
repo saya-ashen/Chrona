@@ -21,7 +21,7 @@ function fixture() {
   const initial = join(migrationsDir, "0001_initial");
   mkdirSync(initial, { recursive: true });
   const sqlPath = join(initial, "migration.sql");
-  copyFileSync(resolve("prisma/migrations/0001_initial/migration.sql"), sqlPath);
+  copyFileSync(resolve("packages/db/prisma/migrations/0001_initial/migration.sql"), sqlPath);
   const databasePath = join(root, "test.db");
   return { migrationsDir, databasePath, databaseUrl: `file:${databasePath}`, sqlPath };
 }
@@ -55,7 +55,7 @@ describe("clean steward SQLite baseline", () => {
   });
 
   test("fresh database with all migrations has a nullable module schema and no connector tables (v2-8)", () => {
-    const options = { ...fixture(), migrationsDir: resolve("prisma/migrations") };
+    const options = { ...fixture(), migrationsDir: resolve("packages/db/prisma/migrations") };
     ensureSqliteDatabase(options);
     inspect(options.databasePath, db => {
       expect(db.query('PRAGMA table_info("Module")').all()).toContainEqual(expect.objectContaining({ name: "dataSchema", type: "INTEGER", notnull: 0, dflt_value: null }));

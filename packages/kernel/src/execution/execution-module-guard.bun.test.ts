@@ -9,7 +9,7 @@ import { registerAgentProvider, type ProviderBinding } from "../agent/agent-prov
 import { assertExecutionModuleIdle } from "./execution-module-guard";
 import type { StewardPorts } from "../ports";
 import { createRuns } from "./runs";
-import { testDb } from "../test-db";
+import { testDb } from "../__testing__/test-db";
 
 const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await close(); });

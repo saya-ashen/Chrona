@@ -1,12 +1,14 @@
 import { defineConfig } from "prisma/config";
+import { applyChronaRuntimeConfigToEnv, chronaDatabaseUrl } from "./packages/runtime-config/src/runtime-config";
+
+applyChronaRuntimeConfigToEnv(process.env);
 
 export default defineConfig({
-  schema: "prisma/schema.prisma",
+  schema: "packages/db/prisma/schema.prisma",
   migrations: {
-    path: "prisma/migrations",
-    seed: "bun prisma/seed.ts",
+    path: "packages/db/prisma/migrations",
   },
   datasource: {
-    url: process.env.DATABASE_URL ?? "file:./prisma/dev.db",
+    url: chronaDatabaseUrl(),
   },
 });

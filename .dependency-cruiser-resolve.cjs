@@ -1,11 +1,7 @@
 const { resolve } = require("node:path");
 const TsconfigPathsPlugin = require("tsconfig-paths-webpack-plugin");
 
-/**
- * The Agent's generated file: closure has no node_modules until installation.
- * Resolve each declared local dependency as an installed package, including its
- * public exports, before applying the host workspace's TypeScript aliases.
- */
+// Resolve declared local package exports before workspace TypeScript aliases.
 class LocalFileDependenciesPlugin {
   apply(resolver) {
     const target = resolver.ensureHook("undescribedResolveInPackage");

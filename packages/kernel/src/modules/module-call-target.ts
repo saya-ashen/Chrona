@@ -5,7 +5,6 @@ import type { Caller, RoutedTool } from "./module-call-types";
 import type { SystemModule } from "./module-system-types";
 import { CallError } from "./module-call-error";
 import { admitted } from "./module-call-admission";
-import { isModulePaused, ModuleUnavailableError } from "./module-availability";
 import { injectedModules, localModules, systemModules } from "./module-registry";
 
 type Db = StewardPorts["db"] | Prisma.TransactionClient;
@@ -89,7 +88,7 @@ async function resolveReleaseTarget(db: Db, workspaceId: string, target: string,
 }
 export async function resolveTarget(db: Db, workspaceId: string, target: string): Promise<Target | CallError> {
   const name = splitTarget(target);
-  if (isModulePaused(name.module)) return new ModuleUnavailableError(name.module);
+
   const release = await resolveReleaseTarget(db, workspaceId, target, name);
   if (release) return release;
   const module = await db.module.findFirst({ where: { workspaceId, name: name.module } });

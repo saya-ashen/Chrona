@@ -1,17 +1,16 @@
 import { spawnSync, type SpawnSyncOptionsWithStringEncoding } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { Database } from "bun:sqlite";
 
 import { checksumSql } from "@chrona/db/sqlite-migrations";
 import { PrismaClient } from "@chrona/db/generated/prisma/client";
 import { createBunSqliteAdapter } from "prisma-adapter-bun-sqlite";
 import { externalPackageCatalog } from "@chrona/kernel/catalog";
-import { fileURLToPath } from "node:url";
 import { inspectSqliteRuntimeLock, quarantineStaleSqliteRuntimeLock } from "@chrona/db/sqlite-runtime-lock";
 import { assertPrivateStoragePath, sqlitePathFromFileUrl } from "@chrona/db/sqlite-url";
 import { isIP } from "node:net";
-import { findResourceDir, getChronaConfigDir, getChronaDataDir } from "./start-server.js";
+import { findResourceDir, getChronaConfigDir, getChronaDataDir, resolveMigrationsDir } from "./start-server.js";
 
 // Exact local endpoint classification, preserved from the retired provider helper.
 function isExactLoopbackHost(host: string): boolean {
@@ -21,7 +20,7 @@ function isExactLoopbackHost(host: string): boolean {
 }
 
 export type ChronaDoctorCheck = {
-  key: "git" | "executionMode" | "database" | "databaseIntegrity" | "migrationHistory" | "providerPi" | "externalApps" | "dataDirectoryPermissions" | "databasePermissions" | "databaseArtifactsPermissions" | "configDirectoryPermissions" | "configPermissions" | "runtimeLock" | "backupRestore" | "networkBind" | "apiProtection";
+  key: "git" | "executionMode" | "database" | "databaseIntegrity" | "migrationHistory" | "externalApps" | "dataDirectoryPermissions" | "databasePermissions" | "databaseArtifactsPermissions" | "configDirectoryPermissions" | "configPermissions" | "runtimeLock" | "backupRestore" | "networkBind" | "apiProtection";
   status: "ok" | "warning" | "error";
   message: string;
 };
@@ -93,23 +92,8 @@ function executionModeCheck(): ChronaDoctorCheck {
   return { key: "executionMode", status: "ok", message: "Execution mode is trusted-local. Modules and Provider run with host user permissions, without OS isolation or a hard virtual-memory limit." };
 }
 
-function providerPiCheck(): ChronaDoctorCheck[] {
-  // Pi is the ordinary Provider configured by apps/server/src/steward-runtime.ts.
-  if (process.env.CHRONA_STEWARD_AGENT && process.env.CHRONA_STEWARD_AGENT !== "pi") return [];
-  const key = "providerPi";
-  const checks: ChronaDoctorCheck[] = [];
-  const command = process.env.CHRONA_STEWARD_PI_COMMAND ?? "";
-  if (!isAbsolute(command)) checks.push({ key, status: "error", message: "Configure CHRONA_STEWARD_PI_COMMAND as an absolute Pi executable path." });
-  const version = process.env.CHRONA_STEWARD_PI_VERSION ?? "0.85.0";
-  // Synchronous equivalent of packages/pi/src/pi-completion.ts TOKEN_LIMIT_PI_VERSIONS.
-  const verified = ["1.5.0", "1.5.2"];
-  if (!verified.includes(version)) checks.push({ key, status: "warning", message: `Pi completion requires CHRONA_STEWARD_PI_VERSION in ${verified.join(", ")} (configured ${version}); agent runs work, but bounded model calls by apps are unavailable.` });
-  if (!checks.length) checks.push({ key, status: "ok", message: `Pi ${version} is configured with an absolute command path and supports bounded model calls.` });
-  return checks;
-}
-
 function bundledMigrations() {
-  const directory = process.env.CHRONA_MIGRATIONS_DIR ?? join(findResourceDir(), "prisma", "migrations");
+  const directory = process.env.CHRONA_MIGRATIONS_DIR ?? resolveMigrationsDir(findResourceDir());
   const migrations = readdirSync(directory, { withFileTypes: true })
     .filter(entry => entry.isDirectory())
     .map(entry => ({ name: entry.name, checksum: checksumSql(readFileSync(join(directory, entry.name, "migration.sql"), "utf8")) }))
@@ -146,7 +130,7 @@ function migrationHistoryCheck(databasePath: string): ChronaDoctorCheck {
 export function inspectLocalChrona(): ChronaDoctorCheck[] {
   const git = spawnSync("git", ["--version"], { encoding: "utf8", timeout: 5_000, maxBuffer: 4096, windowsHide: true });
   const gitAvailable = git.status === 0 && /^git version /m.test(git.stdout);
-  const checks: ChronaDoctorCheck[] = [{ key: "git", status: gitAvailable ? "ok" : "error", message: gitAvailable ? "Git is available for module source repositories." : "Git is required for module source repositories. Install Git and make it available on the Chrona process PATH, then rerun chrona doctor." }, executionModeCheck(), ...providerPiCheck()];
+  const checks: ChronaDoctorCheck[] = [{ key: "git", status: gitAvailable ? "ok" : "error", message: gitAvailable ? "Git is available for module source repositories." : "Git is required for module source repositories. Install Git and make it available on the Chrona process PATH, then rerun chrona doctor." }, executionModeCheck()];
   const databaseUrl = configuredDatabaseUrl();
   const sqlitePath = sqlitePathFromFileUrl(databaseUrl);
   if (!sqlitePath || sqlitePath === ":memory:") {
@@ -185,7 +169,7 @@ function externalResources(): string {
   // Same resolution as integrations/steward/module-runtime.ts resourcePath, without its runtime imports.
   const adjacent = join(dirname(process.execPath), "resources");
   const root = process.env.CHRONA_RESOURCE_DIR || (existsSync(adjacent) ? adjacent : null);
-  return root ? join(root, "external") : fileURLToPath(new URL("../../../.generated/applications", import.meta.url));
+  return process.env.CHRONA_MODULE_RESOURCES ?? (root ? join(root, "external") : "");
 }
 
 function bundledReleaseMessage(name: string, moduleId: string, releaseHash: string, activeHash: string): string | undefined {
@@ -215,7 +199,7 @@ function rejectedUpdateMessage(
 }
 
 async function externalAppMessages(db: PrismaClient) {
-  const catalog = await externalPackageCatalog({ db, dataDir: getChronaDataDir(), now: () => new Date(), publicUrl: null, moduleExternalResources: externalResources() }, "ws_default");
+  const catalog = await externalPackageCatalog({ db, dataDir: getChronaDataDir(), now: () => new Date(), publicUrl: null, moduleExternalResources: externalResources() || undefined }, "ws_default");
   const messages: string[] = [];
   let rejected = false;
   for (const entry of catalog) {

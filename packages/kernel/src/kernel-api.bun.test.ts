@@ -3,12 +3,12 @@ import { handleModuleCall } from "./modules/module-effects";
 import { createApprovals } from "./approvals";
 import { mkdtemp, rm } from "node:fs/promises";
 import { moduleCallSchema, moduleManifestSchema } from "@chrona/contracts/steward";
-import { testDb } from "./test-db";
-import { registerSystemModules } from "./system-modules";
+import { testDb } from "./__testing__/test-db";
+import { registerSystemModules } from "./system/system-modules";
 import { callSync, enqueueCall, kernelOrigin, listSystemModules, callStatus, runDueCalls } from "./modules/module-calls";
-import { testModuleProcess } from "./modules/module-test-process";
+import { testModuleProcess } from "./__testing__/module-test-process";
 import { moduleSupervisor } from "./modules/module-supervisor";
-import { drainTimers } from "./timers";
+import { drainTimers } from "./timers/timers";
 import type { StewardPorts } from "./ports";
 
 const cleanup: (() => Promise<unknown>)[] = [];

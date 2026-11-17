@@ -1,9 +1,0 @@
-{
-  "compilerOptions": {
-    "target": "ES2022", "lib": ["ESNext", "DOM"], "module": "ESNext", "moduleResolution": "Bundler",
-    "strict": true, "skipLibCheck": true, "noEmit": true, "types": ["bun"], "esModuleInterop": true,
-    "resolveJsonModule": true, "allowImportingTsExtensions": true,
-    "baseUrl": "../..", "paths": { "@/generated/prisma/*": ["packages/db/src/generated/prisma/*"] }
-  },
-  "include": ["src/**/*.ts", "scripts/**/*.ts"], "exclude": ["dist"]
-}

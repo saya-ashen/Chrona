@@ -18,7 +18,7 @@ const clients: PrismaClient[] = [];
 function connect() { const client = new PrismaClient({ adapter: new PrismaBunSqlite({ url: `file:${join(root, "test.db")}` }) }); clients.push(client); return client; }
 beforeEach(async () => {
   root = mkdtempSync(join(tmpdir(), "chrona-event-store-")); time = new Date("2026-11-05T00:00:00.000Z");
-  ensureSqliteDatabase({ databaseUrl: `file:${join(root, "test.db")}`, migrationsDir: resolve("prisma/migrations") });
+  ensureSqliteDatabase({ databaseUrl: `file:${join(root, "test.db")}`, migrationsDir: resolve("packages/db/prisma/migrations") });
   db = connect(); await db.workspace.create({ data: { id: "ws", name: "test" } });
   await db.module.create({ data: { id: "mod", workspaceId: "ws", name: "coding", activeHash: "hash" } });
   principal = { workspaceId: "ws", ownerId: "owner", caller: { kind: "module", moduleId: "mod", hash: "hash" } };

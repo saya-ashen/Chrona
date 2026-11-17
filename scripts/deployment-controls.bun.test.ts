@@ -5,14 +5,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Database } from "bun:sqlite";
 
-import { writeReleaseIdentity } from "../build/release-identity";
+import { writeReleaseIdentity } from "./build/release-identity";
 import { acquireSqliteRuntimeLock } from "../packages/db/src/sqlite-runtime-lock";
 import { ensureSqliteDatabase } from "../packages/db/src/sqlite-migrations";
 import { restoreSqliteDatabase } from "../packages/db/src/sqlite-backup";
 import { acceptRelease, runPreflight, summarizeDataState } from "./deployment-controls";
 
 const script = join(import.meta.dir, "deployment-controls.ts");
-const migrationsDir = join(import.meta.dir, "../prisma/migrations");
+const migrationsDir = join(import.meta.dir, "../packages/db/prisma/migrations");
 const runSql = `INSERT INTO Run (id, workspaceId, lane, trigger, status, provider, tokenHash, prompt, cwd)
   VALUES ('run', 'workspace', 'coding', 'manual', 'finished', 'test', 'test-token', 'fixture', '/tmp');`;
 const executionSql = `INSERT INTO ExecutionAttempt
@@ -38,9 +38,7 @@ async function fixture() {
 
 async function releaseFixture(root: string) {
   const release = join(root, "chrona-linux-x64");
-  await mkdir(join(release, "resources/module-git"), { recursive: true });
   await mkdir(join(release, "resources/prisma/migrations/0001_initial"), { recursive: true });
-  await writeFile(join(release, "resources/module-git/lock.json"), JSON.stringify({ version: 1, modules: [] }));
   await writeFile(join(release, "resources/prisma/migrations/0001_initial/migration.sql"), await Bun.file(join(migrationsDir, "0001_initial/migration.sql")).text());
   await writeReleaseIdentity(release, process.cwd());
   return release;
@@ -142,7 +140,7 @@ test("preflight CLI binds PID, external database and resource root, and failed c
   try {
     const success = cli("preflight", args);
     expect(success.status).toBe(0);
-    expect(JSON.parse(success.stdout)).toMatchObject({ passed: true, databasePath: f.databasePath, process: { pid: child.pid, resourceRoot: join(release, "resources") } });
+    expect(JSON.parse(success.stdout)).toMatchObject({ passed: true, activeModules: [], databasePath: f.databasePath, process: { pid: child.pid, resourceRoot: join(release, "resources") } });
     const wrongPid = [...args]; wrongPid[wrongPid.indexOf("--pid") + 1] = String(process.pid);
     await expect(runPreflight(wrongPid)).rejects.toThrow("not owned by requested process");
     f.db.exec(runSql + "UPDATE Run SET stopStatus = 'unknown'");
@@ -180,9 +178,9 @@ test.each(["unknown", "internal", "forbidden", null])("preflight CLI follows Mod
 
 test("preflight CLI observes the source entry's implicit package fallback without overrides", async () => {
   const f = await fixture(), release = await releaseFixture(f.root);
-  const sourceDir = join(f.root, "apps/cli/src"), resources = join(f.root, "apps/resources");
+  const sourceDir = join(f.root, "apps/cli/src"), resources = f.root;
   await mkdir(sourceDir, { recursive: true });
-  await mkdir(join(resources, "prisma/migrations"), { recursive: true });
+  await mkdir(join(resources, "packages/db/prisma/migrations"), { recursive: true });
   const startup = await readFile(join(import.meta.dir, "../apps/cli/src/start-server.ts"), "utf8");
   // Keep the real launcher's default resolution in the fixture; only relocate its dependency import.
   await writeFile(join(sourceDir, "start-server.ts"), startup.replace('"@chrona/db/sqlite-url"', JSON.stringify(join(import.meta.dir, "../packages/db/src/sqlite-url.ts"))));
@@ -223,7 +221,7 @@ test("accept rejects the wrong requested directory even with a valid sibling ide
 test("backup CLI restores the selected external database and all four controlled roots", async () => {
   const f = await fixture(), output = join(f.root, "backup.db"), restored = join(f.root, "restored");
   try {
-    for (const name of ["platform", "sessions", "secrets", "qq-bot"]) {
+    for (const name of ["platform", "sessions", "secrets"]) {
       await mkdir(join(f.dataDir, name), { recursive: true });
       await writeFile(join(f.dataDir, name, "fixture.txt"), `synthetic-${name}`);
     }
@@ -233,7 +231,7 @@ test("backup CLI restores the selected external database and all four controlled
     restoreSqliteDatabase(`file:${join(restored, "chrona.db")}`, output, { dataDir: restored });
     const db = new Database(join(restored, "chrona.db"), { readonly: true });
     try { expect(db.query("SELECT name FROM Workspace").get()).toEqual({ name: "fixture" }); } finally { db.close(); }
-    for (const name of ["platform", "sessions", "secrets", "qq-bot"]) expect(await readFile(join(restored, name, "fixture.txt"), "utf8")).toBe(`synthetic-${name}`);
+    for (const name of ["platform", "sessions", "secrets"]) expect(await readFile(join(restored, name, "fixture.txt"), "utf8")).toBe(`synthetic-${name}`);
   } finally { await f.close(); }
 });
 

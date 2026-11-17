@@ -6,7 +6,7 @@ import { createStewardService, type StewardPorts } from "@chrona/kernel";
 import { testDb } from "@chrona/kernel/test-support";
 import { createProviderChannel } from "../../../packages/kernel/src/agent/provider-channel";
 import { liveRuns } from "../../../packages/kernel/src/execution/runs";
-import { testReleaseRuntimeChecks } from "../../../packages/kernel/src/modules/module-release-test-fixture";
+import { testReleaseRuntimeChecks } from "../../../packages/kernel/src/__testing__/module-release-test-fixture";
 import type { ProviderAnswer, ProviderRunView } from "@chrona/contracts";
 let db: ReturnType<typeof testDb>, ports: StewardPorts, service: ReturnType<typeof createStewardService>;
 let workspaceId: string;
@@ -15,7 +15,7 @@ beforeEach(async () => {
   db = testDb(); workspaceId = (await db.workspace.create({ data: { name: "owner" } })).id; answers = [];
   ports = { db, ...testReleaseRuntimeChecks(), now: () => new Date(), dataDir: await mkdtemp(join(tmpdir(), "chrona-provider-api-")), publicUrl: null };
   service = createStewardService(ports);
-  const session = await db.session.create({ data: { workspaceId, key: "provider-fixture", source: "web" } });
+  const session = await db.session.create({ data: { workspaceId, key: "provider-fixture", source: "owner" } });
   await service.forWorkspace(workspaceId).runs.enqueue({ sessionId: session.id, lane: "background", trigger: "source", prompt: "Fixture only" });
 
 });

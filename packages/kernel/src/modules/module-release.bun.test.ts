@@ -1,29 +1,13 @@
-import { afterEach, expect, test } from "bun:test";
+import { expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { appendFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { appendFile, readFile, rm, symlink, writeFile } from "node:fs/promises";
+
 import { join } from "node:path";
-import { moduleManifestSchema } from "@chrona/contracts/steward";
+
 import { resolveBuiltinRelease, resolveExternalRelease } from "./module-release";
-import { seedTestModuleRelease } from "./module-release-test-fixture";
+
 import { readModuleFiles } from "./module-preview";
 
-test.each(["mind", "chat"])("shipped %s manifest is accepted by the real installation contract", async name => {
-  const manifest = JSON.parse(await readFile(join(import.meta.dir, "../../../../.generated/applications", name, "module.json"), "utf8"));
-  expect(moduleManifestSchema.safeParse(manifest).success).toBe(true);
-});
-
-const roots: string[] = [];
-afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
-async function fixture(name = "files") {
-  const root = await mkdtemp(join(tmpdir(), "chrona-release-test-")); roots.push(root);
-  const resources = join(root, "external"), codeDir = join(resources, name); await mkdir(codeDir, { recursive: true });
-  await writeFile(join(codeDir, "module.json"), JSON.stringify(moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [] })));
-  await writeFile(join(codeDir, "index.ts"), "// release\n");
-  await writeFile(join(codeDir, "test.ts"), "// test\n");
-  const git = await seedTestModuleRelease(resources, name);
-  return { root, resources, codeDir, git, ports: { moduleExternalResources: resources } };
-}
 test.each(["pi", "files", "author", "mind"])("offline %s release identity is its real commit with no invented upstream", async name => {
   const f = await fixture(name), release = await resolveExternalRelease(f.ports, name);
   expect(release.hash).toBe(f.git.commit);

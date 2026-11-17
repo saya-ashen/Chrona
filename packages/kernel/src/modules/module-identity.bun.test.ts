@@ -2,15 +2,14 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { KERNEL_MODULE_NAMES, moduleManifestSchema } from "@chrona/contracts/steward";
-import { testDb } from "../test-db";
+import { testDb } from "../__testing__/test-db";
 import { moduleContext } from "./module-context";
 import { activateIn } from "./module-generation";
 import { rollback } from "./module-activation";
 import { buildPending } from "./module-build";
 import { resolveBuiltinRelease } from "./module-release";
-import { requestStatus, setStatusIn } from "./module-status";
+import { requestStatus} from "./module-status";
 import { assertExternalName, assertModuleOperation, moduleIdentity } from "./module-identity";
-import { isModulePaused, PAUSED_MODULE_NAMES } from "./module-availability";
 import { moduleSupervisor } from "./module-supervisor";
 import type { StewardPorts } from "../ports";
 
@@ -31,7 +30,8 @@ async function fixture() {
   return { db, workspace, ports, context, app, dataDir };
 }
 
-test.each(["pi", "web", "notify"])("ordinary preinstalled %s accepts checked updates, rollback and deletion", async name => {
+test("an ordinary external entry accepts checked updates, rollback and deletion", async () => {
+  const name = "ordinary-entry";
   const f = await fixture(), app = await f.app(name, false);
   expect(moduleIdentity(app)).toMatchObject({ origin: "external", capabilities: { build: true, propose: true, group: true, activate: true, update: true, rollback: true, remove: true, install: false } });
   for (const operation of ["build", "propose", "group", "activate", "update", "rollback"] as const) {
@@ -45,22 +45,20 @@ test.each(["pi", "web", "notify"])("ordinary preinstalled %s accepts checked upd
   expect(await f.db.module.findUniqueOrThrow({ where: { id: app.id } })).toMatchObject({ builtin: false, activeHash: "old" });
 });
 
-test.each(["mcp", "files", "events"])("optional official %s has external lifecycle rights without reviving builtin identity", async name => {
+test("a historical source annotation cannot grant builtin identity", async () => {
+  const name = "legacy-source-entry";
   const f = await fixture(), app = await f.app(name, false, "builtin");
-  const available = !isModulePaused(name);
-  expect(moduleIdentity(app)).toMatchObject({ origin: "external", capabilities: { build: available, propose: available, group: available, update: available, rollback: available, remove: true } });
+  expect(moduleIdentity(app)).toMatchObject({ origin: "external", capabilities: { build: true, propose: true, group: true, update: true, rollback: true, remove: true } });
   for (const operation of ["build", "propose", "group", "activate", "update", "rollback"] as const) {
-    if (available) expect(() => assertModuleOperation(app, operation)).not.toThrow();
-    else expect(() => assertModuleOperation(app, operation)).toThrow("unavailable: paused");
+    expect(() => assertModuleOperation(app, operation)).not.toThrow();
   }
   expect(() => assertModuleOperation(app, "remove")).not.toThrow();
-  if (available) expect(await assertExternalName(f.db, f.workspace.id, name, "propose")).toMatchObject({ id: app.id });
-  else await expect(assertExternalName(f.db, f.workspace.id, name, "propose")).rejects.toMatchObject({ code: "unavailable", reason: "module_paused" });
+  expect(await assertExternalName(f.db, f.workspace.id, name, "propose")).toMatchObject({ id: app.id });
   expect(moduleIdentity({ name, builtin: true }, { removable: false }).capabilities.remove).toBe(false);
   expect(moduleIdentity({ name: "other-entry", builtin: false }, { removable: false }).capabilities.remove).toBe(false);
 });
 
-test.each([...KERNEL_MODULE_NAMES, "rescue"])("persisted builtin flag cannot grant dynamic authority to %s", async name => {
+test.each([...KERNEL_MODULE_NAMES])("persisted builtin flag cannot grant dynamic authority to %s", async name => {
   const f = await fixture(), app = await f.db.module.create({ data: { workspaceId: f.workspace.id, name, builtin: true } });
   expect(() => assertModuleOperation(app, "activate")).toThrow();
   await expect(assertExternalName(f.db, f.workspace.id, name, "propose")).rejects.toMatchObject({ code: "forbidden" });
@@ -101,34 +99,4 @@ test("Agent has no builtin release even when old resources are supplied", async 
   f.ports.moduleBuiltinResources = join(f.dataDir, "release");
   await expect(resolveBuiltinRelease(f.ports, "agent")).rejects.toMatchObject({ reason: "release_not_found" });
   expect(await f.db.module.count()).toBe(0);
-});
-
-test.each(["building", "pending_review"])("stored %s candidates for a paused app reject without interrupting build recovery", async status => {
-  const f = await fixture(), app = await f.app("remind");
-  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: app.id, hash: "next" } }, data: { status } });
-  let executed = 0;
-  f.ports.packages = { install: async () => { executed++; throw new Error("Paused apps must not install dependencies"); } } as NonNullable<StewardPorts["packages"]>;
-  await buildPending(f.context);
-  expect(executed).toBe(0);
-  expect(await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: app.id, hash: "next" } } })).toMatchObject({ status: "rejected" });
-  expect(await f.db.module.findUniqueOrThrow({ where: { id: app.id } })).toMatchObject({ activeHash: "old" });
-  expect(await f.db.run.count()).toBe(0);
-  expect(await f.db.approval.count()).toBe(0);
-});
-
-test.each([...PAUSED_MODULE_NAMES])("paused %s cannot enable through owner or provider status paths", async name => {
-  const f = await fixture(), app = await f.app(name);
-  for (const status of ["active", "paused"] as const) {
-    await f.db.module.update({ where: { id: app.id }, data: { status } });
-    const attempts = await Promise.allSettled([
-      requestStatus(f.context, app.id, "active", "Attempt enable"),
-      f.db.$transaction(tx => setStatusIn(f.context, tx, app.id, "active", { source: "owner", reason: "Attempt enable" })),
-    ]);
-    for (const attempt of attempts) {
-      expect(attempt.status).toBe("rejected");
-      if (attempt.status === "rejected") expect(attempt.reason).toMatchObject({ code: "unavailable", reason: "module_paused" });
-    }
-    expect(await f.db.module.findUniqueOrThrow({ where: { id: app.id } })).toMatchObject({ status, activeHash: "old" });
-  }
-  expect(await f.db.audit.count({ where: { kind: "module_enabled" } })).toBe(0);
 });

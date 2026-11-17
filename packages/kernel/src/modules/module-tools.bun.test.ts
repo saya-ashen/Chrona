@@ -5,16 +5,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { moduleManifestSchema, RUN_LIMITS, type ModuleManifest } from "@chrona/contracts/steward";
 import { createModules } from "./modules";
-import { registerSystemModules } from "../system-modules";
+import { registerSystemModules } from "../system/system-modules";
 import { callModuleTool, moduleToolCatalog } from "./module-tools";
 import type { StewardPorts } from "../ports";
-import { testDb } from "../test-db";
-import { testModuleSandbox } from "./module-test-process";
+import { testDb } from "../__testing__/test-db";
+import { testModuleSandbox } from "../__testing__/module-test-process";
 import { moduleSupervisor } from "./module-supervisor";
 import { callsSettled } from "./module-calls";
 import { moduleContext } from "./module-context";
 import { recordModuleActivation } from "./module-evolution";
-import { notice, notices } from "../test-notices";
+import { notice, notices } from "../__testing__/test-notices";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -34,11 +34,11 @@ async function fixture() {
   cleanups.push(async () => { await callsSettled(ports); await moduleSupervisor(ports).stop(); });
   const workspaceId = (await db.workspace.create({ data: { name: "tools" } })).id;
   registerSystemModules();
-  const notifyManifest = moduleManifestSchema.parse(JSON.parse(await Bun.file(new URL("../../../../.generated/applications/notify/module.json", import.meta.url)).text()));
+  const notifyManifest = moduleManifestSchema.parse({ name: "notify", entry: "index.ts", tests: ["test.ts"], effects: [], tools: [{ name: "send", description: "Synthetic send", visibility: ["modules"], parameters: { type: "object", properties: {}, additionalProperties: true }, output: {} }] });
   const notify = await db.module.create({ data: { workspaceId, name: "notify", activeHash: "notify-fixture" } });
   await db.moduleVersion.create({ data: { moduleId: notify.id, hash: "notify-fixture", manifest: notifyManifest, intent: {}, source: "user", report: {}, status: "approved" } });
   const api = createModules(ports, workspaceId);
-  const session = await db.session.create({ data: { workspaceId, source: "test", key: "tools:test", focus: ["mail-sort"] } });
+  const session = await db.session.create({ data: { workspaceId, source: "module", key: "tools:test", focus: ["mail-sort"] } });
   const module = await db.module.create({ data: { workspaceId, name: "mail-sort", activeHash: "hash" } });
   const tool: ModuleManifest["tools"][number] = { name: "find-mail", description: "Find matching mail", visibility: ["provider", "owner"], idempotent: false, parameters: { type: "object", properties: { query: { type: "string" }, count: { type: "number" }, unread: { type: "boolean" }, folder: { type: "string", enum: ["inbox", "sent"] } }, required: ["query"] },
       output: {}
@@ -80,10 +80,8 @@ test("owner tools list every toolset and call as the user", async () => {
     "m_modules_list", "m_modules_describe", "m_modules_health", "m_modules_admit", "m_modules_receipt",
     "m_modules_enable", "m_modules_disable", "m_modules_rollback", "m_modules_remove", "m_modules_operation", "m_settings_update",
     "m_secrets_set", "m_secrets_remove", "m_secrets_list", "m_activity_runtime", "m_activity_runs", "m_activity_records", "m_activity_usage", "m_activity_consumer", "m_agent_providers", "m_mail_sort_find_mail",
-    "m_notify_settings", "m_notify_ui_settings", "m_notify_activity", "m_notify_list", "m_notify_counts", "m_notify_status", "m_notify_feedback", "m_notify_retry",
   ]);
   expect(toolsets.find(set => set.name === "module_mail_sort")).toEqual({ name: "module_mail_sort", description: "Find matching mail", tools: ["m_mail_sort_find_mail"] });
-  expect(toolsets.find(set => set.name === "module_notify")?.tools).toEqual(["m_notify_settings", "m_notify_ui_settings", "m_notify_activity", "m_notify_list", "m_notify_counts", "m_notify_status", "m_notify_feedback", "m_notify_retry"]);
   expect(await api.callTool("m_mail_sort_find_mail", { query: "hi" })).toMatchObject({ result: { found: 3 } });
   expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_tool_call" } })).toMatchObject({ actorKey: "user", details: { callerRunId: null, callerSessionId: null } });
   await expect(api.callTool("m_mail_sort_find_mail", {})).rejects.toMatchObject({ code: "invalid" });
@@ -132,7 +130,7 @@ test("module failure returns truncated public stderr and shares the consecutive 
   for (let i = 0; i < 3; i++) await expect(f.call()).rejects.toMatchObject({ code: "failed", message: expect.stringContaining("x".repeat(1900)) });
   expect((await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).status).toBe("paused");
   expect(await f.db.moduleRun.count()).toBe(3);
-  expect((await notices(f.db, { title: "模块连续失败，已暂停" })).length).toBe(1);
+  expect((await notices(f.db, { kind: "module-paused" })).length).toBe(1);
   await expect(f.call()).rejects.toMatchObject({ code: "not_found" });
   expect((await f.catalog()).some(tool => tool.name.startsWith("m_mail_sort_"))).toBe(false);
 });

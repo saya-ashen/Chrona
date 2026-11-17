@@ -2,11 +2,11 @@ import { afterEach, expect, test } from "bun:test";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { createModules } from "./modules";
 import { listSystemModules } from "./module-calls";
-import { modulesListOutput } from "../system-outputs";
-import { registerSystemModules } from "../system-modules";
+import { modulesListOutput } from "../system/system-outputs";
+import { registerSystemModules } from "../system/system-modules";
 import { callSync } from "./module-calls";
 import type { StewardPorts } from "../ports";
-import { testDb } from "../test-db";
+import { testDb } from "../__testing__/test-db";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await close(); });

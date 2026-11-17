@@ -6,7 +6,7 @@ import type { Prisma } from "@chrona/db";
 import { moduleContext } from "./module-context";
 import { requestRemove, removeApproved } from "./module-remove";
 import { moduleSupervisor } from "./module-supervisor";
-import { testDb } from "../test-db";
+import { testDb } from "../__testing__/test-db";
 import type { StewardPorts } from "../ports";
 
 const closes: (() => Promise<unknown>)[] = [];

@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { createSettings } from "./settings";
 import { createRuns } from "./execution/runs";
-import { testDb } from "./test-db";
+import { testDb } from "./__testing__/test-db";
 import type { StewardPorts } from "./ports";
 
 const cleanups: (() => Promise<unknown>)[] = [];
@@ -49,7 +49,7 @@ for (const lane of ["foreground", "background"] as const) test(`build settings d
   const f = await fixture();
   await f.db.workspace.update({ where: { id: f.workspaceId }, data: { settings: { builds: { timeoutMinutes: 120 } } } });
   const runs = createRuns(f.ports, f.workspaceId);
-  const session = await f.db.session.create({ data: { workspaceId: f.workspaceId, key: "web:other", source: "web" } });
+  const session = await f.db.session.create({ data: { workspaceId: f.workspaceId, key: "web:other", source: "owner" } });
   await runs.enqueue({ sessionId: session.id, lane, trigger: "message", prompt: "Other work" });
   const run = (await runs.claimNext(lane))!;
   expect(run.deadlineAt).toBeNull();

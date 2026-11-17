@@ -4,12 +4,11 @@ import type { StewardPorts } from "../ports";
 import { listSystemModules, type Caller, type SystemTool, type Tool } from "./module-calls";
 import { discoveryAdmission } from "./module-call-admission";
 import { StewardError } from "../errors";
-import { isModulePaused } from "./module-availability";
 
 type Reference = { target: string; source: { kind: "system" | "module"; hash: string | null }; tool: SystemTool | Tool };
 /** Batch only current approved versions, without loading historical manifests or runtime evidence. */
 export async function activeModuleReferences(ports: StewardPorts, workspaceId: string) {
-  const modules = (await ports.db.module.findMany({ where: { workspaceId, status: "active", activeHash: { not: null } }, orderBy: { name: "asc" }, select: { id: true, name: true, activeHash: true } })).filter(module => !isModulePaused(module.name));
+  const modules = (await ports.db.module.findMany({ where: { workspaceId, status: "active", activeHash: { not: null } }, orderBy: { name: "asc" }, select: { id: true, name: true, activeHash: true } }));
   if (!modules.length) return [];
   const versions = [];
   for (let offset = 0; offset < modules.length; offset += 200) {
@@ -34,7 +33,7 @@ async function exactReference(ports: StewardPorts, workspaceId: string, target: 
     const tool = system.tools.find(tool => tool.name === toolName);
     return tool ? { target, source: { kind: "system", hash: null }, tool } : undefined;
   }
-  if (isModulePaused(name)) return;
+
   const module = await ports.db.module.findFirst({ where: { workspaceId, name, status: "active", activeHash: { not: null } }, select: { id: true, activeHash: true } });
   if (!module?.activeHash) return;
   const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } }, select: { status: true, manifest: true } });

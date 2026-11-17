@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { moduleManifestSchema, type ExecutionPrincipal, type ExecutionStart, type ExecutionView } from "@chrona/contracts/steward";
-import { testDb } from "../test-db";
+import { testDb } from "../__testing__/test-db";
 import type { StewardPorts } from "../ports";
 import { createExecutions } from "./execution";
 import { createExecutionEventStore } from "./execution-event-store";

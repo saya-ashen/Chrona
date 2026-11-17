@@ -11,9 +11,7 @@ import { moduleFailurePolicy } from "./module-failure-policy";
 import { moduleContext } from "./module-context";
 import { ensureVersionMaterial } from "./module-source";
 import { rollbackFailedStart } from "./module-generation";
-import { resolveExternalRelease } from "./module-release";
 import { assertModuleOperation } from "./module-identity";
-import { assertModuleAvailable, isModulePaused, ModuleUnavailableError } from "./module-availability";
 import { trackDelivery, eventLimits, activationChanged, availableInstance, evidence, failureDetail, deliveryFailure, handlerFailureData, instanceStatus, isHandlerRejection, keyOf, moduleEffects, restartDelay, staged, triggerKey, type CallScope, type Delivery, type DeliveryOptions, type DeliveryStage, type Instance, type Options, type Process, type Reply, type Timers } from "./module-supervisor-state";
 export { registerModuleEffects, type CallScope, type DeliveryStage } from "./module-supervisor-state";
 
@@ -172,33 +170,13 @@ class ModuleSupervisor {
     const { ports } = this;
     const module = await ports.db.module.findUniqueOrThrow({ where: { id: instance.moduleId } });
     if (module.activeHash !== instance.hash || module.status !== "active") throw new Error("Module identity changed before start");
-    assertModuleAvailable(module.name);
+
     const codeDir = join(ports.dataDir, "platform/store", instance.hash);
     assertModuleOperation(module, "enable");
     const version = await ports.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: module.id, hash: instance.hash } } });
     if (version.status !== "approved") throw new Error("Module version is not approved");
     await ensureVersionMaterial(moduleContext(ports, instance.scope.workspaceId), version);
     return codeDir;
-  }
-  private async providerHost(instance: Instance) {
-    const { ports } = this;
-    const module = await this.getActiveModule(instance.moduleId, instance.hash);
-    if (module.builtin || module.workspaceId !== instance.scope.workspaceId || module.name !== instance.manifest.name) return undefined;
-    const host = Object.hasOwn(ports.providerModules ?? {}, module.name) ? ports.providerModules![module.name] : undefined;
-    if (!host) return undefined;
-    const version = await ports.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: module.id, hash: instance.hash } } });
-    if (version.status !== "approved") throw new Error("Provider module version is not approved");
-    // A name or manifest alone never grants host configuration. The installed code
-    // must be the exact verified release shipped by this host, including its Git seed.
-    let reason: string;
-    try {
-      const release = await resolveExternalRelease(ports, module.name, instance.hash);
-      if (release.git && release.hash === instance.hash && JSON.stringify(release.manifest) === JSON.stringify(instance.manifest)) return host;
-      reason = `installed ${instance.hash.slice(0, 12)} is not this release's trusted ${String(release.hash).slice(0, 12)}; run \`chrona admin install ${module.name} update <key>\``;
-    } catch (error) { reason = String((error as Error)?.message ?? error).slice(0, 300); }
-    // Without this line the provider just reports "unavailable" with no trace of why.
-    console.error(JSON.stringify({ component: "module-supervisor", event: "provider_host_withheld", module: module.name, reason }));
-    return undefined;
   }
   private async bindings(workspaceId: string) {
     return Object.fromEntries((await this.ports.db.module.findMany({ where: { workspaceId, status: "active", activeHash: { not: null } }, select: { id: true, name: true } })).map(row => [row.name, row.id]));
@@ -212,12 +190,10 @@ class ModuleSupervisor {
     const contentDir = instance.manifest.content ? join(ports.dataDir, "platform/content", instance.moduleId) : undefined;
     if (contentDir) await mkdir(contentDir, { recursive: true });
     const bindings = JSON.stringify(await this.bindings(instance.scope.workspaceId));
-    const provider = await this.providerHost(instance);
-    const startModule = provider ? provider.startModule : sandbox.startModule!;
     const current = await this.getActiveModule(instance.moduleId, instance.hash);
     if (current.workspaceId !== instance.scope.workspaceId || current.name !== instance.manifest.name || current.builtin) throw new Error("Module identity changed before start");
     if (isClosing(instance)) throw new Error("Module instance closed before start");
-    const process = startModule({ codeDir, dataDir, contentDir, env: { CHRONA_PUBLIC_URL: ports.publicUrl ?? "", ...provider?.env, CHRONA_MODULE_BINDINGS: bindings }, entry: instance.manifest.entry, ipcEndpoint: instance.channel.endpoint, ipcToken: instance.channel.token, network: instance.manifest.effects.includes("network") });
+    const process = sandbox.startModule!({ codeDir, dataDir, contentDir, env: { CHRONA_PUBLIC_URL: ports.publicUrl ?? "", CHRONA_KERNEL_URL: ports.kernelUrl ?? "", CHRONA_MODULE_BINDINGS: bindings }, entry: instance.manifest.entry, ipcEndpoint: instance.channel.endpoint, ipcToken: instance.channel.token, network: instance.manifest.effects.includes("network") });
     instance.process = process;
     // Install exit observers before yielding after startModule returns.
     return this.connect(instance, process);
@@ -253,7 +229,7 @@ class ModuleSupervisor {
     if (this.isStopped()) throw new Error("Module supervisor stopped");
     const module = await this.ports.db.module.findUniqueOrThrow({ where: { id: moduleId } });
     if (this.isStopped()) throw new Error("Module supervisor stopped");
-    assertModuleAvailable(module.name);
+
     if (module.status !== "active" || module.activeHash !== hash) throw new Error("Module version is not active");
     return module;
   }
@@ -290,7 +266,7 @@ class ModuleSupervisor {
   }
   private async ensureActive(moduleId: string) {
     const module = await this.ports.db.module.findUnique({ where: { id: moduleId } });
-    if (this.stopped || this.restarts.has(moduleId) || module?.status !== "active" || !module.activeHash || isModulePaused(module.name)) return;
+    if (this.stopped || this.restarts.has(moduleId) || module?.status !== "active" || !module.activeHash) return;
     const version = await this.ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: module.activeHash } } });
     if (!moduleManifestSchema.safeParse(version?.manifest).data?.keepAlive) return;
     // Reconciliation defers replacement while the previous owner drains. Direct
@@ -314,7 +290,7 @@ class ModuleSupervisor {
   }
   async reconcile() {
     if (this.stopped) return;
-    const modules = (await this.ports.db.module.findMany({ where: { status: "active", activeHash: { not: null } } })).filter(module => !isModulePaused(module.name));
+    const modules = (await this.ports.db.module.findMany({ where: { status: "active", activeHash: { not: null } } }));
     const active = new Map(modules.map(module => [module.id, module]));
     for (const instance of this.instances.values()) {
       const current = active.get(instance.moduleId);
@@ -331,7 +307,7 @@ class ModuleSupervisor {
   }
   /**
    * `activated` reaches each module declaring it once per active version and again when a module it `uses` changes version
-   * (module-dependency-direction §4), so a sleeping app can register with web. Recorded in platform/activated.json;
+   * (module-dependency-direction §4), so a sleeping application can refresh its dependency registration. Recorded in platform/activated.json;
    * Successful delivery and unconfirmed dispatch remain distinct across restarts.
    */
   private announced?: Record<string, string | { signature: string; activationId: string; status: "unconfirmed" }>;
@@ -374,9 +350,9 @@ class ModuleSupervisor {
           this.announced = {};
         }
       }
-      const hashes = new Map(modules.filter(module => !isModulePaused(module.name)).map(module => [module.name, module.activeHash]));
+      const hashes = new Map(modules.map(module => [module.name, module.activeHash]));
       for (const module of modules) {
-        if (isModulePaused(module.name)) continue;
+
         await this.announceModule(file, module, hashes);
       }
     } finally { this.announcing = false; }
@@ -460,10 +436,6 @@ class ModuleSupervisor {
     const { moduleId, hash } = instance;
     const module = await this.ports.db.module.findUniqueOrThrow({ where: { id: moduleId } });
     const evolution = await currentModuleEvolution(this.ports.db, module.workspaceId, moduleId, hash);
-    if (isModulePaused(module.name)) {
-      await this.close(instance);
-      throw Object.assign(staged(new ModuleUnavailableError(module.name), "unavailable"), { staleActivation: true });
-    }
     if (this.stopped || instance.closing || module.status !== "active" || module.activeHash !== hash || module.activationId !== instance.scope.receiverActivationId || (evolution?.activationId ?? null) !== instance.activationId) {
       await this.close(instance);
       throw Object.assign(staged(new Error("Module activation changed before event delivery"), "unavailable"), { staleActivation: true });
@@ -514,7 +486,7 @@ class ModuleSupervisor {
   /** Authenticated HTTP endpoint of the active module serving path; null when unavailable. */
   async listener(path: string) {
     for (const module of await this.ports.db.module.findMany({ where: { status: "active", activeHash: { not: null } } })) {
-      if (isModulePaused(module.name)) continue;
+
       const version = await this.ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } });
       if (!listenPaths(moduleManifestSchema.safeParse(version?.manifest).data ?? {}).includes(path)) continue;
       if (this.stopped || this.restarts.has(module.id)) return null;

@@ -8,12 +8,12 @@ import { moduleManifestSchema, runToolResultSchema } from "@chrona/contracts/ste
 import { admitContextPrimitive } from "./agent-context";
 import { callContextTool, contextRunTools, selectContextTools } from "./agent-context-tools";
 import { callSync, kernelOrigin } from "../modules/module-calls";
-import { registerSystemModules } from "../system-modules";
+import { registerSystemModules } from "../system/system-modules";
 import { moduleSupervisor } from "../modules/module-supervisor";
-import { testModuleProcess } from "../modules/module-test-process";
+import { testModuleProcess } from "../__testing__/module-test-process";
 import { createRuns } from "../execution/runs";
 import { createTools } from "../tools";
-import { testDb } from "../test-db";
+import { testDb } from "../__testing__/test-db";
 import type { StewardPorts } from "../ports";
 
 const cleanups: (() => Promise<void>)[] = [];

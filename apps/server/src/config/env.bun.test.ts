@@ -25,7 +25,6 @@ function resetEnv() {
   delete process.env.CHRONA_MIGRATIONS_DIR;
   delete process.env.CHRONA_UNSAFE_PUBLIC_BIND;
   delete process.env.CHRONA_UNSAFE_CORS;
-  delete process.env.CHRONA_EXPERIMENTAL_DASHBOARD_AI_SUMMARY;
   delete process.env.CHRONA_EMAIL_TRIGGER_SECRET;
   resetEnvCacheForTests();
 }
@@ -47,8 +46,6 @@ describe("server environment safety", () => {
     process.env.CHRONA_CONFIG_FILE = tempConfig({
       server: { host: "0.0.0.0", port: 3200, allowedOrigins: ["http://localhost:3200"], unsafePublicBind: true },
       database: { url: "file:/tmp/chrona-config.db", migrationsDir: "/tmp/chrona-migrations" },
-      web: { dist: "/tmp/chrona-web" },
-      experimental: { dashboardAiSummary: true },
       security: { apiKey: "from-config" },
     });
     const env = readEnv();
@@ -57,16 +54,13 @@ describe("server environment safety", () => {
     expect(env.PORT).toBe("3200");
     expect(env.ALLOWED_ORIGINS).toBe("http://localhost:3200");
     expect(env.DATABASE_URL).toBe("file:/tmp/chrona-config.db");
-    expect(env).not.toHaveProperty("CHRONA_EXPERIMENTAL_DASHBOARD_AI_SUMMARY");
     expect(env.API_KEY).toBe("from-config");
   });
 
   it("ignores removed legacy environment variables", () => {
     resetEnv();
     process.env.CHRONA_EMAIL_TRIGGER_SECRET = "short";
-    process.env.CHRONA_EXPERIMENTAL_DASHBOARD_AI_SUMMARY = "1";
     expect(readEnv()).not.toHaveProperty("CHRONA_EMAIL_TRIGGER_SECRET");
-    expect(readEnv()).not.toHaveProperty("CHRONA_EXPERIMENTAL_DASHBOARD_AI_SUMMARY");
   });
 
   it("keeps env values above server config file values", () => {

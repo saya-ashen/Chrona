@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { PREINSTALLED_MODULE_NAMES, moduleManifestSchema, type ProviderAdapter, type ProviderRunInput } from "@chrona/contracts/steward";
+import { moduleManifestSchema, type ProviderAdapter, type ProviderRunInput } from "@chrona/contracts/steward";
 import { callSync } from "@chrona/kernel";
 import { PrismaClient } from "@chrona/db";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 import { testDb } from "@chrona/kernel/test-support";
-import { registerTestProvider, testProviderPorts } from "../../../../../packages/kernel/src/test-provider";
+import { registerTestProvider, testProviderPorts } from "../../../../../packages/kernel/src/__testing__/test-provider";
 import { moduleContext } from "../../../../../packages/kernel/src/modules/module-context";
 import { switchActiveIn } from "../../../../../packages/kernel/src/modules/module-generation";
 import { requestRemove } from "../../../../../packages/kernel/src/modules/module-remove";
@@ -72,10 +72,7 @@ beforeEach(async () => {
   db = testDb(); fake = controlledProvider(); errors = [];
   const databases = await db.$queryRawUnsafe<{ name: string; file: string }[]>("PRAGMA database_list");
   databaseFile = databases.find(row => row.name === "main")!.file;
-  const initialization = { version: 1, status: "complete", packages: Object.fromEntries([...PREINSTALLED_MODULE_NAMES, "mind", "remind"].map(name => [name, {
-    requestKey: `fixture:${name}`, attempts: 1, status: "skipped", moduleId: null, hash: null, approvalId: null, error: null,
-  }])) };
-  workspaceId = (await db.workspace.create({ data: { name: "Generic workbench acceptance", settings: { moduleInitialization: initialization } } })).id;
+  workspaceId = (await db.workspace.create({ data: { name: "Generic workbench acceptance" } })).id;
   const manifest = moduleManifestSchema.parse({ name: "execution-test", entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, listen: "/api/execution-test",
     uses: methods.map(method => `agent.${method}`), tools: [{ name: "dispatch", description: "Owner Agent fixture", visibility: ["owner"],
       parameters: { type: "object", properties: { tool: { type: "string" }, input: { type: "string" }, key: { type: "string" } }, required: ["tool", "input"] }, output: {} }] });

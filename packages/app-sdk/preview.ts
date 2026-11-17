@@ -26,18 +26,20 @@ const httpReady = Promise.race([
   module.httpReady,
   new Promise<never>((_, reject) => { readinessTimer = setTimeout(() => reject(new Error("Module HTTP readiness timed out")), 5000); }),
 ]).finally(() => clearTimeout(readinessTimer));
-void httpReady.catch(() => {});
+void httpReady.catch(error => console.error(JSON.stringify({ component: "preview", event: "http_readiness_failed", error: String(error) })));
 const server = Bun.serve({ hostname: "127.0.0.1", port: 0, idleTimeout: 0, async fetch(request) {
   const url = new URL(request.url), headers = new Headers(request.headers);
-  headers.delete("authorization"); headers.delete("cookie"); headers.delete("x-chrona-module-token");
+  headers.delete("x-chrona-module-token");
   try {
     await httpReady;
     const response = await module.fetch(`${url.pathname}${url.search}`, { method: request.method, headers, body: request.body, signal: request.signal });
     const out = new Headers(response.headers);
-    // Modules cannot overwrite browser credentials on the preview's origin.
-    out.delete("set-cookie"); out.delete("x-chrona-module-token");
+    out.delete("x-chrona-module-token");
     return new Response(response.body, { status: response.status, headers: out });
-  } catch { return new Response("The module is not serving HTTP (does it call chrona.serve?)", { status: 502 }); }
+  } catch (error) {
+    console.error(JSON.stringify({ component: "preview", event: "http_proxy_failed", error: String(error) }));
+    return new Response("The module is not serving HTTP (does it call chrona.serve?)", { status: 502 });
+  }
 } });
 console.log(`Preview: http://127.0.0.1:${server.port}/`);
 async function stop() { await server.stop(true); await module.stop(); process.exit(0); }

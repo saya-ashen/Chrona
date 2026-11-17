@@ -3,7 +3,6 @@ import { moduleManifestSchema } from "@chrona/contracts/steward";
 import type { ModuleTool } from "@chrona/contracts/steward";
 import type { StewardPorts } from "../ports";
 import { StewardError } from "../errors";
-import { isModulePaused } from "./module-availability";
 import { audit } from "../audit";
 import { CallError, callSync, listSystemModules, type SystemTool } from "./module-calls";
 
@@ -21,7 +20,7 @@ function systemEntries(audience: "provider" | "owner" | "modules"): Entry[] {
 async function addModuleTools(ports: StewardPorts, modules: Awaited<ReturnType<StewardPorts["db"]["module"]["findMany"]>>, audience: "provider" | "owner" | "modules", focus: unknown[], catalog: { tools: Entry[]; names: Set<string>; toolsets: Set<string> }) {
   const { db } = ports, { tools, names, toolsets } = catalog;
   for (const module of modules) {
-    if (isModulePaused(module.name)) continue;
+
     // One toolset per module name, like one MCP server per name.
     if (toolsets.has(module.name)) continue;
     const version = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } });

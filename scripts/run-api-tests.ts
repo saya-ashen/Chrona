@@ -1,5 +1,4 @@
 
-import { restoreApplications } from "./restore-applications";
 /**
  * Concurrent API test runner.
  *
@@ -13,7 +12,6 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const glob = new Bun.Glob("*.bun.test.{ts,tsx}");
-await restoreApplications();
 const rootDir = process.cwd();
 const tempParent = resolve(rootDir, ".tmp");
 const listOnly = process.argv.includes("--list");
@@ -22,7 +20,7 @@ const concurrency = Math.max(
 	1,
 	Number(process.env.CHRONA_TEST_CONCURRENCY ?? "4"),
 );
-// Every server test, not only the HTTP map walk: the server holds the listen proxy and rescue console.
+// Every server test, not only the HTTP map walk: the server holds the authenticated listen proxy.
 const dirs = ["apps/server/src/__tests__/api", "apps/server/src/__tests__", "apps/server/src", "apps/server/src/config", "apps/server/src/middleware"];
 const serialFiles = new Set<string>();
 

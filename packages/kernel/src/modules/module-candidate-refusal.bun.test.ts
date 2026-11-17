@@ -8,7 +8,7 @@ import { modules } from "../system/modules";
 import { ModuleSnapshot } from "./module-files";
 import { withAgentContextEntry } from "../agent/agent-context-entry";
 import { interruptRunCallsIn } from "../execution/run-events";
-import { testDb } from "../test-db";
+import { testDb } from "../__testing__/test-db";
 
 registerSystemModule(modules);
 const closes: (() => Promise<unknown>)[] = [];
@@ -181,10 +181,4 @@ test("Run interruption retains publication ownership while the routed handler ca
   pause.release();
   expect(await original).toMatchObject({ code: "forbidden", reason: "submission_refused" });
   await expect(checkCandidates(f.ports, f.workspace.id, owner, { admissionId: f.submission.admissionId, requestKey: "submit" })).rejects.toMatchObject({ code: "not_found" });
-});
-
-test("paused target refusal keeps the existing policy reason", async () => {
-  const f = await fixture();
-  await f.db.candidateAdmission.update({ where: { id: f.submission.admissionId }, data: { targets: [{ name: "remind", moduleId: null, expectedActiveHash: null }] } });
-  expect(await refusal(f.routed("submit", [{ ...f.submission.items[0]!, name: "remind" }]))).toMatchObject({ code: "unavailable", reason: "module_paused" });
 });

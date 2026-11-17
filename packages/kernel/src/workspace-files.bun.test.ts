@@ -3,21 +3,19 @@ import { mkdir, mkdtemp, readFile, rm, symlink, truncate, writeFile } from "node
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { contentRefSchema } from "@chrona/contracts/steward";
-import { testDb } from "./test-db";
-import webManifest from "../../../.generated/applications/web/module.json";
+import { testDb } from "./__testing__/test-db";
 import type { StewardPorts } from "./ports";
 import { readWorkspaceFile, FILE_MAX_BYTES } from "./workspace-files";
 import { readRunContent } from "./execution/run-content";
 import { registerWorkspaceModule } from "./execution/local-workspace";
 import { runtimeCall } from "./execution/local-runtime";
-import { createAttachments } from "../../../.generated/applications/web/attachments";
-import { contextRunImages } from "./agent/agent-context-read";
+
 
 async function fixture() {
   const db = testDb(), root = await mkdtemp(join(tmpdir(), "chrona-file-ownership-"));
   const workspace = await db.workspace.create({ data: { name: "files" } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "web", activeHash: "approved", status: "active" } });
-  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "approved", status: "approved", source: "user", intent: {}, report: {}, manifest: webManifest } });
+  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "approved", status: "approved", source: "user", intent: {}, report: {}, manifest: { name: "web", entry: "index.ts", tests: ["test.ts"], effects: [] } } });
   const ports: StewardPorts = { db, dataDir: root, now: () => new Date(), publicUrl: null };
   const content = join(root, "platform/content", module.id);
   await mkdir(content, { recursive: true });
@@ -71,23 +69,10 @@ test("an ordinary Chat application reads its own content without reviving shared
   } finally { await f.close(); }
 });
 
-test("Web uploads preserve image MIME through the owning Agent receipt", async () => {
-  const f = await fixture();
-  try {
-    const base64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jvXkAAAAASUVORK5CYII=";
-    const storage = createAttachments(f.content);
-    const image = await storage.upload({ name: "no-extension", mime: "image/png", base64 });
-    expect(image.ref).toEndWith(".png");
-    await f.db.run.create({ data: { id: "image-run", workspaceId: f.workspaceId, lane: "foreground", trigger: "source", provider: "fake", tokenHash: "image", prompt: "", cwd: f.cwd } });
-    await f.db.agentRunAdmission.create({ data: { runId: "image-run", moduleId: f.moduleId, hash: "approved", targets: [], content: (await storage.accept([image])).map(file => file.ref) } });
-    expect(await contextRunImages(f.ports, { id: "image-run", workspaceId: f.workspaceId })).toEqual([{ mime: "image/png", base64 }]);
-  } finally { await f.close(); }
-});
-
 test("output capture follows the real origin recipient, hides bytes and rejects ownerless Runs", async () => {
   const f = await fixture();
   try {
-    const origin = await f.db.session.create({ data: { workspaceId: f.workspaceId, source: "web", key: "web", entryModuleId: f.moduleId } });
+    const origin = await f.db.session.create({ data: { workspaceId: f.workspaceId, source: "owner", key: "web", entryModuleId: f.moduleId } });
     const build = await f.db.session.create({ data: { workspaceId: f.workspaceId, source: "build", key: "build", originSessionId: origin.id } });
     const run = await f.db.run.create({ data: { workspaceId: f.workspaceId, sessionId: build.id, lane: "build", trigger: "build", provider: "fixture", tokenHash: "fixture-token", status: "running", cwd: f.cwd, prompt: "", deadlineAt: new Date(Date.now() + 60000) } });
     await writeFile(join(f.cwd, "answer.txt"), "recipient private bytes");

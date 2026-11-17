@@ -178,35 +178,14 @@ it.each(["valid", "checksum", "name", "untracked", "prefix", "empty", "missing"]
   } finally { rmSync(f.directory, { recursive: true, force: true }); }
 });
 
-it.each([
-  { agent: "pi", version: "0.85.0", command: "/opt/pi", status: "warning" },
-  { agent: undefined, version: "1.5.0", command: "/opt/pi", status: "ok" },
-  { agent: "pi", version: "1.5.0", command: "pi", status: "error" },
-  { agent: "pi", version: "1.5.0", command: undefined, status: "error" },
-  { agent: "pi", version: undefined, command: "/opt/pi", status: "warning" },
-  { agent: "pi", version: "1.5.2", command: "/opt/pi", status: "ok" },
-  { agent: "pi", version: "1.5.1", command: "/opt/pi", status: "warning" },
-])("checks Pi configuration: $version $command", ({ agent, version, command, status }) => {
-  const f = migrationFixture();
-  try {
-    for (const [key, value] of [["CHRONA_STEWARD_AGENT", agent], ["CHRONA_STEWARD_PI_VERSION", version], ["CHRONA_STEWARD_PI_COMMAND", command]]) {
-      if (value === undefined) delete process.env[key!]; else process.env[key!] = value;
-    }
-    const checks = inspectLocalChrona().filter(check => check.key === "providerPi");
-    expect(checks).toHaveLength(1);
-    expect(checks[0]?.status).toBe(status);
-    if (status === "warning") expect(checks[0]?.message).toContain("Pi completion requires CHRONA_STEWARD_PI_VERSION in 1.5.0, 1.5.2");
-  } finally { rmSync(f.directory, { recursive: true, force: true }); }
-});
-
 it.each(["fresh", "local", "outdated", "unfetched", "missing", "invalid", "inactive", "inactive-rejected"])("compares the bundled release with installed Git ancestry: %s without writing data", async scenario => {
   const directory = mkdtempSync(join(tmpdir(), "chrona-doctor-install-"));
   const databasePath = join(directory, "chrona-test.db");
-  ensureSqliteDatabase({ databaseUrl: `file:${databasePath}`, migrationsDir: join(import.meta.dir, "../../../prisma/migrations") });
+  ensureSqliteDatabase({ databaseUrl: `file:${databasePath}`, migrationsDir: join(import.meta.dir, "../../../packages/db/prisma/migrations") });
   const { PrismaClient } = await import("@chrona/db/generated/prisma/client");
   const { PrismaBunSqlite } = await import("prisma-adapter-bun-sqlite");
-  const { seedTestModuleRelease } = await import("../../../packages/kernel/src/modules/module-release-test-fixture");
-  const { testModuleSandbox } = await import("../../../packages/kernel/src/modules/module-test-process");
+  const { seedTestModuleRelease } = await import("../../../packages/kernel/src/__testing__/module-release-test-fixture");
+  const { testModuleSandbox } = await import("../../../packages/kernel/src/__testing__/module-test-process");
   const { createExternalModuleInstaller, installExternal, externalPackageCatalog, refreshInstallationReceipts } = await import("../../../packages/kernel/src/modules/module-install");
   const { buildPending } = await import("../../../packages/kernel/src/modules/module-build");
   const { moduleContext } = await import("../../../packages/kernel/src/modules/module-context");
@@ -272,9 +251,7 @@ it.each(["fresh", "local", "outdated", "unfetched", "missing", "invalid", "inact
     const before = snapshot();
     if (scenario !== "missing") expect(before.some(([name]) => String(name).startsWith(`platform/repos/${module.id}.git/`))).toBe(true);
     const current = await inspectExternalApps();
-    // Other missing fixtures and the paused Remind release still produce catalog warnings.
-    expect(current.status).toBe(scenario === "inactive-rejected" ? "error" : "warning");
-    expect(current.message).toContain("pi: Release resources missing");
+    expect(current.status).toBe(scenario === "inactive-rejected" ? "error" : ["fresh", "local"].includes(scenario) ? "ok" : "warning");
     if (inactive) {
       const waiting = "web: installed but not yet active (waiting for approval or build); run chrona admin approvals to see pending items";
       if (scenario === "inactive-rejected") {
@@ -303,11 +280,11 @@ it.each(["fresh", "local", "outdated", "unfetched", "missing", "invalid", "inact
 it("reports rejected updates and clears the error for the next candidate without writing data", async () => {
   const directory = mkdtempSync(join(tmpdir(), "chrona-doctor-install-"));
   const databasePath = join(directory, "chrona-test.db");
-  ensureSqliteDatabase({ databaseUrl: `file:${databasePath}`, migrationsDir: join(import.meta.dir, "../../../prisma/migrations") });
+  ensureSqliteDatabase({ databaseUrl: `file:${databasePath}`, migrationsDir: join(import.meta.dir, "../../../packages/db/prisma/migrations") });
   const { PrismaClient } = await import("@chrona/db/generated/prisma/client");
   const { PrismaBunSqlite } = await import("prisma-adapter-bun-sqlite");
-  const { seedTestModuleRelease } = await import("../../../packages/kernel/src/modules/module-release-test-fixture");
-  const { testModuleSandbox } = await import("../../../packages/kernel/src/modules/module-test-process");
+  const { seedTestModuleRelease } = await import("../../../packages/kernel/src/__testing__/module-release-test-fixture");
+  const { testModuleSandbox } = await import("../../../packages/kernel/src/__testing__/module-test-process");
   const { createExternalModuleInstaller, installExternal, externalPackageCatalog, refreshInstallationReceipts } = await import("../../../packages/kernel/src/modules/module-install");
   const { buildPending } = await import("../../../packages/kernel/src/modules/module-build");
   const { moduleContext } = await import("../../../packages/kernel/src/modules/module-context");
@@ -346,7 +323,6 @@ it("reports rejected updates and clears the error for the next candidate without
     // Other missing fixtures and the paused Remind release still produce catalog warnings.
     expect(current.status).toBe("warning");
     expect(current.message).not.toContain("files:");
-    expect(current.message).toContain("pi: Release resources missing");
     expect(snapshot()).toEqual(before);
     const repo = join(directory, "platform", "repos", `${module.id}.git`);
     const git = (...args: string[]) => execFileSync("git", [`--git-dir=${repo}`, ...args], {

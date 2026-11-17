@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 type Installed = { npm: boolean; python: boolean; packages: Record<string, string[]> };
-// Installers get the host toolchain environment, never Chrona's own secrets (API_KEY, RESCUE_KEY ...).
+// Installers get the host toolchain environment, never Chrona's own secrets (API_KEY, QQ credentials, database configuration).
 const environment = () => Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] =>
   entry[1] !== undefined && /^(PATH|PATHEXT|SYSTEMROOT|COMSPEC|USERPROFILE|APPDATA|LOCALAPPDATA|HOME|LANG|TMP|TEMP|TMPDIR|SSL_CERT_FILE|XDG_[A-Z_]+|UV_CACHE_DIR|BUN_INSTALL_CACHE_DIR)$/i.test(entry[0])));
 

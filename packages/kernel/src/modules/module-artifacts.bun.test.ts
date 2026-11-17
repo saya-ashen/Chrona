@@ -11,7 +11,7 @@ import { MODULE_MATERIAL_FILE, MODULE_SOURCE_MAX_BYTES, MODULE_SOURCE_MAX_FILES,
 const databaseRoot = mkdtempSync(join(tmpdir(), "chrona-material-test-db-"));
 process.env.DATABASE_URL = `file:${join(databaseRoot, "test.db")}`;
 const [{ snapshotModuleMaterial, moduleMaterialDigest, moduleSourceFiles, storeModuleArtifacts }, { commitModuleSource, importLegacyModuleSource, moduleGitPath, readModuleSource, readModuleMaterial }, { snapshotModule, ModuleDirectory, checkoutModule }, { admitCandidates, submitCandidates, candidateSource }, { testDb }, { moduleContext }, { buildPending }, { ensureVersionMaterial }, { rollback }, { testModuleProcess }, { createExternalModuleInstaller, installExternal }] = await Promise.all([
-  import("./module-artifacts"), import("./module-git"), import("./module-files"), import("./module-candidates"), import("../test-db"), import("./module-context"), import("./module-build"), import("./module-source"), import("./module-activation"), import("./module-test-process"), import("./module-install"),
+  import("./module-artifacts"), import("./module-git"), import("./module-files"), import("./module-candidates"), import("../__testing__/test-db"), import("./module-context"), import("./module-build"), import("./module-source"), import("./module-activation"), import("../__testing__/module-test-process"), import("./module-install"),
 ]);
 const roots: string[] = [];
 const closes: (() => Promise<unknown>)[] = [];

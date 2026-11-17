@@ -1,12 +1,10 @@
 import { afterEach, expect, test } from "bun:test";
-import { testDb } from "./test-db";
+import { testDb } from "./__testing__/test-db";
 import { BUILTIN_MODULE_NAMES, KERNEL_MODULE_NAMES, moduleManifestSchema } from "@chrona/contracts/steward";
-import { registerSystemModules } from "./system-modules";
+import { registerSystemModules } from "./system/system-modules";
 import { callSync, kernelOrigin, listLocalModules } from "./modules/module-calls";
 import { moduleTools } from "./modules/module-tools";
 import { registerProviderCallbacks, retainProviderCallbacks } from "./agent/local-provider";
-import { selectedMemory } from "../../app-common/src/memory";
-import memoryManifest from "../../../.generated/applications/memory-local/module.json";
 import { createApprovals } from "./approvals";
 import type { StewardPorts } from "./ports";
 
@@ -85,34 +83,28 @@ test("retired contribution declarations are rejected instead of granting a kerne
 });
   await expect(callSync(f.ports, { workspaceId: f.workspaceId, caller: entry, chain: [], path: [] }, "modules.contributions", { section: "memory" })).rejects.toMatchObject({ code: "not_found" });
 });
-test("app-owned memory selection discovers only the actual current approved memory tool contracts", async () => {
+test("tool discovery exposes only the current approved application version", async () => {
   registerSystemModules();
   const f = await fixture(), entry = await f.app("entry-test", { uses: ["modules.describe"] });
-  const memory = await f.app("memory-local", memoryManifest);
+  const application = await f.app("fixture-app", { tools: [{ name: "read", description: "Read fixture data", visibility: ["modules"], parameters: { type: "object", properties: {} }, output: { type: "object", properties: {}, additionalProperties: false } }] });
   const origin = { workspaceId: f.workspaceId, caller: entry, chain: [], path: [] };
-  const read = () => callSync(f.ports, origin, "modules.describe", { query: "memory-local" });
-  const config = { provider: "memory-local", autoRecall: true, autoRetain: false };
-  const selected = () => selectedMemory(async (target, args) => { if (target === "entry-test.settings") return config; const output = (await callSync(f.ports, origin, target, args ?? {})).output as { items: { target: { tool: string } }[] }; return { ...output, items: output.items.map(tool => ({ ...tool, target: `memory-local.${tool.target.tool}` })) }; }, "entry-test");
+  const read = () => callSync(f.ports, origin, "modules.describe", { query: "fixture-app" });
   const tools = ((await read()).output as { items: { target: { moduleId: string; tool: string }; moduleId: string; hash: string }[] }).items;
-  const declared = moduleManifestSchema.parse(memoryManifest).tools;
-  expect(tools.map(tool => `memory-local.${tool.target.tool}`).sort()).toEqual(declared.filter(tool => tool.visibility.includes("modules")).map(tool => `memory-local.${tool.name}`).sort());
-  for (const tool of tools) expect(tool).toMatchObject({ moduleId: memory.moduleId, hash: memory.hash });
-  expect(await selected()).toMatchObject({ ...config, module: "memory-local", available: true });
-  expect([...(await selected()).tools].sort()).toEqual(["conversation-context", "conversation-retain", "forget", "preferences", "recall"]);
-  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: memory.moduleId, hash: memory.hash } }, data: { status: "rejected" } });
+  expect(tools.map(tool => `fixture-app.${tool.target.tool}`).sort()).toEqual(["fixture-app.read"]);
+  for (const tool of tools) expect(tool).toMatchObject({ moduleId: application.moduleId, hash: application.hash });
+  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: application.moduleId, hash: application.hash } }, data: { status: "rejected" } });
   expect((await read()).output).toEqual({ items: [], nextCursor: null });
-  expect(await selected()).toMatchObject({ available: false, tools: new Set() });
-  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: memory.moduleId, hash: memory.hash } }, data: { status: "approved" } });
-  await f.db.module.update({ where: { id: memory.moduleId }, data: { activeHash: "unapproved" } });
+  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: application.moduleId, hash: application.hash } }, data: { status: "approved" } });
+  await f.db.module.update({ where: { id: application.moduleId }, data: { activeHash: "unapproved" } });
   expect((await read()).output).toEqual({ items: [], nextCursor: null });
-  await f.db.module.update({ where: { id: memory.moduleId }, data: { activeHash: memory.hash, status: "paused" } });
+  await f.db.module.update({ where: { id: application.moduleId }, data: { activeHash: application.hash, status: "paused" } });
   expect((await read()).output).toEqual({ items: [], nextCursor: null });
-  await f.db.module.update({ where: { id: memory.moduleId }, data: { status: "active" } });
-  expect((await selected()).available).toBe(true);
+  await f.db.module.update({ where: { id: application.moduleId }, data: { status: "active" } });
+  expect((await read()).output).toMatchObject({ items: [{ target: { moduleId: application.moduleId, tool: "read" } }] });
 });
 test("resolving a legacy session-linked approval never resurrects a retired conversation Run", async () => {
   const f = await fixture();
-  const session = await f.db.session.create({ data: { workspaceId: f.workspaceId, source: "rescue", key: "old", title: "Old", status: "waiting_approval" } });
+  const session = await f.db.session.create({ data: { workspaceId: f.workspaceId, source: "module", key: "old", title: "Old", status: "waiting_approval" } });
   const api = createApprovals({ ...f.ports, workspaceId: f.workspaceId });
   const approval = await api.create({ action: "delete_data", title: "Old request", detail: "", preview: "", payload: { sessionId: session.id } });
   await api.resolve(approval.id, { decision: "approve", scope: "once" });

@@ -1,12 +1,9 @@
 
-import { restoreApplications } from "./restore-applications";
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { buildProcessHelper } from "../packages/process/scripts/build-helper";
 
 const include = new Bun.Glob("**/*.bun.test.{ts,tsx}");
-const additionalTests = ["state.test.ts", "dom.test.ts", "host-agent.integration.test.ts"]
-	.map(file => `.generated/applications/chat/${file}`);
 const ignoredSegments = new Set([
 	"node_modules",
 	".direnv",
@@ -21,7 +18,6 @@ const ignoredSegments = new Set([
 	"build",
 	"coverage",
 ]);
-await restoreApplications();
 const rootDir = process.cwd();
 const listOnly = process.argv.includes("--list");
 const requestedFiles = process.argv.slice(2).filter(arg => arg !== "--list").map((p) => p.replace(/^\.\//u, ""));
@@ -31,22 +27,15 @@ const concurrency = Math.max(
 	Number(process.env.CHRONA_TEST_CONCURRENCY ?? "2"),
 );
 
-// Retained applications run offline checks without changing their installation/pause policy.
 function shouldInclude(path: string) {
-	const retained = [
-		"scripts/",
-		"examples/desktop-demo/",
-		"apps/cli/", ".generated/applications/", "packages/app-common/", "packages/app-sdk/",
-		"packages/kernel/src/", "packages/domain/src/steward/",
-		"packages/host/src/", "packages/contracts/src/steward/", "packages/pi/", "packages/process/", "packages/git-workspaces/", "packages/remote-device/", "packages/remote-model/",
-		"packages/db/", "packages/shared/", "packages/logging/",
-	];
+	const retained = ["scripts/", "examples/", "apps/cli/", "packages/"];
+	const sourcePath = path.startsWith("scripts/build/") ? path.slice("scripts/build/".length) : path;
 	return retained.some(prefix => path.startsWith(prefix))
-		&& !path.split("/").some((segment) => ignoredSegments.has(segment));
+		&& !sourcePath.split("/").some((segment) => ignoredSegments.has(segment));
 }
 
 function isBunTestFile(path: string) {
-	return path.endsWith(".bun.test.ts") || path.endsWith(".bun.test.tsx") || additionalTests.includes(path);
+	return path.endsWith(".bun.test.ts") || path.endsWith(".bun.test.tsx");
 }
 
 function resolveRequestedFiles(paths: string[]) {
@@ -141,7 +130,7 @@ async function runWithFreshDatabase(
 async function discoverTestFiles(): Promise<string[]> {
 	return requestedFiles.length > 0
 			? resolveRequestedFiles(requestedFiles)
-			: [...await Array.fromAsync(include.scan(".")), ...(await Array.fromAsync(include.scan(".generated/applications"))).map(path => `.generated/applications/${path}`), ...additionalTests]
+			: [...await Array.fromAsync(include.scan("."))]
 					.filter(shouldInclude)
 					.sort((a, b) => a.localeCompare(b));
 

@@ -28,7 +28,7 @@ function commit(repo: string, message: string, parent?: string) {
 }
 async function fixture() {
   const dataDir = mkdtempSync(join(tmpdir(), "chrona-owner-git-")), databaseUrl = `file:${join(dataDir, "chrona.db")}`;
-  ensureSqliteDatabase({ databaseUrl, migrationsDir: resolve("prisma/migrations") });
+  ensureSqliteDatabase({ databaseUrl, migrationsDir: resolve("packages/db/prisma/migrations") });
   const db = new PrismaClient({ adapter: new PrismaBunSqlite({ url: databaseUrl }) }); fixtures.push({ db, dataDir });
   await db.workspace.create({ data: { id: "ws_default", name: "Personal" } });
   const module = await db.module.create({ data: { workspaceId: "ws_default", name: "test-module" } });

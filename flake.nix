@@ -1,5 +1,5 @@
 {
-  description = "Chrona packages and modules";
+  description = "Chrona kernel, host, CLI and SDK";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -56,35 +56,12 @@
           });
         })];
       };
-      playwrightLibs = with pkgs; [
-        glib
-        nspr
-        nss
-        atk
-        at-spi2-atk
-        at-spi2-core
-        dbus
-        expat
-        libdrm
-        libgbm
-        mesa
-        libxkbcommon
-        alsa-lib
-        udev
-        cups
-        gtk3
-        pango
-        cairo
-        xorg.libX11
-        xorg.libXcomposite
-        xorg.libXdamage
-        xorg.libXext
-        xorg.libXfixes
-        xorg.libXrandr
-        xorg.libxcb
-      ];
       smokeTools = with pkgs; [
         bun
+        git
+        stdenv.cc
+        gnutar
+        gzip
         nodejs_22
         coreutils
         findutils
@@ -99,8 +76,7 @@
           let
             name = baseNameOf path;
           in
-            !(builtins.elem name [".codegraph" "node_modules" "dist" "result"])
-            && path != "${self}/.generated/applications";
+            !(builtins.elem name [".codegraph" "node_modules" "dist" "result"]);
       };
 
       chronaNodeModules = pkgs.stdenv.mkDerivation {
@@ -177,7 +153,7 @@
         '';
 
         meta = {
-          description = "Local AI work executor for governed planning, scheduling, recovery, and results";
+          description = "Kernel and host runtime for independently maintained applications";
           homepage = "https://github.com/saya-ashen/Chrona";
           license = pkgs.lib.licenses.mit;
           mainProgram = "chrona";
@@ -209,50 +185,10 @@
           export PATH="${pkgs.lib.makeBinPath smokeTools}:$PATH"
           export PRISMA_SCHEMA_ENGINE_BINARY="${pkgs.prisma-engines}/bin/schema-engine"
 
-          ROOT="$(pwd)"
-          TMP="$(mktemp -d)"
-          trap 'rm -rf "$TMP"' EXIT
-
-          echo "==> Installing dependencies"
-          bun install
-
-          echo "==> Running checks"
-          bun run typecheck
-          bunx vitest run  # no --coverage to avoid jsdom teardown flakiness
-
-          echo "==> Building binary"
+          bun install --frozen-lockfile
+          bun run ci:local
           bun run build
-
-          CHRONA_BIN="$(find "$ROOT/dist/releases" -path "*/chrona" -type f | head -n 1)"
-          test -n "$CHRONA_BIN"
-
-          mkdir -p "$TMP/home" "$TMP/data" "$TMP/config"
-
-          echo "==> Checking CLI"
-          HOME="$TMP/home" \
-          CHRONA_DATA_DIR="$TMP/data" \
-          CHRONA_CONFIG_DIR="$TMP/config" \
-          "$CHRONA_BIN" --help
-
-          echo "==> Starting Chrona briefly"
-          set +e
-          HOME="$TMP/home" \
-          CHRONA_DATA_DIR="$TMP/data" \
-          CHRONA_CONFIG_DIR="$TMP/config" \
-          PORT=3101 \
-          timeout 20s "$CHRONA_BIN" start
-          code="$?"
-          set -e
-
-          if [ "$code" != "0" ] && [ "$code" != "124" ]; then
-            echo "chrona start failed with exit code $code"
-            exit "$code"
-          fi
-
-          test -f "$TMP/config/.env"
-          test -f "$TMP/data/chrona.db"
-
-          echo "binary smoke test passed"
+          bun run build:smoke
         '');
       };
       checks = {
@@ -288,25 +224,21 @@
       };
 
       devShells.default = pkgs.mkShell {
-        packages =
-          (with pkgs; [
-            bun
-            nodejs_22
-            prisma-engines
-            uv
-            python313
-            sqlite
-            pkg-config
-            openssl
-            typescript-language-server
-            just
-          ])
-          ++ playwrightLibs;
+        packages = with pkgs; [
+          bun
+          nodejs_22
+          prisma-engines
+          uv
+          python313
+          sqlite
+          pkg-config
+          openssl
+          typescript-language-server
+          just
+        ];
 
         shellHook = ''
-          export PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/ms-playwright"
           export PRISMA_SCHEMA_ENGINE_BINARY="${pkgs.prisma-engines}/bin/schema-engine"
-          export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath playwrightLibs}:''${LD_LIBRARY_PATH:-}"
         '';
       };
 

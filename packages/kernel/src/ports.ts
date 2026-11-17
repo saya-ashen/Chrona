@@ -50,9 +50,9 @@ type ExecutionEventTransactions = {
 };
 export type StewardPorts = {
   db: PrismaClient; now(): Date; dataDir: string; publicUrl: string | null;
+  /** Loopback kernel HTTP origin for application-owned Provider tool bridges. */
+  kernelUrl?: string;
   provider?: ProviderAdapter;
-  /** Host bindings keyed by module name; supervisor requires the approved identity and exact trusted release. */
-  providerModules?: Record<string, { env: Record<string, string>; startModule: NonNullable<NonNullable<StewardPorts["sandbox"]>["startModule"]> }>;
   /** Host-owned project mapping; resolves and authorizes against the real caller moduleId/hash, never a body path. */
   resolveExecutionProject?: (principal: ExecutionPrincipal, projectRef: string) => Promise<ExecutionProjectGrant>;
   /** Host directory grants, scoped to the admitted owner/module; no business session state. */
@@ -88,7 +88,7 @@ export type StewardPorts = {
   moduleRuntimes?: { version: number; runtimes: { extensions: string[]; check?: { programs: { default: string[]; [platform: string]: string[] }; argv: string[] } }[] };
   /** Trusted resources from the running release: built-in installation and development-reference checkout, never app data. */
   moduleBuiltinResources?: string;
-  /** Trusted official external packages from this release; never a request-provided host path. */
+  /** Explicit host-configured release input directory; never a request-provided host path. */
   moduleExternalResources?: string;
   /** B's bounded adapter to the existing proposal/build/activation queue. Must not run checks inline. */
   moduleExternalInstaller?: ExternalModuleInstaller;

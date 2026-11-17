@@ -12,11 +12,11 @@ import { admitContextPrimitive, type ModulePrincipal } from "./agent-context";
 import { callSync, kernelOrigin, CallError } from "../modules/module-calls";
 import { createProviderChannel } from "./provider-channel";
 import { moduleSupervisor } from "../modules/module-supervisor";
-import { testModuleProcess } from "../modules/module-test-process";
-import { testDb } from "../test-db";
+import { testModuleProcess } from "../__testing__/module-test-process";
+import { testDb } from "../__testing__/test-db";
 import type { StewardPorts } from "../ports";
 import "../modules/module-effects";
-import { registerSystemModules } from "../system-modules";
+import { registerSystemModules } from "../system/system-modules";
 
 const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await close(); }, 30000);

@@ -1,7 +1,7 @@
 import { CallError } from "../modules/module-call-error";
 import { publicSystemTools } from "./tool-contract-declarations";
 import type { SystemModule } from "../modules/module-system-types";
-import { timerTool } from "../timers";
+import { timerTool } from "../timers/timers";
 import { json } from "./shared";
 export const timers: SystemModule = {
   name: "timers", description: "Application-owned persistent wakeups under kernel budgets.", tools: publicSystemTools.timers,

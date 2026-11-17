@@ -5,12 +5,12 @@ import { tmpdir } from "node:os";
 import { createProviderChannel } from "./provider-channel";
 import { providerRuns } from "./provider-journal";
 import { providerStartGate } from "./provider-start";
-import { createStewardService } from "../service";
-import { testDb } from "../test-db";
+import { createStewardService } from "../runtime/service";
+import { testDb } from "../__testing__/test-db";
 import { liveRuns } from "../execution/runs";
 import type { StewardPorts } from "../ports";
 import type { ProviderQuestion, ProviderInteraction } from "@chrona/contracts/steward";
-import { notice, notices } from "../test-notices";
+import { notice, notices } from "../__testing__/test-notices";
 let db: ReturnType<typeof testDb>, ports: StewardPorts, workspaceId: string, time: Date;
 let service: ReturnType<typeof createStewardService>, api: ReturnType<typeof service.forWorkspace>;
 const channels: ReturnType<typeof createProviderChannel>[] = [];
@@ -21,7 +21,7 @@ beforeEach(async () => {
 });
 afterEach(async () => { await Promise.all(channels.splice(0).map(channel => channel.close())); liveRuns.clear(); await db.$disconnect(); });
 async function fixture(observer?: (request: ProviderInteraction) => Promise<void>) {
-  const session = await db.session.create({ data: { workspaceId, key: "web:test", source: "web" } });
+  const session = await db.session.create({ data: { workspaceId, key: "web:test", source: "owner" } });
   await api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Work" });
   const run = (await api.runs.claimNext("foreground"))!, controller = new AbortController(), channel = createProviderChannel(ports, run, observer); channels.push(channel);
   liveRuns.set(run.id, { done: new Promise(() => {}), inject: async () => {}, abort: async () => { controller.abort(); await channel.close(); await api.runs.finish(run.id, { outcome: "failed", sessionId: null, error: "Abort" }); } });
@@ -114,7 +114,7 @@ test("progress is safe, deduplicated and bounded; requests publish durable notif
   expect(await db.runEvent.count()).toBe(300);
   const result = f.channel.events.question(question(), f.controller.signal), request = await waiting();
   // Notification budgets belong to notify; the kernel publishes a normal request fact.
-  expect(await notice(db)).toMatchObject({ level: "now", idempotencyKey: `provider-input:${f.run.id}` });
+  expect(await notice(db)).toMatchObject({ kind: "provider-input-required", idempotencyKey: `provider-input:${f.run.id}` });
   await api.provider.answer(request.id, { decision: "cancel" }); expect(await result).toEqual({ decision: "cancel" });
 });
 test("telemetry cannot crowd a live question or the latest usage out of the projection", async () => {
@@ -159,7 +159,7 @@ test("a failed reply receipt never releases a positive answer", async () => {
   } finally { await db.$executeRawUnsafe("DROP TRIGGER fail_provider_receipt"); }
 });
 test("a durable queued cancel is never claimed after restart", async () => {
-  const session = await db.session.create({ data: { workspaceId, key: "web:queued", source: "web" } });
+  const session = await db.session.create({ data: { workspaceId, key: "web:queued", source: "owner" } });
   const run = await api.runs.enqueue({ sessionId: session.id, lane: "background", trigger: "schedule", prompt: "Keep" });
   await db.run.update({ where: { id: run.id }, data: { cancelRequestedAt: new Date() } });
   expect(await api.runs.claimNext("background")).toBeNull();

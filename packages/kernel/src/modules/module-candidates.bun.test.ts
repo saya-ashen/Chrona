@@ -9,12 +9,12 @@ import { moduleContext } from "./module-context";
 import { advanceFixedCandidateSet, activateGroupIn, recordGroupReview } from "./module-group";
 import { createApprovals } from "../approvals";
 import { buildPending } from "./module-build";
-import { testModuleSandbox } from "./module-test-process";
+import { testModuleSandbox } from "../__testing__/module-test-process";
 import { findCandidateSet, assertCandidateSetIn } from "./module-candidate-records";
 import { commitModuleSource } from "./module-git";
 import { propose } from "./module-proposal";
-import { seedTestModuleRelease } from "./module-release-test-fixture";
-import { testDb } from "../test-db";
+import { seedTestModuleRelease } from "../__testing__/module-release-test-fixture";
+import { testDb } from "../__testing__/test-db";
 
 const closes: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const close of closes.splice(0).reverse()) await close(); });

@@ -4,9 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { admitContextPrimitive, ownedRun, view, type ModulePrincipal } from "../agent/agent-context";
 import { createRuns, liveRuns, nextLocalMidnight } from "./runs";
-import { testDb } from "../test-db";
+import { testDb } from "../__testing__/test-db";
 import type { StewardPorts } from "../ports";
-import { notices } from "../test-notices";
+import { notices } from "../__testing__/test-notices";
 import { assertTerminalRecordsReleaseQuota, assertExplicitRetryIssuesFreshAttempt } from "../__testing__/state-machine-invariants";
 let db: ReturnType<typeof testDb>, ports: StewardPorts, workspaceId: string, sessionId: string, time: Date, principal: ModulePrincipal;
 beforeEach(async () => {

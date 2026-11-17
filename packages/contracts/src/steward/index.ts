@@ -34,7 +34,7 @@ export const relativePathSchema = z.string().trim().min(1).max(500)
 // ---------------------------------------------------------------- vocab ----
 
 // "reflect": stored history of the removed reflection loop; nothing creates such sessions any more.
-export const SESSION_SOURCES = ["web", "qq", "mcp", "rescue", "wake", "module", "build", "reflect"] as const;
+export const SESSION_SOURCES = ["owner", "wake", "module", "build", "reflect"] as const;
 export const SESSION_STATUSES = ["active", "ended"] as const;
 export const RUN_LANES = ["foreground", "background", "build"] as const;
 export const RUN_TRIGGERS = ["message", "schedule", "source", "edit", "approval", "retry", "build"] as const;
@@ -114,22 +114,21 @@ export const moduleManifestSchema = z.object({
   tools: z.array(moduleToolSchema).max(30).default([]),
   /** Run from activation and restart on exit (long connections); otherwise started per event and stopped when idle. */
   keepAlive: z.boolean().default(false),
-  /** Receive on("activated") once per active version and when a module it `uses` changes version (e.g. to call web.page-set). */
+  /** Receive activation once per active version and when a declared dependency changes version. */
   activated: z.boolean().default(false),
   /** A private file directory at `chrona.paths.content`, kept with the module's data (v2-8: no longer shown to the user or the Provider; expose files through tools). */
   content: z.boolean().default(false),
   /**
    * Serves HTTP under this path (v2-4 entry modules): `chrona.serve` binds authenticated HTTP on an ephemeral IPv4 loopback port and reports it over the module channel
-   * and Chrona proxies authenticated requests to it, without `Authorization` and `Cookie`. One active module per path;
-   * kernel paths (`/api/steward*`, `/api/workspaces`, `/api/health`) are reserved. Requires keepAlive.
-   * `"/"` is the web page: every GET/HEAD outside /api, /health and /ready, unauthenticated (pages carry no data;
-   * the browser holds the user's key), so its module is an entry module (see isEntryModule).
-   * Several paths as an array (v2-8: the web page at "/" and its data API under /api/web).
+   * and Chrona forwards requests with an internal transport token. The application authenticates its own clients;
+   * Authorization, Cookie and Set-Cookie remain application-owned. One active module per path.
+   * Kernel paths (`/api/steward*`, `/api/workspaces`, `/api/health`) are reserved. Requires keepAlive.
+   * `"/"` receives GET/HEAD outside /api, /health and /ready. An array declares several listener paths.
    */
   listen: z.union([listenPath, z.array(listenPath).min(1).max(4)]).optional(),
   /**
    * Module tools this module calls through Chrona (`chrona.call`); approved with the version like any capability.
-   * `"*"`: every tool open to the user (`owner` visibility), for entry modules that offer all apps to the user (web, MCP).
+   * `"*"` declares all tools visible to the caller; it never grants owner authority.
    */
   uses: z.array(z.union([interfaceRefSchema, z.literal("*")])).default([]),
   /** Explicit owner authority, granted only through checked version activation. */
@@ -211,7 +210,7 @@ export const moduleEventSchema = z.object({
     /** The result of an async call this module made with `reply: true` (`id` is always "call"). */
     z.object({ kind: z.literal("call_result"), id: z.literal("call"), firedAt: iso, callId: z.string().max(128), target: routedTargetSchema, key: z.string().max(500),
       status: z.enum(["succeeded", "failed", "unknown"]), output: z.json().optional(), error: z.string().max(2000).optional() }).strict(),
-    /** For manifests with `activated`: once per active version, and again when a module this one `uses` changes version (e.g. to call web.page-set). */
+    /** For activated manifests: once per active version and when a declared dependency changes. */
     z.object({ kind: z.literal("activated"), id: z.literal("activated"), firedAt: iso }).strict(),
   ]),
   now: iso,
@@ -236,7 +235,6 @@ export function grantedUses(manifest: { uses?: readonly string[]; secrets?: read
   return [...new Set([...(manifest.uses ?? []), ...(manifest.secrets?.length ? SECRET_TARGETS : [])])];
 }
 /** Default notification application target; no kernel routing privilege. */
-export const NOTIFY_INTERFACE = "notify.send";
 /** Chrona's in-process system modules: reached by routed calls like modules, but part of Chrona (not proposable, not sandboxed). */
 export const SYSTEM_MODULES = ["approvals", "modules", "settings", "secrets", "activity", "timers", "agent"] as const;
 /** Longest call path; synchronous calls are refused when the target is already on their path (it is waiting). */
@@ -272,7 +270,7 @@ export type ModuleEffect = (typeof MODULE_EFFECTS)[number];
 
 // ---------------------------------------------------------------- views ----
 
-/** A conversation with the Provider. Entries decide keys (`qq:dm`, `web:<id>`, `rescue`); `wake`/`module` sessions are created per run. */
+/** Provider execution context; application conversation keys and history remain private to their owner. */
 export const sessionSchema = z.object({
   id, key: z.string().max(200), source: z.enum(SESSION_SOURCES), title: z.string().max(200).nullable(),
   status: z.enum(SESSION_STATUSES), moduleId: id.nullable(), originSessionId: id.nullable(),

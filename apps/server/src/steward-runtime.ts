@@ -1,5 +1,4 @@
-import { startRescueListener } from "./rescue";
-import { createModuleRuntimePorts, resourcePath } from "@chrona/host";
+import { createModuleRuntimePorts } from "@chrona/host";
 import type { PrismaClient } from "@chrona/db";
 import { createRegisteredProviderClient, stopAgentRuns, moduleSupervisor, createStewardService, createExecutions, createExecutionV2Admission, createExecutionWorkspaceCleanup, createExecutionEventStore, createExternalModuleInstaller, CallError, type StewardPorts } from "@chrona/kernel";
 import { loadExecutionProjects, loadExecutionPlacements } from "./config/execution-projects";
@@ -7,7 +6,6 @@ import { createExecutionProjectRegistry } from "./config/execution-project-regis
 import { createServerWorkspacePreparer } from "./execution-server-workspace";
 import { createExecutionWorkspaceCleanupHost } from "./execution-workspace-cleanup";
 import type { ProviderAdapter } from "@chrona/contracts/steward";
-import { createPiApplicationHost } from "@chrona/host";
 
 let gitAvailable: Promise<boolean> | undefined;
 function probeGit() {
@@ -47,18 +45,18 @@ function executionInitialization(ports: StewardPorts) {
 }
 export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions = {}) {
   const injected = options.provider;
-  const providerModules = injected === undefined && options.port ? { pi: createPiApplicationHost({ port: options.port, dataDir: options.dataDir }) } : undefined;
   const configured = injected === undefined ? createRegisteredProviderClient(() => ports) : injected;
   const handles = new Set<ReturnType<ProviderAdapter["start"]>>();
   let stopping = false, pending = false;
   const provider: ProviderAdapter | undefined = configured ? { name: configured.name, supportsRunModel: configured.supportsRunModel, health: () => configured.health(), ...(configured.complete ? { complete: configured.complete } : {}), ...(configured.transcript ? { transcript: configured.transcript } : {}), start(input) {
     if (stopping) throw new Error("Runtime stopping");
     const handle = configured.start(input); handles.add(handle);
-    void handle.done.finally(() => handles.delete(handle)).catch(() => {});
+    void handle.done.then(() => handles.delete(handle), error => { handles.delete(handle); console.error(JSON.stringify({ component: "runtime", event: "provider_failed", error: String(error) })); });
     return handle;
   } } : undefined;
   const ports: StewardPorts = {
-    ...createModuleRuntimePorts(db, options), provider, providerModules,
+    ...createModuleRuntimePorts(db, options), provider,
+    kernelUrl: options.port ? `http://127.0.0.1:${options.port}` : undefined,
     chatTimeoutMs: options.chatTimeoutMs,
     onQueued: () => tickOnce(), onRunFinished: async () => { wake(); },
   };
@@ -81,7 +79,6 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
   ports.onRunFinished = async () => { wake(); };
   const service = createStewardService(ports), timers = options.timers ?? globalThis;
   let timer: ReturnType<typeof setInterval> | undefined, running: Promise<void> | undefined;
-  let rescue: ReturnType<typeof startRescueListener>;
   let starting: Promise<void> | undefined;
   const canTick = () => pending && !stopping;
   function tickOnce(): Promise<void> {
@@ -112,7 +109,6 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
     start() {
       if (timer || (!options.timers && (process.env.NODE_ENV === "test" || process.env.BUN_ENV === "test" || process.argv.includes("test")))) return;
       stopping = false;
-      rescue ??= startRescueListener(service, resourcePath("rescue.html", "apps/server/src/static/rescue.html"));
       starting = moduleSupervisor(ports).start().catch(error => options.onError?.(error));
       const seconds = options.tickSeconds ?? Number(process.env.CHRONA_STEWARD_TICK_SECONDS ?? 30);
       if (Number.isFinite(seconds) && seconds > 0) timer = timers.setInterval(wake, seconds * 1000);
@@ -120,8 +116,6 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
     },
     async stop() {
       stopping = true;
-      rescue?.stop(true);
-      rescue = undefined;
       if (timer) timers.clearInterval(timer);
       timer = undefined;
       await running;

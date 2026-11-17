@@ -4,8 +4,8 @@ import { constants } from "node:fs";
 import { dirname, join } from "node:path";
 import { moduleManifestSchema, type ProviderAdapter, type ProviderRunInput } from "@chrona/contracts/steward";
 import type { StewardPorts } from "../ports";
-import { testDb } from "../test-db";
-import { testProviderPorts } from "../test-provider";
+import { testDb } from "../__testing__/test-db";
+import { testProviderPorts } from "../__testing__/test-provider";
 import { runtimeCall, startLocalProvider } from "./local-runtime";
 import { retainProviderCallbacks } from "../agent/local-provider";
 import { callProviderEndpoint, runProviderBinding } from "../agent/agent-provider";
@@ -225,8 +225,8 @@ test("admitted Provider contracts and paused modules remain fenced before launch
     await f.ports.db.moduleVersion.update({ where: { id: version.id }, data: { manifest: { ...manifest, tools: manifest.tools.map(tool => tool.name === "start" ? { ...tool, output: { type: "string" } } : tool) } } });
     await expect(startLocalProvider(f.ports, f.workspaceId, input)).rejects.toMatchObject({ code: "conflict" });
     await f.ports.db.moduleVersion.update({ where: { id: version.id }, data: { manifest: version.manifest! } });
-    await f.ports.db.module.update({ where: { id: binding.moduleId }, data: { name: "remind" } });
-    await expect(startLocalProvider(f.ports, f.workspaceId, input)).rejects.toMatchObject({ code: "unavailable", reason: "module_paused" });
+    await f.ports.db.module.update({ where: { id: binding.moduleId }, data: { status: "paused" } });
+    await expect(startLocalProvider(f.ports, f.workspaceId, input)).rejects.toMatchObject({ code: "forbidden" });
     expect(await f.ports.db.providerLaunch.count()).toBe(0);
   } finally { await f.close(); }
 });

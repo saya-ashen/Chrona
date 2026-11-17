@@ -18,7 +18,6 @@ import { isAgentContextEntry } from "../agent/agent-context-entry";
 import { admitted } from "./module-call-admission";
 export { admitted } from "./module-call-admission";
 export { moduleCallbackContractHash, validateToolArgs, moduleToolExampleError } from "./module-tool-contract";
-import { isModulePaused } from "./module-availability";
 export { registerLocalModule, registerSystemModule, listSystemModules, listLocalModules } from "./module-registry";
 
 import type { Caller, Json, CallOrigin } from "./module-call-types";
@@ -258,7 +257,6 @@ function duplicateEnqueuedCall(existing: Row, origin: CallOrigin, digest: string
   return { callId: existing.id, status: existing.status as "queued", duplicate: true };
 }
 async function enqueueIn({ tx, ports, origin, target: requestedTarget, raw }: EnqueueInput, { key, reply = false, expectedTarget }: EnqueueOptions): Promise<EnqueuedCall> {
-  if (origin.caller.kind === "module" && isModulePaused(origin.caller.module)) throw new CallError("forbidden", "Paused modules cannot enqueue calls");
   const digest = requestDigest({ args: raw, mode: "async", reply }), existing = await previousCall(tx, origin, requestedTarget, key);
   if (existing) {
     return duplicateEnqueuedCall(existing, origin, digest, expectedTarget);
@@ -369,7 +367,7 @@ function replyTarget(row: Row): RoutedTarget {
 async function replyRow(ports: StewardPorts, row: Row) {
   const { db } = ports;
   const module = row.callerModuleId ? await db.module.findUnique({ where: { id: row.callerModuleId } }) : null;
-  if (module && (isModulePaused(module.name) || module.status !== "active" || !module.activeHash)) return;
+  if (module && (module.status !== "active" || !module.activeHash)) return;
   const claimed = await db.moduleInvocation.updateMany({ where: { id: row.id, repliedAt: null, replyAttempts: row.replyAttempts }, data: { replyAttempts: { increment: 1 } } });
   if (!claimed.count || !module || !module.activeHash) return;
   const now = ports.now();

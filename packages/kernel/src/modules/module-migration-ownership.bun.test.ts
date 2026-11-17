@@ -4,7 +4,7 @@ import { join } from "node:path";
 import * as filesystem from "node:fs/promises";
 import type { Prisma } from "@chrona/db";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
-import { testDb } from "../test-db";
+import { testDb } from "../__testing__/test-db";
 import { moduleContext } from "./module-context";
 import { startMigration } from "./module-generation";
 import { migrateData, recoverMigrations, type PreparedMigration } from "./module-migration";

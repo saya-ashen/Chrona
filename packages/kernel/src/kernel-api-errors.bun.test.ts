@@ -18,7 +18,7 @@ async function fixture(inject: (original: SystemModule["handle"]) => SystemModul
   const dataDir = await mkdtemp(join(tmpdir(), "chrona-api-errors-"));
   cleanup.push(() => rm(dataDir, { recursive: true, force: true }));
   const databaseUrl = `file:${join(dataDir, "test.db")}`;
-  ensureSqliteDatabase({ databaseUrl, migrationsDir: resolve(import.meta.dirname, "../../../prisma/migrations") });
+  ensureSqliteDatabase({ databaseUrl, migrationsDir: resolve(import.meta.dirname, "../../../packages/db/prisma/migrations") });
   const db = new PrismaClient({ adapter: new PrismaBunSqlite({ url: databaseUrl }) });
   cleanup.push(() => db.$disconnect());
   const workspace = await db.workspace.create({ data: { name: "error classification" } });

@@ -33,8 +33,10 @@ describe("sqlite url helpers", () => {
     );
   });
 
-  it("keeps development default local", () => {
-    expect(resolveRuntimeDatabaseUrl({ NODE_ENV: "development" })).toBe("file:./prisma/dev.db");
+  it("keeps runtime data outside the source tree", () => {
+    const directory = join(tmpdir(), "chrona-runtime-data");
+    expect(resolveRuntimeDatabaseUrl({ NODE_ENV: "development", CHRONA_DATA_DIR: directory })).toBe(`file:${join(directory, "chrona.db")}`);
+    expect(resolveRuntimeDatabaseUrl({ NODE_ENV: "development" })).not.toContain("./prisma/");
   });
 
   it("defaults tests to an isolated local database", () => {

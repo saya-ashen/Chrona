@@ -1,22 +1,21 @@
 import { moduleMaterialDigest, moduleMaterialRecord, snapshotModuleMaterial } from "./module-artifacts";
-import { installDependencies } from "./module-dependencies";
-import { assertBuildOwnership, buildOwnershipError } from "./module-build-ownership";
+import { installDependencies } from "./checks/module-dependencies";
+import { assertBuildOwnership, buildOwnershipError } from "./checks/module-build-ownership";
 import { StewardError } from "../errors";
 import { checkoutModule } from "./module-files";
 import { versionMaterial } from "./module-source";
 import { moduleModelSettings } from "../settings";
 import { assertExternalModule, ModuleIdentityError } from "./module-identity";
-import { ModuleUnavailableError } from "./module-availability";
 import { chmod, mkdir, rename, rm } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { notifyLifecycle } from "../notify-user";
 import { intentSchema, json, requireModule, type ModuleContext, type ModuleVersion, type BuildReport, type Proposal } from "./module-context";
-import { runTests, checkContinuity } from "./module-continuity";
+import { runTests, checkContinuity } from "./checks/module-continuity";
 import { advanceFixedCandidateSet } from "./module-group";
 import { audit } from "../audit";
-import { smokeRun } from "./module-probe";
-import { typecheckBuild, typecheckErrors } from "./module-typecheck";
+import { smokeRun } from "./checks/module-probe";
+import { typecheckBuild, typecheckErrors } from "./checks/module-typecheck";
 import { moduleOutputImpacts } from "./module-output-impact";
 import { moduleToolExampleError } from "./module-tool-contract";
 
@@ -61,7 +60,7 @@ async function modelManifestError(context: ModuleContext, manifest: ReturnType<t
   if (!manifest.model) return null;
   const workspace = await context.db.workspace.findUniqueOrThrow({ where: { id: context.workspaceId } });
   const limits = moduleModelSettings(workspace.settings);
-  return !limits ? "Module model capability unavailable: the owner must configure moduleModel first (web page Settings > 模块模型, or settings.update); Chrona cannot set it for them"
+  return !limits ? "Module model capability unavailable: the owner must configure moduleModel through settings.update first; Chrona cannot set it for them"
     : manifest.model.maxCalls > limits.maxCallsPerEvent || manifest.model.maxOutputTokens > limits.maxOutputTokens ? "Module model limits exceed owner moduleModel settings" : null;
 }
 async function validateBuildManifest(context: ModuleContext, version: ModuleVersion, manifest: ReturnType<typeof moduleManifestSchema.parse>, report: BuildReport) {
@@ -212,7 +211,7 @@ export async function buildPending(context: ModuleContext, now = context.ports.n
     let result: Proposal, identityRejected = false;
     try { result = await buildVersion(context, version); }
     catch (error) {
-      if (!(error instanceof ModuleIdentityError || error instanceof ModuleUnavailableError || error instanceof ExactReleaseUpdateError)) throw error;
+      if (!(error instanceof ModuleIdentityError || error instanceof ExactReleaseUpdateError)) throw error;
       identityRejected = true;
       console.error(JSON.stringify({ component: "module-build", event: "candidate.rejected", versionId: version.id, error: error.message }));
       const report: BuildReport = { ...(version.report as BuildReport), tests: [], errors: [String(error).slice(0, 4000)] };

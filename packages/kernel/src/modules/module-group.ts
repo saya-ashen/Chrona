@@ -17,7 +17,6 @@ import { requiresCapabilityApproval } from "./module-owner";
 import { assertCandidateSetIn, findCandidateSet, readCandidateSetIn, setCandidateSetStateIn, type CandidateSet } from "./module-candidate-records";
 import { recordApprovalFact, recordWithdrawal } from "../notification-facts";
 import { ModuleIdentityError } from "./module-identity";
-import { ModuleUnavailableError } from "./module-availability";
 import { assertExecutionModuleIdle } from "../execution/execution-module-guard";
 
 /**
@@ -92,7 +91,7 @@ async function fixedSetIn(context: ModuleContext, tx: Prisma.TransactionClient, 
   return findCandidateSet({ ...context, db: tx as ModuleContext["db"] }, version);
 }
 function candidateConflict(error: unknown): error is Error {
-  return error instanceof StewardError || error instanceof ModuleIdentityError || error instanceof ModuleUnavailableError;
+  return error instanceof StewardError || error instanceof ModuleIdentityError;
 }
 async function rejectFixedSetIn(context: ModuleContext, tx: Prisma.TransactionClient, set: CandidateSet, reason: string) {
   await setCandidateSetStateIn(context, tx, set, "rejected");

@@ -2,7 +2,7 @@ import { PrismaClient } from "@/generated/prisma/client";
 import { inDatabaseTransaction, transactionAwareClient } from "./transaction-context";
 import { guardSqliteAdapter } from "./sqlite-adapter-guards";
 export { afterDatabaseCommit } from "./transaction-context";
-import { applyChronaRuntimeConfigToEnv } from "@chrona/shared/runtime-config";
+import { applyChronaRuntimeConfigToEnv } from "@chrona/runtime-config";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -50,7 +50,7 @@ function createAdapter(databaseUrl: string) {
 
 function createDbClient() {
   const databaseUrl = resolveEffectiveDatabaseUrl();
-  const migrationsDir = process.env.CHRONA_MIGRATIONS_DIR ?? resolve(import.meta.dirname, "../../../prisma/migrations");
+  const migrationsDir = process.env.CHRONA_MIGRATIONS_DIR ?? resolve(import.meta.dirname, "../prisma/migrations");
   if (process.env.NODE_ENV === "test") {
     ensureSqliteDatabase({
       databaseUrl,
