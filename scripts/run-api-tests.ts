@@ -1,158 +1,30 @@
-
-/**
- * Concurrent API test runner.
- *
- * Files that share cross-file DB state stay serial; isolated files run with
- * bounded concurrency, each against its own temp database.
- */
-
-export {};
-
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { runTestFiles } from "./run-bun-tests";
 
 const glob = new Bun.Glob("*.bun.test.{ts,tsx}");
-const rootDir = process.cwd();
-const tempParent = resolve(rootDir, ".tmp");
-const listOnly = process.argv.includes("--list");
-const requestedFiles = process.argv.slice(2).filter(arg => arg !== "--list").map((p) => p.replace(/^\.\//u, ""));
-const concurrency = Math.max(
-	1,
-	Number(process.env.CHRONA_TEST_CONCURRENCY ?? "4"),
-);
 // Every server test, not only the HTTP map walk: the server holds the authenticated listen proxy.
 const dirs = ["apps/server/src/__tests__/api", "apps/server/src/__tests__", "apps/server/src", "apps/server/src/config", "apps/server/src/middleware"];
-const serialFiles = new Set<string>();
 
-let exitCode = 0;
-const failedFiles: Array<{ file: string; code: number }> = [];
-
-async function runFile(
-	path: string,
-	dbPath: string,
-	dataDir: string,
-): Promise<number> {
-	if (existsSync(dbPath)) {
-		rmSync(dbPath, { force: true });
-	}
-
-	let initCode = 1;
-	for (let attempt = 0; attempt < 3; attempt += 1) {
-		const initProc = Bun.spawn(
-			["bun", "run", "scripts/init-sqlite-db.ts", dbPath],
-			{
-				cwd: rootDir,
-				stdout: "inherit",
-				stderr: "inherit",
-			},
-		);
-		initCode = await initProc.exited;
-		if (initCode === 0) break;
-		if (attempt < 2) await Bun.sleep(250 * (attempt + 1));
-	}
-	if (initCode !== 0) {
-		return initCode;
-	}
-
-	const proc = Bun.spawn(["bun", "test", "--timeout=20000", `./${path}`], {
-		cwd: rootDir,
-		env: {
-			...process.env,
-			DATABASE_URL: `file:${dbPath}`,
-			CHRONA_DATA_DIR: dataDir,
-			NODE_ENV: "test",
-		},
-		stdout: "inherit",
-		stderr: "inherit",
-	});
-	return await proc.exited;
-}
-
-const discoveredFiles: string[] = [];
-if (requestedFiles.length > 0) {
-	for (const candidate of requestedFiles) {
-		if (!candidate.startsWith("apps/server/") || !existsSync(candidate)) {
-			console.error(`Invalid API test file: ${candidate}`);
-			process.exit(1);
-		}
-		discoveredFiles.push(candidate);
-	}
-} else {
-	for (const dir of dirs) {
-		const entries = (await Array.fromAsync(glob.scan(dir))).sort((a, b) =>
-			a.localeCompare(b),
-		);
-		for (const file of entries) {
-			discoveredFiles.push(`${dir}/${file}`);
-		}
-	}
-}
-
-if (listOnly) {
-	console.log(JSON.stringify(discoveredFiles));
-	process.exit(0);
-}
-mkdirSync(tempParent, { recursive: true });
-const tempDir = mkdtempSync(join(tempParent, "api-tests-"));
-const files: Array<{ file: string; dbPath: string; dataDir: string }> =
-	discoveredFiles.map((fullPath, idx) => ({
-		file: fullPath,
-		dbPath: resolve(tempDir, `${idx}-${fullPath.replaceAll("/", "-")}.db`),
-		dataDir: resolve(tempDir, `${idx}-${fullPath.replaceAll("/", "-")}-data`),
-	}));
-
-const serial = files.filter(({ file }) => serialFiles.has(file));
-const parallel = files.filter(({ file }) => !serialFiles.has(file));
-console.log(
-	`Running ${serial.length} serial API test file${serial.length === 1 ? "" : "s"} and ${parallel.length} parallel API test file${parallel.length === 1 ? "" : "s"} with concurrency ${concurrency}...`,
-);
-
-try {
-	for (const { file, dbPath, dataDir } of serial) {
-		const code = await runFile(file, dbPath, dataDir);
-		if (code !== 0) {
-			exitCode = code;
-			failedFiles.push({ file, code });
-		}
-	}
-
-	const active = new Set<Promise<void>>();
-	const launch = (file: string, dbPath: string, dataDir: string) => {
-		const job = (async () => {
-			const code = await runFile(file, dbPath, dataDir);
-			if (code !== 0) {
-				exitCode = code;
-				failedFiles.push({ file, code });
+async function discoverTestFiles(): Promise<string[]> {
+	const requestedFiles = process.argv.slice(2).filter(arg => arg !== "--list").map(path => path.replace(/^\.\//u, ""));
+	if (requestedFiles.length > 0) {
+		for (const candidate of requestedFiles) {
+			if (!candidate.startsWith("apps/server/") || !existsSync(candidate)) {
+				throw new Error(`Invalid API test file: ${candidate}`);
 			}
-		})();
-		active.add(job);
-		job.finally(() => active.delete(job));
-	};
-
-	for (const { file, dbPath, dataDir } of parallel) {
-		while (active.size >= concurrency) {
-			await Promise.race(active);
 		}
-		launch(file, dbPath, dataDir);
+		return requestedFiles;
 	}
-
-	await Promise.all(active);
-} finally {
-	for (const { dbPath } of files) {
-		if (existsSync(dbPath)) {
-			rmSync(dbPath, { force: true });
-		}
+	const files: string[] = [];
+	for (const dir of dirs) {
+		const entries = (await Array.fromAsync(glob.scan(dir))).sort((a, b) => a.localeCompare(b));
+		for (const file of entries) files.push(`${dir}/${file}`);
 	}
-	if (existsSync(tempDir)) {
-		rmSync(tempDir, { recursive: true, force: true });
-	}
+	return files;
 }
 
-if (failedFiles.length > 0) {
-	console.error("\nFailed API test files:");
-	for (const failure of failedFiles) {
-		console.error(`  - ${failure.file} (exit ${failure.code})`);
-	}
+if (import.meta.main) {
+	const files = await discoverTestFiles();
+	if (process.argv.includes("--list")) console.log(JSON.stringify(files));
+	else process.exit(await runTestFiles(files, "API"));
 }
-
-process.exit(exitCode);

@@ -54,11 +54,11 @@ function runtimeInterpreter(declared: Runtime, code: string) {
   if (!interpreter) throw new Error(`模块运行环境不可用：需要 ${programs.join(" / ")}`);
   return interpreter;
 }
-function moduleCommand(code: string, entry: ModuleEntry, typecheck: string): { program: string; argv: string[]; sdk?: boolean } {
+function moduleCommand(code: string, entry: ModuleEntry, sdk: string): { program: string; argv: string[]; sdk?: boolean } {
   if (typeof entry !== "string") return explicitModuleCommand(code, entry);
   const declared = runtime(entry);
   return { program: runtimeInterpreter(declared, code), sdk: declared.sdk,
-    argv: [...declared.argv, ...(declared.preload ? ["--preload", join(typecheck, declared.preload)] : []), moduleEntryFile(code, entry)] };
+    argv: [...declared.argv, ...(declared.preload ? ["--preload", join(sdk, declared.preload)] : []), moduleEntryFile(code, entry)] };
 }
 function moduleEnvironment(dirs: ModuleDirs, sdkEnabled: boolean, interpreter: string, sdk: string, helper: string): Record<string, string> {
   const excluded = new Set(["CHRONA_SOCKET", "CHRONA_HTTP_SOCKET", "CHRONA_IPC_ENDPOINT", "CHRONA_IPC_TOKEN", "CHRONA_HOST_GENERATION", "CHRONA_HOST_STOP_RECEIPT"]);
@@ -85,9 +85,9 @@ function moduleHostReceipt(hostData: string, env: Record<string, string>) {
   return { path, generation };
 }
 /** Trusted local processes retain OS permissions; routed declarations govern only Chrona calls. */
-export function createScriptSandbox({ executionMode = "trusted-local", dataDir, timeoutMs = 60_000, maxOutputBytes = 64 * 1024, moduleSdk = fileURLToPath(new URL("../../../app-sdk", import.meta.url)), moduleTypecheck = fileURLToPath(new URL("../../../app-sdk/typecheck", import.meta.url)), processHelper }: {
+export function createScriptSandbox({ executionMode = "trusted-local", dataDir, timeoutMs = 60_000, maxOutputBytes = 64 * 1024, moduleSdk = fileURLToPath(new URL("../../../app-sdk", import.meta.url)), processHelper }: {
   executionMode?: "trusted-local"; dataDir?: string; timeoutMs?: number; maxOutputBytes?: number;
-  moduleSdk?: string; moduleTypecheck?: string; processHelper?: string;
+  moduleSdk?: string; processHelper?: string;
 } = {}) {
   assertExecutionMode(executionMode);
   limits(timeoutMs, maxOutputBytes);
@@ -96,12 +96,12 @@ export function createScriptSandbox({ executionMode = "trusted-local", dataDir, 
     const validated = moduleEntrySchema.parse(entry);
     const code = directory(dirs.codeDir), data = directory(dirs.dataDir);
     const content = dirs.contentDir ? directory(dirs.contentDir) : undefined;
-    const command = moduleCommand(code, validated, moduleTypecheck);
+    const command = moduleCommand(code, validated, moduleSdk);
     const interpreter = command.program;
     const sdk = dataDir ? join(resolve(dataDir), "platform/node_modules/chrona") : resolve(moduleSdk);
     const helper = processHelper ?? process.env.CHRONA_PROCESS_HELPER ?? fileURLToPath(new URL(`../../../process/bin/${process.platform}-${process.arch}/chrona-process-guardian${process.platform === "win32" ? ".exe" : ""}`, import.meta.url));
     const env = moduleEnvironment({ ...dirs, codeDir: code, dataDir: data, contentDir: content }, command.sdk === true, interpreter, sdk, helper);
-    if (command.sdk) env.CHRONA_SDK_LOADER = join(moduleTypecheck, "chrona-sdk-loader.ts");
+    if (command.sdk) env.CHRONA_SDK_LOADER = join(moduleSdk, "chrona-sdk-loader.ts");
     const supervision = processCapability({ helperPath: processHelper });
     if (!supervision.available || supervision.scope !== "descendants") throw new Error(supervision.reason ?? "Full descendant supervision is not verified for this platform");
     const stopReceipt = dirs.ipcEndpoint ? moduleHostReceipt(dataDir ?? dirname(data), env) : undefined;

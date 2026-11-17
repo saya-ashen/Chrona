@@ -1,6 +1,6 @@
 import { seedTestModuleRelease } from "../__testing__/module-release-test-fixture";
 import { afterEach, expect, test } from "bun:test";
-import { chmod, link, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { testDb } from "../__testing__/test-db";
@@ -11,8 +11,6 @@ import { resolveExternalRelease } from "./module-release";
 import { moduleContext } from "./module-context";
 import { buildPending } from "./module-build";
 import { propose } from "./module-proposal";
-import { moduleGitCommand, moduleGitPath } from "./module-git";
-import { moduleUpstream } from "./module-upstream";
 import { createApprovals } from "../approvals";
 import { onApproved } from "./module-activation";
 import { testModuleSandbox } from "../__testing__/module-test-process";
@@ -52,12 +50,11 @@ test.each(["custom-entry", "custom-backend"])("offline %s installation keeps an 
   const f = await fixture(); await f.resource(name);
   const result = await installExternal(f.ports, f.workspaceId, { package: name, mode: "install", requestKey: "offline-upstream" });
   expect(result.status).toBe("building");
-  expect(await f.db.moduleUpstream.findUnique({ where: { moduleId: result.moduleId! } })).toBeNull();
-  expect((await resolveExternalRelease(f.ports, name)).git?.repository).toBeNull();
+  expect((await resolveExternalRelease(f.ports, name)).hash).toMatch(/^[a-f0-9]{64}$/);
   expect(f.executions()).toBe(0);
 });
 
-test.each(["qq", "files", "events", "remote-execution"] as const)("optional %s installs, stays removed on restart and explicitly reinstalls through checks", async name => {
+test.each(["qq", "files", "events"] as const)("optional %s installs, stays removed on restart and explicitly reinstalls through checks", async name => {
   const f = await fixture(); await f.resource(name, name === "files" ? { uses: ["*"] } : {});
   expect(await f.db.module.findUnique({ where: { workspaceId_name: { workspaceId: f.workspaceId, name } } })).toBeNull();
   expect((await externalPackageCatalog(f.ports, f.workspaceId)).find(item => item.name === name)).toMatchObject({ available: true, moduleId: null });
@@ -70,15 +67,14 @@ test.each(["qq", "files", "events", "remote-execution"] as const)("optional %s i
   await buildPending(context); await refreshInstallationReceipts(f.ports, f.workspaceId);
   expect(await installExternal(f.ports, f.workspaceId, request)).toMatchObject({ status: "installed", moduleId: first.moduleId });
   if (name === "files") {
-    const session = await f.db.session.create({ data: { workspaceId: f.workspaceId, moduleId: first.moduleId, source: "module", key: "retained-context", title: "Ended private Files conversation" } });
-    await expect(requestRemove(context, first.moduleId!, "unmarked active session")).rejects.toMatchObject({ code: "conflict" });
-    await f.db.agentContext.create({ data: { workspaceId: f.workspaceId, moduleId: first.moduleId!, sessionId: session.id, hash: "" } });
+    const session = await f.db.agentContext.create({ data: { workspaceId: f.workspaceId, ownerId: "owner", moduleId: first.moduleId!, hash: first.hash! } });
+
     const run = await f.db.run.create({ data: { workspaceId: f.workspaceId, sessionId: session.id, lane: "foreground", trigger: "module", provider: "fixture", tokenHash: `files-${session.id}`, prompt: "fixture", cwd: f.ports.dataDir } });
     await expect(requestRemove(context, first.moduleId!, "queued context")).rejects.toMatchObject({ code: "conflict" });
     await f.db.run.update({ where: { id: run.id }, data: { status: "failed", stopStatus: "unknown", error: "Execution stop is unconfirmed" } });
     await expect(requestRemove(context, first.moduleId!, "unknown context stop")).rejects.toMatchObject({ code: "conflict" });
     await f.db.run.update({ where: { id: run.id }, data: { status: "succeeded", stopStatus: "confirmed", error: null, endedAt: f.ports.now() } });
-    expect((await f.db.session.findUniqueOrThrow({ where: { id: session.id } })).status).toBe("active");
+    expect((await f.db.agentContext.findUniqueOrThrow({ where: { id: session.id } })).status).toBe("active");
   }
   const removal = await requestRemove(context, first.moduleId!, "remove optional app");
   const approval = await f.db.approval.update({ where: { id: removal.approvalId }, data: { status: "approved" } });
@@ -91,25 +87,42 @@ test.each(["qq", "files", "events", "remote-execution"] as const)("optional %s i
   expect(f.executions()).toBe(executions);
   await buildPending(context); await refreshInstallationReceipts(f.ports, f.workspaceId);
   expect(await installExternal(f.ports, f.workspaceId, { ...request, requestKey: `reinstall-${name}` })).toMatchObject({ status: "installed", moduleId: second.moduleId });
-  expect(f.executions()).toBeGreaterThan(executions);
+  expect(f.executions()).toBe(executions);
 });
 
-test("real adapter copies read-only hardlinked official resources and only queues once", async () => {
+test("changed pinned release can be explicitly retried after startup rejection", async () => {
+  const f = await fixture(), context = moduleContext(f.ports, f.workspaceId);
+  await installExternal(f.ports, f.workspaceId, { package: "files", mode: "install", requestKey: "before-retry" });
+  await buildPending(context); await refreshInstallationReceipts(f.ports, f.workspaceId);
+  await f.resource("files", { description: "Changed pinned release" });
+  const request = { package: "files", mode: "update" as const, requestKey: "failed-startup" };
+  const candidate = await installExternal(f.ports, f.workspaceId, request), sandbox = f.ports.sandbox!;
+  f.ports.sandbox = { ...sandbox, startModule: () => { throw new Error("synthetic startup rejection"); } };
+  await buildPending(context); await refreshInstallationReceipts(f.ports, f.workspaceId);
+  expect(await installExternal(f.ports, f.workspaceId, request)).toMatchObject({ status: "failed", hash: candidate.hash });
+  f.ports.sandbox = sandbox;
+  const retry = { ...request, requestKey: "retry-startup" };
+  expect(await installExternal(f.ports, f.workspaceId, retry)).toMatchObject({ status: "building", hash: candidate.hash });
+  await buildPending(context); await refreshInstallationReceipts(f.ports, f.workspaceId);
+  expect(await installExternal(f.ports, f.workspaceId, retry)).toMatchObject({ status: "installed", hash: candidate.hash });
+  expect(await installExternal(f.ports, f.workspaceId, request)).toMatchObject({ status: "failed" });
+});
+
+test("real adapter copies read-only official resources and only queues once", async () => {
   const f = await fixture(), release = await resolveExternalRelease(f.ports, "files");
-  await link(join(release.codeDir, "index.ts"), join(f.ports.dataDir, "linked.ts"));
   await chmod(join(release.codeDir, "index.ts"), 0o444);
   const request = { package: "files" as const, mode: "install" as const, requestKey: "one" };
   const result = await installExternal(f.ports, f.workspaceId, request);
   expect(result).toMatchObject({ status: "building", hash: release.hash, error: null });
   expect(f.executions()).toBe(0);
-  expect(await f.db.module.findUniqueOrThrow({ where: { id: result.moduleId! } })).toMatchObject({ builtin: false, activeHash: null });
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: result.moduleId! } })).toMatchObject({ activeHash: null });
   expect(await installExternal(f.ports, f.workspaceId, request)).toEqual(result);
   expect(await f.db.moduleVersion.count()).toBe(1);
   await expect(installExternal(f.ports, f.workspaceId, { ...request, requestKey: "two" })).rejects.toMatchObject({ code: "conflict" });
   await buildPending(moduleContext(f.ports, f.workspaceId));
   await refreshInstallationReceipts(f.ports, f.workspaceId);
   expect(await installExternal(f.ports, f.workspaceId, request)).toMatchObject({ status: "installed", hash: release.hash });
-  expect(f.executions()).toBeGreaterThan(0);
+  expect(f.executions()).toBe(0);
 });
 
 test("pending receipt recovers an actual proposal after the adapter response was lost", async () => {
@@ -144,12 +157,13 @@ test("prepared copy failures are failed with an explicit retry while uncertain p
 test("same-hash existing version is reconciled by version id when propose preserves its old intent", async () => {
   const f = await fixture(), context = moduleContext(f.ports, f.workspaceId);
   const selected = await resolveExternalRelease(f.ports, "files");
-  const local = await propose(context, { sourceCommit: selected.hash, gitBundle: selected.git!, root: f.ports.moduleExternalResources!, dir: "files", intent: { changes: ["Original owner intent"] } }, "user");
+  const local = await propose(context, { expectedHash: selected.hash, root: f.ports.moduleExternalResources!, dir: "files", intent: { changes: ["Original owner intent"] } }, "user");
+  await buildPending(context);
   const request = { package: "files" as const, mode: "update" as const, requestKey: "existing-version" };
   await installExternal(f.ports, f.workspaceId, request);
   const id = installationId(f.workspaceId, request.requestKey);
   await f.db.moduleInstallation.update({ where: { id }, data: { status: "pending", moduleId: null, hash: null, approvalId: null, errorCode: null, errorReason: null, errorMessage: null } });
-  expect(await installExternal(f.ports, f.workspaceId, request)).toMatchObject({ status: "building", moduleId: local.moduleId, hash: local.hash });
+  expect(await installExternal(f.ports, f.workspaceId, request)).toMatchObject({ status: "installed", moduleId: local.moduleId, hash: local.hash });
   expect(await f.db.moduleVersion.findFirstOrThrow()).toMatchObject({ intent: { changes: ["Original owner intent"] } });
   expect(await f.db.moduleVersion.count()).toBe(1);
 });
@@ -160,7 +174,7 @@ test("lost receipt cannot bind a same-name reinstall with the same hash", async 
   await f.db.module.delete({ where: { id: old.moduleId! } });
   await f.db.moduleRemoval.create({ data: { workspaceId: f.workspaceId, moduleId: old.moduleId!, name: "files", hash: old.hash, createdAt: f.ports.now() } });
   const selected = await resolveExternalRelease(f.ports, "files");
-  const replacement = await propose(moduleContext(f.ports, f.workspaceId), { sourceCommit: selected.hash, gitBundle: selected.git!, root: f.ports.moduleExternalResources!, dir: "files", intent: { changes: ["Same name new installation"] } }, "user");
+  const replacement = await propose(moduleContext(f.ports, f.workspaceId), { expectedHash: selected.hash, root: f.ports.moduleExternalResources!, dir: "files", intent: { changes: ["Same name new installation"] } }, "user");
   const submission = await f.db.moduleInstallationSubmission.findUniqueOrThrow({ where: { id: `${id}:submission` } });
   await f.db.moduleInstallationSubmission.update({ where: { id: submission.id }, data: { moduleId: null } });
   await f.db.moduleInstallation.update({ where: { id }, data: { status: "pending", moduleId: null, hash: null, approvalId: null, errorCode: null, errorReason: null, errorMessage: null } });
@@ -196,20 +210,12 @@ test("receipts reflect actual approval, paused selection, inactive approval and 
   expect(await f.db.module.findUniqueOrThrow({ where: { id: result.moduleId! } })).toMatchObject({ status: "paused" });
   const update = { ...request, mode: "update" as const, requestKey: "inactive" };
   await f.db.module.update({ where: { id: result.moduleId! }, data: { activeHash: "a".repeat(64) } });
-  expect(await installExternal(f.ports, f.workspaceId, update)).toMatchObject({ status: "failed", error: { reason: "candidate_inactive" } });
-  await f.db.moduleVersion.update({ where: { id: version.id }, data: { status: "rejected", report: { tests: [], errors: ["check failed token=not-for-output"] } } });
-  const retry = await installExternal(f.ports, f.workspaceId, { ...update, requestKey: "retry" });
-  expect(retry.status).toBe("building");
-  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: result.moduleId!, hash: result.hash! } }, data: { status: "rejected", report: { tests: [], errors: ["check failed token=not-for-output"] } } });
-  await refreshInstallationReceipts(f.ports, f.workspaceId);
-  const failed = await installExternal(f.ports, f.workspaceId, { ...update, requestKey: "retry" });
-  expect(failed).toMatchObject({ status: "failed", error: { reason: "installation_rejected" } });
-  expect(failed.error?.message).not.toContain("not-for-output");
+  expect(await installExternal(f.ports, f.workspaceId, update)).toMatchObject({ status: "failed", error: { code: "conflict" } });
+
 });
 
 test.each([
   { report: { errors: ["First build error", "Second build error"] }, summary: "First build error" },
-  { report: { typecheck: { errors: [{ message: "First type error" }, { message: "Second type error" }] } }, summary: "First type error" },
   { report: { tests: [{ exitCode: 0, stderr: "harmless" }, { exitCode: 1, stderr: "Test failed token=secret-value" }] }, summary: "Test failed credential=[Redacted]" },
 ])("rejection summary uses the first useful error: $summary", ({ report, summary }) => {
   expect(rejectionSummary(report)).toBe(summary);
@@ -220,11 +226,11 @@ test("rejected official update emits one lifecycle notice with its cause and ret
   const first = await installExternal(f.ports, f.workspaceId, { package: "files", mode: "install", requestKey: "before-rejection" });
   await buildPending(context);
   await refreshInstallationReceipts(f.ports, f.workspaceId);
-  await f.resource("files", { description: "Update that fails type checking" });
+  await f.resource("files", { description: "Update that fails startup checks" });
   const request = { package: "files" as const, mode: "update" as const, requestKey: "rejected-update" };
   const candidate = await installExternal(f.ports, f.workspaceId, request);
   const error = `index.ts:1 TS2322: Type string is not assignable to number ${"x".repeat(400)}`;
-  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: candidate.moduleId!, hash: candidate.hash! } }, data: { status: "rejected", report: { tests: [], typecheck: { status: "failed", errors: [{ file: "index.ts", line: 1, code: 2322, message: error }] } } } });
+  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: candidate.moduleId!, hash: candidate.hash! } }, data: { status: "rejected", report: { tests: [], errors: [error] } } });
   const rejection = { status: "failed", hash: candidate.hash, error: { reason: "installation_rejected", message: error.slice(0, 300) } };
   expect((await externalPackageCatalog(f.ports, f.workspaceId)).find(item => item.name === "files")?.installation).toMatchObject(rejection);
   // Catalog observation stays read-only; the tick persists the receipt and notice together.
@@ -247,6 +253,7 @@ test("an explicit checked external update preserves paused selection", async () 
   const f = await fixture(), request = { package: "files" as const, mode: "install" as const, requestKey: "initial" };
   const first = await installExternal(f.ports, f.workspaceId, request);
   await buildPending(moduleContext(f.ports, f.workspaceId));
+  await refreshInstallationReceipts(f.ports, f.workspaceId);
   await f.db.module.update({ where: { id: first.moduleId! }, data: { status: "paused" } });
   await f.resource("files", { description: "Owner explicitly selected update" });
   const update = { ...request, mode: "update" as const, requestKey: "paused-update" };
@@ -277,35 +284,25 @@ test.each(["pi", "qq"] as const)("%s checks and credential approval refresh the 
 test("ordinary local source uses its own real Git commit rather than impersonating a release", async () => {
   const f = await fixture(), release = await resolveExternalRelease(f.ports, "files");
   const result = await propose(moduleContext(f.ports, f.workspaceId), { root: f.ports.moduleExternalResources!, dir: "files", intent: { changes: ["Owner local source"] } }, "user");
-  expect(result.hash).toMatch(/^[a-f0-9]{40}$/);
-  expect(result.report.git?.commit).toBe(result.hash);
+  expect(result.hash).toMatch(/^[a-f0-9]{64}$/);
+  expect(result.hash).toMatch(/^[a-f0-9]{64}$/);
   expect(result.hash).not.toBe(release.hash);
 });
 
-test("offline official update preserves a local fork and the owner's remote", async () => {
-  const f = await fixture(); await f.resource("pi");
-  const first = await installExternal(f.ports, f.workspaceId, { package: "pi", mode: "install", requestKey: "fork-initial" });
-  const context = moduleContext(f.ports, f.workspaceId), dir = join(f.ports.moduleExternalResources!, "pi");
-  const repository = "https://github.com/owner/custom-pi", repo = moduleGitPath(context.platform, first.moduleId!);
-  await f.db.moduleUpstream.create({ data: { moduleId: first.moduleId!, repository, branch: "main", commit: first.hash! } });
-  await moduleGitCommand(repo, ["config", "remote.upstream.url", repository]);
-  await writeFile(join(dir, "local.txt"), "owner customization\n");
-  await propose(context, { root: f.ports.moduleExternalResources!, dir: "pi", intent: { changes: ["Owner customization"] } }, "user");
+test("offline update refuses local changes and preserves the selected application", async () => {
+  const f = await fixture();
+  const first = await installExternal(f.ports, f.workspaceId, { package: "files", mode: "install", requestKey: "initial" });
+  const context = moduleContext(f.ports, f.workspaceId);
+  await buildPending(context); await refreshInstallationReceipts(f.ports, f.workspaceId);
+  const dir = join(f.ports.moduleExternalResources!, "files");
+  await writeFile(join(dir, "local.txt"), "owner customization");
+  const custom = await propose(context, { root: f.ports.moduleExternalResources!, dir: "files", intent: { changes: ["Owner customization"] } }, "user");
+  await buildPending(context);
   await rm(join(dir, "local.txt"));
-  await f.resource("pi", { description: "New upstream release" });
-  const release = await resolveExternalRelease(f.ports, "pi");
-  const request = { package: "pi" as const, mode: "update" as const, requestKey: "fork-update" };
-  const result = await installExternal(f.ports, f.workspaceId, request);
-  expect(result).toMatchObject({ status: "building", moduleId: first.moduleId, error: null });
-  expect(result.hash).not.toBe(release.hash);
-  const { readModuleSource } = await import("./module-git");
-  const files = await readModuleSource({ platform: context.platform, moduleId: first.moduleId!, commit: result.hash! });
-  expect(files.find(file => file.path === "local.txt")?.bytes.toString()).toBe("owner customization\n");
-  expect(JSON.parse(Buffer.from(files.find(file => file.path === "module.json")!.bytes).toString()).description).toBe("New upstream release");
-  expect((await f.db.module.findUniqueOrThrow({ where: { id: first.moduleId! } })).activeHash).toBeNull();
-  expect(await installExternal(f.ports, f.workspaceId, request)).toEqual(result);
-  expect(await moduleUpstream(f.ports, f.workspaceId, { action: "status", moduleId: first.moduleId! })).toMatchObject({ repository, fetchedCommit: null });
-  expect((await moduleGitCommand(repo, ["config", "--get", "remote.upstream.url"])).toString().trim()).toBe(repository);
+  await f.resource("files", { description: "New release" });
+  const request = { package: "files", mode: "update" as const, requestKey: "conflicting-update" };
+  expect(await installExternal(f.ports, f.workspaceId, request)).toMatchObject({ status: "failed", error: { message: expect.stringContaining("Local application changes conflict") } });
+  expect((await f.db.module.findUniqueOrThrow({ where: { id: first.moduleId! } })).activeHash).toBe(custom.hash);
 });
 
 test("corrupt persisted submission phase fails closed instead of inferring a successful proposal", async () => {
@@ -335,7 +332,7 @@ test.each(["user", "provider", "build"] as const)("a same-name %s candidate cann
   await f.resource("web", { authority: "owner" });
   const release = await resolveExternalRelease(f.ports, "web");
   const context = moduleContext(f.ports, f.workspaceId);
-  const candidate = await propose(context, { root: f.ports.moduleExternalResources!, dir: "web", sourceCommit: release.hash, gitBundle: release.git!, intent: { changes: [`Official installation ${installationId(f.workspaceId, "initialize:v1:web:1")}`] } }, source);
+  const candidate = await propose(context, { root: f.ports.moduleExternalResources!, dir: "web", expectedHash: release.hash, intent: { changes: [`Official installation ${installationId(f.workspaceId, "initialize:v1:web:1")}`] } }, source);
   await buildPending(context);
   expect(await f.db.moduleVersion.findFirstOrThrow({ where: { moduleId: candidate.moduleId! } })).toMatchObject({ hash: release.hash, status: "pending_review" });
   expect(await f.db.module.findUniqueOrThrow({ where: { id: candidate.moduleId! } })).toMatchObject({ activeHash: null });

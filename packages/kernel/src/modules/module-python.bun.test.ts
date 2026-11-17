@@ -1,10 +1,11 @@
+import { seedTestModuleRelease } from "../__testing__/module-release-test-fixture";
 import { afterEach, expect, test } from "bun:test";
 import "./module-effects";
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createScriptSandbox } from "../../../host/src/runtime/script-sandbox";
 import runtimeTable from "../../../host/src/runtimes.json";
+import { createScriptSandbox } from "../../../host/src/runtime/script-sandbox";
 import { createApprovals } from "../approvals";
 import { createModules } from "./modules";
 import { moduleSupervisor } from "./module-supervisor";
@@ -93,7 +94,7 @@ async function fixture() {
   const db = testDb({ injectedAgent: false }), dataDir = await realpath(await mkdtemp(join(tmpdir(), "chrona-python-")));
   const runtime = createScriptSandbox({ executionMode: "trusted-local", dataDir });
   const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => new Date(),
-    moduleRuntimes: runtimeTable, sandbox: { ...runtime.health, runModule: runtime.runModule, startModule: runtime.startModule } };
+    sandbox: { ...runtime.health, runModule: runtime.runModule, startModule: runtime.startModule } };
   const supervisor = moduleSupervisor(ports);
   cleanups.push(async () => { await supervisor.stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "python-acceptance" } });
@@ -105,6 +106,7 @@ async function fixture() {
   await writeFile(join(dir, "main.py"), mainSource);
   await writeFile(join(dir, "test.py"), testSource);
   const propose = () => modules.propose({ root, dir: manifest.name, intent }, "user");
+  await seedTestModuleRelease(root, manifest.name);
   return { db, dataDir, dir, workspace, modules, approvals, propose };
 }
 

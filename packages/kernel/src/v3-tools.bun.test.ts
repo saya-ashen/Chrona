@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdtemp,} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createTestAgentContext } from "./__testing__/test-provider";
 import { testDb } from "./__testing__/test-db";
 import { createRuns } from "./execution/runs";
 import { createApprovals } from "./approvals";
@@ -10,7 +11,7 @@ import type { StewardPorts } from "./ports";
 let db: ReturnType<typeof testDb>, ports: StewardPorts, workspaceId: string, sessionId: string;
 beforeEach(async () => {
   db = testDb(); workspaceId = (await db.workspace.create({ data: { name: "tools" } })).id;
-  sessionId = (await db.session.create({ data: { workspaceId, key: "web:tools", source: "owner" } })).id;
+  sessionId = (await createTestAgentContext(db, workspaceId)).id;
   ports = { db, dataDir: await mkdtemp(join(tmpdir(), "chrona-tools-")), now: () => new Date("2026-10-15T04:00:00Z"), publicUrl: null };
 });
 afterEach(async () => { await db.$disconnect(); });

@@ -3,7 +3,7 @@ import { onApproved } from "./module-activation";
 import { assertExecutionModuleIdle } from "../execution/execution-module-guard";
 import { requiresCapabilityApproval } from "./module-owner";
 import { activationNotice } from "./module-activation-notice";
-import { fenceExecutionVersionChange } from "../execution/execution-delivery-controls";
+import { fenceAgentVersionChange } from "../agent/module-drain";
 import { StewardError } from "../errors";
 import { readVersionSource, versionSource } from "./module-source";
 import { assertExternalModule, ModuleIdentityError } from "./module-identity";
@@ -11,14 +11,13 @@ import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { createApprovals } from "../approvals";
-import { intentSchema, groupPayloadSchema, json, requireModule, expireModuleApprovals, type ModuleContext, type ModuleVersion, type BuildReport, type Proposal } from "./module-context";
-import { advanceFixedCandidateSet, isGroupCandidate, recordGroupReview } from "./module-group";
-import { findCandidateSet } from "./module-candidate-records";
+import { intentSchema, json, requireModule, expireModuleApprovals, type ModuleContext, type ModuleVersion, type BuildReport, type Proposal } from "./module-context";
+import { CandidateIdentityError, assertCandidateVersionIn, refreshCandidateReceipt, setCandidateSetStateIn } from "./module-candidate-records";
+import { recordApprovalFact } from "../notification-facts";
 import { dataEmpty } from "./module-data";
 import { redactSensitiveText } from "@chrona/logging/redaction";
 import { activateIn } from "./module-generation";
 import { audit } from "../audit";
-import { outputImpactSummary } from "./module-output-impact";
 import { codeDifference, compactDiff, continuityPreview, insertCodeDiff } from "./module-preview";
 
 
@@ -45,16 +44,13 @@ export function reviewManifest(value: unknown) {
 async function reviewPreview(context: ModuleContext, review: Review, active: Awaited<ReturnType<ModuleContext["db"]["moduleVersion"]["findUnique"]>>) {
   const { version, module, report, files, needsMigration } = review, { hash } = version;
   const manifest = moduleManifestSchema.parse(version.manifest), intent = intentSchema.parse(version.intent);
-  // Only what changes (v2-22): two whole manifests could fill an approval, and a group's would not fit one.
   const diff = ["--- active", "+++ proposed", ...compactDiff(active?.manifest ? reviewManifest(active.manifest) : "", reviewManifest(manifest))].join("\n");
-  const results = report.tests.map((result, index) => ({ test: manifest.tests[index], exitCode: result.exitCode }));
   const prefix = reviewPrefix(manifest, report, diff);
-  const impactPreview = report.outputImpacts?.length ? `依赖这些工具契约的应用需随本次更新一并检查（不会自动修改调用方）：\n${outputImpactSummary(report.outputImpacts).join("\n")}\n` : "";
-  const suffix = `${impactPreview}${continuityPreview(report.continuity!, needsMigration)}意图：${JSON.stringify(intent)}\n测试：${JSON.stringify(results)}\nhash: ${hash}`;
+  const suffix = `${continuityPreview(report.continuity!, needsMigration)}意图：${JSON.stringify(intent)}\nhash: ${hash}`;
   // Fail closed rather than silently hiding manifest or intent being approved.
-  let preview: string | null = null, codeDiff = "";
-  if ((prefix + suffix).length <= 20_000) preview = insertCodeDiff(prefix, suffix, codeDiff = codeDifference(module.activeHash ? await readVersionSource(context, module.id, module.activeHash) : [], files), hash);
-  return { active, manifest, hash, preview, parts: { prefix, suffix, codeDiff } };
+  let preview: string | null = null;
+  if ((prefix + suffix).length <= 20_000) preview = insertCodeDiff(prefix, suffix, codeDifference(module.activeHash ? await readVersionSource(context, module.id, module.activeHash) : [], files), hash);
+  return { active, manifest, hash, preview };
 }
 const SUPERSEDED = "Superseded by newer candidate ";
 export const superseded = (report: unknown) => (report as BuildReport | null)?.errors?.[0]?.startsWith(SUPERSEDED) === true;
@@ -74,10 +70,13 @@ function addsCredentials(version: ModuleVersion, active: ModuleVersion | null) {
 /** Checks passed and nothing needs the owner: activate now and tell them afterwards. */
 async function activateChecked(context: ModuleContext, { version, module }: Review, update: boolean) {
   const { hash } = version, manifest = moduleManifestSchema.parse(version.manifest);
-  await fenceExecutionVersionChange(context.ports, context.workspaceId, module.id, hash,
-    (tx, current) => assertExactReleaseUpdateIn(context, tx, module.id, version.report as BuildReport, current));
+  await fenceAgentVersionChange(context.ports, context.workspaceId, module.id, hash,
+    async (tx, current) => {
+      await assertCandidateVersionIn(context, tx, version);
+      await assertExactReleaseUpdateIn(context, tx, module.id, version.report as BuildReport, current);
+    });
   await context.db.$transaction(async tx => {
-    if (await findCandidateSet({ ...context, db: tx as ModuleContext["db"] }, version)) throw new StewardError("conflict", "Fixed candidates activate only through their receipt");
+    const receipt = await assertCandidateVersionIn(context, tx, version);
     const candidate = await tx.moduleVersion.findUnique({ where: { id: version.id } });
     if (candidate?.status !== "pending_review") throw new StewardError("conflict", "Module candidate is no longer pending review");
     const current = await assertExternalModule(tx, context.workspaceId, module.id, "activate");
@@ -89,21 +88,17 @@ async function activateChecked(context: ModuleContext, { version, module }: Revi
     await activateIn(context, tx, { moduleId: module.id, hash, reason: "activate" });
     await audit(tx, { workspaceId: context.workspaceId, actor: "chrona", kind: "module_auto_activated", subjectId: module.id, details: { versionId: version.id, hash } });
     await activationNotice(context, tx, version, update);
+    if (receipt) await setCandidateSetStateIn(context, tx, receipt, "approved");
   });
   await supersedeCandidates(context, module.id, hash);
-}
-async function groupReview(context: ModuleContext, { version, module, report }: Review, parts: Parameters<typeof recordGroupReview>[2]): Promise<Proposal | null> {
-  if (!await recordGroupReview(context, version, parts)) return null;
-  const set = await advanceFixedCandidateSet(context, version);
-  const status = set?.state === "approved" ? "approved" : set?.state === "rejected" ? "rejected" : "pending_review";
-  return { moduleId: module.id, hash: version.hash, status, ...(set?.approvalId ? { approvalId: set.approvalId } : {}), report };
 }
 export async function requestReview(context: ModuleContext, review: Review): Promise<Proposal> {
   const { db } = context, { version, module, report } = review, { hash } = version;
   await assertExactReleaseUpdateIn(context, db, module.id, report);
+  await assertCandidateVersionIn(context, db, version);
   const active = module.activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } }) : null;
   await assertExternalModule(db, context.workspaceId, module.id, "activate");
-  if (!await isGroupCandidate(context, version) && !review.needsMigration && !addsCredentials(version, active)) {
+  if (!review.needsMigration && !addsCredentials(version, active)) {
     try { await activateChecked(context, review, !!active); }
     catch (error) {
       // Only unresolved execution is a retryable wait; keep this exact checked version.
@@ -124,44 +119,50 @@ export async function requestReview(context: ModuleContext, review: Review): Pro
     }
     return { moduleId: module.id, hash, status: "approved", report };
   }
-  const { preview, parts } = await reviewPreview(context, review, active);
+  const { preview } = await reviewPreview(context, review, active);
   if (preview === null) {
     report.errors = ["Review preview exceeds 20000 characters (manifest diff, intent and results); shrink the manifest change or split the update"];
     await db.moduleVersion.update({ where: { moduleId_hash: { moduleId: module.id, hash } }, data: { status: "rejected", report: json(report) } });
     return { moduleId: module.id, hash, status: "rejected", report };
   }
   const card = { moduleId: module.id, action: "activate_module" as const, title: `启用模块 ${module.name}`,
-    detail: review.needsMigration ? "此版本需要迁移已有数据" : addsCredentials(version, active) ? "此版本需要新的凭据或 owner 权限" : "与同一构建的其他应用一起启用", payload: { kind: "activate_module" as const, moduleId: module.id, hash }, preview };
-  // v2-15: one module of a group build waits for the group's single approval (modules.request-group), never alone or automatically.
-  const group = await groupReview(context, review, { ...parts, detail: card.detail, needsMigration: review.needsMigration });
-  if (group) return group;
-  await expireModuleApprovals(context, module.id);
+    detail: review.needsMigration ? "此版本需要迁移已有数据" : addsCredentials(version, active) ? "此版本需要新的凭据或 owner 权限" : "启用此固定版本", payload: { kind: "activate_module" as const, moduleId: module.id, hash }, preview };
   await supersedeCandidates(context, module.id, hash);
-  const approval = await createApprovals(context).create(card);
+  const approval = await db.$transaction(async tx => {
+    const receipt = await assertCandidateVersionIn(context, tx, version);
+    await assertExactReleaseUpdateIn(context, tx, module.id, report);
+    const candidate = await tx.moduleVersion.findUnique({ where: { id: version.id } });
+    if (candidate?.status !== "pending_review") throw new StewardError("conflict", "Module candidate is no longer pending review");
+    const current = await assertExternalModule(tx, context.workspaceId, module.id, "activate");
+    if (current.activeHash !== module.activeHash || current.activationId !== module.activationId) throw new StewardError("conflict", "Module changed during review");
+    await expireModuleApprovals(context, module.id, tx);
+    const row = await tx.approval.create({ data: { ...card, workspaceId: context.workspaceId, createdAt: context.now() } });
+    await recordApprovalFact(tx, row);
+    await audit(tx, { workspaceId: context.workspaceId, actor: "chrona", kind: "approval_created", subjectId: row.id, details: { action: card.action } });
+    if (receipt) await setCandidateSetStateIn(context, tx, receipt, "pending_approval", row.id);
+    return row;
+  });
   return { moduleId: module.id, hash, status: "pending_review", approvalId: approval.id, report };
 }
 function approvalCoversVersion(payload: unknown, version: ModuleVersion) {
   const single = payload as { hash?: unknown } | null;
-  return single?.hash === version.hash || groupPayloadSchema.safeParse(payload).data?.versions.some(member => member.moduleId === version.moduleId && member.hash === version.hash) === true;
+  return single?.hash === version.hash;
 }
 async function recoverReview(context: ModuleContext, version: ModuleVersion) {
   const { db, workspaceId } = context;
-  const fixed = await findCandidateSet(context, version);
-  if (fixed) {
-    const set = await advanceFixedCandidateSet(context, version);
-    if (!set || set.state !== "submitted") return;
-  }
+  const fixed = await refreshCandidateReceipt(context, version);
+  if (fixed?.state === "approved" || fixed?.state === "rejected") return;
   const module = await assertExternalModule(db, workspaceId, version.moduleId, "activate");
+  if (module.status === "migrating") return;
   await assertExactReleaseUpdateIn(context, db, module.id, version.report as BuildReport, module);
-  if (version.status !== "pending_review" || (!fixed && await isGroupCandidate(context, version))) return;
+  if (version.status !== "pending_review") return;
   const approvals = await db.approval.findMany({ where: { workspaceId, action: "activate_module" } });
-  const covering = approvals.filter(row => row.moduleId === version.moduleId && approvalCoversVersion(row.payload, version));
+  const covering = approvals.filter(row => row.moduleId === version.moduleId && approvalCoversVersion(row.payload, version) && (!fixed || row.id === fixed.approvalId));
   if (covering.length) {
     const approved = covering.find(row => row.status === "approved");
     if (approved) await createApprovals(context, action => onApproved(context, action)).resolve(approved.id, { decision: "approve" }, "recovery");
     return;
   }
-  if (approvals.some(row => approvalCoversVersion(row.payload, version))) return;
   const waiting = (version.report as DrainReport | null)?.activationWait;
   // A later activation (even of the same hash) invalidates the original automatic intent.
   if (waiting && (!module.executionFenceAt || waiting.activeHash !== module.activeHash || waiting.activationId !== module.activationId)) return;
@@ -176,7 +177,6 @@ async function recoveredReviewMaterial(context: ModuleContext, version: ModuleVe
   if (!report?.continuity) return null;
   const source = await versionSource(context, version);
   const files = source.files;
-  report.git = source.revision;
   const manifest = moduleManifestSchema.parse(version.manifest);
   const needsMigration = module.dataSchema !== null && manifest.data.schema > module.dataSchema && !await dataEmpty(join(context.platform, "data", module.id));
   return { version, module, report, files, needsMigration };
@@ -193,13 +193,14 @@ export async function recoverReviews(context: ModuleContext) {
     const candidates = await db.moduleVersion.findMany({ where: { module: { workspaceId }, status: { in: ["pending_review", "rejected"] } } });
     for (const version of candidates) {
       try {
-        if (version.status === "rejected") { await advanceFixedCandidateSet(context, version); continue; }
+        if (version.status === "rejected") { await refreshCandidateReceipt(context, version); continue; }
         await recoverReview(context, version);
       } catch (error) {
-        if (error instanceof ModuleIdentityError || error instanceof ExactReleaseUpdateError) {
+        if (error instanceof ModuleIdentityError || error instanceof ExactReleaseUpdateError || error instanceof CandidateIdentityError) {
           console.error(JSON.stringify({ component: "module-build", event: "review.rejected", versionId: version.id, error: error.message }));
           await db.moduleVersion.updateMany({ where: { id: version.id, status: "pending_review" }, data: { status: "rejected", report: json({ ...(version.report as BuildReport), errors: [error.message] }) } });
           await expireModuleApprovals(context, version.moduleId);
+          await refreshCandidateReceipt(context, version);
           continue;
         }
         console.error(JSON.stringify({ level: "error", component: "module-build", event: "review.recovery_failed", versionId: version.id,

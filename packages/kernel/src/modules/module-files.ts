@@ -64,23 +64,41 @@ export class ModuleSnapshot {
   async verify() {
     for (const check of this.checks.values()) {
       let unchanged = false;
-      try { unchanged = await check(); } catch { /* Disappearance is also a changed snapshot. */ }
+      try { unchanged = await check(); }
+      catch (error) { throw Object.assign(new StewardError("conflict", "Module material changed during snapshot"), { cause: error }); }
       if (!unchanged) throw new StewardError("conflict", "Module material changed during snapshot");
     }
   }
   async close() { for (const handle of [...this.directories.values()].reverse()) await handle.close(); }
 }
-/** Linux RENAME_NOREPLACE publishes a whole private object without replacing even an empty winner. */
-function publishDirectory(parent: FileHandle, temporary: string, destination: string) {
+/** Native no-replace flags preserve even an empty existing winner for caller verification. */
+export function publishModuleDirectory(parent: FileHandle, temporary: string, destination: string, sourceParent: FileHandle = parent) {
+  if (process.platform === "darwin") {
+    const library = dlopen("/usr/lib/libSystem.B.dylib", {
+      renameatx_np: { args: [FFIType.i32, FFIType.ptr, FFIType.i32, FFIType.ptr, FFIType.u32], returns: FFIType.i32 },
+      __error: { args: [], returns: FFIType.ptr },
+    });
+    try {
+      const from = Buffer.from(`${temporary}\0`), to = Buffer.from(`${destination}\0`);
+      // XNU sys/stdio.h defines RENAME_EXCL = 0x4; sys/errno.h exposes errno through __error().
+      if (library.symbols.renameatx_np(sourceParent.fd, ptr(from), parent.fd, ptr(to), 0x4) === 0) return;
+      const errno = read.i32(library.symbols.__error()!);
+      if (errno === 17) return; // EEXIST leaves the complete existing winner to its caller.
+      throw new StewardError("conflict", `Atomic artifact publication failed (errno ${errno})`);
+    } finally { library.close(); }
+  }
   for (const name of process.platform === "linux" ? ["libc.so.6", "libc.so"] : []) {
     let library;
     try { library = dlopen(name, {
       renameat2: { args: [FFIType.i32, FFIType.ptr, FFIType.i32, FFIType.ptr, FFIType.u32], returns: FFIType.i32 },
       __errno_location: { args: [], returns: FFIType.ptr },
-    }); } catch { continue; }
+    }); } catch (error) {
+      console.error(JSON.stringify({ component: "module-files", event: "publication.library_unavailable", library: name, error: String(error) }));
+      continue;
+    }
     try {
       const from = Buffer.from(`${temporary}\0`), to = Buffer.from(`${destination}\0`);
-      if (library.symbols.renameat2(parent.fd, ptr(from), parent.fd, ptr(to), 1) === 0) return;
+      if (library.symbols.renameat2(sourceParent.fd, ptr(from), parent.fd, ptr(to), 1) === 0) return;
       if (read.i32(library.symbols.__errno_location()!) === 17) return; // Caller verifies the complete existing winner.
       throw new StewardError("conflict", "Atomic artifact publication failed");
     } finally { library.close(); }
@@ -150,7 +168,7 @@ export class ModuleDirectory {
         await directory.write({ path: "bytes", bytes }, 0o444);
         await directory.handle.sync();
       } finally { await directory.close(); }
-      publishDirectory(this.handle, temporary, name);
+      publishModuleDirectory(this.handle, temporary, name);
       await this.handle.sync();
     } finally { await rm(target, { recursive: true, force: true }); }
   }
@@ -195,8 +213,7 @@ export async function snapshotModule(root: string, path: string): Promise<Module
         if (files.length >= MODULE_SOURCE_MAX_FILES) throw new StewardError("invalid", "Module exceeds file limits");
         const file = await dir.read(entry.name, MODULE_SOURCE_MAX_BYTES - total);
         total += file.bytes.byteLength;
-        // Preserve the legacy snapshot/hash representation.
-        files.push({ path: relative, bytes: file.bytes });
+        files.push({ ...file, path: relative });
       }
     }
   }

@@ -1,8 +1,11 @@
 import { randomUUID } from "node:crypto";
 import {
+  closeSync,
   copyFileSync,
   existsSync,
+  fsyncSync,
   lstatSync,
+  openSync,
   readdirSync,
   readFileSync,
   readlinkSync,
@@ -16,9 +19,9 @@ import { Database } from "bun:sqlite";
 import { acquireSqliteRuntimeLock, type SqliteRuntimeLock } from "./sqlite-runtime-lock";
 import { ensurePrivateDirectory, secureGeneratedPrivateFile, sqlitePathFromFileUrl } from "./sqlite-url";
 
-import { backupDataFiles, backupDataRoots, replaceDataFiles, stageDataFiles } from "./sqlite-backup-files";
+import { backupDataFiles, backupDataRoots, recoverDataFiles, replaceDataFiles, stageDataFiles, type RestoreDataFiles } from "./sqlite-backup-files";
 
-const RESTORE_MARKER_VERSION = 1;
+const RESTORE_MARKER_VERSION = 2;
 
 export type SqliteBackupResult = {
   sourcePath: string;
@@ -32,7 +35,8 @@ type RestoreMarker = {
   recoveryPath: string | null;
   retiredPath: string | null;
   stagedPath: string | null;
-  phase: "staged" | "prior_retired" | "replaced";
+  phase: "staged" | "replacing" | "replaced" | "recovered";
+  files?: RestoreDataFiles;
 };
 
 type RestoreOptions = {
@@ -42,6 +46,8 @@ type RestoreOptions = {
   rename?: (from: string, to: string) => void;
   /** Test seam for interruption after old WAL sidecars are retired. */
   onSidecarsRemoved?: () => void;
+  /** Test seam for process termination between directory/DB renames and marker writes. */
+  onRestoreStep?: (step: string) => void;
 };
 
 function requireFilePath(databaseUrl: string): string {
@@ -101,9 +107,9 @@ function assertOutsideDataRoots(dataDir: string, ...paths: string[]): void {
 
 /** The runtime lock covers the service. On Linux, also refuse orphaned app/Agent
  * processes whose launch directory is still inside the data roots. */
-function assertPrivateProcessesStopped(dataDir: string) {
+function assertPrivateProcessesStopped(dataDir: string, preservedRoots: string[] = []) {
   if (process.platform !== "linux") return;
-  const roots = [resolve(dataDir, "platform"), resolve(dataDir, "sessions")];
+  const roots = [resolve(dataDir, "platform"), resolve(dataDir, "sessions"), ...preservedRoots];
   for (const name of readdirSync("/proc")) {
     if (!/^\d+$/.test(name) || Number(name) === process.pid) continue;
     let cwd: string;
@@ -113,7 +119,7 @@ function assertPrivateProcessesStopped(dataDir: string) {
       if (code === "ENOENT" || code === "ESRCH" || code === "EACCES" || code === "EPERM") continue;
       throw error;
     }
-    if (roots.some(root => cwd === root || cwd.startsWith(`${root}${sep}`))) throw new Error(`Backup requires stopped application processes (pid ${name}).`);
+    if (roots.some(root => cwd === root || cwd.startsWith(`${root}${sep}`))) throw new Error(`Backup and restore require stopped application processes (pid ${name}).`);
   }
 }
 
@@ -131,6 +137,7 @@ export function backupSqliteDatabase(databaseUrl: string, outputPath: string, da
   createPrivateDirectory(dirname(backupPath));
   const lock = dataDir ? acquireSqliteRuntimeLock(databaseUrl) : null;
   try {
+    if (existsSync(restoreMarkerPath(sourcePath))) throw new Error("Recover the interrupted restore before creating a backup.");
     if (dataDir) assertPrivateProcessesStopped(dataDir);
     if (dataDir && existsSync(`${backupPath}.tar`)) throw new Error("Backup archive already exists.");
     vacuumInto(sourcePath, backupPath);
@@ -147,8 +154,24 @@ function restoreMarkerPath(databasePath: string): string {
 
 function writeRestoreMarker(databasePath: string, marker: RestoreMarker): void {
   const markerPath = restoreMarkerPath(databasePath);
-  writeFileSync(markerPath, `${JSON.stringify(marker)}\n`, { mode: 0o600 });
-  secureGeneratedFile(markerPath);
+  const temporaryPath = `${markerPath}.${randomUUID()}.tmp`;
+  try {
+    const file = openSync(temporaryPath, "wx", 0o600);
+    try {
+      secureGeneratedFile(temporaryPath);
+      writeFileSync(file, `${JSON.stringify(marker)}\n`);
+      fsyncSync(file);
+    } finally { closeSync(file); }
+    renameSync(temporaryPath, markerPath);
+  } finally { rmSync(temporaryPath, { force: true }); }
+}
+
+function validRestoreFiles(files: RestoreDataFiles): boolean {
+  return typeof files.dataDir === "string" && files.dataDir === resolve(files.dataDir)
+    && typeof files.stage === "string" && dirname(files.stage) === files.dataDir
+    && files.stage.startsWith(resolve(files.dataDir, ".restore-files-"))
+    && Array.isArray(files.originalRoots) && files.originalRoots.every(root => backupDataRoots.includes(root))
+    && new Set(files.originalRoots).size === files.originalRoots.length;
 }
 
 function readRestoreMarker(databasePath: string): RestoreMarker | null {
@@ -159,54 +182,64 @@ function readRestoreMarker(databasePath: string): RestoreMarker | null {
     if (
       marker.version === RESTORE_MARKER_VERSION
       && marker.activePath === databasePath
-      && ["staged", "prior_retired", "replaced"].includes(marker.phase ?? "")
+      && ["staged", "replacing", "replaced", "recovered"].includes(marker.phase ?? "")
+      && (marker.recoveryPath === null || typeof marker.recoveryPath === "string" && dirname(marker.recoveryPath) === dirname(databasePath) && marker.recoveryPath.startsWith(`${databasePath}.pre-restore-`))
+      && (marker.retiredPath === null || typeof marker.retiredPath === "string" && dirname(marker.retiredPath) === dirname(databasePath) && marker.retiredPath.startsWith(`${databasePath}.pre-restore-`))
+      && (marker.stagedPath === null || typeof marker.stagedPath === "string" && dirname(marker.stagedPath) === dirname(databasePath) && marker.stagedPath.startsWith(`${databasePath}.restore-stage-`))
+      && (marker.files === undefined || marker.files !== null && validRestoreFiles(marker.files))
     ) {
       return marker as RestoreMarker;
     }
-  } catch {
-    // Invalid marker is not safe to ignore: it may represent an interrupted replacement.
+  } catch (error) {
+    throw new Error("Chrona found an unreadable restore recovery marker; inspect the data directory before retrying.", { cause: error });
   }
-  throw new Error("Chrona found an unreadable restore recovery marker; inspect the data directory before retrying.");
+  throw new Error("Chrona found an invalid restore recovery marker; inspect the data directory before retrying.");
 }
 
-function restoreVerifiedRecoverySnapshot(databasePath: string, marker: RestoreMarker): void {
+function restoreVerifiedRecoverySnapshot(databasePath: string, marker: RestoreMarker, onRestoreStep?: (step: string) => void): void {
   if (!marker.recoveryPath || !existsSync(marker.recoveryPath)) {
     throw new Error("Chrona restore recovery cannot find the verified pre-restore database.");
   }
   if (existsSync(databasePath)) {
     // Preserve the uncertain main file before removing sidecars or replacing it.
-    renameSync(databasePath, `${databasePath}.restore-interrupted-${process.pid}-${Date.now()}`);
+    renameSync(databasePath, `${databasePath}.restore-interrupted-${randomUUID()}`);
   }
+  onRestoreStep?.("recovery_database_retired");
   removeSqliteSidecars(databasePath);
-  const recoveryStage = `${databasePath}.restore-recovery-${process.pid}-${Date.now()}`;
+  const recoveryStage = `${databasePath}.restore-recovery-${randomUUID()}`;
   copyFileSync(marker.recoveryPath, recoveryStage);
   assertHealthySqliteDatabase(recoveryStage);
+  onRestoreStep?.("recovery_database_staged");
   renameSync(recoveryStage, databasePath);
+  onRestoreStep?.("recovery_database_replaced");
 }
 
-/** Repairs an interrupted restore without accepting a main DB separated from its WAL. */
-export function recoverInterruptedSqliteRestore(databaseUrl: string): void {
+/** Repairs the whole restore before startup can open a DB paired with different private files. */
+export function recoverInterruptedSqliteRestore(databaseUrl: string, onRestoreStep?: (step: string) => void): void {
   const databasePath = requireFilePath(databaseUrl);
   const marker = readRestoreMarker(databasePath);
   if (!marker) return;
-
-  // Once the old main file was retired, a replacement may be incomplete or a
-  // rollback may have restored a main file after its WAL was removed. The
-  // verified recovery snapshot is authoritative in either case.
-  if (marker.phase === "prior_retired") {
-    restoreVerifiedRecoverySnapshot(databasePath, marker);
-  } else if (!existsSync(databasePath)) {
-    if (marker.recoveryPath && existsSync(marker.recoveryPath)) {
-      restoreVerifiedRecoverySnapshot(databasePath, marker);
-    } else if (marker.retiredPath && existsSync(marker.retiredPath)) {
-      renameSync(marker.retiredPath, databasePath);
-    } else {
-      throw new Error("Chrona restore recovery cannot find either the active or preserved database.");
-    }
+  if (marker.files) {
+    assertOutsideDataRoots(marker.files.dataDir, databasePath);
+    assertPrivateProcessesStopped(marker.files.dataDir, [marker.files.stage, ...backupDataRoots.map(root => `${marker.files!.stage}-prior-${root}`)]);
   }
-
-  assertHealthySqliteDatabase(databasePath);
-  if (marker.stagedPath && existsSync(marker.stagedPath)) rmSync(marker.stagedPath, { force: true });
+  if (marker.phase === "replacing") {
+    if (marker.recoveryPath) {
+      restoreVerifiedRecoverySnapshot(databasePath, marker, onRestoreStep);
+    } else {
+      if (existsSync(databasePath)) renameSync(databasePath, `${databasePath}.restore-interrupted-${randomUUID()}`);
+      removeSqliteSidecars(databasePath);
+    }
+    onRestoreStep?.("database_recovered");
+    if (marker.files) recoverDataFiles(marker.files, () => onRestoreStep?.("root_recovered"));
+    marker.phase = "recovered";
+    writeRestoreMarker(databasePath, marker);
+    onRestoreStep?.("recovered");
+  }
+  if (marker.phase === "replaced" || marker.recoveryPath) assertHealthySqliteDatabase(databasePath);
+  if (marker.stagedPath) rmSync(marker.stagedPath, { force: true });
+  if (marker.files) rmSync(marker.files.stage, { recursive: true, force: true });
+  onRestoreStep?.("cleaned");
   rmSync(restoreMarkerPath(databasePath), { force: true });
 }
 
@@ -238,7 +271,7 @@ function prepareRestore(
   if (existsSync(databasePath) && !force) throw new Error("Chrona database already exists. Pass --force to replace it.");
   assertHealthySqliteDatabase(sourcePath);
   createPrivateDirectory(dirname(databasePath));
-  const unique = `${process.pid}-${Date.now()}`;
+  const unique = randomUUID();
   const stagedPath = `${databasePath}.restore-stage-${unique}`;
   const hasCurrentDatabase = existsSync(databasePath);
   const retiredPath = hasCurrentDatabase ? `${databasePath}.pre-restore-${unique}` : null;
@@ -265,30 +298,33 @@ function rollbackRetiredDatabase(prepared: PreparedRestore, rename: (from: strin
   if (existsSync(prepared.databasePath) || !prepared.retiredPath || !existsSync(prepared.retiredPath)) return;
   try {
     rename(prepared.retiredPath, prepared.databasePath);
-  } catch {
-    // The durable marker makes the next start/restore repair this state.
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException | null)?.code;
+    console.error(JSON.stringify({ component: "sqlite-restore", event: "rollback.deferred", error: { code: ["EACCES", "EPERM", "ENOENT", "EEXIST", "ENOTEMPTY", "EXDEV", "EBUSY", "EIO"].includes(code ?? "") ? code : "rename_failed" } }));
   }
 }
 
 function replaceStagedDatabase(
   prepared: PreparedRestore,
   rename: (from: string, to: string) => void,
-  onSidecarsRemoved: (() => void) | undefined,
+  options: RestoreOptions,
 ): void {
-  if (prepared.retiredPath) {
-    // Retire the main database before removing its WAL sidecars. If anything
-    // interrupts after this point, the marker makes the verified WAL-aware
-    // recovery snapshot authoritative rather than accepting a stale main file.
-    rename(prepared.databasePath, prepared.retiredPath);
-    prepared.marker = { ...prepared.marker, phase: "prior_retired" };
-    writeRestoreMarker(prepared.databasePath, prepared.marker);
-  }
+  // Publish rollback intent before the first rename, including the main/WAL retirement gap.
+  prepared.marker.phase = "replacing";
+  writeRestoreMarker(prepared.databasePath, prepared.marker);
+  options.onRestoreStep?.("replacing");
+  if (prepared.marker.files) replaceDataFiles(prepared.marker.files, () => options.onRestoreStep?.("root_replaced"));
+  if (prepared.retiredPath) rename(prepared.databasePath, prepared.retiredPath);
+  options.onRestoreStep?.("database_retired");
   removeSqliteSidecars(prepared.databasePath);
-  onSidecarsRemoved?.();
+  options.onSidecarsRemoved?.();
   rename(prepared.stagedPath, prepared.databasePath);
+  options.onRestoreStep?.("database_replaced");
+  assertHealthySqliteDatabase(prepared.databasePath);
   prepared.marker = { ...prepared.marker, phase: "replaced", stagedPath: null };
   writeRestoreMarker(prepared.databasePath, prepared.marker);
-  assertHealthySqliteDatabase(prepared.databasePath);
+  options.onRestoreStep?.("replaced");
+  if (prepared.marker.files) rmSync(prepared.marker.files.stage, { recursive: true, force: true });
   rmSync(restoreMarkerPath(prepared.databasePath), { force: true });
 }
 
@@ -301,10 +337,32 @@ function restoreWithLock(
   const prepared = prepareRestore(lock, databaseUrl, inputPath, options.force);
   const rename = options.rename ?? renameSync;
   try {
+    if (options.dataDir) {
+      const dataDir = resolve(options.dataDir);
+      const originalRoots = backupDataRoots.filter(root => lstatSync(resolve(dataDir, root), { throwIfNoEntry: false }) !== undefined);
+      if (!options.force && originalRoots.some(root => {
+        const path = resolve(dataDir, root);
+        return !lstatSync(path).isDirectory() || readdirSync(path).length > 0;
+      })) throw new Error("Chrona platform, sessions or secrets directories are non-empty or unsafe. Pass --force to replace them.");
+      const stage = stageDataFiles(dataDir, `${prepared.sourcePath}.tar`);
+      prepared.marker.files = { dataDir, stage, originalRoots };
+      stampRestoredAppDirectories(stage);
+    }
     stageRestore(prepared);
-    replaceStagedDatabase(prepared, rename, options.onSidecarsRemoved);
+    options.onRestoreStep?.("staged");
+    replaceStagedDatabase(prepared, rename, options);
   } catch (error) {
-    rollbackRetiredDatabase(prepared, rename);
+    if (prepared.marker.files) {
+      try {
+        if (existsSync(restoreMarkerPath(prepared.databasePath))) recoverInterruptedSqliteRestore(databaseUrl);
+        else {
+          rmSync(prepared.stagedPath, { force: true });
+          rmSync(prepared.marker.files.stage, { recursive: true, force: true });
+        }
+      } catch (recoveryError) {
+        throw new AggregateError([error, recoveryError], "Chrona restore failed; recovery is pending in the restore marker.");
+      }
+    } else rollbackRetiredDatabase(prepared, rename);
     throw error;
   }
   return { sourcePath: prepared.sourcePath, backupPath: prepared.databasePath, recoveryPath: prepared.recoveryPath };
@@ -332,28 +390,8 @@ export function restoreSqliteDatabase(
   if (options.dataDir) assertOutsideDataRoots(options.dataDir, requireFilePath(databaseUrl), resolve(inputPath));
   const lock = acquireSqliteRuntimeLock(databaseUrl);
   try {
-    if (!options.dataDir) return restoreWithLock(lock, databaseUrl, inputPath, options);
-    // Check SQLite and overwrite guards before staging or replacing any directories.
-    prepareRestore(lock, databaseUrl, inputPath, options.force);
-    if (!options.force && backupDataRoots.some(root => {
-      const path = resolve(options.dataDir!, root);
-      const stat = lstatSync(path, { throwIfNoEntry: false });
-      return stat && (!stat.isDirectory() || readdirSync(path).length > 0);
-    })) {
-      throw new Error("Chrona platform, sessions or secrets directories are non-empty or unsafe. Pass --force to replace them.");
-    }
-    const stage = stageDataFiles(options.dataDir, `${resolve(inputPath)}.tar`);
-    try {
-      stampRestoredAppDirectories(stage);
-    } catch (error) {
-      rmSync(stage, { recursive: true, force: true });
-      throw error;
-    }
-    let result: ReturnType<typeof restoreWithLock> | undefined;
-    replaceDataFiles(options.dataDir, stage, () => {
-      result = restoreWithLock(lock, databaseUrl, inputPath, options);
-    });
-    return result!;
+    if (options.dataDir) assertPrivateProcessesStopped(options.dataDir);
+    return restoreWithLock(lock, databaseUrl, inputPath, options);
   } finally {
     lock.release();
   }

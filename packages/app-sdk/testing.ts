@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 import { createLoopbackChannel } from "./transport";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
-import type { Trigger, CallOptions } from "./sdk";
+import type { Trigger, CallOptions, CallState } from "./sdk";
 
 type Call = { id: string; method: string; params: Record<string, unknown> };
 type Event = { trigger: Trigger; now: string; params: Record<string, string | number | boolean> };
@@ -26,7 +26,7 @@ async function effectReply(target: string, args: Record<string, unknown>, stubs:
   const stub = findStub(stubs, target);
   return { result: { output: stub ? await stub(args, options) ?? null : null } };
 }
-type TestState = { stubs: Record<string, Stub>; manifest: { secrets?: (string | { name: string })[] }; seen: Set<string>; completions: Map<string, unknown>; bindings: Record<string, string> };
+type TestState = { stubs: Record<string, Stub>; manifest: { secrets?: (string | { name: string })[] }; receipts: Map<string, CallState>; completions: Map<string, unknown>; bindings: Record<string, string> };
 function updateBindings(target: string, reply: unknown, bindings: Record<string, string>) {
   if (target !== "modules.list" && target !== "modules.describe") return;
   const output = (reply as { result: { output: { items: { id: string; name: string; moduleId?: string; target?: unknown }[] } | null } }).result.output;
@@ -39,21 +39,32 @@ function updateBindings(target: string, reply: unknown, bindings: Record<string,
 function initialBindings(uses: string[] = [], names: string[], ownName?: string) {
   return Object.fromEntries([...uses, ...names, ...(ownName ? [ownName] : [])].map(target => target.split(".")[0]!).filter(name => name !== "*").map(name => [name, name]));
 }
-async function callReply(call: Call, { stubs, manifest, seen, completions, bindings }: TestState): Promise<unknown> {
-  if (call.method === "callStatus") return { result: { callId: String(call.params.callId), status: "queued" } };
+function receiptKey(target: string, key: unknown): string {
+  return JSON.stringify([target, key]);
+}
+function boundTarget(address: string | { moduleId: string; tool: string }, bindings: Record<string, string>): string {
+  return typeof address === "string" ? address : `${Object.entries(bindings).find(([, id]) => id === address.moduleId)?.[0] ?? address.moduleId}.${address.tool}`;
+}
+async function callReply(call: Call, { stubs, manifest, receipts, completions, bindings }: TestState): Promise<unknown> {
+  if (call.method === "callStatus") {
+    const receipt = call.params.callId ? [...receipts.values()].find(row => row.callId === call.params.callId)
+      : receipts.get(receiptKey(boundTarget(call.params.target as string | { moduleId: string; tool: string }, bindings), call.params.key));
+    return receipt ? { result: receipt } : { error: { code: "not_found", message: "Call not found in test fixture" } };
+  }
   const address = call.params.target as string | { moduleId: string; tool: string };
-  const target = typeof address === "string" ? address : `${Object.entries(bindings).find(([, id]) => id === address.moduleId)?.[0] ?? address.moduleId}.${address.tool}`, args = (call.params.args ?? {}) as Record<string, unknown>;
+  const target = boundTarget(address, bindings), args = (call.params.args ?? {}) as Record<string, unknown>;
   // Match the host before either Agent fixtures or caller stubs can hide an invalid mode.
   if (call.params.mode === "async" && ["agent.register", "agent.providers", "agent.run", "agent.read", "agent.write", "agent.stop", "agent.native"].some(name => name === address)) return { error: { code: "invalid", message: `${address} is called synchronously (its arguments are never stored)` } };
-  if (target.startsWith("agent.") && !findStub(stubs, target)) {
+  if (typeof address === "string" && target.startsWith("agent.") && !findStub(stubs, target)) {
     const result = await agentReply(target, args, completions, call.params.key);
     if (result) return result;
   }
   if (call.params.mode === "async") {
-    // A repeated key returns the stored call, as Chrona does. The request id doubles as the call id (answer it with a call_result event).
-    const key = `${target}:${String(call.params.key)}`, duplicate = seen.has(key);
-    seen.add(key);
-    return { result: { callId: call.id, status: "queued", duplicate } };
+    const key = receiptKey(target, call.params.key), receipt = receipts.get(key);
+    if (receipt) return { result: { ...receipt, duplicate: true } };
+    const queued: CallState = { callId: call.id, status: "queued" };
+    receipts.set(key, queued);
+    return { result: { ...queued, duplicate: false } };
   }
   const reply = await effectReply(target, args, stubs, manifest, { key: call.params.key as string | undefined, mode: call.params.mode as CallOptions["mode"] });
   updateBindings(target, reply, bindings);
@@ -67,8 +78,8 @@ async function callReply(call: Call, { stubs, manifest, seen, completions, bindi
 export async function startModule(entry: string | ExplicitModuleEntry, { stubs = {} }: { stubs?: Record<string, Stub> } = {}) {
   const manifest = JSON.parse(await readFile(join(process.env.CHRONA_MODULE ?? process.cwd(), "module.json"), "utf8")) as { name?: string; effects: string[]; uses?: string[]; secrets?: (string | { name: string })[] };
   const bindings = initialBindings(manifest.uses, Object.keys(stubs), manifest.name);
-  const calls: Call[] = [], seen = new Set<string>(), completions = new Map<string, unknown>();
-  const state = { stubs, manifest, seen, completions, bindings };
+  const calls: Call[] = [], receipts = new Map<string, CallState>(), completions = new Map<string, unknown>();
+  const state = { stubs, manifest, receipts, completions, bindings };
   let closed = false;
   const pending = new Map<string, { resolve(reply: Reply): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }>();
   function fail(error = new Error("Module disconnected")) {
@@ -91,7 +102,10 @@ export async function startModule(entry: string | ExplicitModuleEntry, { stubs =
     if (request) { pending.delete(value.id); clearTimeout(request.timer); request.resolve(value as Reply); }
   }
   const channel = await createLoopbackChannel({
-    onMessage(value) { void message(value).catch(() => { void channel.close(); }); },
+    onMessage(value) { void message(value).catch(error => {
+      console.error(JSON.stringify({ component: "sdk-testing", event: "message.failed", error: error instanceof SyntaxError ? "invalid_json" : error instanceof TypeError ? "invalid_message_type" : "message_dispatch_failed" }));
+      void channel.close();
+    }); },
     onDisconnect: fail,
   });
   // The release ships this static loader with the SDK. A trusted launcher may
@@ -113,7 +127,9 @@ export async function startModule(entry: string | ExplicitModuleEntry, { stubs =
   }).catch(error => { fail(error); throw error; });
   // Tests may only use send()/stop(). Keep a natural unknown exit observable by
   // those methods without an unhandled rejection or releasing its resources.
-  void exited.catch(() => {});
+  void exited.catch(error => {
+    console.error(JSON.stringify({ component: "sdk-testing", event: "process.failed", error: error instanceof Error && error.name === "ProcessStopUnknownError" ? "descendant_stop_unknown" : "process_supervision_failed" }));
+  });
   return {
     calls,
     /** Rejects if descendant shutdown cannot be confirmed. */
@@ -130,6 +146,11 @@ export async function startModule(entry: string | ExplicitModuleEntry, { stubs =
       return globalThis.fetch(url, { ...options, headers, redirect: "manual" });
     },
     send(event: Event): Promise<Reply> {
+      if (event.trigger.kind === "call_result") {
+        const trigger = event.trigger;
+        const receipt = [...receipts.values()].find(row => row.callId === trigger.callId);
+        if (receipt) Object.assign(receipt, { status: trigger.status, output: trigger.output, error: trigger.error });
+      }
       return new Promise<Reply>((resolve, reject) => {
         const id = randomUUID();
         const timer = setTimeout(() => { pending.delete(id); reject(new Error("Module event timeout")); }, 5000);

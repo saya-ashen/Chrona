@@ -41,10 +41,9 @@ test("modules list bounds history, retains the older active description and proj
   const key = "CHRONA_METADATA_TEST_TOKEN", previous = process.env[key], secret = "synthetic-metadata-credential";
   process.env[key] = secret;
   try {
-    const git = { commit: "a".repeat(40), tree: "b".repeat(40) };
     for (let i = 1; i <= 7; i++) {
       await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash: `candidate-${i}`, manifest: { ...f.manifest, description: "Unactivated description" }, source: "build", status: "rejected",
-        intent: { storePaths: ["private-intent-path"] }, report: { errors: Array.from({ length: 9 }, () => "x".repeat(290) + secret + " token=private-candidate " + "x".repeat(1000)), git, storePaths: ["private-report-path"], tests: [{ stderr: "private-build-stderr" }] }, createdAt: new Date(i * 1000) } });
+        intent: { storePaths: ["private-intent-path"] }, report: { errors: Array.from({ length: 9 }, () => "x".repeat(290) + secret + " token=private-candidate " + "x".repeat(1000)), storePaths: ["private-report-path"], tests: [{ stderr: "private-build-stderr" }] }, createdAt: new Date(i * 1000) } });
       await f.db.moduleRun.create({ data: { moduleId: f.module.id, hash: "active", triggerId: "tool:read", firedAt: new Date(i * 1000), exitCode: 1,
         error: `${secret} password=private-run ` + "x".repeat(3000), output: { private: "private-run-output" }, createdAt: new Date(i * 1000) } });
     }
@@ -54,14 +53,14 @@ test("modules list bounds history, retains the older active description and proj
     const list = await createModules(f.ports, f.workspaceId).list();
     expect(list).toHaveLength(1);
     const app = list[0]!;
-    expect(Object.keys(app).sort()).toEqual(["id", "name", "builtin", "status", "activeHash", "origin", "capabilities", "description", "health", "versions", "runs"].sort());
+    expect(Object.keys(app).sort()).toEqual(["id", "name", "status", "activeHash", "origin", "capabilities", "description", "health", "versions", "runs"].sort());
     expect(app).toMatchObject({ description: f.manifest.description, capabilities: { configure: false }, health: { runtime: { state: "unobserved", pid: null }, incident: null, open: false } });
     expect(app.health).not.toHaveProperty("readiness"); expect(app.health).not.toHaveProperty("healthCheck");
     expect(app.versions.map(version => version.hash)).toEqual([7, 6, 5, 4, 3].map(i => `candidate-${i}`));
     expect(app.runs.map(run => run.createdAt.getTime())).toEqual([7000, 6000, 5000, 4000, 3000]);
     for (const version of app.versions) {
-      expect(Object.keys(version).sort()).toEqual(["hash", "status", "createdAt", "errors", "git"].sort());
-      expect(version.git).toEqual(git); expect(version.errors).toHaveLength(5);
+      expect(Object.keys(version).sort()).toEqual(["hash", "status", "createdAt", "errors"].sort());
+      expect(version.errors).toHaveLength(5);
       expect(version.errors!.every(error => error.length <= 300)).toBe(true);
     }
     expect(app.runs.every(run => run.error!.length <= 1000)).toBe(true);
@@ -74,13 +73,13 @@ test("modules list bounds history, retains the older active description and proj
   } finally { if (previous === undefined) delete process.env[key]; else process.env[key] = previous; }
 });
 
-test.each(["test", "typecheck", "migration"] as const)("modules.list exposes bounded rejected %s failure without raw reports", async phase => {
+test.each(["check", "migration"] as const)("modules.list exposes bounded rejected %s failure without raw reports", async phase => {
   const f = await fixture(), key = "CHRONA_BUILD_DIAGNOSTIC_TOKEN", previous = process.env[key], secret = "synthetic-build-diagnostic-secret";
   process.env[key] = secret;
   try {
     const message = `Cannot use test outside of the test runner. token=${secret}`;
     const output = {stdout: "", stderr: "source preview ".repeat(100) + message, exitCode: 1};
-    const report = phase === "test" ? {tests: [output]} : phase === "migration" ? {tests: [], migration: output} : {tests: [], typecheck: {status: "failed", errors: [{message}]}};
+    const report = phase === "migration" ? { tests: [], migration: output } : { tests: [], errors: [message] };
     await f.db.moduleVersion.create({data: {moduleId: f.module.id, hash: "rejected-check", manifest: f.manifest, source: "build", status: "rejected", intent: {}, report, createdAt: new Date(1000)}});
     const app = (await createModules(f.ports, f.workspaceId).list())[0]!;
     expect(app.versions[0]!.errors?.[0]).toContain("Cannot use test outside of the test runner");
@@ -93,12 +92,12 @@ test.each(["test", "typecheck", "migration"] as const)("modules.list exposes bou
 
 test("unversioned and invalid active manifests remain visible without configuration or readiness inference", async () => {
   const f = await fixture();
-  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: f.module.id, hash: "active" } }, data: { manifest: { ...f.manifest, settings: { secret: "private" } }, report: { errors: [42], git: { commit: "invalid", tree: "invalid" } } } });
+  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: f.module.id, hash: "active" } }, data: { manifest: { ...f.manifest, settings: { secret: "private" } }, report: { errors: [42] } } });
   await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "draft", status: "paused" } });
   const apps = await createModules(f.ports, f.workspaceId).list();
   expect(apps.every(app => app.description === null && app.capabilities.configure === false)).toBe(true);
   const list = await createModules(f.ports, f.workspaceId).list();
-  expect(list.find(app => app.name === "example")).toMatchObject({ description: null, versions: [{ errors: null, git: null }] });
+  expect(list.find(app => app.name === "example")).toMatchObject({ description: null, versions: [{ errors: null }] });
   expect(list.find(app => app.name === "draft")).toMatchObject({ activeHash: null, description: null, health: { runtime: { state: "paused", pid: null } }, versions: [], runs: [] });
 });
 

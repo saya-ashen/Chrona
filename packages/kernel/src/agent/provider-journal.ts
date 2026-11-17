@@ -8,18 +8,7 @@ type RecordContext = Pick<StewardPorts, "db" | "now"> & { workspaceId: string };
 export async function providerReceipt(db: Prisma.TransactionClient, _workspaceId: string, id: string, status: ProviderInteraction["status"], now: Date) {
   return db.runInteraction.updateMany({ where: { id, status: "pending" }, data: { status, settledAt: now } });
 }
-export type ProviderWriteGuard = (tx: Prisma.TransactionClient) => Promise<void>;
-/** Acquire SQLite's writer before checking an optional device fence and applying the effect. */
-export function providerWrite<T>(db: PrismaClient, guard: ProviderWriteGuard | undefined, effect: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
-  return db.$transaction(async tx => {
-    if (guard) {
-      await tx.$executeRaw`UPDATE "Run" SET "id" = "id" WHERE 0`;
-      await guard(tx);
-    }
-    return effect(tx);
-  });
-}
-export function providerJournal(db: PrismaClient, runId: string, now: () => Date, guard?: ProviderWriteGuard) {
+export function providerJournal(db: PrismaClient, runId: string, now: () => Date) {
   let progress = 0, raw = 0, gap = false;
   return async (type: "progress" | "usage" | "resources" | "raw", value: Prisma.InputJsonValue) => {
     if (type === "progress" && ++progress > 300) return;
@@ -29,7 +18,7 @@ export function providerJournal(db: PrismaClient, runId: string, now: () => Date
       value = { type: "chrona_raw_gap", reason: "retention_limit", retainedEvents: 300, detail: "Subsequent raw events are not retained for this Run" };
     }
     const at = now();
-    await providerWrite(db, guard, tx => appendRunEventIn(tx, runId, type, { type, value, at: at.toISOString() }, at));
+    await db.$transaction(tx => appendRunEventIn(tx, runId, type, { type, value, at: at.toISOString() }, at));
   };
 }
 function eventValue(row: { payload: unknown }) {
@@ -39,9 +28,9 @@ function eventValue(row: { payload: unknown }) {
 export async function providerRuns(ctx: RecordContext, { sessionId, ids }: { sessionId?: string; ids?: string[] }, connected: (id: string) => boolean, waiting: (id: string) => boolean, liveQuestion: (id: string) => ProviderQuestion | null = () => null): Promise<ProviderRunView[]>  {
   const { db, workspaceId, now } = ctx;
   const scope = { workspaceId, ...(sessionId ? { sessionId } : {}) };
-  const [active, recent] = ids ? [[], await db.run.findMany({ where: { ...scope, id: { in: ids } }, include: { session: true } })] : await Promise.all([
-    db.run.findMany({ where: { ...scope, status: "running" }, include: { session: true }, orderBy: { createdAt: "desc" }, take: 2 }),
-    db.run.findMany({ where: scope, include: { session: true }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 15 }),
+  const [active, recent] = ids ? [[], await db.run.findMany({ where: { ...scope, id: { in: ids } } })] : await Promise.all([
+    db.run.findMany({ where: { ...scope, status: "running" }, orderBy: { createdAt: "desc" }, take: 2 }),
+    db.run.findMany({ where: scope, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 15 }),
   ]);
   const runs = [...new Map([...active, ...recent].map(run => [run.id, run])).values()];
   return Promise.all(runs.map(async run => {
@@ -59,7 +48,7 @@ export async function providerRuns(ctx: RecordContext, { sessionId, ids }: { ses
     });
     const last = (type: string) => records.map(eventValue).findLast(value => value.type === type)?.value;
     const progress = providerProgressSchema.safeParse(last("progress")), usage = providerUsageSchema.safeParse(last("usage")), resources = providerResourcesSchema.safeParse(last("resources"));
-    return providerRunViewSchema.parse({ id: run.id, sessionId: run.sessionId, sessionTitle: run.session?.title ?? null, active: alive, status: run.status,
+    return providerRunViewSchema.parse({ id: run.id, sessionId: run.sessionId, sessionTitle: null, active: alive, status: run.status,
       progress: progress.success ? progress.data : null, usage: usage.success ? usage.data : null, resources: resources.success ? resources.data : null,
       interactions, updatedAt: (run.endedAt ?? run.startedAt ?? run.createdAt).toISOString() });
   }));

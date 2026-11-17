@@ -3,34 +3,28 @@ import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { Prisma } from "@chrona/db/generated/prisma/client";
 import { listenPaths, moduleManifestSchema } from "@chrona/contracts/steward";
+import { redactSensitiveText } from "@chrona/logging/redaction";
 import { audit } from "../audit";
 import { latestModuleEvolution, recordModuleActivation, updateModuleEvolution } from "./module-evolution";
 import { StewardError } from "../errors";
 import type { ModuleContext } from "./module-context";
 import { assertExternalModule, assertModuleOperation } from "./module-identity";
 import { pauseIn } from "./module-status";
-import { fenceExecutionModuleIn } from "../execution/execution-delivery-controls";
+import { fenceAgentModuleIn, abortDrainedAgentRuns } from "../agent/module-drain";
 import { assertExecutionModuleIdle } from "../execution/execution-module-guard";
 import { ensureVersionMaterial } from "./module-source";
 
 export async function activateIn(context: ModuleContext, tx: Prisma.TransactionClient, { moduleId, hash, reason, dataHandling }: { moduleId: string; hash: string; reason: "activate" | "rollback"; dataHandling?: string }) {
   const { activeHash: previousHash } = await switchActiveIn(context, tx, moduleId, hash, { preservePause: reason === "activate", operation: reason });
   const previousOutcome = reason === "rollback" && previousHash ? await latestModuleEvolution(tx, context.workspaceId, moduleId, previousHash) : null;
-  const generation = await recordGeneration(context, tx, reason);
-  if (reason === "activate") await recordModuleActivation(context, tx, { moduleId, previousHash, hash, generationId: generation.id, ...(dataHandling ? { dataHandling } : {}) });
-  else {
-    if (previousOutcome && previousHash) await updateModuleEvolution(tx, { workspaceId: context.workspaceId, moduleId, activationId: previousOutcome.activationId, hash: previousHash, status: "rolled-back", expectedCurrentHash: hash, ...(dataHandling ? { dataHandling } : {}), nextAction: `代码已切回 ${hash.slice(0, 12)}；${dataHandling ?? "本次恢复未恢复旧数据快照。"}`, now: context.ports.now() });
-    await recordModuleActivation(context, tx, { moduleId, previousHash, hash, generationId: generation.id, dataHandling: dataHandling ?? `恢复到已批准版本 ${hash.slice(0, 12)}；本次未恢复旧数据快照。`, rollback: { attempted: false, result: "blocked", reason: "恢复目标不会自动继续回滚，避免版本来回切换。" } });
-  }
-  await audit(tx, { workspaceId: context.workspaceId, actor: "chrona", kind: `module_${reason}`, subjectId: moduleId, details: { hash, generationId: generation.id } });
-  return generation;
-}
-/** One generation for the current active hashes; a group activation (v2-15) records it once after switching all its modules. */
-export async function recordGeneration(context: ModuleContext, tx: Prisma.TransactionClient, reason: "activate" | "rollback") {
-  const { workspaceId } = context;
-  const modules = await tx.module.findMany({ where: { workspaceId }, orderBy: { id: "asc" } });
-  const previous = await tx.generation.findFirst({ where: { workspaceId }, orderBy: { seq: "desc" } });
-  return tx.generation.create({ data: { workspaceId, seq: (previous?.seq ?? 0) + 1, modules: Object.fromEntries(modules.map(row => [row.id, row.activeHash])), reason, createdAt: context.ports.now() } });
+  if (previousOutcome && previousHash) await updateModuleEvolution(tx, { workspaceId: context.workspaceId, moduleId, activationId: previousOutcome.activationId, hash: previousHash, status: "rolled-back", expectedCurrentHash: hash, ...(dataHandling ? { dataHandling } : {}), nextAction: `代码已切回 ${hash.slice(0, 12)}；${dataHandling ?? "本次恢复未恢复旧数据快照。"}`, now: context.ports.now() });
+  const activation = await recordModuleActivation(context, tx, {
+    moduleId, previousHash, hash,
+    dataHandling: dataHandling ?? (reason === "rollback" ? `恢复到已批准版本 ${hash.slice(0, 12)}；本次未恢复旧数据快照。` : undefined),
+    ...(reason === "rollback" ? { rollback: { attempted: false, result: "blocked", reason: "恢复目标不会自动继续回滚，避免版本来回切换。" } } as const : {}),
+  });
+  await audit(tx, { workspaceId: context.workspaceId, actor: "chrona", kind: `module_${reason}`, subjectId: moduleId, details: { hash, previousHash, activationId: activation.activationId } });
+  return activation;
 }
 async function assertListenAvailable(tx: Prisma.TransactionClient, moduleId: string, manifest: ReturnType<typeof moduleManifestSchema.parse>) {
   if (!manifest.listen) return;
@@ -68,35 +62,25 @@ async function automaticRollbackVersionError(input: AutomaticRollbackInput) {
   if (!candidateRow || candidateRow.status !== "approved" || !previousRow || previousRow.status !== "approved") return "Candidate or rollback target is not an approved version.";
   const candidate = moduleManifestSchema.safeParse(candidateRow.manifest).data, previous = moduleManifestSchema.safeParse(previousRow.manifest).data;
   if (!candidate || !previous) return "Candidate or rollback target manifest is invalid.";
-  return automaticRollbackDataError(candidate, previous, moduleSchema, current) ?? automaticRollbackScheduleError(candidate, previous);
+  return automaticRollbackDataError(candidate, previous, moduleSchema, current);
 }
 async function automaticRollbackMigrationError(tx: Prisma.TransactionClient, workspaceId: string, moduleId: string, hash: string) {
   const migration = await tx.moduleMigration.findFirst({ where: { moduleId, module: { workspaceId } }, select: { hash: true } });
   return migration?.hash === hash ? "This activation used migration or restore." : null;
 }
-function automaticRollbackScheduleError(candidate: ReturnType<typeof moduleManifestSchema.parse>, previous: ReturnType<typeof moduleManifestSchema.parse>) {
-  return candidate.uses.includes("schedules.create") || previous.uses.includes("schedules.create")
-    ? "Removed calendar scheduler dependency; automatic rollback requires manual review." : null;
-}
-async function automaticRollbackGroupError(tx: Prisma.TransactionClient, workspaceId: string, moduleId: string, hash: string, generationId: string) {
-  return await tx.moduleActivation.findFirst({ where: { moduleId, candidateHash: hash, generationId, grouped: true, module: { workspaceId } }, select: { activationId: true } })
-    ? "This version was activated as a group; partial automatic rollback is disabled." : null;
-}
 async function automaticRollbackEligibility(input: AutomaticRollbackInput) {
-  const { tx, workspaceId, moduleId, hash, current } = input;
+  const { tx, workspaceId, moduleId, hash } = input;
   const versionError = await automaticRollbackVersionError(input);
   if (versionError) return versionError;
   const migrationError = await automaticRollbackMigrationError(tx, workspaceId, moduleId, hash);
   if (migrationError) return migrationError;
-  const groupError = await automaticRollbackGroupError(tx, workspaceId, moduleId, hash, current.generationId);
-  if (groupError) return groupError;
   return null;
 }
 async function automaticRollbackTarget(tx: Prisma.TransactionClient, context: ModuleContext, moduleId: string, hash: string, current: NonNullable<Awaited<ReturnType<typeof latestModuleEvolution>>>) {
   if (current.observedCapabilities.length) return { reason: "A successful capability was already verified." };
   const module = await tx.module.findFirst({ where: { id: moduleId, workspaceId: context.workspaceId } });
   if (!module || module.status !== "active" || module.activeHash !== hash) return { reason: "Module is paused, migrating, removed, or its active hash changed." };
-  try { assertModuleOperation(module, "rollback"); } catch { return { reason: "Built-in or reserved modules cannot automatically switch code." }; }
+  assertModuleOperation(module, "rollback");
   if (!current.previousHash) return { reason: "No previously approved version exists for a first installation." };
   return { moduleSchema: module.dataSchema, previousHash: current.previousHash };
 }
@@ -104,15 +88,16 @@ async function automaticRollbackTarget(tx: Prisma.TransactionClient, context: Mo
 export async function rollbackFailedStart(context: ModuleContext, moduleId: string, hash: string, activationId: string) {
   const { workspaceId, ports } = context, now = ports.now();
   // Commit the exact eligible activation's fence before attempting a switch that may need to drain.
-  await ports.db.$transaction(async tx => {
+  const drained = await ports.db.$transaction(async tx => {
     await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${workspaceId}`;
     const current = await latestModuleEvolution(tx, workspaceId, moduleId, hash);
     if (!current || current.activationId !== activationId || current.status !== "failed" || current.rollback.attempted || current.rollback.reason?.startsWith("恢复目标不会自动继续回滚")) return;
     const target = await automaticRollbackTarget(tx, context, moduleId, hash, current);
     if (target.reason) return;
     if (await automaticRollbackEligibility({ tx, workspaceId, moduleId, hash, previousHash: target.previousHash!, moduleSchema: target.moduleSchema!, current })) return;
-    await fenceExecutionModuleIn(ports, tx, workspaceId, moduleId);
+    return fenceAgentModuleIn(ports, tx, workspaceId, moduleId);
   });
+  if (drained) await abortDrainedAgentRuns(ports, workspaceId, drained.runIds);
   return ports.db.$transaction(async tx => {
     const current = await latestModuleEvolution(tx, workspaceId, moduleId, hash);
     const deny = async (reason: string) => {
@@ -131,19 +116,23 @@ export async function rollbackFailedStart(context: ModuleContext, moduleId: stri
     const attempted = await updateModuleEvolution(tx, { workspaceId, moduleId, activationId, hash, now, rollback: { attempted: true, result: "blocked", reason: "A single automatic rollback attempt is in progress." } });
     if (!attempted) return { rolledBack: false, reason: "Activation changed before rollback." };
     await switchActiveIn(context, tx, moduleId, previousHash);
-    const generation = await recordGeneration(context, tx, "rollback");
     await updateModuleEvolution(tx, { workspaceId, moduleId, activationId, hash, status: "rolled-back", expectedCurrentHash: previousHash, now,
       rollback: { attempted: true, result: "succeeded", reason: `Restored approved code ${previousHash.slice(0, 12)}; data and delivery evidence were preserved.` },
       dataHandling: "仅切换到已批准旧代码；未改动当前数据或投递记录，未重放外部效果。",
       nextAction: `已恢复旧代码 ${previousHash.slice(0, 12)}。已保留当前数据与投递记录；外部已产生效果不会撤销或重放。` });
-    const restored = await recordModuleActivation(context, tx, { moduleId, previousHash: hash, hash: previousHash, generationId: generation.id,
+    const restored = await recordModuleActivation(context, tx, { moduleId, previousHash: hash, hash: previousHash,
       dataHandling: "自动恢复到已批准旧代码；当前数据与投递记录保留，未重放外部效果。",
       rollback: { attempted: false, result: "blocked", reason: "恢复目标不会自动继续回滚，避免版本来回切换。" } });
-    await audit(tx, { workspaceId, actor: "chrona", kind: "module_rollback", subjectId: moduleId, details: { hash: previousHash, failedHash: hash, generationId: generation.id, activationId, restoredActivationId: restored.activationId, automatic: true } });
+    await audit(tx, { workspaceId, actor: "chrona", kind: "module_rollback", subjectId: moduleId, details: { hash: previousHash, failedHash: hash, activationId, restoredActivationId: restored.activationId, automatic: true } });
     return { rolledBack: true, reason: "Automatic code rollback succeeded; current data and delivery evidence were preserved." };
   }).catch(async error => {
-    const reason = `Rollback attempt failed without changing data: ${String(error).slice(0, 300)}`;
-    await ports.db.$transaction(tx => updateModuleEvolution(tx, { workspaceId, moduleId, activationId, hash, status: "failed", now: ports.now(), rollback: { attempted: true, result: "blocked", reason }, nextAction: "自动代码切换失败；候选版本仍为当前版本，请人工检查诊断并恢复。" })).catch(() => {});
+    const reason = `Rollback attempt failed without changing data: ${redactSensitiveText(String(error), 300)}`;
+    console.error(JSON.stringify({ component: "module-generation", event: "rollback.failed", moduleId, activationId, error: reason }));
+    try {
+      await ports.db.$transaction(tx => updateModuleEvolution(tx, { workspaceId, moduleId, activationId, hash, status: "failed", now: ports.now(), rollback: { attempted: true, result: "blocked", reason }, nextAction: "自动代码切换失败；候选版本仍为当前版本，请人工检查诊断并恢复。" }));
+    } catch (recordError) {
+      console.error(JSON.stringify({ component: "module-generation", event: "rollback.failure_record_failed", moduleId, activationId, error: redactSensitiveText(String(recordError), 300) }));
+    }
     return { rolledBack: false, reason };
   });
 }

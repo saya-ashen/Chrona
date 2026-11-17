@@ -60,8 +60,8 @@ let db: ReturnType<typeof testDb>, runtime: ReturnType<typeof createStewardRunti
 let app: Awaited<ReturnType<typeof createServerApp>>, fake: ReturnType<typeof controlledProvider>;
 let entry: { id: string; hash: string }, errors: unknown[];
 async function boot() {
-  runtime = createStewardRuntime(db, { dataDir: join(root, "data"), provider: fake.provider, onError: error => { errors.push(error); } });
-  await testProviderPorts(runtime.ports);
+  runtime = createStewardRuntime(db, { dataDir: join(root, "data"), onError: error => { errors.push(error); } });
+  await testProviderPorts(Object.assign(runtime.ports, { provider: fake.provider }));
   app = await createServerApp({ steward: runtime });
 }
 beforeEach(async () => {
@@ -141,9 +141,8 @@ test("HTTP Agent Runs retain auth, actual SDK caller identity, private fences, q
   await writeFile(join(run.input.cwd, "existing.txt"), "existing\n");
   expect(run.input.execution).toBeUndefined(); expect(run.input.content).toEqual([]); expect(run.input.hostPaths).toEqual([]);
   expect(await db.agentRunAdmission.findUniqueOrThrow({ where: { runId: view.runId } })).toMatchObject({ moduleId: entry.id, hash: entry.hash });
-  expect(await db.agentContext.findUniqueOrThrow({ where: { sessionId: view.contextId } })).toMatchObject({ workspaceId, moduleId: entry.id, hash: entry.hash, providerId: fake.provider.name });
+  expect(await db.agentContext.findUniqueOrThrow({ where: { id: view.contextId } })).toMatchObject({ workspaceId, moduleId: entry.id, hash: entry.hash, providerId: fake.provider.name });
   const providerModule = await db.module.findUniqueOrThrow({ where: { workspaceId_name: { workspaceId, name: "test-provider" } } });
-  expect(providerModule.builtin).toBe(false);
   expect(await db.agentRunProvider.findUniqueOrThrow({ where: { runId: view.runId } })).toMatchObject({ moduleId: providerModule.id, hash: providerModule.activeHash });
   for (const who of [{ kind: "owner" as const, via: null }, { kind: "provider" as const, runId: view.runId }, { kind: "kernel" as const }]) {
     await expect(direct(who, "agent.read", target(view))).rejects.toMatchObject({ code: "forbidden" });

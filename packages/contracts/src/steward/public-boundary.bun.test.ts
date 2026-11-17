@@ -25,6 +25,10 @@ test("retired request contracts are absent from the package exports", () => {
     "notificationSchema", "notificationChannelSchema", "notificationSettingsSchema",
     "DEFAULT_NOTIFICATION_SETTINGS", "NOTIFY_LEVELS", "NOTIFICATION_STATUSES", "buildGovernanceSchema",
     "modulePackageCatalogSchema", "buildRequestSchema", "buildIntentSchema", "reviseBuildSchema",
+    "agentTools", "agentInput", "contextRunOutput", "moduleAgentInputs", "moduleAgentOutputs",
+    "isModuleAgentTool", "moduleAgentInput", "camelArguments",
+    "sessionSchema", "runSchema", "messageSchema", "attachmentSchema", "REF_ALPHABET",
+    "DELIVERY_CHANNELS", "chronaToolInputSchemas", "CHRONA_TOOLS",
   ]) expect(Object.hasOwn(contracts, name)).toBe(false);
   expect(contracts.candidateAdmissionInputSchema).toBeDefined();
   expect(contracts.candidateSourceInputSchema).toBeDefined();

@@ -47,27 +47,13 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
       if (checks.some((check) => check.status === "error")) process.exitCode = 1;
     });
   const admin = program.command("admin").description("Local recovery administration");
-  admin.command("git-status <module>").description("Read saved module Git association and local commits without contacting the remote")
-    .action(async (module: string) => { await (await import("./admin-module-git")).runAdminModuleGit({ action: "status", module }); });
-  admin.command("git-associate <module> <repository>").description("Associate an existing module with a GitHub HTTPS repository while the service is stopped")
-    .option("--branch <branch>", "Existing upstream branch", "main")
-    .action(async (module: string, repository: string, input: { branch: string }) => { await (await import("./admin-module-git")).runAdminModuleGit({ action: "associate", module, repository, branch: input.branch }); });
-  admin.command("git-push <module>").description("Explicitly fast-forward the associated remote to one exact local commit while the service is stopped")
-    .requiredOption("--commit <sha>", "Exact local commit (40 lowercase hex characters)")
-    .requiredOption("--expected-remote <sha>", "Expected existing remote branch tip (40 lowercase hex characters)")
-    .action(async (module: string, input: { commit: string; expectedRemote: string }) => {
-      const result = await (await import("./admin-module-git")).runAdminModuleGit({ action: "push", module, ...input });
-      if (result.status === "uncertain") process.exitCode = 1;
-    });
   admin.command("modules").description("List modules and versions").action(async () => { await (await import("./admin")).runAdmin("modules"); });
   admin.command("catalog").description("List official external packages and saved installation receipts").action(async () => { await (await import("./admin")).runAdmin("catalog"); });
   admin.command("install <package>").description("Explicitly install an official external package while the service is stopped")
     .option("--update", "Explicitly update an already installed package", false)
-    .option("--exact-release", "Select the bundled release commit only when approved active source is identical (requires --update)", false)
     .requiredOption("--request-key <key>", "Stable key; reuse after an uncertain receipt")
-    .action(async (name: string, input: { update: boolean; exactRelease: boolean; requestKey: string }) => {
-      if (input.exactRelease && !input.update) throw new Error("--exact-release requires --update");
-      await (await import("./admin")).runAdmin("install", [name, input.update ? "update" : "install", input.requestKey, ...(input.exactRelease ? ["exact-release"] : [])]);
+    .action(async (name: string, input: { update: boolean; requestKey: string }) => {
+      await (await import("./admin")).runAdmin("install", [name, input.update ? "update" : "install", input.requestKey]);
     });
   admin.command("diagnostics [module]").description("Read saved module faults and recovery attempts without starting Chrona").action(async (module?: string) => { await (await import("./admin")).runAdmin("diagnostics", module ? [module] : []); });
   admin.command("approvals").description("List pending approvals, including recovery decisions").action(async () => { await (await import("./admin")).runAdmin("approvals"); });

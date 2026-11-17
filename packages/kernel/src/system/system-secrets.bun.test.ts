@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, spyOn, test } from "bun:test";
 import { chmod, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -94,13 +94,21 @@ test("credential declarations and exact uses do not grant owner management autho
 
 test("host failure is sanitized and unsafe saved files cannot fall through to host credentials", async () => {
   const f = await fixture("other_service");
-  f.ports.secrets = async () => { throw new Error("host-secret-private"); };
+  const errors: string[] = [], logger = spyOn(console, "error").mockImplementation(value => { errors.push(String(value)); });
+  cleanups.push(() => { logger.mockRestore(); return Promise.resolve(); });
+  f.ports.secrets = async () => { throw Object.assign(new Error("host-secret-private"), { code: "EACCES" }); };
   await expect(f.routed()).rejects.toMatchObject({ code: "unavailable", message: "Secret not configured" });
-  expect(JSON.stringify(await f.db.moduleInvocation.findMany())).not.toContain("host-secret-private");
-  let hostReads = 0;
-  f.ports.secrets = async () => { hostReads++; return { key: "private" }; };
-  await f.store.write("other_service", { key: "saved" });
-  await chmod(join(f.dataDir, "secrets", "other_service.json"), 0o644);
-  await expect(f.routed()).rejects.toMatchObject({ code: "unavailable" });
-  expect(hostReads).toBe(0);
+  expect(JSON.parse(errors[0]!)).toMatchObject({ component: "secrets", event: "read.failed", source: "host", error: { reason: "credential_read_failed", code: "EACCES" } });
+  expect(JSON.stringify([errors, await f.db.moduleInvocation.findMany()])).not.toContain("host-secret-private");
+  if (process.platform !== "win32") {
+    await f.store.write("other_service", { key: "saved-private" });
+    await chmod(join(f.dataDir, "secrets", "other_service.json"), 0o644);
+    let hostReads = 0;
+    f.ports.secrets = async () => { hostReads++; return { key: "host-private" }; };
+    await expect(f.routed()).rejects.toMatchObject({ code: "unavailable", message: "Secret not configured" });
+    expect(hostReads).toBe(0);
+    expect(JSON.parse(errors[1]!)).toMatchObject({ source: "saved", error: { reason: "Unsafe secret file" } });
+    expect(JSON.stringify(errors)).not.toContain("saved-private");
+    expect(JSON.stringify(errors)).not.toContain("host-private");
+  }
 });

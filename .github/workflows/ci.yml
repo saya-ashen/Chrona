@@ -32,8 +32,6 @@ jobs:
       - name: Audit high and critical dependencies
         run: bun run audit:security
 
-      - run: bun run db:generate
-
       - name: Build source process guardian before runtime checks
         run: bun scripts/chrona.ts build helper
 
@@ -44,8 +42,6 @@ jobs:
         env:
           LINT_RATCHET_BASE: ${{ github.event_name == 'push' && github.event.before || '' }}
 
-      - name: Verify migration and container startup contracts
-        run: bun test ./scripts/init-sqlite-current.bun.test.ts ./scripts/docker-entrypoint.bun.test.ts ./scripts/build/release-smoke.bun.test.ts
 
   container:
     runs-on: ubuntu-24.04

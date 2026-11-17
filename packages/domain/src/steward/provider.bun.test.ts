@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { providerRequestStatus, providerRunActive, providerText, providerToolPhase, providerUsage, validProviderAnswer } from "./provider";
+import { providerRequestStatus, providerRunActive, providerText, validProviderAnswer } from "./provider";
 import type { ProviderAnswer, ProviderQuestion } from "@chrona/contracts/steward";
 const question = (method: ProviderQuestion["method"]): ProviderQuestion => ({ method, title: "Fixture", message: "", options: ["A", "B"], timeoutMs: 1000 });
 test.each<[ProviderQuestion["method"], ProviderAnswer, boolean]>([
@@ -8,19 +8,9 @@ test.each<[ProviderQuestion["method"], ProviderAnswer, boolean]>([
   ["input", { decision: "submit", value: "text" }, true], ["editor", { decision: "submit", value: false }, false],
   ["editor", { decision: "cancel" }, true],
 ])("%s validates response %j", (method, answer, valid) => expect(validProviderAnswer(question(method), answer)).toBe(valid));
-test("progress uses names only; secret and control text never crosses", () => {
-  expect(providerToolPhase("web_search")).toEqual({ phase: "searching", tool: "web_search" });
-  expect(providerToolPhase("bad\narguments")).toEqual({ phase: "executing", tool: null });
+test("secret and control text never crosses", () => {
   const text = providerText("\u001b[31mhello\u202e known-token password=hunter2 Bearer a-secret", ["known-token"]);
   expect(text).not.toContain("hunter2"); expect(text).not.toContain("a-secret"); expect(text).not.toContain("known-token"); expect(text).not.toContain("\u202e");
-});
-const stats = (total: number, cost: number) => ({ sessionId: "fixture", tokens: { input: total - 1, output: 1, cacheRead: 0, cacheWrite: 0, total }, cost, contextUsage: { tokens: 12, contextWindow: 100 } });
-test("usage distinguishes delta, session total, reset and unknown", () => {
-  expect(providerUsage(stats(20, 0.5), stats(10, 0.2))).toMatchObject({ scope: "run", total: 10, cost: 0.3 });
-  expect(providerUsage(stats(20, 0.5))).toMatchObject({ scope: "session", total: 20 });
-  expect(providerUsage(stats(2, 0.1), stats(10, 0.2))).toMatchObject({ scope: "session", total: 2 });
-  expect(providerUsage({ ...stats(20, 0.5), sessionId: "different" }, stats(10, 0.2))).toMatchObject({ scope: "session", total: 20 });
-  for (const invalid of [null, {}, stats(-1, 0), stats(10, -1), stats(10, Infinity)]) expect(providerUsage(invalid)).toBeNull();
 });
 test.each([
   ["running", true, true], ["running", false, false], ["finished", true, false],

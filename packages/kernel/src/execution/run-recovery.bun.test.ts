@@ -7,7 +7,7 @@ import { createRuns, liveRuns, nextLocalMidnight } from "./runs";
 import { testDb } from "../__testing__/test-db";
 import type { StewardPorts } from "../ports";
 import { notices } from "../__testing__/test-notices";
-import { assertTerminalRecordsReleaseQuota, assertExplicitRetryIssuesFreshAttempt } from "../__testing__/state-machine-invariants";
+import { assertTerminalRecordsReleaseQuota, assertExplicitRetryIssuesFreshAttempt, assertInterleavedSettlementConverges } from "../__testing__/state-machine-invariants";
 let db: ReturnType<typeof testDb>, ports: StewardPorts, workspaceId: string, sessionId: string, time: Date, principal: ModulePrincipal;
 beforeEach(async () => {
   db = testDb(); time = new Date("2026-10-15T04:00:00Z");
@@ -22,6 +22,16 @@ afterEach(async () => { liveRuns.clear(); await db.$disconnect(); });
 async function queueContext(requestKey = "run") {
   return await admitContextPrimitive(ports, principal, "run", { contextId: sessionId, requestKey, lane: "foreground", prompt: "Keep this", tools: [], content: [] }) as { runId: string };
 }
+test("a context retains one execution identity and rejects another owner or detached module", async () => {
+  const queued = await queueContext();
+  expect(await db.agentContext.findUniqueOrThrow({ where: { id: sessionId } })).toMatchObject({ workspaceId, ownerId: principal.ownerId, moduleId: principal.caller.moduleId, hash: principal.caller.hash, status: "active", cwd: join(ports.dataDir, "sessions", sessionId) });
+  await expect(ownedRun(db, { ...principal, ownerId: "another-owner" }, queued.runId)).rejects.toMatchObject({ code: "not_found" });
+  expect(await db.agentContext.count({ where: { workspaceId } })).toBe(1);
+  await db.agentContext.update({ where: { id: sessionId }, data: { moduleId: null } });
+  await expect(ownedRun(db, principal, queued.runId)).rejects.toMatchObject({ code: "not_found" });
+  await expect(createRuns(ports, workspaceId).enqueue({ sessionId, lane: "foreground", trigger: "source", prompt: "Detached module" })).rejects.toMatchObject({ code: "forbidden" });
+});
+
 test.each(["failed", "unavailable"] as const)("Agent context %s preserves continuation but only its application can request another attempt", async outcome => {
   const runs = createRuns(ports, workspaceId);
   await queueContext();
@@ -29,7 +39,7 @@ test.each(["failed", "unavailable"] as const)("Agent context %s preserves contin
   await writeFile(join(run.cwd, "draft.txt"), "kept");
   await runs.finish(run.id, { outcome, sessionId: "provider-context", error: "Synthetic" }, { stopEvidence: "provider_exited" });
   expect(view(await ownedRun(ports.db, principal, run.id))).toMatchObject({ status: outcome === "unavailable" ? "provider_unavailable" : outcome, active: false });
-  expect((await db.session.findUniqueOrThrow({ where: { id: sessionId } })).providerSessionId).toBe("provider-context");
+  expect((await db.agentContext.findUniqueOrThrow({ where: { id: sessionId } })).providerSessionId).toBe("provider-context");
   expect(await readFile(join(run.cwd, "draft.txt"), "utf8")).toBe("kept");
   time = new Date(time.getTime() + 86400_000);
   expect(await runs.claimNext("foreground")).toBeNull();
@@ -136,5 +146,27 @@ test("an explicit application retry claims a fresh Run and capability after fail
       claims.add(claimed.id);
     },
     observedDownstreamAttempts: () => claims.size,
+  });
+});
+
+test("cancellation and Provider exit converge when stop observation is interleaved", async () => {
+  const runs = createRuns(ports, workspaceId);
+  await assertInterleavedSettlementConverges({
+    async beginRequest(scenario) {
+      await queueContext(`interleaved-${scenario}`);
+      return (await runs.claimNext("foreground"))!;
+    },
+    async resolveExternally(run) {
+      await runs.finish(run.id, { outcome: "failed", sessionId: null, error: "Observer disconnected" });
+    },
+    async enterWaiting(run) {
+      await db.run.update({ where: { id: run.id }, data: { cancelRequestedAt: ports.now() } });
+    },
+    async readFinalState(run) {
+      await runs.finish(run.id, { outcome: "finished", sessionId: null, error: null }, { stopEvidence: "provider_exited" });
+      const current = view(await ownedRun(db, principal, run.id));
+      return { status: current.status, active: current.active };
+    },
+    isStuckWaiting: state => state.active,
   });
 });

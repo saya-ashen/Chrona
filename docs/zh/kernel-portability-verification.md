@@ -1,6 +1,6 @@
 # 内核可移植性实施验证记录
 
-当前远程设备功能已退役：`remote-device`、`remote-model` 及专属 HTTP 入口已删除。下文远程设备实现、命令和验收仅保留历史背景，不是当前启用指引；未来需要时另行设计。通用 execution 与 process 能力保留。
+2026-11-17 源码边界：远程执行全部退役，包括 `runtime-callback.remote-delivery`、carrier、签名停止、模型中继、治理和专用 Execution 表；旧本地 execution 与内核应用开发检查也已移除。保留普通 Agent Run、通用进程监督、SDK loader、固定材料安装与迁移恢复。下文的远程协议、checker、发行资源和检查结果均为历史记录；不代表本次源码经过构建、测试或部署。独立 remote-execution 仓库及真实数据保留，未来能力另行设计。
 
 > 当前状态：Coding 与 coding-web 已退役，包含旧 work-v2；当前 Chat 独立拥有会话与执行记录。本文的 Coding/Editor 接口、源码路径、验收和部署描述仅作历史记录，不是现行接入指引。详见[Coding 退役说明](../../../chrona-module-author/docs/coding-retirement.md)。
 
@@ -44,7 +44,7 @@
 
 S1 明确登记 `modules.diagnostics` 的字段删除；S5 明确登记 `agent.run`、`agent.placement`、`agent.locations`、`agent.cleanup` 的合同变化。以 transitions（历史路径 `../../packages/contracts/fixtures/contract-hash-transitions.json`） 和 additions（历史路径 `../../packages/contracts/fixtures/contract-hash-additions.json`） 逐项核对，不通过更新 S0 fixture 隐藏额外变化。新增应用工具在并行修改时，也必须同步检查 additions。
 
-历史 S0 设计稿中的签名编码、字段及候选协议不是当前 API。当前执行合同见 [kernel-execution.ts](../../packages/contracts/src/steward/kernel-execution.ts)，当前普通应用协议见 contracts.ts（历史路径 `../../packages/engine/src/modules/steward/applications/remote-execution/contracts.ts`）。例如现行停止签名为 Ed25519 签署 `Buffer.from(executionDigest(statement), 'hex')`，不是早期草案的 JSON 文本签名；配对公钥为 PEM Ed25519。
+历史 S0 设计稿中的签名编码、字段及候选协议已退役。旧执行合同 `packages/contracts/src/steward/kernel-execution.ts` 已删除，当前普通应用协议见 contracts.ts（历史路径 `../../packages/engine/src/modules/steward/applications/remote-execution/contracts.ts`）。例如现行停止签名为 Ed25519 签署 `Buffer.from(executionDigest(statement), 'hex')`，不是早期草案的 JSON 文本签名；配对公钥为 PEM Ed25519。
 
 ## 2. 实际检查到的结果
 

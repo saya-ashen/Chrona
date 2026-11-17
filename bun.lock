@@ -44,7 +44,6 @@
       "dependencies": {
         "@chrona/contracts": "workspace:*",
         "@chrona/db": "workspace:*",
-        "@chrona/git-workspaces": "workspace:*",
         "@chrona/host": "workspace:*",
         "@chrona/kernel": "workspace:*",
         "@chrona/logging": "workspace:*",
@@ -75,10 +74,6 @@
       "dependencies": {
         "@chrona/contracts": "workspace:*",
       },
-    },
-    "packages/git-workspaces": {
-      "name": "@chrona/git-workspaces",
-      "version": "0.1.0",
     },
     "packages/host": {
       "name": "@chrona/host",
@@ -138,7 +133,6 @@
 
     "@chrona/domain": ["@chrona/domain@workspace:packages/domain"],
 
-    "@chrona/git-workspaces": ["@chrona/git-workspaces@workspace:packages/git-workspaces"],
 
     "@chrona/host": ["@chrona/host@workspace:packages/host"],
 

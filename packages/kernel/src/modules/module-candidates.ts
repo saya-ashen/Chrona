@@ -11,13 +11,14 @@ import { parseInput, StewardError } from "../errors";
 import { json, moduleContext, type ModuleContext } from "./module-context";
 import { checkoutModule } from "./module-files";
 import { moduleMaterialDigest, snapshotModuleMaterial } from "./module-artifacts";
-import { commitModuleSource, readModuleMaterial, type ModuleGitRevision } from "./module-git";
+import { storeVersionMaterial, readStoredVersionMaterial } from "./module-artifacts";
 import { assertCandidateAdmissionIn, assertCandidateOwner, assertCandidateSubmitter, candidateDigest, candidateRequestId, readCandidateAdmissionIn, readCandidateSetIn, type CandidateAdmissionRecord, type CandidateDb, type CandidateSet } from "./module-candidate-records";
 
 async function confinedMaterial<T>(operation: () => Promise<T>): Promise<T> {
   try { return await operation(); }
   catch (error) {
     if (error instanceof StewardError || error instanceof CallError) throw error;
+    console.error(JSON.stringify({ component: "module-candidates", event: "material.unavailable", error: String(error) }));
     const code = (error as NodeJS.ErrnoException).code;
     throw new StewardError(code === "ENOENT" ? "not_found" : "invalid", "Candidate material is unavailable or unsafe");
   }
@@ -46,7 +47,7 @@ export async function admitCandidates(ports: StewardPorts, workspaceId: string, 
     }
     const admission: CandidateAdmissionRecord = { input, issuer: caller, receiptId: null };
     await assertCandidateAdmissionIn(context, tx, admission);
-    await tx.candidateAdmission.create({ data: { id: admissionId, workspaceId, requestKey: input.requestKey, submitterModuleId: input.submitter.moduleId, submitterHash: input.submitter.hash, targets: json(input.targets), issuer: json(caller), createdAt: ports.now() } });
+    await tx.candidateAdmission.create({ data: { id: admissionId, workspaceId, requestKey: input.requestKey, submitterModuleId: input.submitter.moduleId, submitterHash: input.submitter.hash, targets: json([input.target]), issuer: json(caller), createdAt: ports.now() } });
     return { admissionId, ...input };
   });
 }
@@ -57,7 +58,7 @@ async function authorizedAdmission(context: ModuleContext, db: CandidateDb, call
   return admission;
 }
 /** Project one fixed member, retaining the terminal result after a recorded module removal. */
-async function receiptMemberView(context: ModuleContext, db: CandidateDb, state: CandidateSet["state"], member: CandidateSet["members"][number]): Promise<CandidateReceipt["members"][number]> {
+async function receiptMemberView(context: ModuleContext, db: CandidateDb, state: CandidateSet["state"], member: CandidateSet["member"]): Promise<CandidateReceipt["member"]> {
   const version = await db.moduleVersion.findUnique({ where: { id: member.versionId } });
   const module = await db.module.findFirst({ where: { id: member.moduleId, workspaceId: context.workspaceId } });
   if (!version || !module) {
@@ -67,13 +68,12 @@ async function receiptMemberView(context: ModuleContext, db: CandidateDb, state:
     throw new StewardError("conflict", "Fixed candidate member is missing");
   }
   if (version.moduleId !== member.moduleId || version.hash !== member.hash) throw new StewardError("conflict", "Fixed candidate member changed");
-  return { ...member, status: candidateReceiptSchema.shape.members.element.shape.status.parse(version.status), selected: module.activeHash === member.hash };
+  return { ...member, status: candidateReceiptSchema.shape.member.shape.status.parse(version.status), selected: module.activeHash === member.hash };
 }
 async function receiptView(context: ModuleContext, db: CandidateDb, set: CandidateSet): Promise<CandidateReceipt> {
-  const members: CandidateReceipt["members"] = [];
-  for (const member of set.members) members.push(await receiptMemberView(context, db, set.state, member));
-  const rejected = members.some(member => member.status === "rejected");
-  const approved = members.every(member => member.status === "approved");
+  const member = await receiptMemberView(context, db, set.state, set.member);
+  const rejected = member.status === "rejected";
+  const approved = member.status === "approved";
   let state = set.state;
   if (state !== "approved" && state !== "rejected") {
     if (rejected) state = "rejected";
@@ -83,7 +83,7 @@ async function receiptView(context: ModuleContext, db: CandidateDb, set: Candida
   if (state !== set.state) {
     await db.candidateReceipt.update({ where: { id: set.receiptId }, data: { state } });
   }
-  return { ...set, state, members };
+  return { ...set, state, member };
 }
 async function replay(context: ModuleContext, db: CandidateDb, caller: Caller, input: CandidateSubmitInput) {
   const receiptId = candidateRequestId("submission", context.workspaceId, caller, input.requestKey);
@@ -94,8 +94,8 @@ async function replay(context: ModuleContext, db: CandidateDb, caller: Caller, i
   const set = (await readCandidateSetIn(context, db, receiptId))!;
   return receiptView(context, db, set);
 }
-function exactItems(admission: CandidateAdmissionRecord, input: CandidateSubmitInput) {
-  if (admission.input.targets.length !== input.items.length || !admission.input.targets.every(target => input.items.some(item => item.name === target.name))) throw new StewardError("conflict", "Submit exactly the complete admitted target set");
+function exactItem(admission: CandidateAdmissionRecord, input: CandidateSubmitInput) {
+  if (admission.input.target.name !== input.item.name) throw new StewardError("conflict", "Submit exactly the admitted target");
 }
 /** Only the claimed system invocation can prove refusal; publication fences exclude competing direct calls. */
 async function submissionRefusal<T>(proof: boolean, operation: () => Promise<T>): Promise<T> {
@@ -105,21 +105,18 @@ async function submissionRefusal<T>(proof: boolean, operation: () => Promise<T>)
     throw error;
   }
 }
-async function freezeItems(context: ModuleContext, admission: CandidateAdmissionRecord, input: CandidateSubmitInput) {
+async function freezeItem(context: ModuleContext, admission: CandidateAdmissionRecord, input: CandidateSubmitInput) {
   const root = await ownContent(context, admission.input.submitter.moduleId);
-  const frozen = [];
-  for (const item of input.items) {
-    const files = await snapshotModuleMaterial(root, item.dir);
-    const manifestFile = files.find(file => file.path === "module.json");
-    let rawManifest: unknown;
-    try { rawManifest = JSON.parse(Buffer.from(manifestFile?.bytes ?? []).toString("utf8")); }
-    catch { throw new StewardError("invalid", "Candidate module.json is missing or invalid"); }
-    const manifest = parseInput(moduleManifestSchema, rawManifest);
-    if (manifest.name !== item.name || !files.some(file => file.path === moduleMaterialEntryPath(manifest.entry)) || (manifest.data.migrate && !files.some(file => file.path === manifest.data.migrate))) throw new StewardError("invalid", "Candidate name, entry or migration material does not match its manifest");
-    const target = admission.input.targets.find(target => target.name === item.name)!;
-    frozen.push({ item, target, manifest, files, moduleId: target.moduleId ?? randomUUID(), versionId: randomUUID(), materialDigest: moduleMaterialDigest(files) });
-  }
-  return frozen;
+  const item = input.item;
+  const files = await snapshotModuleMaterial(root, item.dir);
+  const manifestFile = files.find(file => file.path === "module.json");
+  let rawManifest: unknown;
+  try { rawManifest = JSON.parse(Buffer.from(manifestFile?.bytes ?? []).toString("utf8")); }
+  catch (error) { throw new StewardError("invalid", `Candidate module.json is missing or invalid: ${error instanceof SyntaxError ? "invalid JSON" : "missing manifest"}`); }
+  const manifest = parseInput(moduleManifestSchema, rawManifest);
+  if (manifest.name !== item.name || !files.some(file => file.path === moduleMaterialEntryPath(manifest.entry)) || (manifest.data.migrate && !files.some(file => file.path === manifest.data.migrate))) throw new StewardError("invalid", "Candidate name, entry or migration material does not match its manifest");
+  const target = admission.input.target;
+  return { item, target, manifest, files, moduleId: target.moduleId ?? randomUUID(), versionId: randomUUID(), materialDigest: moduleMaterialDigest(files) };
 }
 async function submissionInvocation(db: CandidateDb, workspaceId: string, caller: Caller, input: CandidateSubmitInput) {
   if (caller.kind !== "module") return null;
@@ -129,7 +126,7 @@ async function submissionInvocation(db: CandidateDb, workspaceId: string, caller
     select: { id: true, status: true, errorReason: true },
   });
 }
-/** Freeze all bytes and Git revisions before exposing any version to the checker. */
+/** Retain verified material before exposing a runnable version to the checker. */
 export async function submitCandidates(
   ports: StewardPorts, workspaceId: string, caller: Caller, raw: unknown,
   { invocationId }: { invocationId?: string } = {},
@@ -144,13 +141,13 @@ export async function submitCandidates(
     }
     const admission = await submissionRefusal(!!invocationId, () => authorizedAdmission(context, tx, caller, input.admissionId));
     if (admission.receiptId) throw new StewardError("conflict", "Candidate admission was already consumed");
-    exactItems(admission, input);
+    exactItem(admission, input);
     await submissionRefusal(!!invocationId, () => assertCandidateAdmissionIn(context, tx, admission, caller));
     return { admission };
   });
   if (initial.previous) return initial.previous;
   // Classify explicit material refusals before confinedMaterial translates raw I/O errors.
-  const frozen = await confinedMaterial(() => submissionRefusal(!!invocationId, () => freezeItems(context, initial.admission!, input)));
+  const frozen = await confinedMaterial(() => submissionRefusal(!!invocationId, () => freezeItem(context, initial.admission!, input)));
   // Identity can change while application content is being read. No runnable rows exist yet.
   const completed = await ports.db.$transaction(async tx => {
     const previous = await replay(context, tx, caller, input);
@@ -161,16 +158,7 @@ export async function submitCandidates(
     return null;
   });
   if (completed) return completed;
-  const revisions: ModuleGitRevision[] = [];
-  try {
-    for (const item of frozen) revisions.push(await commitModuleSource({ platform: context.platform, moduleId: item.moduleId, versionId: item.versionId, files: item.files, message: item.item.intent.changes.join("; ") }));
-  } catch (error) {
-    // A parallel identical request can win the Git branch update. Its durable
-    // receipt is still authoritative; private unreferenced objects grant nothing.
-    const previous = await ports.db.$transaction(tx => replay(context, tx, caller, input));
-    if (previous) return previous;
-    throw error;
-  }
+  await storeVersionMaterial(context.platform, frozen.files);
   return ports.db.$transaction(async tx => {
     const previous = await replay(context, tx, caller, input);
     if (previous) return previous;
@@ -187,16 +175,15 @@ export async function submitCandidates(
     const receiptId = candidateRequestId("submission", workspaceId, caller, input.requestKey);
     const set: CandidateSet = {
       receiptId, admissionId: input.admissionId, requestKey: input.requestKey,
-      submitter: admission.input.submitter, members: [], state: "submitted", approvalId: null,
+      submitter: admission.input.submitter, member: { name: frozen.item.name, moduleId: frozen.moduleId, hash: frozen.materialDigest, versionId: frozen.versionId, materialDigest: frozen.materialDigest, expectedActiveHash: frozen.target.expectedActiveHash }, state: "submitted", approvalId: null,
     };
-    for (const [index, item] of frozen.entries()) {
-      const revision = revisions[index]!;
-      if (await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: item.moduleId, hash: revision.commit } } })) throw new StewardError("conflict", "Candidate version already exists; terminal versions cannot be resubmitted");
+    {
+      const item = frozen;
+      if (await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: item.moduleId, hash: frozen.materialDigest } } })) throw new StewardError("conflict", "Candidate version already exists; terminal versions cannot be resubmitted");
       if (item.target.moduleId === null) await tx.module.create({ data: { id: item.moduleId, workspaceId, name: item.item.name } });
-      await tx.moduleVersion.create({ data: { id: item.versionId, moduleId: item.moduleId, hash: revision.commit, manifest: json(item.manifest), intent: json(item.item.intent), report: json({ tests: [], git: revision }), status: "building", source: "candidate", createdAt: ports.now() } });
-      set.members.push({ name: item.item.name, moduleId: item.moduleId, hash: revision.commit, versionId: item.versionId, materialDigest: item.materialDigest, expectedActiveHash: item.target.expectedActiveHash });
+      await tx.moduleVersion.create({ data: { id: item.versionId, moduleId: item.moduleId, hash: frozen.materialDigest, manifest: json(item.manifest), intent: json(item.item.intent), report: json({ tests: [] }), status: "building", source: "candidate", createdAt: ports.now() } });
     }
-    await tx.candidateReceipt.create({ data: { id: receiptId, admissionId: input.admissionId, requestKey: input.requestKey, requestDigest: candidateDigest(input), state: set.state, approvalId: null, createdAt: ports.now(), members: json(set.members), memberBindings: { create: set.members.map(member => ({ versionId: member.versionId })) } } });
+    await tx.candidateReceipt.create({ data: { id: receiptId, admissionId: input.admissionId, requestKey: input.requestKey, requestDigest: candidateDigest(input), state: set.state, approvalId: null, createdAt: ports.now(), members: json([set.member]), memberBindings: { create: { versionId: set.member.versionId } } } });
     return receiptView(context, tx, set);
   });
 }
@@ -207,13 +194,13 @@ export async function candidateSource(ports: StewardPorts, workspaceId: string, 
     const admission = await authorizedAdmission(context, db, caller, input.admissionId);
     if (admission.receiptId) throw new StewardError("conflict", "Candidate admission was already consumed");
     await assertCandidateAdmissionIn(context, db, admission, caller);
-    if (!admission.input.targets.some(target => target.moduleId === input.moduleId && target.expectedActiveHash === input.hash)) throw new StewardError("forbidden", "Source is outside this admission's exact targets");
+    if (!(admission.input.target.moduleId === input.moduleId && admission.input.target.expectedActiveHash === input.hash)) throw new StewardError("forbidden", "Source is outside this admission's exact target");
     const version = await db.moduleVersion.findFirst({ where: { moduleId: input.moduleId, hash: input.hash, status: "approved", module: { workspaceId } } });
-    if (!version || !/^[a-f0-9]{40}$/.test(version.hash)) throw new StewardError("conflict", "An immutable Git source version is required");
+    if (!version || !/^[a-f0-9]{64}$/.test(version.hash)) throw new StewardError("conflict", "An immutable material version is required");
     return admission;
   };
   const admission = await ports.db.$transaction(authorize);
-  const files = await confinedMaterial(() => readModuleMaterial({ platform: context.platform, moduleId: input.moduleId, commit: input.hash }));
+  const files = await confinedMaterial(() => readStoredVersionMaterial(context.platform, input.hash));
   const root = await confinedMaterial(() => ownContent(context, admission.input.submitter.moduleId));
   await ports.db.$transaction(async tx => {
     await authorize(tx);

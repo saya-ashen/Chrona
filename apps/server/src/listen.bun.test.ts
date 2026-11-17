@@ -50,7 +50,7 @@ chrona.serve(async request => {
   const apps = await chrona.call("modules.list");
   return Response.json({ path: new URL(request.url).pathname, query: new URL(request.url).search, auth: request.headers.get("authorization"), cookie: request.headers.get("cookie"), transportToken: request.headers.get("x-chrona-module-token"), body: await request.text(), apps: Array.isArray(apps.items) }, { headers: { "set-cookie": "module=session" } });
 });`);
-  const steward = createStewardRuntime(db, { provider: null, dataDir, sandbox: { ...selected.health, startModule: selected.startModule } });
+  const steward = createStewardRuntime(db, { dataDir, sandbox: { ...selected.health, startModule: selected.startModule } });
   stop = () => steward.stop();
   const app = await createServerApp({ steward });
   expect((await app.request("/api/echo/x")).status).toBe(200);

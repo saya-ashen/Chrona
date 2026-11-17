@@ -1,3 +1,4 @@
+import { createTestAgentContext } from "../../../packages/kernel/src/__testing__/test-provider";
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
@@ -15,7 +16,7 @@ beforeEach(async () => {
   db = testDb(); workspaceId = (await db.workspace.create({ data: { name: "owner" } })).id; answers = [];
   ports = { db, ...testReleaseRuntimeChecks(), now: () => new Date(), dataDir: await mkdtemp(join(tmpdir(), "chrona-provider-api-")), publicUrl: null };
   service = createStewardService(ports);
-  const session = await db.session.create({ data: { workspaceId, key: "provider-fixture", source: "owner" } });
+  const session = await createTestAgentContext(db, workspaceId);
   await service.forWorkspace(workspaceId).runs.enqueue({ sessionId: session.id, lane: "background", trigger: "source", prompt: "Fixture only" });
 
 });

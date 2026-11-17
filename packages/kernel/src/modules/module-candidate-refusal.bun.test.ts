@@ -13,7 +13,7 @@ import { testDb } from "../__testing__/test-db";
 registerSystemModule(modules);
 const closes: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const close of closes.splice(0).reverse()) await close(); });
-const owner: Caller = { kind: "owner", via: null }, hash = "a".repeat(40);
+const owner: Caller = { kind: "owner", via: null }, hash = "a".repeat(64);
 const manifest = (name: string, authority?: "owner") => moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [], authority });
 async function fixture() {
   const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-candidate-refusal-");
@@ -28,10 +28,10 @@ async function fixture() {
   await writeFile(join(root, "module.json"), JSON.stringify(manifest("alpha")));
   await writeFile(join(root, "index.ts"), "export {};");
   await writeFile(join(root, "chrona-material.json"), JSON.stringify({ schema: 1, source: ["module.json", "index.ts"], artifacts: [], build: { commands: [], toolchain: "bun", target: "test" } }));
-  const admission = await admitCandidates(ports, workspace.id, caller, { requestKey: "admit", submitter: { moduleId: author.id, hash }, targets: [{ name: "alpha", moduleId: null, expectedActiveHash: null }] });
-  const submission = { admissionId: admission.admissionId, requestKey: "submit", items: [{ name: "alpha", dir: "alpha", intent: { changes: ["Fixture"], preserves: [] } }] };
+  const admission = await admitCandidates(ports, workspace.id, caller, { requestKey: "admit", submitter: { moduleId: author.id, hash }, target: { name: "alpha", moduleId: null, expectedActiveHash: null } });
+  const submission = { admissionId: admission.admissionId, requestKey: "submit", item: { name: "alpha", dir: "alpha", intent: { changes: ["Fixture"], preserves: [] } } };
   const direct = () => submitCandidates(ports, workspace.id, caller, submission);
-  const routed = (key = submission.requestKey, items = submission.items) => callSync(ports, { workspaceId: workspace.id, caller, chain: [], path: [] }, "modules.submit", { admissionId: admission.admissionId, items }, { key });
+  const routed = (key = submission.requestKey, item = submission.item) => callSync(ports, { workspaceId: workspace.id, caller, chain: [], path: [] }, "modules.submit", { admissionId: admission.admissionId, item }, { key });
   const issuerAuthority = (authority?: "owner") => db.moduleVersion.update({ where: { moduleId_hash: { moduleId: author.id, hash } }, data: { manifest: manifest("author", authority) } });
   const revokeIssuer = () => issuerAuthority();
   return { db, ports, workspace, caller, root, submission, direct, routed, revokeIssuer, issuerAuthority };
@@ -85,11 +85,11 @@ test("accepted receipt replay with stale issuer authority never carries refusal 
 
 test("submission conflicts never carry refusal proof", async () => {
   const f = await fixture();
-  const partial = await refusal(f.routed("partial", [{ ...f.submission.items[0]!, name: "other" }]));
+  const partial = await refusal(f.routed("partial", { ...f.submission.item, name: "other" }));
   expect(partial).toMatchObject({ code: "conflict" });
   expect(partial.reason).toBeUndefined();
   await f.direct();
-  const changed = await refusal(f.routed("submit", [{ ...f.submission.items[0]!, dir: "changed" }]));
+  const changed = await refusal(f.routed("submit", { ...f.submission.item, dir: "changed" }));
   expect(changed).toMatchObject({ code: "conflict" });
   expect(changed.reason).toBeUndefined();
 });
@@ -105,7 +105,7 @@ test("raw material I/O errors are unmarked after public error translation", asyn
 test("database failure before publication does not become refusal proof", async () => {
   const f = await fixture();
   const faultyDb = f.db.$extends({ query: { candidateAdmission: { findFirst() { throw new Error("injected database failure"); } } } });
-  const error = await refusal(callSync({ ...f.ports, db: faultyDb as typeof f.db }, { workspaceId: f.workspace.id, caller: f.caller, chain: [], path: [] }, "modules.submit", { admissionId: f.submission.admissionId, items: f.submission.items }, { key: "submit" }));
+  const error = await refusal(callSync({ ...f.ports, db: faultyDb as typeof f.db }, { workspaceId: f.workspace.id, caller: f.caller, chain: [], path: [] }, "modules.submit", { admissionId: f.submission.admissionId, item: f.submission.item }, { key: "submit" }));
   expect(error).toMatchObject({ code: "unknown" });
   expect(error.reason).toBeUndefined();
 });
@@ -171,7 +171,7 @@ test("Run interruption retains publication ownership while the routed handler ca
   const f = await fixture(), pause = pauseFirstSnapshot();
   const run = await f.db.run.create({ data: { workspaceId: f.workspace.id, lane: "foreground", trigger: "source", provider: "fake", tokenHash: "candidate-refusal", prompt: "", cwd: "/tmp", status: "running" } });
   const origin = { workspaceId: f.workspace.id, caller: f.caller, chain: [], path: [], run: { executionRunId: run.id } };
-  const original = refusal(withAgentContextEntry(f.ports, origin, () => callSync(f.ports, origin, "modules.submit", { admissionId: f.submission.admissionId, items: f.submission.items }, { key: "submit" })));
+  const original = refusal(withAgentContextEntry(f.ports, origin, () => callSync(f.ports, origin, "modules.submit", { admissionId: f.submission.admissionId, item: f.submission.item }, { key: "submit" })));
   await pause.ready;
   await f.db.$transaction(tx => interruptRunCallsIn(tx, run.id, f.ports.now()));
   const competitor = await refusal(f.direct());

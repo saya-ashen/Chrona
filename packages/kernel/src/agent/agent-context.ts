@@ -1,15 +1,30 @@
+import { realpath, stat } from "node:fs/promises";
+import { isAbsolute } from "node:path";
 import type { Prisma } from "@chrona/db";
-import { providerAnswerSchema, type ExecutionPrincipal } from "@chrona/contracts/steward";
+import { providerAnswerSchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "../ports";
 import { CallError } from "../modules/module-call-error";
 import { createProviderControl } from "./provider-channel";
 import { assertApprovedAgentPrincipal } from "./agent-context-admission";
 import { selectContextTools } from "./agent-context-tools";
 import { selectAgentProvider, providerView, type ProviderBinding } from "./agent-provider";
-import { contextDigest, contextRequestDigest, modulePrincipal, ownedContext, type ModulePrincipal } from "./agent-context-state";
+import { contextDigest, contextRequestDigest, modulePrincipal, ownedContext, type AgentPrincipal, type ModulePrincipal } from "./agent-context-state";
 import { executeContextCommand, type ContextCommand } from "./agent-context-admission";
 
 export { ownedRun, view, type ModulePrincipal } from "./agent-context-state";
+
+async function preparedCwd(value: unknown) {
+  if (typeof value !== "string" || !isAbsolute(value)) throw new CallError("invalid", "Agent cwd must be an absolute directory");
+  try {
+    const cwd = await realpath(value);
+    if (!(await stat(cwd)).isDirectory()) throw new CallError("invalid", "Agent cwd must be a prepared directory");
+    return cwd;
+  } catch (error) {
+    if (error instanceof CallError) throw error;
+    console.error(JSON.stringify({ component: "agent", event: "cwd_unavailable", error: String(error) }));
+    throw new CallError("invalid", "Agent cwd must be a prepared directory");
+  }
+}
 
 async function selectContextProvider(ports: StewardPorts, principal: ModulePrincipal, args: Record<string, unknown>) {
   let providerId = args.providerId as string | undefined;
@@ -53,7 +68,9 @@ function duplicateOutput(name: string, output: unknown) {
 async function applyEffects(ports: StewardPorts, command: ContextCommand, output: unknown) {
   const { principal, name, args, answer } = command;
   const { workspaceId } = principal;
-  if (name === "run") void ports.onQueued?.().catch(() => {});
+  if (name === "run") void ports.onQueued?.().catch(error => {
+    console.error(JSON.stringify({ component: "agent", event: "queue_wake.failed", workspaceId, error: String(error) }));
+  });
   if (name === "respond") {
     await createProviderControl(ports, workspaceId).answer(String(args.questionId), answer!);
     await admitContextPrimitive(ports, principal, name, args, true);
@@ -64,7 +81,7 @@ async function applyEffects(ports: StewardPorts, command: ContextCommand, output
 }
 
 /** Kernel retains only scoped context identity, admission receipts and durable Run evidence. */
-export async function admitContextPrimitive(ports: StewardPorts, rawPrincipal: ExecutionPrincipal, name: string, args: Record<string, unknown>, ...[settle = false, settledOutput]: [settle?: boolean, settledOutput?: Prisma.InputJsonValue]) {
+export async function admitContextPrimitive(ports: StewardPorts, rawPrincipal: AgentPrincipal, name: string, args: Record<string, unknown>, ...[settle = false, settledOutput]: [settle?: boolean, settledOutput?: Prisma.InputJsonValue]) {
   const principal = modulePrincipal(rawPrincipal);
   let binding: ProviderBinding | undefined;
   if (name === "run" && args.providerRegistration === true) {
@@ -74,7 +91,8 @@ export async function admitContextPrimitive(ports: StewardPorts, rawPrincipal: E
   }
   const selection = name === "run" ? await selectRunTools(ports, principal, args) : undefined;
   const answer = name === "respond" ? parseAnswer(args.answer) : undefined;
-  const command: ContextCommand = { principal, name, args, settle, settledOutput, binding, selection, answer };
+  const cwd = name === "run" && args.cwd !== undefined ? await preparedCwd(args.cwd) : undefined;
+  const command: ContextCommand = { principal, name, args, settle, settledOutput, binding, selection, answer, cwd };
   const result = await ports.db.$transaction(tx => executeContextCommand(ports, tx, command));
   if (result.duplicate) return duplicateOutput(name, result.output);
   return applyEffects(ports, command, result.output);

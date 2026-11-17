@@ -6,13 +6,12 @@ import { join, resolve } from "node:path";
 import { ensureSqliteDatabase } from "./sqlite-migrations";
 
 const models = [
-  "Workspace", "Session", "Module", "ModuleVersion", "Generation",
+  "Workspace", "Module", "ModuleVersion",
   "ModuleRun", "ModuleCall", "ModuleInvocation", "Timer", "Run",
-  "ExecutionAttempt", "ExecutionAuthority", "ExecutionDelivery", "ExecutionReceipt", "ExecutionDetail",
-  "ExecutionSnapshot", "ExecutionControl", "ExecutionCommand", "Approval",
+  "Approval",
   "Audit", "StewardState", "AgentContext",
   "AgentRunAdmission", "AgentCommand", "AgentProvider", "AgentRunProvider", "ProviderLaunch", "RunEvent", "RunInteraction",
-  "ModuleMigration", "ModuleReview", "ModuleInstallation", "ModuleInstallationHead", "ModuleInstallationSubmission", "ModuleRemoval", "ModuleUpstream", "ModuleUpstreamMerge", "ModuleActivation", "ModuleExecutionResult", "KernelFact", "KernelFactConsumer", "CandidateAdmission", "CandidateReceipt", "CandidateMember",
+  "ModuleMigration", "ModuleInstallation", "ModuleInstallationHead", "ModuleInstallationSubmission", "ModuleRemoval", "ModuleActivation", "ModuleExecutionResult", "KernelFact", "KernelFactConsumer", "CandidateAdmission", "CandidateReceipt", "CandidateMember",
 ];
 
 function fixture() {
@@ -40,17 +39,16 @@ describe("clean steward SQLite baseline", () => {
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
       ).all().map((row) => row.name).sort();
       expect(names).toEqual([...models, "_chrona_migrations"].sort());
-      for (const model of ["Session", "Module", "Generation", "ModuleInvocation", "Timer", "Run", "Approval", "Audit", "StewardState"]) {
+      for (const model of ["AgentContext", "Module", "ModuleInvocation", "Timer", "Run", "Approval", "Audit", "StewardState"]) {
         const keys = db.query<{ table: string; from: string; on_delete: string }, []>(
           `PRAGMA foreign_key_list("${model}")`,
         ).all();
         expect(keys.some((key) => key.table === "Workspace" && key.from === "workspaceId" && key.on_delete === "CASCADE")).toBe(true);
       }
-      const attemptKeys = db.query<{ table: string; on_delete: string }, []>('PRAGMA foreign_key_list("ExecutionAttempt")').all();
-      expect(attemptKeys.map(key => [key.table, key.on_delete]).sort()).toEqual([["Module", "RESTRICT"], ["Run", "RESTRICT"], ["Workspace", "RESTRICT"]]);
-      for (const model of ["ExecutionDetail", "ExecutionSnapshot", "ExecutionControl", "ExecutionCommand"]) {
-        expect(db.query<{ table: string; on_delete: string }, []>(`PRAGMA foreign_key_list("${model}")`).all()).toContainEqual(expect.objectContaining({ table: "ExecutionAttempt", on_delete: "CASCADE" }));
-      }
+      const contextKeys = db.query<{ table: string; from: string; on_delete: string }, []>('PRAGMA foreign_key_list("AgentContext")').all();
+      expect(contextKeys).toContainEqual(expect.objectContaining({ table: "Module", from: "moduleId", on_delete: "SET NULL" }));
+      const runKeys = db.query<{ table: string; from: string; on_delete: string }, []>('PRAGMA foreign_key_list("Run")').all();
+      expect(runKeys).toContainEqual(expect.objectContaining({ table: "AgentContext", from: "sessionId", on_delete: "SET NULL" }));
     });
   });
 
@@ -78,11 +76,6 @@ describe("clean steward SQLite baseline", () => {
         ["Run", ["workspaceId", "lane", "status", "createdAt"], false],
         ["Run", ["tokenHash"], true],
         ["Approval", ["workspaceId", "status", "createdAt"], false],
-        ["ExecutionAttempt", ["workspaceId", "ownerId", "callerKey", "commandKey"], true],
-        ["ExecutionAttempt", ["heldDirectory"], true],
-        ["ExecutionDetail", ["attemptId", "seq"], true],
-        ["ExecutionDetail", ["expiresAt"], false],
-        ["ExecutionSnapshot", ["expiresAt"], false],
         ["Module", ["workspaceId", "name"], true],
       ] as const) {
         const indexes = db.query<{ name: string; unique: number }, []>(`PRAGMA index_list("${table}")`).all();

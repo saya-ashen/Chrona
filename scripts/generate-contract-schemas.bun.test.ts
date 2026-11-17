@@ -13,9 +13,9 @@ for (const [name, schema] of Object.entries(schemas)) {
   });
 }
 
-test("system artifact contains only the seven public namespaces and the public build response tool", () => {
+test("system artifact contains only tools from the seven public namespaces", () => {
   const targets = Object.entries(publicSystemTools).flatMap(([namespace, tools]) => tools.map(tool => `${namespace}.${tool.name}`));
-  expect(Object.keys(schemas["system-tools.json"]).sort()).toEqual([...targets, "chrona_reply"].sort());
+  expect(Object.keys(schemas["system-tools.json"]).sort()).toEqual(targets.sort());
   expect(Object.keys(publicSystemTools).sort()).toEqual(["activity", "agent", "approvals", "modules", "secrets", "settings", "timers"]);
 });
 

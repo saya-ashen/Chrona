@@ -19,7 +19,6 @@
       "@chrona/kernel/test-support": ["../../packages/kernel/src/__testing__/test-support.ts"],
       "@chrona/kernel/*": ["../../packages/kernel/src/*"],
       "@chrona/kernel": ["../../packages/kernel/src/index.ts"],
-      "@chrona/git-workspaces": ["../../packages/git-workspaces/src/index.ts"],
       "@chrona/db/*": ["../../packages/db/src/*"],
       "@chrona/db": ["../../packages/db/src/index.ts"],
       "@chrona/contracts/*": ["../../packages/contracts/src/*"],

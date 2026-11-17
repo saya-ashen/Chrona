@@ -48,5 +48,5 @@ test.each([false, true])("restart reconciles only a persisted stop receipt (conf
   expect(calls).toEqual(["status"]);
   expect(await db.run.count()).toBe(1);
   expect(await db.run.findUniqueOrThrow({ where: { id: run.id } })).toMatchObject({ stopStatus: confirmed ? "confirmed" : "unknown", status: confirmed ? "finished" : "failed" });
-  if (confirmed) expect(await db.session.findUniqueOrThrow({ where: { id: context.contextId } })).toMatchObject({ providerSessionId: "continued" });
+  if (confirmed) expect(await db.agentContext.findUniqueOrThrow({ where: { id: context.contextId } })).toMatchObject({ providerSessionId: "continued" });
 });

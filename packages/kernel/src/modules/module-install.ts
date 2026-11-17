@@ -5,11 +5,9 @@ import { mkdtemp, readdir, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { redactSensitiveText } from "@chrona/logging/redaction";
-import { recordModuleUpstream, submitMergedCommit } from "./module-upstream";
 import { moduleContext, type ModuleContext } from "./module-context";
-import { verifyModuleGitBundle } from "./module-git-upstream";
 import { propose } from "./module-proposal";
-import { moduleSourceFiles, storeModuleArtifacts } from "./module-artifacts";
+import { moduleMaterialDigest } from "./module-artifacts";
 import { checkoutModule } from "./module-files";
 import { moduleInstallRequestSchema, moduleInstallResultSchema, type ModuleInstallRequest, type ModuleInstallResult } from "@chrona/contracts/steward";
 import type { StewardPorts } from "../ports";
@@ -19,14 +17,12 @@ import { assertExternalName } from "./module-identity";
 import { parseInput, StewardError } from "../errors";
 import { rejectedUpdateNotice } from "./module-activation-notice";
 import { prepareExactReleaseUpdate, readExactReleaseBaselineIn } from "./module-exact-release";
-import type { Caller } from "./module-call-types";
 import { diagnosticText } from "./module-diagnostics";
 import type { BuildReport } from "./module-context";
 
 export function rejectionSummary(report: unknown): string {
   const build = report as Partial<BuildReport> | null;
-  const error = build?.errors?.find(error => error.trim())
-    ?? build?.typecheck?.errors?.find(error => error.message.trim())?.message;
+  const error = build?.errors?.find(error => error.trim());
   const failed = [...(build?.tests ?? []), ...(build?.migration ? [build.migration] : [])].find(test => test.exitCode !== 0 && (test.stderr.trim() || test.stdout.trim()));
   const message = error ?? (failed?.stderr.trim() ? failed.stderr : failed?.stdout) ?? "Module checks failed; inspect the version report";
   return diagnosticText(message, 300, !error && !!failed).slice(0, 300);
@@ -51,43 +47,32 @@ function resultData(result: ModuleInstallResult) {
 function failure(result: ModuleInstallResult, reason: string, message: string, code: NonNullable<ModuleInstallResult["error"]>["code"] = "failed"): ModuleInstallResult {
   return { ...result, status: "failed", approvalId: null, error: { code, reason, message: redactSensitiveText(message).slice(0, 1000) } };
 }
-/** Queue only: tests, dependency installation and activation remain in the existing background build. */
 export function createExternalModuleInstaller(ports: StewardPorts): ExternalModuleInstaller {
   return async ({ workspaceId, request, release, exactReleaseUpdate }) => {
     // Re-resolve immediately before copying; never trust an adapter argument as a host path.
     const trusted = await revalidateInstallationRelease(ports, request.package, release);
-    if (!trusted.git) throw new StewardError("invalid", "Installation requires a pinned Git release");
-    const git = trusted.git;
     const { id, marker, submission } = await prepareSubmission(ports, workspaceId, request, release.hash);
     const root = await realpath(await mkdtemp(join(tmpdir(), "chrona-install-")));
     try {
       const context = moduleContext(ports, workspaceId), intent = { changes: [marker], preserves: [] };
-      await copyRelease(trusted, root, request.package, context.platform);
-      const prepared = async (commit: string) => {
-        submission.hash = commit;
-        submission.existingVersionId = submission.moduleId ? (await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: submission.moduleId, hash: commit } } }))?.id ?? null : null;
+      await copyRelease(trusted, root, request.package);
+      const prepared = async (hash: string) => {
+        submission.hash = hash;
+        submission.existingVersionId = submission.moduleId ? (await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: submission.moduleId, hash } } }))?.id ?? null : null;
         submission.phase = "proposing";
         await ports.db.moduleInstallationSubmission.update({ where: { id }, data: submission });
       };
       let proposal;
-      if (request.mode === "exact-release" && submission.moduleId) {
-        if (!exactReleaseUpdate) throw new StewardError("forbidden", "Exact release selection requires an owner baseline");
-        const { baseline, expectedLocal } = await prepareExactReleaseUpdate(context, submission.moduleId, trusted, exactReleaseUpdate);
-        const associated = await ports.db.moduleUpstream.findUnique({ where: { moduleId: submission.moduleId } });
-        const bundle = { ...git, ...(associated?.repository ? { repository: null } : {}) };
-        await prepared(git.commit);
-        proposal = await propose(context, { root, dir: request.package, intent, allowed: [request.package], sourceCommit: git.commit, gitBundle: bundle, expectedLocal, expectedModuleId: submission.moduleId, exactReleaseUpdate: baseline }, "user");
-        if (proposal.hash !== git.commit) throw new StewardError("conflict", "Proposal commit differs from the selected release");
-      } else if (request.mode === "update" && submission.moduleId) {
-        proposal = await submitMergedCommit(context, { moduleId: submission.moduleId, commit: git.commit, bundle: git, intent, onPrepared: prepared });
+      if (submission.moduleId) {
+        if (!exactReleaseUpdate) throw new StewardError("conflict", "Release update requires an exact active baseline");
+        const { baseline } = await prepareExactReleaseUpdate(context, submission.moduleId, trusted, exactReleaseUpdate);
+        await prepared(trusted.hash);
+        proposal = await propose(context, { root, dir: request.package, intent, allowed: [request.package], expectedHash: trusted.hash, expectedModuleId: submission.moduleId, exactReleaseUpdate: baseline }, "user");
       } else {
-        await prepared(trusted.git.commit);
-        proposal = await propose(context, { root, dir: request.package, intent, allowed: [request.package], sourceCommit: git.commit, gitBundle: git, expectedModuleId: null }, "user");
-        if (proposal.hash !== trusted.git.commit) throw new StewardError("conflict", "Proposal commit differs from the selected release");
+        await prepared(trusted.hash);
+        proposal = await propose(context, { root, dir: request.package, intent, allowed: [request.package], expectedHash: trusted.hash, expectedModuleId: null }, "user");
       }
-      if (proposal.moduleId) {
-        await recordModuleUpstream(ports, workspaceId, proposal.moduleId, git);
-      }
+      if (proposal.hash !== trusted.hash) throw new StewardError("conflict", "Installation material differs from the selected release");
       submission.moduleId = proposal.moduleId ?? submission.moduleId;
       submission.phase = "submitted";
       await ports.db.moduleInstallationSubmission.update({ where: { id }, data: submission });
@@ -104,7 +89,7 @@ export function createExternalModuleInstaller(ports: StewardPorts): ExternalModu
 }
 async function revalidateInstallationRelease(ports: StewardPorts, name: ModuleInstallRequest["package"], release: Parameters<ExternalModuleInstaller>[0]["release"]) {
   const trusted = await resolveExternalRelease(ports, name);
-  if (release.name !== trusted.name || release.origin !== "external" || release.codeDir !== trusted.codeDir || release.hash !== trusted.hash || JSON.stringify(release.git) !== JSON.stringify(trusted.git)) throw new StewardError("conflict", "External release changed before submission");
+  if (release.name !== trusted.name || release.origin !== "external" || release.codeDir !== trusted.codeDir || release.hash !== trusted.hash) throw new StewardError("conflict", "External release changed before submission");
   return trusted;
 }
 async function prepareSubmission(ports: StewardPorts, workspaceId: string, request: InstallationRequest, hash: string) {
@@ -120,19 +105,15 @@ async function prepareSubmission(ports: StewardPorts, workspaceId: string, reque
   await ports.db.moduleInstallationSubmission.create({ data: { id, installationId: installationId(workspaceId, request.requestKey), ...submission } });
   return { id, marker, submission };
 }
-async function copyRelease(trusted: Awaited<ReturnType<typeof resolveExternalRelease>>, root: string, name: string, platform: string) {
-  const files = await readReleaseMaterial(trusted.codeDir), source = moduleSourceFiles(files);
-  if (!trusted.git) throw new StewardError("invalid", "Official installation requires Git provenance");
-  const revision = await verifyModuleGitBundle(trusted.git);
-  if (source.length !== revision.files.length || source.some((file, index) => file.path !== revision.files[index]?.path || !Buffer.from(file.bytes).equals(revision.files[index]!.bytes) || !!file.executable !== !!revision.files[index]!.executable)) throw new StewardError("conflict", "External release changed while copying");
-  await storeModuleArtifacts(platform, files);
+async function copyRelease(trusted: Awaited<ReturnType<typeof resolveExternalRelease>>, root: string, name: string) {
+  const files = await readReleaseMaterial(trusted.codeDir);
+  if (moduleMaterialDigest(files) !== trusted.hash) throw new StewardError("conflict", "External release changed while copying");
   await checkoutModule(root, name, files);
 }
 async function installationFacts(ports: StewardPorts, workspaceId: string, result: ModuleInstallResult): Promise<ModuleInstallResult> {
   if (!result.moduleId || !result.hash) return result;
   const module = await ports.db.module.findFirst({ where: { id: result.moduleId, workspaceId, name: result.package } });
   if (!module) return failure(result, "module_removed", "The submitted module was removed; explicitly install it again", "not_found");
-  if (module.builtin) return failure(result, "module_identity_conflict", "The installation target is now immutable", "conflict");
   const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: result.hash } } });
   if (!version) return failure(result, "version_missing", "The submitted version is missing; inspect diagnostics before retrying", "not_found");
   if (version.status === "approved") return approvedInstallation(result, module.activeHash);
@@ -219,13 +200,6 @@ function resumeInstallation(request: InstallationRequest, previous: Prisma.Modul
 export async function installExternal(ports: StewardPorts, workspaceId: string, raw: ModuleInstallRequest): Promise<ModuleInstallResult> {
   return installRequest(ports, workspaceId, parseInput(moduleInstallRequestSchema, raw));
 }
-/** Host-only stopped-service CLI selection. Routed install/Author inputs cannot select source commits. */
-export async function installExactRelease(ports: StewardPorts, workspaceId: string, raw: ModuleInstallRequest, caller: Caller): Promise<ModuleInstallResult> {
-  if (caller.kind !== "owner") throw new StewardError("forbidden", "Exact release selection requires local owner administration");
-  const request = parseInput(moduleInstallRequestSchema, raw);
-  if (request.mode !== "update") throw new StewardError("invalid", "Exact release selection requires update");
-  return installRequest(ports, workspaceId, { ...request, mode: "exact-release" });
-}
 async function installRequest(ports: StewardPorts, workspaceId: string, request: InstallationRequest): Promise<ModuleInstallResult> {
   const id = installationId(workspaceId, request.requestKey);
   const claim = await ports.db.$transaction(async tx => {
@@ -234,7 +208,7 @@ async function installRequest(ports: StewardPorts, workspaceId: string, request:
     const module = await assertExternalName(tx, workspaceId, request.package, "install");
     if (module && request.mode === "install") throw new StewardError("conflict", "Module already installed; explicitly select update");
     if (!module && request.mode !== "install") throw new StewardError("not_found", "Module not installed; explicitly select install");
-    const exactReleaseUpdate = request.mode === "exact-release" ? await readExactReleaseBaselineIn(tx, module!) : undefined;
+    const exactReleaseUpdate = request.mode === "update" ? await readExactReleaseBaselineIn(tx, module!) : undefined;
     const moduleId = module?.id ?? null;
     const pending: ModuleInstallResult = { package: request.package, requestKey: request.requestKey, status: "pending", moduleId, hash: null, approvalId: null, error: null };
     const result = pending;
@@ -285,7 +259,7 @@ export async function recordInstallationResult(ports: StewardPorts, workspaceId:
     if (row.package !== result.package) throw new StewardError("conflict", "Installation receipt identity mismatch");
     await tx.moduleInstallation.update({ where: { id }, data: resultData(result) });
     if (row.mode !== "install" && result.error?.reason === "installation_rejected" && result.moduleId && result.hash) {
-      const module = await tx.module.findFirst({ where: { id: result.moduleId, workspaceId, name: result.package, builtin: false } });
+      const module = await tx.module.findFirst({ where: { id: result.moduleId, workspaceId, name: result.package } });
       if (module) await rejectedUpdateNotice({ ports, workspaceId, tx, module, hash: result.hash, error: result.error.message });
     }
   });
@@ -304,13 +278,14 @@ export async function externalPackageCatalog(ports: StewardPorts, workspaceId: s
       const release = await resolveExternalRelease(ports, name);
       return { name, ...releaseCatalogDetails(release), moduleId: module?.id ?? null, installation, error: null };
     } catch (error) {
-      return { name, description: null, available: false, releaseHash: null, git: null, moduleId: module?.id ?? null, installation, error: error instanceof Error ? redactSensitiveText(error.message).slice(0, 1000) : "Release unavailable" };
+      console.error(JSON.stringify({ component: "module-install", event: "catalog.release_unavailable", name, error: redactSensitiveText(String(error)) }));
+      return { name, description: null, available: false, releaseHash: null, moduleId: module?.id ?? null, installation, error: error instanceof Error ? redactSensitiveText(error.message).slice(0, 1000) : "Release unavailable" };
     }
   }));
 }
 
 function releaseCatalogDetails(release: ModuleRelease) {
-  return { description: release.manifest.description ?? null, available: true, releaseHash: release.hash, git: release.git ? { repository: release.git.repository, branch: release.git.branch, commit: release.git.commit } : null };
+  return { description: release.manifest.description ?? null, available: true, releaseHash: release.hash };
 }
 
 function installationFailure(result: ModuleInstallResult, error: unknown): ModuleInstallResult {

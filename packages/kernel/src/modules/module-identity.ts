@@ -1,33 +1,28 @@
 import type { Prisma } from "@chrona/db";
-import { BUILTIN_MODULE_NAMES, KERNEL_MODULE_NAMES, LOCAL_CAPABILITY_NAMES, type ModuleCapabilities, type ModuleOperation, type ModuleOrigin } from "@chrona/contracts/steward";
+import { KERNEL_MODULE_NAMES, LOCAL_CAPABILITY_NAMES, type ModuleCapabilities, type ModuleOperation, type ModuleOrigin } from "@chrona/contracts/steward";
 import { StewardError } from "../errors";
 
 const kernelNames = new Set<string>(KERNEL_MODULE_NAMES);
-const builtinNames = new Set<string>(BUILTIN_MODULE_NAMES);
 const isKernelReservedName = (name: string) => kernelNames.has(name) || (LOCAL_CAPABILITY_NAMES as readonly string[]).includes(name);
-const isReservedModuleName = (name: string) => isKernelReservedName(name) || builtinNames.has(name);
-/** For persisted apps ONLY Module.builtin decides origin; source/manifest/hash never do. */
-export function moduleIdentity(row: { name: string; builtin: boolean }, options: { configurable?: boolean; removable?: boolean } = {}) {
-  const origin: ModuleOrigin = row.builtin ? "builtin" : "external";
+export function moduleIdentity(_row: { name: string }, options: { configurable?: boolean; removable?: boolean } = {}) {
+  const origin: ModuleOrigin = "external";
   const capabilities = moduleCapabilities(origin, options);
   return { origin, capabilities };
 }
 export function moduleCapabilities(origin: ModuleOrigin, options: { configurable?: boolean; removable?: boolean } = {}): ModuleCapabilities {
-  const external = origin === "external", app = origin !== "kernel";
+  const app = origin !== "kernel";
   return {
-    build: app, propose: app, group: app, activate: app, update: app, rollback: app,
-    remove: external && options.removable !== false, install: false,
+    build: app, propose: app, activate: app, update: app, rollback: app,
+    remove: app && options.removable !== false, install: false,
     enable: app, disable: app, configure: options.configurable === true, diagnose: app,
   };
 }
 export class ModuleIdentityError extends StewardError {
-  constructor(code: "forbidden" | "conflict", public readonly reason: "immutable_module" | "reserved_module_name" | "module_identity_conflict", message: string) { super(code, message); }
+  constructor(code: "forbidden" | "conflict", public readonly reason: "reserved_module_name" | "module_identity_conflict", message: string) { super(code, message); }
 }
-const dynamic = new Set<ModuleOperation>(["build", "propose", "group", "activate", "update", "rollback", "remove", "install"]);
-/** Guard again inside the action/approval transaction. Trusted release activation must not call this dynamic guard. */
-export function assertModuleOperation(row: { name: string; builtin: boolean }, operation: ModuleOperation) {
-  if (isKernelReservedName(row.name) || (!row.builtin && builtinNames.has(row.name))) throw new ModuleIdentityError("conflict", "module_identity_conflict", `Module ${row.name} conflicts with a reserved identity`);
-  if (dynamic.has(operation) && row.builtin && (!builtinNames.has(row.name) || operation === "remove" || operation === "install")) throw new ModuleIdentityError("forbidden", "immutable_module", `Built-in ${row.name} cannot ${operation}`);
+/** Recheck reserved identities inside the action/approval transaction. */
+export function assertModuleOperation(row: { name: string }, operation: ModuleOperation) {
+  if (isKernelReservedName(row.name)) throw new ModuleIdentityError("conflict", "module_identity_conflict", `Module ${row.name} cannot ${operation}: reserved identity`);
 }
 export async function assertExternalModule(tx: Prisma.TransactionClient, workspaceId: string, moduleId: string, operation: ModuleOperation) {
   const row = await tx.module.findFirst({ where: { workspaceId, id: moduleId } });
@@ -38,7 +33,7 @@ export async function assertExternalModule(tx: Prisma.TransactionClient, workspa
 /** New names are checked before any row/candidate is created, including an empty workspace. */
 export async function assertExternalName(tx: Prisma.TransactionClient, workspaceId: string, name: string, operation: ModuleOperation) {
   const row = await tx.module.findUnique({ where: { workspaceId_name: { workspaceId, name } } });
-  if (isReservedModuleName(name) && !(row?.builtin && builtinNames.has(name))) throw new ModuleIdentityError("forbidden", "reserved_module_name", `Module name ${name} is reserved by Chrona`);
+  if (isKernelReservedName(name)) throw new ModuleIdentityError("forbidden", "reserved_module_name", `Module name ${name} is reserved by Chrona`);
   if (row) assertModuleOperation(row, operation);
   return row;
 }

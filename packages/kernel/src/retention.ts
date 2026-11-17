@@ -13,7 +13,7 @@ const passes = new WeakMap<StewardPorts["db"], { at: number; running: boolean }>
 // An allowlist: receipts, status/health anchors, build claims, chat threading and
 // unknown kinds are deliberately absent. See logs/retention-B-readers.md.
 const LOG_KINDS = [
-  "module_execution_result", "module_evolution_outcome", "approval_created", "approval_resolved",
+  "approval_created", "approval_resolved",
   "grant_created", "grant_revoked", "grant_consumed", "secret_set", "secret_removed", "settings_updated",
   "module_activate", "module_auto_activated", "module_rollback", "module_migration_started",
   "module_submission", "module_build_settled", "module_build_rejection", "admin_rollback",
@@ -34,11 +34,7 @@ const unresolvedInvocation = Prisma.sql`(i."status" NOT IN ('succeeded', 'failed
 function stoppedRun(cutoff: Date) {
   return Prisma.sql`r."status" IN ('finished', 'failed', 'cancelled', 'timed_out', 'provider_unavailable')
     AND r."stopStatus" = 'confirmed' AND r."endedAt" < ${cutoff} AND r."leaseUntil" IS NULL
-    AND NOT EXISTS (SELECT 1 FROM "ModuleInvocation" i WHERE i."runId" = r."id" AND ${unresolvedInvocation})
-    AND NOT EXISTS (SELECT 1 FROM "ExecutionAttempt" a WHERE a."runId" = r."id" AND
-      (a."stopConfirmedAt" IS NULL OR EXISTS (SELECT 1 FROM "ExecutionDelivery" d WHERE d."attemptId" = a."id" AND
-        (d."settledAt" IS NULL OR EXISTS (SELECT 1 FROM "ExecutionReceipt" q WHERE q."deliveryId" = d."id"
-          AND q."direction" = 'outbound' AND q."acceptedAt" IS NULL)))))`;
+    AND NOT EXISTS (SELECT 1 FROM "ModuleInvocation" i WHERE i."runId" = r."id" AND ${unresolvedInvocation})`;
 }
 
 /** One atomic selection+delete, never an unbounded OR list of IDs. Every caller
@@ -103,10 +99,7 @@ export async function pruneHistory(db: StewardPorts["db"], now: Date) {
         (m."exitCode" < 0 OR m."createdAt" >= ${cutoff} OR EXISTS
           (SELECT 1 FROM "ModuleInvocation" i WHERE i."id" = m."triggerId" AND
             (${unresolvedInvocation} OR (i."runId" IS NOT NULL AND NOT EXISTS
-              (SELECT 1 FROM "Run" r WHERE r."id" = i."runId" AND ${stoppedRun(cutoff)}))))))
-      AND ("eventKey" IS NULL OR "eventKey" NOT LIKE 'execution:%' OR EXISTS
-        (SELECT 1 FROM "ExecutionAttempt" a JOIN "Run" r ON r."id" = a."runId"
-          WHERE 'execution:' || a."id" = "ModuleCall"."eventKey" AND ${stoppedRun(cutoff)}))`);
+              (SELECT 1 FROM "Run" r WHERE r."id" = i."runId" AND ${stoppedRun(cutoff)}))))))`);
     // Keyed sync/async submissions are replay receipts, not expiring diagnostics.
     // Deferred timer claims can be reused; only settled occurrences expire.
     const invocations = await deleteBatch(db, Prisma.sql`"ModuleInvocation"`, Prisma.sql`

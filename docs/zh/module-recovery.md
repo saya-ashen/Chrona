@@ -1,4 +1,8 @@
-# 模块故障诊断与有界恢复（第一期）
+# 模块故障诊断与有界恢复
+
+003 后续源码整合：应用身份统一，无 builtin 发行或权限分支；恢复材料使用独立保留的完整 SHA256 材料。单应用 `ModuleActivation` 和 `ModuleExecutionResult` 分别保存激活和结果，不再写同内容 Audit 镜像；故障 incident 与计数仍保留。自动回滚检查当前 activation/hash、批准目标、实际能力和数据迁移，已去退役 schedules 字符串守卫。完整数据 restore 的既有 marker 现在覆盖 DB 及 platform/sessions/secrets，并在恢复前检查真实私有进程停止；仅补了故障注入测试源码，未运行。
+
+## 历史实现记录，以下旧入口和验收不适用于当前源码
 
 2026-11-08 当前规则：用户已确认 web/mcp/files/notify/events 支持受检定制和显式回滚到已批准版本；Agent 保持不可动态替换。下节 M1 的全部内置不可回滚是历史规则；本次不扩大自动回滚适用范围，也不宣称五应用所有故障恢复路径已重新验收。当前生命周期见[架构](architecture.md)。
 

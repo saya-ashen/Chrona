@@ -18,7 +18,7 @@ async function fixture() {
   const ports = { db, dataDir: "/not-used-for-pause", publicUrl: null, now: () => now };
   const context = moduleContext(ports, workspace.id);
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest: moduleManifestSchema.parse({ name: "example", entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [] }), source: "user", status: "approved", intent: {}, report: {} } });
-  const { activationId } = await db.$transaction(tx => recordModuleActivation(context, tx, { moduleId: module.id, previousHash: null, hash: "v1", generationId: "fixture" }));
+  const { activationId } = await db.$transaction(tx => recordModuleActivation(context, tx, { moduleId: module.id, previousHash: null, hash: "v1" }));
   // Deliberately opaque rule: lifecycle governance must never interpret calendar schemas.
   const schedule = (status = "active") => db.timer.create({ data: {
     workspaceId: workspace.id, moduleId: module.id, timerId: crypto.randomUUID(), rule: {}, status,

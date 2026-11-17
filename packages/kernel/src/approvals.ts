@@ -7,32 +7,26 @@ import { audit } from "./audit";
 import { recordApprovalFact, recordWithdrawal } from "./notification-facts";
 import { parseInput, StewardError } from "./errors";
 import { toApproval } from "./store";
-import { assertDynamicModuleActivation, groupPayloadSchema, isGroupPayload } from "./modules/module-context";
+import { assertDynamicModuleActivation } from "./modules/module-context";
 import { assertExternalModule } from "./modules/module-identity";
 import { moduleRemovePayloadSchema } from "./modules/module-remove-payload";
 import { drainCalls } from "./modules/module-calls";
 const inputSchema = approvalSchema.pick({ action: true, title: true, detail: true, preview: true }).extend({ moduleId: z.string().min(1).optional(), payload: z.json() }).strict();
 /** Module activation must still pass its current identity and payload guards. */
 async function approve(tx: Prisma.TransactionClient, workspaceId: string, row: Parameters<typeof toApproval>[0]) {
-  if (row.action === "activate_module") await assertDynamicModuleActivation(tx, workspaceId, row.moduleId, row.payload);
+  if (row.action === "activate_module") await assertDynamicModuleActivation(tx, workspaceId, row.moduleId);
 }
 /** v2-16: something a module asked the user to decide (`approvals.request`); the decision goes back to its waiting call. */
 export const isModuleRequest = (payload: unknown): payload is { kind: "module_request"; hash: string; call: string } =>
   !!payload && typeof payload === "object" && !Array.isArray(payload) && (payload as { kind?: unknown }).kind === "module_request"
   && typeof (payload as { call?: unknown }).call === "string" && typeof (payload as { hash?: unknown }).hash === "string";
-/** A module activation is bound to its version hash; a group (v2-15) to every version and no single module. */
+/** A module activation is bound to its version hash. */
 async function assertActivationTarget(tx: Prisma.TransactionClient, workspaceId: string, moduleId: string | undefined, payload: Prisma.JsonValue) {
-  if (isGroupPayload(payload)) {
-    const group = groupPayloadSchema.safeParse(payload);
-    if (moduleId || !group.success) throw new StewardError("invalid", "A group activation binds every version and no single module");
-    for (const version of group.data.versions) if (!await tx.moduleVersion.findFirst({ where: { ...version, module: { workspaceId } } })) throw new StewardError("not_found", "Module version not found");
-    return;
-  }
   if (!moduleId || !payload || typeof payload !== "object" || Array.isArray(payload) || typeof payload.hash !== "string") throw new StewardError("invalid", "Module activation must be bound to a version hash");
   if (!await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: payload.hash } } })) throw new StewardError("not_found", "Module version not found");
 }
 const moduleEffectPayloadSchema = z.union([
-  groupPayloadSchema, moduleRemovePayloadSchema,
+  moduleRemovePayloadSchema,
   z.object({ kind: z.literal("activate_module"), moduleId: z.string(), hash: z.string() }).passthrough(),
 ]);
 // Replaying after a newer activation would roll the app back to an older version.
@@ -42,12 +36,10 @@ async function pendingModuleEffect(tx: Prisma.TransactionClient, workspaceId: st
   if (!parsed.success) return false;
   const payload = parsed.data;
   if (payload.kind === "module_remove") return !await tx.moduleRemoval.findFirst({ where: { workspaceId, moduleId: payload.moduleId } });
-  const versions = payload.kind === "activate_modules" ? payload.versions : [{ moduleId: payload.moduleId, hash: payload.hash }];
-  const modules = await tx.module.findMany({ where: { workspaceId, id: { in: versions.map(version => version.moduleId) } } });
-  if (versions.some(version => !modules.some(module => module.id === version.moduleId && module.status !== "migrating"))) return false;
-  if (versions.every(version => modules.some(module => module.id === version.moduleId && module.activeHash === version.hash && module.status === "active"))) return false;
+  const module = await tx.module.findFirst({ where: { workspaceId, id: payload.moduleId } });
+  if (!module || module.status === "migrating" || module.activeHash === payload.hash && module.status === "active") return false;
   const newer = await tx.moduleActivation.findFirst({ where: {
-    moduleId: { in: versions.map(version => version.moduleId) }, activatedAt: { gt: row.resolvedAt.toISOString() }, module: { workspaceId },
+    moduleId: payload.moduleId, activatedAt: { gt: row.resolvedAt.toISOString() }, module: { workspaceId },
   } });
   return !newer;
 }
@@ -66,7 +58,7 @@ export function createApprovals(context: RecordContext & { ports?: StewardPorts 
       if (input.payload === null) throw new StewardError("invalid", "Approval payload must not be null");
       if (input.action === "activate_module") {
         await assertActivationTarget(tx, workspaceId, input.moduleId, input.payload);
-        await assertDynamicModuleActivation(tx, workspaceId, input.moduleId ?? null, input.payload);
+        await assertDynamicModuleActivation(tx, workspaceId, input.moduleId ?? null);
       }
       if (input.action === "delete_data" && (input.payload as { kind?: unknown }).kind === "module_remove") {
         const removal = parseInput(moduleRemovePayloadSchema, input.payload);

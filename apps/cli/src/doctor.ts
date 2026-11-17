@@ -1,4 +1,3 @@
-import { spawnSync, type SpawnSyncOptionsWithStringEncoding } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { Database } from "bun:sqlite";
@@ -20,7 +19,7 @@ function isExactLoopbackHost(host: string): boolean {
 }
 
 export type ChronaDoctorCheck = {
-  key: "git" | "executionMode" | "database" | "databaseIntegrity" | "migrationHistory" | "externalApps" | "dataDirectoryPermissions" | "databasePermissions" | "databaseArtifactsPermissions" | "configDirectoryPermissions" | "configPermissions" | "runtimeLock" | "backupRestore" | "networkBind" | "apiProtection";
+  key: "executionMode" | "database" | "databaseIntegrity" | "migrationHistory" | "externalApps" | "dataDirectoryPermissions" | "databasePermissions" | "databaseArtifactsPermissions" | "configDirectoryPermissions" | "configPermissions" | "runtimeLock" | "backupRestore" | "networkBind" | "apiProtection";
   status: "ok" | "warning" | "error";
   message: string;
 };
@@ -128,9 +127,7 @@ function migrationHistoryCheck(databasePath: string): ChronaDoctorCheck {
 }
 
 export function inspectLocalChrona(): ChronaDoctorCheck[] {
-  const git = spawnSync("git", ["--version"], { encoding: "utf8", timeout: 5_000, maxBuffer: 4096, windowsHide: true });
-  const gitAvailable = git.status === 0 && /^git version /m.test(git.stdout);
-  const checks: ChronaDoctorCheck[] = [{ key: "git", status: gitAvailable ? "ok" : "error", message: gitAvailable ? "Git is available for module source repositories." : "Git is required for module source repositories. Install Git and make it available on the Chrona process PATH, then rerun chrona doctor." }, executionModeCheck()];
+  const checks: ChronaDoctorCheck[] = [executionModeCheck()];
   const databaseUrl = configuredDatabaseUrl();
   const sqlitePath = sqlitePathFromFileUrl(databaseUrl);
   if (!sqlitePath || sqlitePath === ":memory:") {
@@ -172,21 +169,6 @@ function externalResources(): string {
   return process.env.CHRONA_MODULE_RESOURCES ?? (root ? join(root, "external") : "");
 }
 
-function bundledReleaseMessage(name: string, moduleId: string, releaseHash: string, activeHash: string): string | undefined {
-  const repo = join(getChronaDataDir(), "platform", "repos", `${moduleId}.git`);
-  const options: SpawnSyncOptionsWithStringEncoding = { encoding: "utf8", timeout: 5_000, maxBuffer: 4096, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] };
-  const release = spawnSync("git", [`--git-dir=${repo}`, "cat-file", "-e", `${releaseHash}^{commit}`], options);
-  const missingRelease = ![null, 0].includes(release.status) && !release.error && existsSync(repo);
-  const comparison = release.status === 0
-    ? spawnSync("git", [`--git-dir=${repo}`, "merge-base", "--is-ancestor", releaseHash, activeHash], options)
-    : release;
-  if (missingRelease || (release.status === 0 && comparison.status === 1)) return `${name}: bundled release differs from installed version; stop Chrona and run chrona admin install ${name} --update --request-key <new-key>`;
-  else if (comparison.status !== 0) {
-    const reason = comparison.error?.message || (comparison.stderr || "").trim() || `Git exited with status ${comparison.status} (signal ${comparison.signal})`;
-    return `Could not compare ${name} with the bundled release: ${reason}`;
-  }
-}
-
 function rejectedUpdateMessage(
   entry: Awaited<ReturnType<typeof externalPackageCatalog>>[number],
   module: { id: string; activeHash: string | null },
@@ -213,8 +195,7 @@ async function externalAppMessages(db: PrismaClient) {
       } else if (!module.activeHash) {
         messages.push(`${entry.name}: installed but not yet active (waiting for approval or build); run chrona admin approvals to see pending items`);
       } else if (entry.releaseHash && entry.releaseHash !== module.activeHash) {
-        const message = bundledReleaseMessage(entry.name, entry.moduleId, entry.releaseHash, module.activeHash);
-        if (message) messages.push(message);
+        messages.push(`${entry.name}: bundled material differs from the active version; inspect local application changes before selecting chrona admin install ${entry.name} --update --request-key <new-key>`);
       }
     }
   }

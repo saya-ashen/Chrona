@@ -25,8 +25,8 @@ export async function startLocalProvider(ports: StewardPorts, workspaceId: strin
   const endpoint = <T>(name: keyof typeof declaration.endpoints, args: Record<string, unknown>, key?: string) => callProviderEndpoint<T>(ports, workspaceId, binding, name, args, key);
   let settle!: (outcome: import("@chrona/contracts/steward").RuntimeEvent & { kind: "settled" }) => void;
   const completion = new Promise<import("@chrona/contracts/steward").RuntimeEvent & { kind: "settled" }>(resolve => { settle = resolve; });
-  const callback = retainProviderCallbacks(ports, workspaceId, { provider: binding, events: input.events, detail: input.detail, operationId, settled: settle });
-  const { events: _events, detail: _detail, deadline, ...request } = input;
+  const callback = retainProviderCallbacks(ports, workspaceId, { provider: binding, events: input.events, operationId, settled: settle });
+  const { events: _events, deadline, ...request } = input;
   const start = { ...request, providerOptions: binding.providerOptions, ...(declaration.configuration?.revision ? { configurationRevision: declaration.configuration.revision } : {}), operationId, deadline: deadline?.toISOString() ?? null, callbacks: callback.id };
   try { await ports.db.$transaction(async tx => {
     const authenticated = await authenticateRun(tx, input.token, ports.now());
@@ -54,11 +54,15 @@ export async function startLocalProvider(ports: StewardPorts, workspaceId: strin
         }
       } finally {
         callback.release();
-        await endpoint("release", { operationId }).catch(() => {});
+        await endpoint("release", { operationId }).catch(error => {
+          console.error(JSON.stringify({ component: "local-runtime", event: "release.failed", operationId, error: String(error) }));
+        });
       }
     })();
   }
-  void done.catch(() => {});
+  void done.catch(error => {
+    console.error(JSON.stringify({ component: "local-runtime", event: "completion.failed", operationId, error: String(error) }));
+  });
   const handle = { done,
     async inject(message: string, images?: ProviderRunInput["images"]) { await endpoint("inject", { operationId, message, ...(images ? { images } : {}) }); },
     async abort() { await endpoint("abort", { operationId }); },
@@ -66,6 +70,6 @@ export async function startLocalProvider(ports: StewardPorts, workspaceId: strin
   let handles = active.get(ports.db);
   if (!handles) { handles = new Set(); active.set(ports.db, handles); }
   handles.add(handle);
-  void done.finally(() => handles!.delete(handle)).catch(() => {});
+  void done.then(() => handles!.delete(handle), () => handles!.delete(handle));
   return handle;
 }

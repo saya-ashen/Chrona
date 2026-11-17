@@ -1,14 +1,16 @@
+import { join } from "node:path";
 import type { Prisma } from "@chrona/db";
 import { moduleManifestSchema, type providerAnswerSchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "../ports";
 import { CallError } from "../modules/module-call-error";
-import { assertExecutionPrincipal } from "../execution/execution-principal";
-import { createRuns, createRunSession } from "../execution/runs";
+import { createRuns } from "../execution/runs";
 import { validateExecutionAnswer } from "./provider-channel";
 import type { selectContextTools } from "./agent-context-tools";
 import { assertProviderBinding, providerSnapshot, type ProviderBinding } from "./agent-provider";
 import { reserveCompletionIn, refused } from "../modules/module-model-budget";
-import { contextDigest, contextRequestDigest, view, ownedContext, ownedRun, type ModulePrincipal } from "./agent-context-state";
+import { assertApprovedAgentPrincipal, contextDigest, contextRequestDigest, view, ownedContext, ownedRun, type ModulePrincipal } from "./agent-context-state";
+
+export { assertApprovedAgentPrincipal } from "./agent-context-state";
 
 export type ContextCommand = {
   principal: ModulePrincipal;
@@ -18,15 +20,10 @@ export type ContextCommand = {
   settledOutput?: Prisma.InputJsonValue;
   selection?: Awaited<ReturnType<typeof selectContextTools>>;
   binding?: ProviderBinding;
+  cwd?: string;
   answer?: ReturnType<typeof providerAnswerSchema.parse>;
 };
 type CommandReceipt = Prisma.AgentCommandGetPayload<Record<string, never>>;
-
-export async function assertApprovedAgentPrincipal(tx: Prisma.TransactionClient, principal: ModulePrincipal) {
-  const { workspaceId, caller } = principal;
-  const module = await tx.module.findFirst({ where: { workspaceId, id: caller.moduleId, activeHash: caller.hash, status: "active", versions: { some: { hash: caller.hash, status: "approved" } } }, select: { id: true } });
-  if (!module) throw new CallError("forbidden", "Agent caller is no longer its approved active module");
-}
 
 /** A lifecycle fence may block new work, but not cancellation of this exact version's own admitted Run. */
 export async function assertAgentInterruptPrincipal(tx: Prisma.TransactionClient, principal: ModulePrincipal, runId: string) {
@@ -46,17 +43,20 @@ async function replayReceipt(tx: Prisma.TransactionClient, receipt: CommandRecei
 }
 
 async function createContext(ports: StewardPorts, tx: Prisma.TransactionClient, principal: ModulePrincipal) {
-  const session = await createRunSession(tx, principal.workspaceId, "module", ports.now(), { moduleId: principal.caller.moduleId });
-  await tx.agentContext.create({ data: { sessionId: session.id, workspaceId: principal.workspaceId, moduleId: principal.caller.moduleId, hash: principal.caller.hash } });
-  return { contextId: session.id };
+  const context = await tx.agentContext.create({ data: {
+    workspaceId: principal.workspaceId, ownerId: principal.ownerId, moduleId: principal.caller.moduleId, hash: principal.caller.hash,
+    createdAt: ports.now(), lastActivityAt: ports.now(),
+  } });
+  return { contextId: context.id };
 }
 
 async function runContext(ports: StewardPorts, tx: Prisma.TransactionClient, command: ContextCommand) {
   const { principal, args, binding } = command;
   if (!binding || args.contextId) return ownedContext(tx, principal, String(args.contextId));
-  const session = await createRunSession(tx, principal.workspaceId, "module", ports.now(), { moduleId: principal.caller.moduleId });
-  await tx.agentContext.create({ data: { sessionId: session.id, workspaceId: principal.workspaceId, moduleId: principal.caller.moduleId, hash: principal.caller.hash, providerId: binding.providerId, providerRevision: binding.revision } });
-  return { ...session, providerId: binding.providerId, providerRevision: binding.revision };
+  return tx.agentContext.create({ data: {
+    workspaceId: principal.workspaceId, ownerId: principal.ownerId, moduleId: principal.caller.moduleId, hash: principal.caller.hash,
+    providerId: binding.providerId, providerRevision: binding.revision, createdAt: ports.now(), lastActivityAt: ports.now(),
+  } });
 }
 
 async function assertRunProvider(tx: Prisma.TransactionClient, context: Awaited<ReturnType<typeof runContext>>, command: ContextCommand) {
@@ -102,7 +102,10 @@ async function admitRun(ports: StewardPorts, tx: Prisma.TransactionClient, comma
   if (context.status !== "active") throw new CallError("conflict", "Agent context is not active");
   const active = await tx.run.findFirst({ where: { workspaceId, sessionId: context.id, OR: [{ status: { in: ["queued", "running"] } }, { stopStatus: "unknown" }] }, select: { id: true } });
   if (active) throw new CallError("conflict", "Agent context already has an active run");
-  const run = await createRuns(ports, workspaceId).enqueue({ sessionId: context.id, lane: args.lane as "foreground" | "background", trigger: "source", prompt: String(args.prompt) }, tx);
+  const cwd = context.cwd ?? command.cwd ?? join(ports.dataDir, "sessions", context.id);
+  if (command.cwd && command.cwd !== cwd) throw new CallError("conflict", "Context working directory cannot change");
+  if (!context.cwd) await tx.agentContext.update({ where: { id: context.id }, data: { cwd } });
+  const run = await createRuns(ports, workspaceId).enqueue({ cwd, sessionId: context.id, lane: args.lane as "foreground" | "background", trigger: "source", prompt: String(args.prompt) }, tx);
   await tx.agentRunAdmission.create({ data: { runId: run.id, moduleId: principal.caller.moduleId, hash: principal.caller.hash, targets: selection!.entries.map(entry => ({ target: `${entry.module.name}.${entry.tool.name}`, moduleId: entry.module.id })), content: args.content as string[] } });
   await bindProviderRun(ports, tx, run.id, command);
   return view(run);
@@ -115,7 +118,7 @@ async function controlRun(ports: StewardPorts, tx: Prisma.TransactionClient, com
   if (name === "respond") await validateExecutionAnswer(ports, tx, { workspaceId, runId: run.id, requestId: String(args.questionId), answer: answer! });
   if (name === "interrupt") {
     await tx.run.updateMany({ where: { id: run.id, cancelRequestedAt: null }, data: { cancelRequestedAt: ports.now() } });
-    if (run.status === "queued") await tx.run.update({ where: { id: run.id }, data: { status: "cancelled", stopStatus: "confirmed", endedAt: ports.now() } });
+    if (run.status === "queued") await createRuns(ports, workspaceId).finishRunIn(tx, run.id, { outcome: "cancelled", sessionId: null, error: "Cancelled by owner" }, ports.now(), "never_started");
     return { perform: run.status === "running" || run.stopStatus === "unknown", operationId: run.id, result: view(run.status === "queued" ? { ...run, status: "cancelled", stopStatus: "confirmed" } : run) };
   }
   if (run.status !== "running" || run.stopStatus === "unknown" || run.cancelRequestedAt) throw new CallError("conflict", "Agent run is not running");
@@ -142,7 +145,7 @@ export async function executeContextCommand(ports: StewardPorts, tx: Prisma.Tran
   if (previous) return replayReceipt(tx, previous, command);
   if (settle) throw new CallError("not_found", "Agent control receipt not found");
   if (name === "interrupt") await assertAgentInterruptPrincipal(tx, principal, String(args.runId));
-  else await assertExecutionPrincipal(tx, principal);
+  else await assertApprovedAgentPrincipal(tx, principal, false);
   const output = await applyCommand(ports, tx, command);
   await tx.agentCommand.create({ data: { id: key, workspaceId, moduleId: principal.caller.moduleId, hash: principal.caller.hash, operation: name, requestDigest: hash, output: output as Prisma.InputJsonValue, settled: controlSettled(name, output), createdAt: ports.now() } });
   return { output, duplicate: false };

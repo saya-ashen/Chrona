@@ -6,13 +6,16 @@ import { liveRuns } from "../execution/runs";
 
 /** Reconnect only to a previously admitted operation; this never launches a Provider. */
 export async function reconcileAgentStops(ports: StewardPorts, workspaceId: string) {
-  const rows = await ports.db.run.findMany({ where: { workspaceId, stopStatus: "unknown", execution: null, providerLaunch: { isNot: null } }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: 10 });
+  const rows = await ports.db.run.findMany({ where: { workspaceId, stopStatus: "unknown", providerLaunch: { isNot: null } }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: 10 });
   for (const run of rows) {
     if (liveRuns.has(run.id)) continue;
     let status: unknown;
     try { status = await callProviderEndpoint(ports, workspaceId, await runProviderBinding(ports, workspaceId, run.id), "status", { operationId: run.id }); }
     catch (error) {
-      if (error instanceof CallError && ["not_found", "unavailable", "unknown", "forbidden", "conflict"].includes(error.code)) continue;
+      if (error instanceof CallError && ["not_found", "unavailable", "unknown", "forbidden", "conflict"].includes(error.code)) {
+        console.error(JSON.stringify({ component: "agent-recovery", event: "status.unavailable", runId: run.id, error: String(error) }));
+        continue;
+      }
       throw error;
     }
     // Missing/uncertain receipts are not stop evidence and cannot release capacity.

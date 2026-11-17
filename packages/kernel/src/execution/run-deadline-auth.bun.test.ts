@@ -41,7 +41,7 @@ test.each([
     await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest, source: "user", status: "approved", intent: {}, report: {} } });
     const caller = { kind: "module" as const, module: module.name, moduleId: module.id, hash: "v1" };
     await registerAgentProvider(ports, workspaceId, caller, declaration);
-    const sessionId = (await db.session.create({ data: { workspaceId, key: "web:deadline", source: "owner" } })).id;
+    const sessionId = (await db.agentContext.create({ data: { workspaceId, ownerId: "owner", moduleId: module.id, hash: "v1" } })).id;
     const runs = createRuns(ports, workspaceId);
     await runs.enqueue({ sessionId, lane: "foreground", trigger: "message", prompt: "Work" });
     const run = (await runs.claimNext("foreground"))!;

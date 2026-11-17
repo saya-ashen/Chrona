@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { basename } from "node:path";
-import type { AgentProviderRegistration } from "@chrona/contracts/steward";
+import type { AgentProviderRegistration, ProviderAdapter } from "@chrona/contracts/steward";
 import type { StewardPorts } from "../ports";
 import { callSync, kernelOrigin } from "../modules/module-calls";
 import { testProviderManifest, testProviderProcess } from "./test-provider-process";
@@ -8,7 +8,9 @@ import { registerLocalRuntime } from "../execution/local-runtime";
 import { registerSystemModules } from "../system/system-modules";
 import "../modules/module-effects";
 
-type Fixture = { ports?: StewardPorts; install(workspaceId: string): Promise<void> };
+export type TestProviderPorts = StewardPorts & { provider?: ProviderAdapter };
+
+type Fixture = { ports?: TestProviderPorts; install(workspaceId: string): Promise<void> };
 const fixtures = new WeakMap<StewardPorts["db"], Fixture>();
 const moduleName = "test-provider";
 const versionHash = "test-provider-wire-v1";
@@ -32,7 +34,7 @@ export function registerTestProvider(db: StewardPorts["db"]): StewardPorts["db"]
  * workspaces (outside a transaction), or after committing existing workspaces.
  * testDb stays synchronous; databases that never bind ports acquire no extra modules.
  */
-export async function testProviderPorts<T extends StewardPorts>(ports: T): Promise<T> {
+export async function testProviderPorts<T extends TestProviderPorts>(ports: T): Promise<T> {
   const fixture = fixtures.get(ports.db);
   if (!fixture) throw new Error("testProviderPorts requires testDb() with injectedAgent enabled");
   if (fixture.ports) {
@@ -69,4 +71,19 @@ export async function testProviderPorts<T extends StewardPorts>(ports: T): Promi
   };
   for (const workspace of await ports.db.workspace.findMany({ select: { id: true } })) await fixture.install(workspace.id);
   return ports;
+}
+
+export async function createTestAgentContext(db: StewardPorts["db"], workspaceId: string) {
+  const module = await db.module.upsert({
+    where: { workspaceId_name: { workspaceId, name: "context-test-owner" } },
+    create: { workspaceId, name: "context-test-owner", activeHash: "context-test-v1" }, update: {},
+  });
+  await db.moduleVersion.upsert({
+    where: { moduleId_hash: { moduleId: module.id, hash: "context-test-v1" } },
+    create: {
+      moduleId: module.id, hash: "context-test-v1", status: "approved", source: "user", intent: {}, report: {},
+      manifest: { name: module.name, entry: "index.ts", keepAlive: true, effects: [], tests: ["test.ts"] },
+    }, update: {},
+  });
+  return db.agentContext.create({ data: { workspaceId, ownerId: "owner", moduleId: module.id, hash: "context-test-v1" } });
 }

@@ -13,7 +13,7 @@ import "../modules/module-effects";
 /** Authenticated owner boundary. */
 export function createStewardService(inputPorts: StewardPorts) {
   registerSystemModules();
-  // Agent project/configuration admission is needed even before a Provider operation runs.
+  // Register run-bound Provider callbacks before accepting Agent commands.
   registerLocalRuntime();
   const ports: StewardPorts = Object.create(inputPorts);
   const tick = createTick(ports);

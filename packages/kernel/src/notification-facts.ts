@@ -17,7 +17,6 @@ const lifecycleFactSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("module-update-rejected"), app: identity, hash: identity, activeHash: identity, error: z.string().max(300) }).strict(),
   z.object({ kind: z.literal("module-migration-failed"), app: identity, restore: z.boolean() }).strict(),
   z.object({ kind: z.literal("schedule-failed"), target: identity, status: z.enum(["failed", "unknown"]), error: text.nullable().optional(), disconnected: z.boolean().optional() }).strict(),
-  z.object({ kind: z.literal("build-paused"), status: z.enum(["failed", "timed_out", "provider_unavailable"]) }).strict(),
 ]);
 export type LifecycleFact = z.infer<typeof lifecycleFactSchema>;
 // The question and response protocol remain in provider interactions; this is only its runtime identity.

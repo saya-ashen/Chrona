@@ -37,12 +37,12 @@ async function fixture() {
     id, workspaceId, payload: { type: "lifecycle", data: { key: id, fact: { kind: "module-paused", app: "gone" } } },
     consumedBy: "removed-app", consumedAt: old, createdAt: old, ...extra,
   } });
-  const audit = (id: string, kind = "module_execution_result", createdAt = old) => db.audit.create({ data: {
+  const audit = (id: string, kind = "module_activate", createdAt = old) => db.audit.create({ data: {
     id, workspaceId, kind, actorKey: "chrona", details: {}, createdAt,
   } });
   const epoch = (activationId: string, createdAt = old, candidateHash = "hash") => db.moduleActivation.create({ data: {
-    activationId, moduleId, candidateHash, previousHash: null, generationId: activationId, activatedAt: createdAt.toISOString(),
-    status: "verified", changes: [], checks: {}, affectedCallers: [], observedCapabilities: [], dataHandling: "preserve",
+    activationId, moduleId, candidateHash, previousHash: null, activatedAt: createdAt.toISOString(),
+    status: "verified", changes: [], checks: {}, observedCapabilities: [], dataHandling: "preserve",
     nextAction: "none", rollback: { attempted: false, result: "not-attempted", reason: null }, createdAt, updatedAt: createdAt,
   } });
   const result = (id: string, activationId: string, createdAt = old) => db.moduleExecutionResult.create({ data: {
@@ -77,7 +77,7 @@ test("seven-day boundary is strict for every expiring model; current failure-pol
     await f.call(name, { createdAt: at });
     await f.run(name, { endedAt: at, eventSequence: 1 }); await f.event(name, 1, { createdAt: at });
     await f.fact(name, { createdAt: at, consumedAt: at });
-    await f.audit(name, "module_execution_result", at);
+    await f.audit(name, "module_activate", at);
     await f.result(name, "old", at);
   }
   await f.result("current-policy", "new");
@@ -170,7 +170,7 @@ test("a newer different-hash activation retires inactive execution history", asy
   expect(await f.db.moduleExecutionResult.count()).toBe(0);
 });
 
-test("pruning the Audit copy preserves failure streaks and duplicate success/failure replay", async () => {
+test("failure streaks and duplicate success/failure replay survive diagnostic pruning without Audit mirrors", async () => {
   const f = await fixture();
   await f.epoch("superseded"); await f.epoch("current", boundary);
   await f.result("obsolete", "superseded");
@@ -180,7 +180,8 @@ test("pruning the Audit copy preserves failure streaks and duplicate success/fai
   await f.db.module.update({ where: { id: f.moduleId }, data: { activationId: "resume-is-not-epoch" } });
   const before = await moduleFailurePolicy(f.db, input);
   expect(before).toMatchObject({ consecutiveFailures: 3, shouldPause: true });
-  expect(await pruneHistory(f.db, now)).toMatchObject({ results: 1, audit: 4 });
+  expect(await f.db.audit.count()).toBe(0);
+  expect(await pruneHistory(f.db, now)).toMatchObject({ results: 1, audit: 0 });
   expect(await moduleFailurePolicy(f.db, input)).toEqual(before);
   for (const [resultId, outcome] of [["success", "success"], ["failure-1", "failure"]] as const) {
     expect(await recordModuleExecution(f.db, { ...input, resultId, outcome, now })).toMatchObject({ duplicate: true, consecutiveFailures: 3, shouldPause: true });
@@ -209,31 +210,6 @@ test("completed provider reservations and completion events remain replayable af
   expect(await f.db.runEvent.findMany({ where: { runId: "completion" }, select: { kind: true } })).toEqual([{ kind: "completion" }]);
 });
 
-test("unconfirmed execution stops, unsettled delivery and unaccepted outbound receipts hold Run history", async () => {
-  const f = await fixture();
-  await f.run("delivery"); await f.event("delivery");
-  const attempt = await f.db.executionAttempt.create({ data: {
-    workspaceId: f.workspaceId, ownerId: "owner", callerKey: "owner", workId: "work", commandKey: "command",
-    requestDigest: "digest", runId: "delivery", projectRef: "project", projectDigest: "digest", logDir: "/tmp", baseline: "baseline", budget: {},
-  } });
-  const authority = await f.db.executionAuthority.create({ data: {
-    workspaceId: f.workspaceId, ownerId: "owner", receiverModuleId: f.moduleId, receiverHash: "hash", receiverActivationId: "activation",
-    subjectId: "subject", epoch: 1, keyId: "key", publicKey: "public", verifierId: "verifier", verifierVersion: "1", scope: {}, approvalId: "approval", approvedAt: old,
-  } });
-  const delivery = await f.db.executionDelivery.create({ data: {
-    attemptId: attempt.id, authorityId: authority.id, receiverModuleId: f.moduleId, receiverHash: "hash", receiverActivationId: "activation", launchDigest: "digest", launch: {},
-  } });
-  await f.call("delivery-call", { status: "rejected", eventKey: `execution:${attempt.id}` });
-  expect(await pruneHistory(f.db, now)).toMatchObject({ calls: 0, events: 0 });
-  await f.db.executionAttempt.update({ where: { id: attempt.id }, data: { stopConfirmedAt: old } });
-  expect(await pruneHistory(f.db, new Date(now.getTime() + 3600_000))).toMatchObject({ calls: 0, events: 0 });
-  await f.db.executionDelivery.update({ where: { id: delivery.id }, data: { settledAt: old } });
-  const receipt = await f.db.executionReceipt.create({ data: { deliveryId: delivery.id, operation: "final", requestKey: "key", requestDigest: "digest", direction: "outbound", receipt: {} } });
-  expect(await pruneHistory(f.db, new Date(now.getTime() + 2 * 3600_000))).toMatchObject({ calls: 0, events: 0 });
-  await f.db.executionReceipt.update({ where: { id: receipt.id }, data: { acceptedAt: now } });
-  expect(await pruneHistory(f.db, new Date(now.getTime() + 3 * 3600_000))).toMatchObject({ calls: 1, events: 1 });
-});
-
 test("facts preserve active or paused consumer ACKs, pending pages, withdrawals and explicit consumer selection", async () => {
   const f = await fixture();
   await f.db.module.update({ where: { id: f.moduleId }, data: { status: "paused" } });
@@ -255,7 +231,7 @@ test("only pure-log Audit kinds expire; live authority, ordering, bounded health
   const retained = ["execution_admission_intent", "execution_governance_receipt", "execution_governance_reconcile", "run_continuation", "chat_run_input", "module_build_started", "module_enabled", "module_disabled", "module_runtime_incident", "module_output_mismatch", "future_kind"];
   for (const kind of retained) await f.audit(kind, kind);
   const logs = [
-    "module_execution_result", "module_evolution_outcome", "approval_created", "approval_resolved", "grant_created", "grant_revoked", "grant_consumed",
+    "approval_created", "approval_resolved", "grant_created", "grant_revoked", "grant_consumed",
     "secret_set", "secret_removed", "settings_updated", "module_activate", "module_auto_activated", "module_rollback", "module_migration_started",
     "module_submission", "module_build_settled", "module_build_rejection", "admin_rollback", "reflection_started", "reflection_suggested",
     "module_settings_updated", "workspace_stray_quarantined", "workspace_stray_quarantine_failed", "build_settings_updated", "module_build_failed",
@@ -263,7 +239,7 @@ test("only pure-log Audit kinds expire; live authority, ordering, bounded health
     "build_targets", "build_request", "run_claimed", "run_finished", "run_reply", "tool_limit_rejected", "tool_started", "tool_finished", "run_finalize_failed", "execution_capture_failed",
   ];
   for (const kind of logs) { await f.audit(`old-${kind}`, kind); await f.audit(`new-${kind}`, kind, now); }
-  expect(await pruneHistory(f.db, now)).toMatchObject({ audit: 41 });
+  expect(await pruneHistory(f.db, now)).toMatchObject({ audit: logs.length });
   expect(await f.db.audit.count()).toBe(retained.length + logs.length);
   for (const kind of retained) expect(await f.db.audit.findUnique({ where: { id: kind } })).not.toBeNull();
 });
@@ -279,7 +255,7 @@ test("a pass drains backlogs past one 500-row batch; concurrent/repeated ticks s
     await f.db.moduleExecutionResult.createMany({ data: ids.map(id => ({ id, moduleId: f.moduleId, hash: "hash", activationId: "before", resultId: id, outcome: "failure", consecutiveFailures: 1, createdAt: old })) });
     await f.db.runEvent.createMany({ data: ids.map((_, i) => ({ runId: "bulk", sequence: start + i + 1, kind: "progress", payload: {}, createdAt: old })) });
     await f.db.kernelFact.createMany({ data: ids.map(id => ({ id, workspaceId: f.workspaceId, payload: { type: "notice" }, consumedBy: "removed", consumedAt: old, createdAt: old })) });
-    await f.db.audit.createMany({ data: ids.map(id => ({ id, workspaceId: f.workspaceId, kind: "module_execution_result", actorKey: "chrona", details: {}, createdAt: old })) });
+    await f.db.audit.createMany({ data: ids.map(id => ({ id, workspaceId: f.workspaceId, kind: "module_activate", actorKey: "chrona", details: {}, createdAt: old })) });
   }
   const counts = { calls: 505, invocations: 505, runs: 505, results: 505, events: 505, facts: 505, audit: 505 };
   expect(await Promise.all([pruneHistory(f.db, now), pruneHistory(f.db, now)])).toEqual([counts, null]);

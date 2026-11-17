@@ -3,7 +3,7 @@ import { callProviderEndpoint, runProviderBinding } from "./agent-provider";
 import { settleRunProviderStatus } from "./agent-completion-settlement";
 import { createRuns } from "../execution/runs";
 import { liveRuns } from "../execution/run-live";
-import { releaseRegisteredCompletion } from "../execution/execution-delivery-completion";
+import { releaseRegisteredCompletion } from "./provider-completion";
 
 /** Stop evidence may close a completion Run only after its durable settlement. */
 export async function finishRunFromProviderStatus(ports: StewardPorts, workspaceId: string, runId: string, raw: unknown) {

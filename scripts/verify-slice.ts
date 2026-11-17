@@ -123,7 +123,7 @@ function filterSliceDiagnostics(lines: string[], slicePrefixes: string[]): strin
 	return relevant;
 }
 
-function runTypecheckStep(slicePrefixes: string[], scoped: boolean): StepResult {
+export function runTypecheckStep(slicePrefixes: string[], scoped: boolean): StepResult {
 	const start = performance.now();
 	const res = runCommand(["bunx", "tsc", "--noEmit", "--pretty", "false"]);
 	const durationMs = performance.now() - start;
@@ -141,20 +141,12 @@ function runTypecheckStep(slicePrefixes: string[], scoped: boolean): StepResult 
 		};
 	}
 	const matching = filterSliceDiagnostics(lines, slicePrefixes);
-	if (matching.length > 0) {
-		return {
-			name: "typecheck",
-			ok: false,
-			durationMs,
-			summary: `${matching.length} TypeScript diagnostic line(s) in slice (${lines.length} workspace-wide)`,
-			details: matching.join("\n"),
-		};
-	}
 	return {
 		name: "typecheck",
-		ok: true,
+		ok: false,
 		durationMs,
-		summary: `0 errors in slice (note: ${lines.length} pre-existing diagnostic line(s) outside slice)`,
+		summary: `TypeScript exited ${res.code}: ${matching.length} diagnostic line(s) in slice (${lines.length} workspace-wide)`,
+		details: matching.length > 0 ? matching.join("\n") : res.output,
 	};
 }
 

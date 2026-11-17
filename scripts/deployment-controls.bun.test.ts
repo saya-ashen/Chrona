@@ -13,17 +13,8 @@ import { acceptRelease, runPreflight, summarizeDataState } from "./deployment-co
 
 const script = join(import.meta.dir, "deployment-controls.ts");
 const migrationsDir = join(import.meta.dir, "../packages/db/prisma/migrations");
-const runSql = `INSERT INTO Run (id, workspaceId, lane, trigger, status, provider, tokenHash, prompt, cwd)
-  VALUES ('run', 'workspace', 'coding', 'manual', 'finished', 'test', 'test-token', 'fixture', '/tmp');`;
-const executionSql = `INSERT INTO ExecutionAttempt
-  (id, workspaceId, ownerId, callerKey, workId, commandKey, requestDigest, runId, projectRef, projectDigest, logDir, baseline, budget, stopConfirmedAt, stopEvidence)
-  VALUES ('attempt', 'workspace', 'owner', 'owner', 'work', 'key', 'digest', 'run', 'project', 'digest', '/tmp', 'baseline', '{}', CURRENT_TIMESTAMP, '{"kind":"never_started"}');`;
-const deliverySql = `INSERT INTO ExecutionAuthority
-  (id, workspaceId, ownerId, receiverModuleId, receiverHash, receiverActivationId, subjectId, epoch, keyId, publicKey, verifierId, verifierVersion, scope, approvalId, approvedAt)
-  VALUES ('authority', 'workspace', 'owner', 'module', 'hash', 'activation', 'subject', 1, 'key', 'public', 'verifier', '1', '{}', 'approval', CURRENT_TIMESTAMP);
-  INSERT INTO ExecutionDelivery (id, attemptId, authorityId, receiverModuleId, receiverHash, receiverActivationId, launchDigest, launch, settledAt)
-  VALUES ('delivery', 'attempt', 'authority', 'module', 'hash', 'activation', 'digest', '{}', CURRENT_TIMESTAMP);`;
-
+const runSql = `INSERT INTO Run (id, workspaceId, lane, trigger, status, stopStatus, provider, tokenHash, prompt, cwd)
+  VALUES ('run', 'workspace', 'foreground', 'source', 'finished', 'confirmed', 'test', 'test-token', 'fixture', '/tmp');`;
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), "chrona-deployment-test-"));
   const dataDir = join(root, "data"), databasePath = join(root, "external", "live.db");
@@ -51,9 +42,9 @@ function cli(command: string, args: string[]) {
 test.each(["finished", "failed", "cancelled", "timed_out", "provider_unavailable"])("terminal %s retains never-started settlement", async status => {
   const f = await fixture();
   try {
-    f.db.exec(runSql + executionSql);
+    f.db.exec(runSql);
     f.db.run("UPDATE Run SET status = ?", [status]);
-    expect(summarizeDataState(f.db)).toMatchObject({ unknownStops: 0, unsettledRuns: 0, unsettledExecutions: 0 });
+    expect(summarizeDataState(f.db)).toMatchObject({ unknownStops: 0, unsettledRuns: 0 });
   } finally { await f.close(); }
 });
 
@@ -66,14 +57,11 @@ test.each(["queued", "running", "waiting", "unknown"])("nonterminal %s blocks wo
   } finally { await f.close(); }
 });
 
-test("terminal runs still block unknown stop, held directories and unconfirmed execution stops", async () => {
+test("terminal runs still block unknown stop", async () => {
   const f = await fixture();
   try {
-    f.db.exec(runSql + executionSql);
-    f.db.exec("UPDATE Run SET stopStatus = 'unknown'; UPDATE ExecutionAttempt SET heldDirectory = '/tmp/work'");
-    expect(summarizeDataState(f.db)).toMatchObject({ unknownStops: 1, unsettledExecutions: 1 });
-    f.db.exec("UPDATE ExecutionAttempt SET heldDirectory = NULL, stopConfirmedAt = NULL");
-    expect(summarizeDataState(f.db).unsettledExecutions).toBe(1);
+    f.db.exec(runSql + "UPDATE Run SET stopStatus = 'unknown'");
+    expect(summarizeDataState(f.db).unknownStops).toBe(1);
   } finally { await f.close(); }
 });
 
@@ -88,31 +76,7 @@ test.each(["succeeded", "failed"])("terminal invocation %s blocks until its call
   } finally { await f.close(); }
 });
 
-test.each(["cleanup", "control", "final"])("settled delivery blocks unaccepted outbound %s receipts", async operation => {
-  const f = await fixture();
-  try {
-    f.db.exec(runSql + executionSql + deliverySql);
-    f.db.run(`INSERT INTO ExecutionReceipt (id, deliveryId, operation, requestKey, requestDigest, direction, receipt)
-      VALUES ('receipt', 'delivery', ?, 'key', 'digest', 'outbound', '{}')`, [operation]);
-    expect(summarizeDataState(f.db)).toMatchObject({ unsettledDeliveries: 0, unacceptedOutboundReceipts: 1 });
-    f.db.exec("UPDATE ExecutionReceipt SET acceptedAt = CURRENT_TIMESTAMP");
-    expect(summarizeDataState(f.db).unacceptedOutboundReceipts).toBe(0);
-  } finally { await f.close(); }
-});
-
-test.each(["{}", '{"result":{"state":"unknown"}}', '{"result":{"state":"removed"}}'])("workspace cleanup follows lifecycle receipt %s", async receipt => {
-  const f = await fixture();
-  try {
-    f.db.exec(runSql + executionSql);
-    f.db.run(`INSERT INTO ExecutionCommand (attemptId, commandKey, operation, requestDigest, receipt)
-      VALUES ('attempt', 'key', 'workspace-cleanup-confirm', 'digest', ?)`, [receipt]);
-    expect(summarizeDataState(f.db).unresolvedWorkspaceCleanup).toBe(receipt.includes("removed") ? 0 : 1);
-    f.db.exec("UPDATE ExecutionCommand SET effect = 'unknown'");
-    expect(summarizeDataState(f.db).unknownStops).toBe(1);
-  } finally { await f.close(); }
-});
-
-test.each(["Run", "ExecutionAttempt", "ModuleInvocation", "ModuleCall", "ExecutionDelivery", "ExecutionReceipt", "ExecutionCommand", "AgentCommand"])("missing %s fails even with tracked migration history", async table => {
+test.each(["Run", "ModuleInvocation", "ModuleCall", "AgentCommand"])("missing %s fails even with tracked migration history", async table => {
   const f = await fixture();
   try {
     f.db.exec(`DROP TABLE "${table}"`);

@@ -3,8 +3,6 @@ import { exactReleaseBaselineSchema, type ExactReleaseBaseline } from "./module-
 import { StewardError } from "../errors";
 import type { ModuleContext, BuildReport } from "./module-context";
 import { assertExternalModule, assertModuleOperation } from "./module-identity";
-import { getModuleLocalHead, moduleGitPath, moduleGitRevision } from "./module-git";
-import { verifyModuleGitBundle } from "./module-git-upstream";
 import type { ModuleRelease } from "./module-release";
 import { versionSource } from "./module-source";
 
@@ -14,23 +12,20 @@ export class ExactReleaseUpdateError extends StewardError {
 /** The old approval is an equality precondition, never approval of another source tree. */
 type ActiveModule = { id: string; activeHash: string | null; status: string; activationId: string | null };
 export async function readExactReleaseBaselineIn(db: Prisma.TransactionClient, module: ActiveModule): Promise<ExactReleaseBaseline> {
-  if (!module.activeHash || module.status === "migrating") throw new ExactReleaseUpdateError("Exact release update requires a current approved Git source");
+  if (!module.activeHash || module.status === "migrating") throw new ExactReleaseUpdateError("Exact release update requires a current approved material");
   const active = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } });
-  if (!active || active.status !== "approved" || !/^[a-f0-9]{40}$/.test(active.hash)) throw new ExactReleaseUpdateError("Active module version is not approved");
+  if (!active || active.status !== "approved" || !/^[a-f0-9]{64}$/.test(active.hash)) throw new ExactReleaseUpdateError("Active module version is not approved");
   return { activeHash: active.hash, versionId: active.id, activationId: module.activationId };
 }
 export async function prepareExactReleaseUpdate(context: ModuleContext, moduleId: string, release: ModuleRelease, baseline: ExactReleaseBaseline) {
   await assertExactReleaseUpdateIn(context, context.db, moduleId, { exactReleaseUpdate: baseline });
-  if (!release.git) throw new ExactReleaseUpdateError("Exact release update requires a pinned Git release");
   const active = await context.db.moduleVersion.findUniqueOrThrow({ where: { id: baseline.versionId } });
-  const source = await versionSource(context, active), location = { platform: context.platform, moduleId };
-  const current = await moduleGitRevision(moduleGitPath(context.platform, moduleId), source.revision.commit);
-  const selected = await verifyModuleGitBundle(release.git);
-  if (current.tree !== selected.tree) throw new ExactReleaseUpdateError("Active source differs from the exact release; preserve local changes with a normal update");
-  const expectedLocal = await getModuleLocalHead(location);
-  if (!expectedLocal || (await moduleGitRevision(moduleGitPath(context.platform, moduleId), expectedLocal)).tree !== current.tree) throw new ExactReleaseUpdateError("Unselected local source exists; inspect it before selecting an exact release");
+  await versionSource(context, active);
+  const installed = await context.db.moduleInstallation.findFirst({ where: { workspaceId: context.workspaceId, moduleId, hash: { not: null }, status: "installed" }, orderBy: { createdAt: "desc" } });
+  if (installed?.hash && installed.hash !== baseline.activeHash) throw new ExactReleaseUpdateError("Local application changes conflict with the selected release; export them and resolve the update in the application repository");
+  if (!/^[a-f0-9]{64}$/.test(release.hash)) throw new ExactReleaseUpdateError("Exact release update requires immutable material");
   await assertExactReleaseUpdateIn(context, context.db, moduleId, { exactReleaseUpdate: baseline });
-  return { baseline, expectedLocal };
+  return { baseline };
 }
 /** Read again in the queue/activation transaction: async checks cannot carry an old approval forward. */
 export async function assertExactReleaseUpdateIn(

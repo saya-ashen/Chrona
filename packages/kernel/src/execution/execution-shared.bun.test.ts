@@ -8,36 +8,6 @@ import { testDb } from "../__testing__/test-db";
 import { callSync } from "../modules/module-calls";
 import { moduleSupervisor } from "../modules/module-supervisor";
 import type { StewardPorts } from "../ports";
-import { createExecutions } from "./execution";
-import { createExecutionEventStore } from "./execution-event-store";
-import { createRuns } from "./runs";
-import { moduleContext } from "../modules/module-context";
-import { requestStatus } from "../modules/module-status";
-import { switchActiveIn } from "../modules/module-generation";
-import { requestRemove } from "../modules/module-remove";
-
-test("module pause/version/removal fence started execution and wait for proven stop", async () => {
-  const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-module-execution-");
-  const ports: StewardPorts = { db, dataDir, now: () => new Date(), publicUrl: null,
-    resolveExecutionProject: async (_, projectRef) => ({ projectRef, executor: "server", canonicalPath: dataDir, baseline: "snapshot:fixture" }) };
-  try {
-    const workspace = await db.workspace.create({ data: { name: "guard" } });
-    const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [] });
-    const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "v1", dataSchema: 1 } });
-    for (const hash of ["v1", "v2"]) await db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest, source: "user", intent: {}, report: {}, status: "approved" } });
-    ports.executionEvents = createExecutionEventStore(ports); ports.executions = createExecutions(ports);
-    const principal = { workspaceId: workspace.id, ownerId: "owner", caller: { kind: "module" as const, moduleId: module.id, hash: "v1" } };
-    const view = await ports.executions.start(principal, { workId: "work", projectRef: "project", commandKey: "start", goal: "fixture", budget: { timeoutMs: 1000, maxToolCalls: 1 } });
-    expect(await createRuns(ports, workspace.id).claimNext("background")).not.toBeNull();
-    const context = moduleContext(ports, workspace.id);
-    await expect(requestStatus(context, module.id, "paused", "fixture")).rejects.toMatchObject({ code: "conflict" });
-    await expect(db.$transaction(tx => switchActiveIn(context, tx, module.id, "v2"))).rejects.toMatchObject({ code: "conflict" });
-    await expect(requestRemove(context, module.id, "fixture")).rejects.toMatchObject({ code: "conflict" });
-    await createRuns(ports, workspace.id).finish(view.runId, { outcome: "failed", sessionId: null, error: "stopped" }, { stopEvidence: "provider_exited" });
-    expect(await createRuns(ports, workspace.id).claimNext("background")).toBeNull();
-    expect(await requestStatus(context, module.id, "paused", "fixture")).toMatchObject({ status: "paused" });
-  } finally { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); }
-});
 
 test("real SDK handler typed error crosses supervisor and routed call without message decoding", async () => {
   const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-typed-error-");

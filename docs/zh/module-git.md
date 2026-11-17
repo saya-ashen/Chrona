@@ -1,4 +1,10 @@
-# 模块源码与 Git 工作流
+# 版本材料与 Git 边界
+
+当前源码：内核版本身份是 schema 1 完整材料的 64 位小写 SHA256，绑定路径、源码、锁、构建输入、材料记录、制品字节和 executable mode。解释型应用允许 `commands: []` 与 `artifacts: []`。保留材料位于 `platform/materials/sha256` 与共享 `platform/artifacts/sha256`；源码导出与回滚从该存储恢复，runtime `store` 只在可恢复时回收。移除应用会备份当前完整材料与私有数据，不删除共享 CAS。
+
+Git 历史、分支、checkout/worktree 和可选 bundle 归 Author 或发行方，通过当前 Agent 的既有工具维护。内核没有 bare repo、候选 ref、Git commit 版本、upstream 或推送入口；旧库、旧 hash 和缺记录材料不自动补导入。安装仍核对真实应用、批准基线和精确激活回执；这轮未运行验证或刷新固定发行制品。
+
+## 历史实现记录，以下路径和命令已退役
 
 当前开发固定输入覆盖 13 个独立应用，发行选择其中七个；Pi 是普通 Provider 应用，更新使用相同受控生命周期。来源与恢复入口见[独立应用](independent-applications.md)。发行 lock 中的 `repository` 表示该固定发行提交的公开核验结果，实例中的远端关联单独保存在 `ModuleUpstream`，两者不能混为一谈。发布种子流程见[模块 Git 种子与官方发布](module-git-release.md)。
 

@@ -1,6 +1,6 @@
 # 内核可移植、可信本地运行与远程执行应用化实施方案
 
-当前远程设备功能已退役：`remote-device`、`remote-model` 及专属 HTTP 入口已删除。下文远程设备实现、命令和验收仅保留历史背景，不是当前启用指引；未来需要时另行设计。通用 execution 与 process 能力保留。
+2026-11-17 源码边界：远程执行全部退役，包括 `runtime-callback.remote-delivery`、carrier、签名停止、模型中继、治理和专用 Execution 表；旧本地 execution 与内核应用开发检查也已移除。保留普通 Agent Run、通用进程监督、SDK loader、固定材料安装与迁移恢复。下文的远程协议、checker、发行资源和检查结果均为历史记录；不代表本次源码经过构建、测试或部署。独立 remote-execution 仓库及真实数据保留，未来能力另行设计。
 
 > 当前状态：Coding 与 coding-web 已退役，包含旧 work-v2；当前 Chat 独立拥有会话与执行记录。本文的 Coding/Editor 接口、源码路径、验收和部署描述仅作历史记录，不是现行接入指引。详见[Coding 退役说明](../../../chrona-module-author/docs/coding-retirement.md)。
 

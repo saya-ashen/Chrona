@@ -1,7 +1,6 @@
 import type { Prisma } from "@chrona/db";
 import { currentModuleEvolution } from "./module-evolution";
 
-const kind = "module_execution_result";
 type Db = Prisma.TransactionClient;
 type Activation = { workspaceId: string; moduleId: string; hash: string; activationId: string | null };
 const decision = (consecutiveFailures: number) => ({ consecutiveFailures, shouldPause: consecutiveFailures >= 3 });
@@ -29,10 +28,6 @@ export async function recordModuleExecution(db: Db, input: Activation & { result
   await db.moduleExecutionResult.create({ data: {
     id, moduleId: input.moduleId, hash: input.hash, activationId: input.activationId, resultId: input.resultId,
     outcome: input.outcome, consecutiveFailures: state.consecutiveFailures, createdAt,
-  } });
-  await db.audit.create({ data: { id, workspaceId: input.workspaceId, subjectId: input.activationId, actorKey: "chrona", kind,
-    createdAt,
-    details: { moduleId: input.moduleId, hash: input.hash, activationId: input.activationId, resultId: input.resultId, outcome: input.outcome, consecutiveFailures: state.consecutiveFailures },
   } });
   return { ...state, duplicate: false };
 }

@@ -10,7 +10,6 @@
     "start": "bun run ../cli/src/run.ts"
   },
   "dependencies": {
-    "@chrona/git-workspaces": "workspace:*",
     "@chrona/contracts": "workspace:*",
     "@chrona/db": "workspace:*",
     "@chrona/host": "workspace:*",

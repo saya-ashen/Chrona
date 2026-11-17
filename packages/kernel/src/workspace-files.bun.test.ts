@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdir, mkdtemp, readFile, rm, symlink, truncate, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, truncate, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { contentRefSchema } from "@chrona/contracts/steward";
@@ -7,8 +7,6 @@ import { testDb } from "./__testing__/test-db";
 import type { StewardPorts } from "./ports";
 import { readWorkspaceFile, FILE_MAX_BYTES } from "./workspace-files";
 import { readRunContent } from "./execution/run-content";
-import { registerWorkspaceModule } from "./execution/local-workspace";
-import { runtimeCall } from "./execution/local-runtime";
 
 
 async function fixture() {
@@ -66,26 +64,5 @@ test("an ordinary Chat application reads its own content without reviving shared
     expect((await readRunContent(f.ports, f.workspaceId, chat.id, "chat/selected.txt")).bytes.toString()).toBe("selected Chat bytes");
     await expect(readRunContent(f.ports, f.workspaceId, f.moduleId, "chat/selected.txt")).rejects.toMatchObject({ code: "forbidden" });
     expect(await Bun.file(join(f.root, "content/chat/selected.txt")).exists()).toBe(false);
-  } finally { await f.close(); }
-});
-
-test("output capture follows the real origin recipient, hides bytes and rejects ownerless Runs", async () => {
-  const f = await fixture();
-  try {
-    const origin = await f.db.session.create({ data: { workspaceId: f.workspaceId, source: "owner", key: "web", entryModuleId: f.moduleId } });
-    const build = await f.db.session.create({ data: { workspaceId: f.workspaceId, source: "build", key: "build", originSessionId: origin.id } });
-    const run = await f.db.run.create({ data: { workspaceId: f.workspaceId, sessionId: build.id, lane: "build", trigger: "build", provider: "fixture", tokenHash: "fixture-token", status: "running", cwd: f.cwd, prompt: "", deadlineAt: new Date(Date.now() + 60000) } });
-    await writeFile(join(f.cwd, "answer.txt"), "recipient private bytes");
-    registerWorkspaceModule();
-    const file = await runtimeCall<{ name: string; ref: string; size: number; mime: string }>(f.ports, f.workspaceId, "workspace-local.capture-file", { runId: run.id, path: "answer.txt" });
-    expect(file).toMatchObject({ name: "answer.txt", size: 23 });
-    expect(file.ref).toStartWith("web/outputs/");
-    expect(await readFile(join(f.content, file.ref.slice(4)), "utf8")).toBe("recipient private bytes");
-    // Keyless unrecorded capture keeps no ledger row, so neither path nor bytes are stored.
-    expect(await f.db.moduleInvocation.count()).toBe(0);
-    await f.db.run.update({ where: { id: run.id }, data: { sessionId: null } });
-    await expect(runtimeCall(f.ports, f.workspaceId, "workspace-local.capture-file", { runId: run.id, path: "answer.txt" })).rejects.toMatchObject({ code: "forbidden" });
-    const other = await f.db.workspace.create({ data: { name: "other" } });
-    await expect(runtimeCall(f.ports, other.id, "workspace-local.capture-file", { runId: run.id, path: "answer.txt" })).rejects.toMatchObject({ code: "not_found" });
   } finally { await f.close(); }
 });

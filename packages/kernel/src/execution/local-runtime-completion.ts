@@ -3,7 +3,7 @@ import type { StewardPorts } from "../ports";
 import type { ProviderDeclaration } from "../agent/agent-provider";
 import { providerCompletionBudgetSchema } from "../agent/agent-provider";
 import { settleRunCompletion } from "../agent/agent-completion-settlement";
-import { awaitRegisteredCompletion, releaseRegisteredCompletion } from "./execution-delivery-completion";
+import { awaitRegisteredCompletion, releaseRegisteredCompletion } from "../agent/provider-completion";
 
 interface CompletionContext {
   ports: StewardPorts;

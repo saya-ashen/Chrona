@@ -5,13 +5,11 @@ import { createScriptSandbox } from "./runtime/script-sandbox";
 import { createModuleChannel } from "@chrona/kernel";
 
 async function releaseResources(root: string) {
-  const sdk = join(root, "release/resources/module-sdk"), typecheck = join(root, "release/resources/module-typecheck");
+  const sdk = join(root, "release/resources/module-sdk"), override = join(root, "loader-override");
   await cp(join(import.meta.dirname, "../../app-sdk"), sdk, { recursive: true });
-  await mkdir(typecheck, { recursive: true });
-  const loader = join(import.meta.dirname, "../../app-sdk/typecheck/chrona-sdk-loader.ts");
-  await cp(loader, join(typecheck, "chrona-sdk-loader.ts"));
-  await cp(loader, join(sdk, "chrona-sdk-loader.ts"));
-  return { sdk, typecheck };
+  await mkdir(override);
+  await cp(join(sdk, "chrona-sdk-loader.ts"), join(override, "chrona-sdk-loader.ts"));
+  return { sdk, override };
 }
 
 for (const inherited of [undefined, "/synthetic/untrusted-node-path"]) test(`trusted release SDK resolves with inherited NODE_PATH=${inherited}`, async () => {
@@ -37,8 +35,8 @@ try {
 `);
     await writeFile(join(codeDir, "index.ts"), 'import { on, chrona } from "chrona"; on("tool", async () => { const codes = []; for (const target of ["modules.list", "modules.describe"]) { try { await chrona.call(target, {}); } catch (error) { codes.push((error as {code:string}).code); } } return { result: { sdk: true, inherited: process.env.NODE_PATH ?? null, codes } }; });');
     const before = await readFile(join(codeDir, "index.ts"), "utf8");
-    const { sdk, typecheck } = await releaseResources(root);
-    const sandbox = createScriptSandbox({ executionMode: "trusted-local", dataDir, moduleSdk: sdk, moduleTypecheck: typecheck });
+    const { sdk } = await releaseResources(root);
+    const sandbox = createScriptSandbox({ executionMode: "trusted-local", dataDir, moduleSdk: sdk });
     expect(await sandbox.runModule({ codeDir, dataDir, entry: "test.ts", input: {} })).toMatchObject({ status: "succeeded", exitCode: 0, output: "function\n" });
     child = sandbox.startModule({ codeDir, dataDir, entry: "index.ts", ipcEndpoint: channel.endpoint, ipcToken: channel.token });
     await channel.ready;
@@ -55,9 +53,7 @@ try {
 for (const mode of ["stop", "exit", "unknown"] as const) test.skipIf(process.platform !== "linux")(`copied SDK testing ${mode} preserves descendant stop evidence`, async () => {
   const root = await mkdtemp("/tmp/chrona-sdk-process-release-");
   try {
-    const { sdk, typecheck } = await releaseResources(root);
-    // Exercise the trusted override independently of the SDK-local static loader.
-    if (mode === "exit") await rm(join(sdk, "chrona-sdk-loader.ts"));
+    const { sdk, override } = await releaseResources(root);
     const codeDir = join(root, "app"), dataDir = join(root, "data"), contentDir = join(root, "content");
     await mkdir(codeDir); await mkdir(dataDir); await mkdir(contentDir);
     await writeFile(join(codeDir, "module.json"), JSON.stringify({ effects: [], uses: [] }));
@@ -77,7 +73,7 @@ on("tool", () => {
 import { existsSync, writeFileSync } from "node:fs";
 import { startModule } from "chrona/testing";
 import { ProcessStopUnknownError } from "chrona/process";
-${mode === "exit" ? `process.env.CHRONA_SDK_LOADER = ${JSON.stringify(join(typecheck, "chrona-sdk-loader.ts"))};` : ""}
+${mode === "exit" ? `process.env.CHRONA_SDK_LOADER = ${JSON.stringify(join(override, "chrona-sdk-loader.ts"))};` : ""}
 const alive = pid => { try { process.kill(pid, 0); return true; } catch { return false; } };
 const module = await startModule("index.ts");
 const now = new Date().toISOString();
@@ -98,7 +94,7 @@ console.log("verified");
 // On unknown, the outer test guardian still owns and reaps the retained tree.
 ${mode === "unknown" ? "process.exit(0);" : ""}
 `);
-    const sandbox = createScriptSandbox({ dataDir, moduleSdk: sdk, moduleTypecheck: typecheck });
+    const sandbox = createScriptSandbox({ dataDir, moduleSdk: sdk });
     expect(await sandbox.runModule({ codeDir, dataDir, contentDir, entry: "test.ts", input: {} })).toMatchObject({ status: "succeeded", exitCode: 0, output: "verified\n", stopEvidence: { treeClean: true } });
     const descendant = Number(await readFile(join(dataDir, "descendant"), "utf8"));
     expect(() => process.kill(descendant, 0)).toThrow();
@@ -108,7 +104,7 @@ ${mode === "unknown" ? "process.exit(0);" : ""}
 for (const mode of ["native", "interpreter"] as const) test.skipIf(process.platform !== "linux")(`copied SDK testing starts explicit ${mode} entries`, async () => {
   const root = await mkdtemp("/tmp/chrona-sdk-explicit-release-");
   try {
-    const { sdk, typecheck } = await releaseResources(root);
+    const { sdk } = await releaseResources(root);
     const codeDir = join(root, "app"), dataDir = join(root, "data");
     await mkdir(join(codeDir, "dist"), { recursive: true }); await mkdir(dataDir);
     await writeFile(join(codeDir, "module.json"), JSON.stringify({ effects: [], uses: [] }));
@@ -126,7 +122,7 @@ try {
   console.log("verified");
 } finally { await module.stop(); }
 `);
-    const sandbox = createScriptSandbox({ dataDir, moduleSdk: sdk, moduleTypecheck: typecheck });
+    const sandbox = createScriptSandbox({ dataDir, moduleSdk: sdk });
     expect(await sandbox.runModule({ codeDir, dataDir, entry: "test.ts", input: {} })).toMatchObject({ status: "succeeded", output: "verified\n", stopEvidence: { treeClean: true } });
   } finally { await rm(root, { recursive: true, force: true }); }
 }, 10_000);

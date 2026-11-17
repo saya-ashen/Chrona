@@ -71,7 +71,7 @@ test("SDK Agent contexts preserve ownership, selected tools, scoped reads, inter
     const tools = createTools(f.ports), catalog = await tools.catalog(claimed.token);
     expect(catalog.map(tool => tool.name)).toEqual(["m_context_sink_observe"]);
     await expect(tools.call(claimed.token, "m_modules_build", buildRequest)).rejects.toMatchObject({ code: "forbidden" });
-    expect(await f.ports.db.session.count({ where: { workspaceId: f.workspaceId, source: "build" } })).toBe(0);
+    expect(await f.ports.db.run.count({ where: { workspaceId: f.workspaceId, lane: "build" } })).toBe(0);
     expect(await tools.call(claimed.token, "m_context_sink_observe", {})).toMatchObject({ result: { caller: { kind: "module", moduleId: consumer.module.id, hash: consumer.hash } } });
     await expect(tools.call(claimed.token, "chrona_preferences", {})).rejects.toMatchObject({ code: "forbidden" });
     await expect(tools.call(claimed.token, "m_context_consumer_relay", {})).rejects.toMatchObject({ code: "forbidden" });
@@ -105,7 +105,7 @@ test("SDK Agent contexts preserve ownership, selected tools, scoped reads, inter
     const next = (await relay("run", input, "after-stop")) as { runId: string };
     expect((await runs.claimNext("background"))!.id).toBe(next.runId);
     await runs.finish(next.runId, { outcome: "finished", sessionId: "continued-model-context", error: null }, { stopEvidence: "provider_exited" });
-    expect(await f.ports.db.session.findUnique({ where: { id: first.contextId } })).toMatchObject({ status: "active", providerSessionId: "continued-model-context" });
+    expect(await f.ports.db.agentContext.findUnique({ where: { id: first.contextId } })).toMatchObject({ status: "active", providerSessionId: "continued-model-context" });
     const failed = (await relay("run", input, "fail")) as { runId: string };
     expect((await runs.claimNext("background"))!.id).toBe(failed.runId);
     await runs.finish(failed.runId, { outcome: "failed", sessionId: null, error: "fixture failure" });

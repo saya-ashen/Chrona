@@ -62,9 +62,6 @@
       "@chrona/kernel/test-support": [
         "./packages/kernel/src/__testing__/test-support.ts"
       ],
-      "@chrona/git-workspaces": [
-        "./packages/git-workspaces/src/index.ts"
-      ],
       "@chrona/host": [
         "./packages/host/src/index.ts"
       ],

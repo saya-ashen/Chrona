@@ -1,4 +1,4 @@
-// Only explicit-material versions are collected: ensureVersionMaterial rebuilds them from Git on next use.
+// Retained CAS materials survive checkout collection and are verified before removal.
 import { readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { StewardPorts } from "./ports";

@@ -2,6 +2,7 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { buildProcessHelper } from "../packages/process/scripts/build-helper";
+import { redactSensitiveText } from "../packages/logging/src/redaction-text";
 
 const include = new Bun.Glob("**/*.bun.test.{ts,tsx}");
 const ignoredSegments = new Set([
@@ -21,11 +22,6 @@ const ignoredSegments = new Set([
 const rootDir = process.cwd();
 const listOnly = process.argv.includes("--list");
 const requestedFiles = process.argv.slice(2).filter(arg => arg !== "--list").map((p) => p.replace(/^\.\//u, ""));
-const retryFlaky = process.env.CHRONA_TEST_RETRY_FLAKY === "1";
-const concurrency = Math.max(
-	1,
-	Number(process.env.CHRONA_TEST_CONCURRENCY ?? "2"),
-);
 
 function shouldInclude(path: string) {
 	const retained = ["scripts/", "examples/", "apps/cli/", "packages/"];
@@ -136,13 +132,20 @@ async function discoverTestFiles(): Promise<string[]> {
 
 }
 
-async function main(): Promise<number> {
-	const files = await discoverTestFiles();
+export async function runTestFiles(files: string[], suite: "Bun" | "API"): Promise<number> {
 	if (files.length === 0) {
 		return 0;
 	}
 
-	// Source tests need the same prebuilt helper as development; runtime launch never invokes a compiler.
+	const concurrency = Math.max(
+		1,
+		Math.floor(Number(process.env.CHRONA_TEST_CONCURRENCY ?? (suite === "Bun" ? "2" : "4"))),
+	);
+	if (!Number.isSafeInteger(concurrency)) {
+		throw new Error("CHRONA_TEST_CONCURRENCY must be a finite number");
+	}
+	const retryFlaky = suite === "Bun" && process.env.CHRONA_TEST_RETRY_FLAKY === "1";
+
 	if (["linux", "darwin", "win32"].includes(process.platform)) {
 		buildProcessHelper(resolve(rootDir, `packages/process/bin/${process.platform}-${process.arch}/chrona-process-guardian${process.platform === "win32" ? ".exe" : ""}`));
 	} else {
@@ -154,46 +157,38 @@ async function main(): Promise<number> {
 	const workspace = createTestRunWorkspace(rootDir, files);
 	const helperPath = resolve(rootDir, `packages/process/bin/${process.platform}-${process.arch}/chrona-process-guardian${process.platform === "win32" ? ".exe" : ""}`);
 	for (const item of workspace.files) item.env.CHRONA_PROCESS_HELPER = helperPath;
-	const pending = workspace.files;
-
 	console.log(
-		`Running ${files.length} Bun test file${files.length === 1 ? "" : "s"} with concurrency ${concurrency}...`,
+		`Running ${files.length} ${suite} test file${files.length === 1 ? "" : "s"} with concurrency ${concurrency}...`,
 	);
 
 	try {
-		const active = new Set<Promise<void>>();
-		const launch = (item: TestFileEnvironment) => {
-			const job = (async () => {
-				let code = await runWithFreshDatabase(item);
-				if (code !== 0 && retryFlaky) {
-					console.error(
-						`Retrying isolated Bun test file after exit ${code}: ${item.file}`,
-					);
+		const pending = workspace.files.values();
+		const worker = async () => {
+			for (const item of pending) {
+				let code: number;
+				try {
 					code = await runWithFreshDatabase(item);
+					if (code !== 0 && retryFlaky) {
+						console.error(`Retrying isolated Bun test file after exit ${code}: ${item.file}`);
+						code = await runWithFreshDatabase(item);
+					}
+				} catch (error) {
+					console.error(JSON.stringify({ component: "test-runner", event: "file-failed", file: item.file, error: redactSensitiveText(error instanceof Error ? error.message : String(error)) }));
+					code = 1;
 				}
 				if (code !== 0) {
 					exitCode = code;
 					failedFiles.push({ file: item.file, code });
 				}
-			})();
-			active.add(job);
-			job.finally(() => active.delete(job));
-		};
-
-		for (const item of pending) {
-			while (active.size >= concurrency) {
-				await Promise.race(active);
 			}
-			launch(item);
-		}
-
-		await Promise.all(active);
+		};
+		await Promise.all(Array.from({ length: Math.min(concurrency, files.length) }, worker));
 	} finally {
 		cleanupTestRunWorkspace(workspace);
 	}
 
 	if (failedFiles.length > 0) {
-		console.error("\nFailed Bun test files:");
+		console.error(`\nFailed ${suite} test files:`);
 		for (const failure of failedFiles) {
 			console.error(`  - ${failure.file} (exit ${failure.code})`);
 		}
@@ -204,5 +199,5 @@ async function main(): Promise<number> {
 
 if (import.meta.main) {
 	if (listOnly) console.log(JSON.stringify(await discoverTestFiles()));
-	else process.exit(await main());
+	else process.exit(await runTestFiles(await discoverTestFiles(), "Bun"));
 }

@@ -13,10 +13,10 @@ test("released runtime never selects a test Provider from environment flags", as
       process.env.CHRONA_E2E_TEST_ROUTES = gate;
       process.env.CHRONA_STEWARD_AGENT = agent;
       const runtime = createStewardRuntime(db, { dataDir, port: 48130 });
-      expect(runtime.ports.provider?.name).toBe("registered");
+      expect((await runtime.health()).provider.name).toBe("registered");
       expect((await runtime.health()).provider.available).toBe(false);
       expect(await db.module.count()).toBe(0);
-      expect(runtime.ports.moduleBuiltinResources).toBeUndefined();
+      expect(runtime.ports).not.toHaveProperty("moduleBuiltinResources");
       await runtime.stop();
     }
   } finally {
@@ -39,35 +39,19 @@ test("runtime exposes only the kernel origin and starts without application conf
   } finally { await runtime.stop(); await db.$disconnect(); rmSync(dataDir, { recursive: true, force: true }); }
 });
 
-test("trusted host injection preserves Provider history through the lifecycle wrapper", async () => {
-  const db = testDb({ injectedAgent: false }), dataDir = mkdtempSync(join(tmpdir(), "chrona-runtime-history-"));
-  let selected: { sessionDir: string; limit: number } | undefined;
-  const runtime = createStewardRuntime(db, { dataDir, provider: {
-    name: "history-fixture", health: async () => ({ available: true, sandboxed: false, error: null }),
-    start() { throw new Error("History does not start a model"); },
-    async transcript(input) { selected = input; return [{ kind: "text", at: "2026-11-07T00:00:00.000Z", text: "Retained conversation" }]; },
-  } });
-  try {
-    const input = { sessionDir: join(dataDir, "sessions", "fixture", ".chrona/sessions"), limit: 10 };
-    expect(await runtime.ports.provider!.transcript!(input)).toEqual([{ kind: "text", at: "2026-11-07T00:00:00.000Z", text: "Retained conversation" }]);
-    expect(selected).toEqual(input);
-    expect(await db.module.count()).toBe(0);
-  } finally { await runtime.stop(); await db.$disconnect(); rmSync(dataDir, { recursive: true, force: true }); }
-});
-
 test("runtime wires default and explicit execution mode", async () => {
   const db = testDb({ injectedAgent: false }), keys = ["CHRONA_STEWARD_EXECUTION_MODE"] as const;
   const previous = keys.map(key => process.env[key]);
   try {
     delete process.env.CHRONA_STEWARD_EXECUTION_MODE;
     const dataDir = mkdtempSync(join(tmpdir(), "chrona-review-default-"));
-    const defaults = createStewardRuntime(db, { dataDir, provider: null });
+    const defaults = createStewardRuntime(db, { dataDir });
     try {
       expect(defaults.ports.sandbox?.executionMode).toBe("trusted-local");
     } finally { await defaults.stop(); rmSync(dataDir, { recursive: true, force: true }); }
     process.env.CHRONA_STEWARD_EXECUTION_MODE = "trusted-local";
     const modeDataDir = mkdtempSync(join(tmpdir(), "chrona-review-mode-"));
-    const runtime = createStewardRuntime(db, { dataDir: modeDataDir, provider: null });
+    const runtime = createStewardRuntime(db, { dataDir: modeDataDir });
     try {
       expect(runtime.ports.sandbox?.executionMode).toBe("trusted-local");
     } finally { await runtime.stop(); rmSync(modeDataDir, { recursive: true, force: true }); }
@@ -82,7 +66,7 @@ test("unknown execution mode fails closed", async () => {
   const dataDir = mkdtempSync(join(tmpdir(), "chrona-mode-invalid-"));
   try {
     process.env.CHRONA_STEWARD_EXECUTION_MODE = "unexpected";
-    expect(() => createStewardRuntime(db, { dataDir, provider: null })).toThrow("CHRONA_STEWARD_EXECUTION_MODE supports only trusted-local");
+    expect(() => createStewardRuntime(db, { dataDir })).toThrow("CHRONA_STEWARD_EXECUTION_MODE supports only trusted-local");
   } finally {
     if (previous === undefined) delete process.env.CHRONA_STEWARD_EXECUTION_MODE; else process.env.CHRONA_STEWARD_EXECUTION_MODE = previous;
     await db.$disconnect();
@@ -93,7 +77,7 @@ test("unknown execution mode fails closed", async () => {
 test("runtime forwards thrown and stage failures to onError", async () => {
   const db = testDb({ injectedAgent: false }), errors: unknown[] = [], error = new TypeError("approval failed");
   const dataDir = mkdtempSync(join(tmpdir(), "chrona-runtime-error-"));
-  const runtime = createStewardRuntime(db, { dataDir, provider: null, onError: value => { errors.push(value); } });
+  const runtime = createStewardRuntime(db, { dataDir, onError: value => { errors.push(value); } });
   const tick = spyOn(runtime.service, "tick");
   try {
     tick.mockRejectedValueOnce(error);
@@ -104,10 +88,34 @@ test("runtime forwards thrown and stage failures to onError", async () => {
   } finally { tick.mockRestore(); await runtime.stop(); await db.$disconnect(); rmSync(dataDir, { recursive: true, force: true }); }
 });
 
+test("runtime logs tick failures without onError and keeps health diagnostics private", async () => {
+  const db = testDb({ injectedAgent: false }), dataDir = mkdtempSync(join(tmpdir(), "chrona-runtime-diagnostics-"));
+  const runtime = createStewardRuntime(db, { dataDir });
+  const error = new Error("runtime storage failed token=private-runtime-fixture");
+  const log = spyOn(console, "error").mockImplementation(() => {});
+  const tick = spyOn(runtime.service, "tick");
+  const workspaces = spyOn(db.workspace, "findMany");
+  try {
+    tick.mockRejectedValueOnce(error);
+    await runtime.tickOnce();
+    tick.mockResolvedValueOnce({ failures: [{ workspaceId: "w", stage: "modules", error }] });
+    await runtime.tickOnce();
+    workspaces.mockRejectedValueOnce(error);
+    expect((await runtime.health()).provider).toEqual({ name: "registered", available: false, sandboxed: false });
+    const messages = log.mock.calls.map(([value]) => String(value));
+    expect(messages.filter(value => value.includes('"event":"tick_failed"'))).toHaveLength(2);
+    expect(messages.some(value => value.includes('"event":"provider_health_failed"') && value.includes("runtime storage failed"))).toBe(true);
+    expect(messages.join("\n")).not.toContain("private-runtime-fixture");
+  } finally {
+    tick.mockRestore(); workspaces.mockRestore(); log.mockRestore();
+    await runtime.stop(); await db.$disconnect(); rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
 test("shutdown waits for background finalization before closing modules and returning", async () => {
   const db = testDb({ injectedAgent: false });
   const dataDir = mkdtempSync(join(tmpdir(), "chrona-shutdown-"));
-  const runtime = createStewardRuntime(db, { dataDir, provider: null });
+  const runtime = createStewardRuntime(db, { dataDir });
   let release!: () => void, entered!: () => void;
   const pending = new Promise<void>(resolve => { release = resolve; });
   const started = new Promise<void>(resolve => { entered = resolve; });
@@ -133,7 +141,7 @@ test("runtime ticks every 30 seconds, wakes immediately and stops cleanly", asyn
   const db = testDb({ injectedAgent: false });
   let interval = 0, cleared = false;
   const dataDir = mkdtempSync(join(tmpdir(), "chrona-v4b-runtime-"));
-  const runtime = createStewardRuntime(db, { dataDir, provider: null,
+  const runtime = createStewardRuntime(db, { dataDir,
     timers: { setInterval: ((_fn: () => void, ms: number) => { interval = ms; return 1; }) as unknown as typeof setInterval, clearInterval: (() => { cleared = true; }) as typeof clearInterval },
   });
   try {

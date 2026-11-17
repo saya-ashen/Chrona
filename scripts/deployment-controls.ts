@@ -16,7 +16,7 @@ import { findResourceDir } from "../apps/cli/src/start-server";
 const TERMINAL_RUNS = ["finished", "failed", "cancelled", "timed_out", "provider_unavailable"];
 const TERMINAL_INVOCATIONS = ["succeeded", "failed"];
 const TERMINAL_CALLS = ["executed", "failed", "rejected"];
-const REQUIRED_STATE_TABLES = ["_chrona_migrations", "Module", "Run", "ModuleInvocation", "ModuleCall", "ExecutionAttempt", "ExecutionDelivery", "ExecutionReceipt", "ExecutionCommand", "AgentCommand"];
+const REQUIRED_STATE_TABLES = ["_chrona_migrations", "Module", "Run", "ModuleInvocation", "ModuleCall", "AgentCommand"];
 
 export type DeploymentCheck = { key: string; status: "ok" | "error"; message: string; details?: unknown };
 export type DeploymentReport = {
@@ -56,12 +56,8 @@ export type DataStateSummary = {
   unsettledRuns: number;
   unsettledInvocations: number;
   unsettledCalls: number;
-  unsettledDeliveries: number;
   unsettledCommands: number;
   pendingCallbacks: number;
-  unacceptedOutboundReceipts: number;
-  unsettledExecutions: number;
-  unresolvedWorkspaceCleanup: number;
 };
 
 export function summarizeDataState(db: Database): DataStateSummary {
@@ -69,20 +65,15 @@ export function summarizeDataState(db: Database): DataStateSummary {
   const missing = REQUIRED_STATE_TABLES.filter(table => !present.has(table));
   if (missing.length) throw new Error(`Database is missing required Chrona state table(s): ${missing.join(", ")}`);
   const count = (table: string, where: string) => Number((db.query<{ count: number }, []>(`SELECT COUNT(*) AS count FROM "${table}" WHERE ${where}`).get()?.count ?? 0));
-  const unknownStops = count("Run", `"stopStatus" = 'unknown'`) + count("ExecutionCommand", `"effect" = 'unknown'`);
+  const unknownStops = count("Run", `"stopStatus" = 'unknown'`);
   return {
     unknownStops,
     unsettledRuns: count("Run", `"status" NOT IN (${TERMINAL_RUNS.map(value => `'${value}'`).join(",")})`),
     unsettledInvocations: count("ModuleInvocation", `"status" NOT IN (${TERMINAL_INVOCATIONS.map(value => `'${value}'`).join(",")})`),
     unsettledCalls: count("ModuleCall", `"status" NOT IN (${TERMINAL_CALLS.map(value => `'${value}'`).join(",")})
       OR ("status" = 'failed' AND "error" IN ('unknown', 'internal'))`),
-    unsettledDeliveries: count("ExecutionDelivery", `"settledAt" IS NULL`),
     unsettledCommands: count("AgentCommand", `"settled" = 0`),
     pendingCallbacks: count("ModuleInvocation", `"reply" = 1 AND "repliedAt" IS NULL`),
-    unacceptedOutboundReceipts: count("ExecutionReceipt", `"direction" = 'outbound' AND "acceptedAt" IS NULL`),
-    unsettledExecutions: count("ExecutionAttempt", `"stopConfirmedAt" IS NULL OR "heldDirectory" IS NOT NULL`),
-    unresolvedWorkspaceCleanup: count("ExecutionCommand", `"operation" LIKE 'workspace-cleanup-%'
-      AND (json_extract("receipt", '$.result') IS NULL OR json_extract("receipt", '$.result.state') = 'unknown')`),
   };
 }
 
@@ -150,11 +141,10 @@ export async function runPreflight(args: string[]): Promise<DeploymentReport> {
     checks.push({ key: "databaseOwner", status: "ok", message: `Database ${resolvedDatabasePath} is owned by PID ${pid}.` });
     checks.push(migrationCheck(db, releaseDir));
     const state = summarizeDataState(db);
-    checks.push({ key: "unknownStops", status: state.unknownStops === 0 ? "ok" : "error", message: state.unknownStops === 0 ? "No unknown stop or unknown execution command is retained." : `${state.unknownStops} unknown stop/effect record(s) remain; deployment is blocked.` });
+    checks.push({ key: "unknownStops", status: state.unknownStops === 0 ? "ok" : "error", message: state.unknownStops === 0 ? "No unknown Run stop is retained." : `${state.unknownStops} unknown stop/effect record(s) remain; deployment is blocked.` });
     const unsettled = state.unsettledRuns + state.unsettledInvocations + state.unsettledCalls
-      + state.unsettledDeliveries + state.unsettledCommands + state.pendingCallbacks
-      + state.unacceptedOutboundReceipts + state.unsettledExecutions + state.unresolvedWorkspaceCleanup;
-    checks.push({ key: "unsettledWork", status: unsettled === 0 ? "ok" : "error", message: unsettled === 0 ? "Runs, invocations, calls, deliveries, commands, callbacks and cleanup receipts are settled." : `${unsettled} unsettled row(s) remain; deployment is blocked.` , details: state });
+      + state.unsettledCommands + state.pendingCallbacks;
+    checks.push({ key: "unsettledWork", status: unsettled === 0 ? "ok" : "error", message: unsettled === 0 ? "Runs, invocations, calls, commands and callbacks are settled." : `${unsettled} unsettled row(s) remain; deployment is blocked.` , details: state });
     const activeModules = db.query<{ name: string; activeHash: string | null; status: string }, []>('SELECT name, activeHash, status FROM "Module" ORDER BY name').all();
     checks.push({ key: "activeHashes", status: "ok", message: "Active module versions were read from the target database.", details: activeModules.map(module => ({ name: module.name, activeHash: module.activeHash, status: module.status })) });
     const report: DeploymentReport = { schema: 1, operation: "preflight", releaseDir, dataDir, databasePath: resolvedDatabasePath, process, activeModules, checks, passed: checks.every(check => check.status !== "error") };

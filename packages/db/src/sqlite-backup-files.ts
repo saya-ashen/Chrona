@@ -210,26 +210,40 @@ export function stageDataFiles(dataDir: string, archivePath: string): string {
   }
 }
 
-/** Preserve prior directories next to the staging directory; roll back ordinary failures. */
-export function replaceDataFiles(dataDir: string, stage: string, restoreDatabase: () => void): void {
-  const installed: string[] = [];
-  const retired: string[] = [];
-  try {
-    for (const root of backupDataRoots) {
-      const target = join(dataDir, root);
-      if (lstatSync(target, { throwIfNoEntry: false })) {
-        renameSync(target, `${stage}-prior-${root}`);
-        retired.push(root);
-      }
-      renameSync(join(stage, root), target);
-      installed.push(root);
+export type RestoreDataFiles = {
+  dataDir: string;
+  stage: string;
+  originalRoots: (typeof backupDataRoots[number])[];
+};
+
+export function replaceDataFiles(files: RestoreDataFiles, onRenamed?: () => void): void {
+  for (const root of backupDataRoots) {
+    const target = join(files.dataDir, root);
+    if (files.originalRoots.includes(root)) {
+      renameSync(target, `${files.stage}-prior-${root}`);
+      onRenamed?.();
     }
-    restoreDatabase();
-  } catch (error) {
-    for (const root of installed.reverse()) renameSync(join(dataDir, root), join(stage, root));
-    for (const root of retired.reverse()) renameSync(`${stage}-prior-${root}`, join(dataDir, root));
-    throw error;
-  } finally {
-    rmSync(stage, { recursive: true, force: true });
+    renameSync(join(files.stage, root), target);
+    onRenamed?.();
+  }
+}
+
+export function recoverDataFiles(files: RestoreDataFiles, onRenamed?: () => void): void {
+  for (const root of backupDataRoots) {
+    const target = join(files.dataDir, root), staged = join(files.stage, root), prior = `${files.stage}-prior-${root}`;
+    const hasPrior = lstatSync(prior, { throwIfNoEntry: false }) !== undefined;
+    if (!files.originalRoots.includes(root) || hasPrior) {
+      // A missing staged root means its rename completed, even if the process stopped before returning.
+      if (!lstatSync(staged, { throwIfNoEntry: false })) {
+        renameSync(target, staged);
+        onRenamed?.();
+      }
+      if (hasPrior) {
+        renameSync(prior, target);
+        onRenamed?.();
+      }
+    } else if (!lstatSync(target, { throwIfNoEntry: false }) || !lstatSync(staged, { throwIfNoEntry: false })) {
+      throw new Error(`Chrona restore recovery cannot find the original ${root} directory.`);
+    }
   }
 }

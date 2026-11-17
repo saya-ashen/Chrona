@@ -1,4 +1,4 @@
-import { RUN_LIMITS, buildSettingsSchema, settingsSchema, updateSettingsSchema, moduleModelSettingsSchema } from "@chrona/contracts/steward";
+import { settingsSchema, updateSettingsSchema, moduleModelSettingsSchema } from "@chrona/contracts/steward";
 
 export const kernelModuleModelSettingsSchema = moduleModelSettingsSchema;
 export const kernelSettingsSchema = settingsSchema;
@@ -15,10 +15,6 @@ export function moduleModelSettings(settings: unknown) {
 export function runTimeoutMinutes(settings: unknown): number | null {
   const value = settings as { runTimeoutMinutes?: unknown } | null;
   return settingsSchema.shape.runTimeoutMinutes.parse(value?.runTimeoutMinutes);
-}
-export function buildSettings(settings: unknown) {
-  const value = settings as { builds?: unknown } | null;
-  return buildSettingsSchema.parse(value?.builds ?? { dailyLimit: RUN_LIMITS.maxBuildRunsPerDay, timeoutMinutes: RUN_LIMITS.buildTimeoutMs / 60_000, maxSubmissions: RUN_LIMITS.maxBuildSubmissionsPerRun });
 }
 /** Kernel-owned governance day boundary. */
 export function budgetTimezone(settings: unknown): string {

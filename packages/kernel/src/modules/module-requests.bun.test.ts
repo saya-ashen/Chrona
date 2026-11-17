@@ -118,7 +118,7 @@ test("installed identities and contracts are readable; credentials and approvals
   await web.call("secrets.set", { name: "okx_demo", value: { apiKey: "k-secret" } });
   const approval = await f.api.approvals.create({ action: "modify_external", moduleId: trader.module.id, title: "trader：开始", detail: "", preview: "", payload: {} });
   const view = ((await web.call("modules.list", {})).output as { items: unknown[] }).items;
-  expect(view).toContainEqual(expect.objectContaining({ id: trader.module.id, name: "trader", activeHash: "trader-1", builtin: false, origin: "external", capabilities: expect.objectContaining({ remove: true }), versions: [expect.objectContaining({ hash: "trader-1", status: "approved" })] }));
+  expect(view).toContainEqual(expect.objectContaining({ id: trader.module.id, name: "trader", activeHash: "trader-1", origin: "external", capabilities: expect.objectContaining({ remove: true }), versions: [expect.objectContaining({ hash: "trader-1", status: "approved" })] }));
   expect((await other.call("modules.list", {})).output).toEqual({ items: view, nextCursor: null });
   expect((await other.call("modules.describe", { query: "trader.start" } )).output).toMatchObject({ items: [{ target: { moduleId: trader.module.id, tool: "start" }, moduleId: trader.module.id, hash: "trader-1" }] });
   expect((await other.call("modules.describe", { target: { moduleId: trader.module.id, tool: "start" } })).output).toMatchObject({ target: { moduleId: trader.module.id, tool: "start" }, source: { kind: "module", hash: "trader-1" }, admission: { visibility: ["modules", "owner"], uses: "trader.start" } });

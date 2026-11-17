@@ -1,8 +1,7 @@
 /**
  * Chrona shared contract, platform v2. Supervisor-owned.
  * Design: docs/zh/architecture.md. Chrona's features are modules (apps) that keep their files private
- * and interact only through routed calls. Conversations with the Provider are
- * sessions, keyed by the entry that owns them. There are no affairs.
+ * and interact only through routed calls. Provider execution contexts belong to their approved application.
  */
 import { z } from "zod";
 import { wakeBudgetSchema, routedTargetSchema, pageInput, PUBLIC_CALL_ERRORS, PUBLIC_CALL_REASONS } from "./kernel-api";
@@ -18,50 +17,33 @@ export { moduleOutputSchema, compileModuleOutput } from "./module-output";
 import type { ProviderEvents } from "./provider";
 export * from "./provider";
 export * from "./agent-provider";
-export * from "./execution";
-export * from "./kernel-execution";
-export * from "./execution-events";
-export * from "./execution-tools";
 
 const id = z.string().trim().min(1).max(128);
 const iso = z.string().datetime({ offset: true }).max(40);
 const short = z.string().trim().min(1).max(200);
-const text = z.string().trim().min(1);
 /** Relative path inside a content area or session directory: no `..`, no leading slash, not under `.git`. */
 export const relativePathSchema = z.string().trim().min(1).max(500)
   .refine(p => !p.startsWith("/") && !p.split("/").some(s => s === ".." || s === "" || s === ".git"), "invalid path");
 
 // ---------------------------------------------------------------- vocab ----
 
-// "reflect": stored history of the removed reflection loop; nothing creates such sessions any more.
-export const SESSION_SOURCES = ["owner", "wake", "module", "build", "reflect"] as const;
-export const SESSION_STATUSES = ["active", "ended"] as const;
-export const RUN_LANES = ["foreground", "background", "build"] as const;
-export const RUN_TRIGGERS = ["message", "schedule", "source", "edit", "approval", "retry", "build"] as const;
-export const RUN_STATUSES = ["queued", "running", "finished", "failed", "timed_out", "cancelled", "provider_unavailable"] as const;
+export const RUN_LANES = ["foreground", "background"] as const;
+export const RUN_TRIGGERS = ["message", "schedule", "source", "edit", "approval", "retry"] as const;
 export const APPROVAL_STATUSES = ["open", "approved", "denied", "expired"] as const;
 /** Private approval resolution is once-only. */
 export const APPROVAL_SCOPES = ["once"] as const;
 
 /** Approval records for governed module changes and application-requested decisions. */
 export const ACTIONS = ["activate_module", "delete_data", "modify_external"] as const;
-export const DELIVERY_CHANNELS = ["in_app", "chrona_qqbot"] as const;
 
 export const RUN_LIMITS = {
-  buildTimeoutMs: 60 * 60_000,
   maxChronaToolCalls: 60, maxRunsPerSessionPerDay: 24, maxRunsPerDay: 200, maxFailures: 3,
   jobTimeoutMs: 60_000, jobOutputBytes: 64 * 1024,
-  /** Author tests compile frontend dependencies; runtime modules keep their smaller sandbox limit. */
-  /** Build sessions (v2-13): new ones per day, and module submissions per run. */
-  maxBuildRunsPerDay: 20, maxBuildSubmissionsPerRun: 5, maxQueuedBuilds: 10,
 } as const;
 
-export type SessionSource = (typeof SESSION_SOURCES)[number];
 export type RunLane = (typeof RUN_LANES)[number];
 export type RunTrigger = (typeof RUN_TRIGGERS)[number];
-export type RunStatus = (typeof RUN_STATUSES)[number];
 export type Action = (typeof ACTIONS)[number];
-export type DeliveryChannel = (typeof DELIVERY_CHANNELS)[number];
 
 // ------------------------------------------ private schedule and manifest ---
 
@@ -148,7 +130,7 @@ export const moduleManifestSchema = z.object({
   effects: z.array(z.enum(MODULE_EFFECTS)).max(MODULE_EFFECTS.length),
   params: z.record(slug, z.object({ type: z.enum(["number", "string", "boolean"]), value: z.union([z.number(), z.string().max(2000), z.boolean()]) }).strict()).default({}),
   data: z.object({ schema: z.number().int().min(1), migrate: z.string().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/).optional() }).strict().default({ schema: 1 }),
-  tests: z.array(z.string().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/)).min(1).max(10),
+  tests: z.array(z.string().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/)).max(10).default([]),
 }).strict().superRefine((manifest, ctx) => {
   for (const [key, param] of Object.entries(manifest.params)) {
     if (typeof param.value !== param.type) ctx.addIssue({ code: "custom", path: ["params", key, "value"], message: "Value must match parameter type" });
@@ -198,8 +180,6 @@ export const callerSchema = z.discriminatedUnion("kind", [
 export const moduleEventSchema = z.object({
   trigger: z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("timer"), id: z.string().min(1).max(120), eventId: z.string(), timerId: z.string(), timerRevision: z.string(), scheduledAt: iso, firedAt: iso, payload: z.json() }).strict(),
-    /** Retained private schedule delivery; no public schedule creation API. */
-    z.object({ kind: z.literal("schedule"), id: slug, firedAt: iso, scheduleId: z.string().max(128).optional(), payload: z.record(z.string(), z.unknown()).optional() }).strict(),
     /**
      * A tool call. `caller` is who called it; `call` is set for routed calls: `key` is the caller's idempotency key
      * (async calls only), `attempt` counts deliveries of the same call, `chain` lists the modules on the call path.
@@ -224,8 +204,8 @@ export const MODULE_CALL_ERRORS = ["undeclared", "invalid", "internal",
   "unauthorized", "cursor_expired", "too_large", "capacity", "unsupported_version", "unsupported",
   /** Agent model failures propagated by the module SDK, including an unconfirmed completion deadline. */
   "unconfigured", "budget_exceeded", "provider_error", "timeout"] as const;
-/** `result` answers a tool call. `handled` is ignored (it handed inbound items back before connectors were removed); kept so older modules still answer. */
-export const moduleEventReplySchema = z.object({ id: channelId, result: z.object({ handled: z.boolean().optional(), result: moduleResultSchema }).strict().default({}) }).strict()
+/** A result answers the exact tool call. */
+export const moduleEventReplySchema = z.object({ id: channelId, result: z.object({ result: moduleResultSchema }).strict().default({}) }).strict()
   .or(z.object({ id: channelId, error: z.string().max(2000), errorCode: z.enum(MODULE_CALL_ERRORS).optional(), errorReason: z.enum(PUBLIC_CALL_REASONS).optional() }).strict());
 /** The credential names a manifest declares, whichever form each entry takes. */
 export const secretNames = (manifest: { secrets?: readonly (string | { name: string })[] }) => (manifest.secrets ?? []).map(secret => typeof secret === "string" ? secret : secret.name);
@@ -270,38 +250,15 @@ export type ModuleEffect = (typeof MODULE_EFFECTS)[number];
 
 // ---------------------------------------------------------------- views ----
 
-/** Provider execution context; application conversation keys and history remain private to their owner. */
-export const sessionSchema = z.object({
-  id, key: z.string().max(200), source: z.enum(SESSION_SOURCES), title: z.string().max(200).nullable(),
-  status: z.enum(SESSION_STATUSES), moduleId: id.nullable(), originSessionId: id.nullable(),
-  /** Module names whose tools runs in this session get directly (others through tool search); new sessions: files. */
-  focus: z.array(slug).max(10),
-  running: z.boolean(), lastActivityAt: iso, createdAt: iso, endedAt: iso.nullable(),
-}).strict();
-
 /** A module as an app: identity and state. */
 export const appSchema = z.object({
-  id, name: slug, description: z.string().max(300).nullable(), status: z.enum(["active", "paused"]), builtin: z.boolean(), activeHash: z.string().max(64).nullable(),
+  id, name: slug, description: z.string().max(300).nullable(), status: z.enum(["active", "paused"]), activeHash: z.string().max(64).nullable(),
   origin: moduleOriginSchema, capabilities: moduleCapabilitiesSchema,
-}).strict();
-
-export const runSchema = z.object({
-  id, sessionId: id.nullable(), lane: z.enum(RUN_LANES), trigger: z.enum(RUN_TRIGGERS), status: z.enum(RUN_STATUSES),
-  provider: short, toolCalls: z.array(z.object({ tool: short, at: iso, ok: z.boolean() }).strict()).max(200),
-  error: z.string().max(1000).nullable(), startedAt: iso.nullable(), endedAt: iso.nullable(), createdAt: iso,
-  /** Short user-facing description (from the schedule or module that started it); null for conversation runs. */
-  label: z.string().max(80).nullable(),
 }).strict();
 
 /** A file reference names its owning application; the reader verifies the actual origin identity. */
 export const contentRefSchema = z.string().trim().min(3).max(542).regex(/^[a-z][a-z0-9-]{1,40}\//, "starts with an application name")
   .refine(ref => relativePathSchema.safeParse(ref.slice(ref.indexOf("/") + 1)).success, "invalid path");
-export const attachmentSchema = z.object({ name: short, ref: contentRefSchema.nullable(), mime: z.string().max(100), size: z.number().int().min(0) }).strict();
-export const messageSchema = z.object({
-  id, sessionId: id, direction: z.enum(["in", "out"]), channel: z.enum(DELIVERY_CHANNELS), text: z.string().max(8000),
-  attachments: z.array(attachmentSchema).max(10), quotedMessageId: id.nullable(), at: iso,
-}).strict();
-
 export const approvalSchema = z.object({
   id, action: z.enum(ACTIONS), moduleId: id.nullable(),
   title: short, detail: z.string().max(4000),
@@ -315,11 +272,6 @@ export const moduleModelSettingsSchema = z.object({
   /** All modules together per local day; `moduleDailyCalls` caps single modules (v2-17), absent ones only by this. */
   dailyCalls: z.number().int().min(1).max(10_000), eventTimeoutMs: z.number().int().min(5_000).max(600_000),
   moduleDailyCalls: z.record(slug, z.number().int().min(0).max(10_000)).optional(),
-}).strict();
-export const buildSettingsSchema = z.object({
-  dailyLimit: z.number().int().min(0).max(200),
-  timeoutMinutes: z.number().int().min(5).max(120),
-  maxSubmissions: z.number().int().min(1).max(20),
 }).strict();
 export const settingsSchema = z.object({
   timezone: z.string().min(1).max(80),
@@ -342,24 +294,11 @@ export const healthSchema = z.object({
 export const resolveApprovalSchema = z.object({ decision: z.enum(["approve", "deny"]), scope: z.enum(APPROVAL_SCOPES).default("once") }).strict();
 export const updateSettingsSchema = z.object({ wake: wakeBudgetSchema.optional(), timezone: z.string().min(1).max(80).optional(), runTimeoutMinutes: settingsSchema.shape.runTimeoutMinutes.removeDefault().optional(), moduleModel: moduleModelSettingsSchema.nullable().optional() }).strict();
 
-/** Short codes (e.g. QQ binding codes): no 0/O/1/I/L. */
-export const REF_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
-
-// ---------------------------------------------------------- Chrona tools ---
-/**
- * Tools Chrona exposes to the Provider (Pi: through the Chrona extension bridge; MCP later).
- * Everything else (files, shell, web) is the Provider's own.
- */
-export const chronaToolInputSchemas = {
-  /** Internal build result; application conversations use their own routed tools. */
-  chrona_reply: z.object({ text: text.max(8000), files: z.array(relativePathSchema).max(10).default([]).describe("Files written in this build's actual working directory, copied into the receiving application's content; at most 20 MiB each.") }).strict(),
-} as const;
 /** Shared inputs used by the public modules router; candidate inputs are exported separately. */
 export const modulesToolInputSchemas = {
   describe: pageInput.extend({ target: routedTargetSchema.optional(), query: z.string().optional(), audience: z.enum(["caller", "user"]).default("caller") }),
   rollback: z.object({ moduleId: z.string().min(1), hash: moduleVersionHashSchema, reason: z.string().min(1) }).strict(),
 } as const;
-export const CHRONA_TOOLS = Object.keys(chronaToolInputSchemas) as (keyof typeof chronaToolInputSchemas)[];
 
 export * from "./local-runtime";
 
@@ -387,11 +326,6 @@ export type ProviderRunInput = {
   content?: { name: string; dir: string; writable: boolean }[];
   /** Safe summaries and explicit, run-bound UI requests; never raw thinking or tool payloads. */
   events?: ProviderEvents;
-  /** F binds this execution and its trusted principal before handing details to the Provider. */
-  execution?: import("./execution").ExecutionRef;
-  detail?: import("./execution-events").ExecutionDetailSink;
-  /** Enforced by the existing Pi extension before native tool execution, never prompt-only. */
-  executionBudget?: { maxToolCalls: number };
 };
 export type ProviderTranscriptItem =
   | { id?: string; at: string; kind: "text"; text: string }
@@ -411,11 +345,7 @@ export type ProviderAdapter = {
 
 // ---------------------------------------------------------------- types ----
 
-export type Session = z.infer<typeof sessionSchema>;
 export type App = z.infer<typeof appSchema>;
-export type Run = z.infer<typeof runSchema>;
-export type Attachment = z.infer<typeof attachmentSchema>;
-export type Message = z.infer<typeof messageSchema>;
 export type Approval = z.infer<typeof approvalSchema>;
 export type Settings = z.infer<typeof settingsSchema>;
 export type Health = z.infer<typeof healthSchema>;

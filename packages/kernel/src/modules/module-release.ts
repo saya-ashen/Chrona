@@ -1,24 +1,19 @@
-import { createHash } from "node:crypto";
-import { lstat, readFile, realpath } from "node:fs/promises";
+import { lstat, realpath } from "node:fs/promises";
 import { basename, dirname, join, sep } from "node:path";
-import { BUILTIN_MODULE_NAMES, moduleInstallRequestSchema, moduleManifestSchema, type ModuleManifest } from "@chrona/contracts/steward";
-import { z } from "zod";
-import { verifyModuleGitBundle } from "./module-git-upstream";
+import { moduleInstallRequestSchema, moduleManifestSchema, type ModuleManifest } from "@chrona/contracts/steward";
 import type { StewardPorts } from "../ports";
-import { readModuleFiles } from "./module-preview";
-import { moduleSourceFiles, snapshotModuleMaterial } from "./module-artifacts";
-import { openModuleDirectory, type ModuleFile } from "./module-files";
-import { MODULE_MATERIAL_FILE, MODULE_SOURCE_MAX_BYTES } from "../../../contracts/src/steward/module-material";
+import { moduleMaterialDigest, snapshotModuleMaterial } from "./module-artifacts";
+import type { ModuleFile } from "./module-files";
 import { StewardError } from "../errors";
 
-export type ModuleReleaseGit = { repository: string | null; branch: string; commit: string; bundlePath: string };
-export type ModuleRelease = { name: string; origin: "builtin" | "external"; codeDir: string; hash: string; manifest: ModuleManifest; git: ModuleReleaseGit | null };
+export type ModuleRelease = { name: string; origin: "external"; codeDir: string; hash: string; manifest: ModuleManifest };
 class ModuleReleaseError extends StewardError {
   constructor(code: "not_found" | "invalid" | "forbidden" | "conflict", public readonly reason: "release_not_found" | "invalid_release" | "release_drift", message: string) { super(code, message); }
 }
 function releaseManifest(bytes: Buffer, name: string): ModuleManifest {
   let raw: unknown;
-  try { raw = JSON.parse(bytes.toString("utf8")); } catch { throw new ModuleReleaseError("invalid", "invalid_release", "Release manifest is not JSON"); }
+  try { raw = JSON.parse(bytes.toString("utf8")); }
+  catch (error) { throw Object.assign(new ModuleReleaseError("invalid", "invalid_release", "Release manifest is not JSON"), { cause: error }); }
   const parsed = moduleManifestSchema.safeParse(raw);
   if (!parsed.success || parsed.data.name !== name) throw new ModuleReleaseError("invalid", "invalid_release", "Release manifest mismatch");
   return parsed.data;
@@ -28,80 +23,25 @@ async function releaseDirectory(rootPath: string, name: string) {
   if (!stat.isDirectory() || stat.isSymbolicLink() || !(await realpath(codeDir)).startsWith(root + sep)) throw new ModuleReleaseError("forbidden", "invalid_release", "Unsafe release directory");
   return codeDir;
 }
-function verifyLegacyReleaseHash(files: ModuleFile[], expectedHash: string) {
-  const digest = createHash("sha256");
-  for (const file of files) digest.update(file.path).update("\0").update(file.bytes).update("\0");
-  if (digest.digest("hex") !== expectedHash) throw new ModuleReleaseError("conflict", "release_drift", "Release contents differ from the registered hash");
+export function readReleaseMaterial(codeDir: string): Promise<ModuleFile[]> {
+  return snapshotModuleMaterial(dirname(codeDir), basename(codeDir), { verifyTree: true });
 }
-/** Legacy releases retain their existing source representation and size policy. */
-export async function readReleaseMaterial(codeDir: string): Promise<ModuleFile[]> {
-  const directory = await openModuleDirectory(dirname(codeDir), basename(codeDir));
+/** Only host configuration supplies the release root; request arguments cannot grant a host path. */
+export async function resolveExternalRelease(ports: Pick<StewardPorts, "moduleExternalResources">, name: string, expectedHash?: string): Promise<ModuleRelease> {
+  if (!moduleInstallRequestSchema.shape.package.safeParse(name).success) throw new ModuleReleaseError("not_found", "release_not_found", `Unknown release ${name}`);
+  if (!ports.moduleExternalResources) throw new ModuleReleaseError("not_found", "release_not_found", "External release resources are not configured");
   try {
-    try { await directory.read(MODULE_MATERIAL_FILE, MODULE_SOURCE_MAX_BYTES); }
-    catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      return (await readModuleFiles(codeDir, "Unsafe release file")).sort((a, b) => a.path.localeCompare(b.path));
-    }
-    return snapshotModuleMaterial(dirname(codeDir), basename(codeDir));
-  } finally { await directory.close(); }
-}
-/** Host-configured resources only. Neither a manifest nor a routed request can supply the root. */
-async function resolveRelease(rootPath: string | undefined, name: string, origin: ModuleRelease["origin"], expectedHash?: string): Promise<ModuleRelease> {
-
-  if (!moduleInstallRequestSchema.shape.package.safeParse(name).success || origin === "builtin" && !(BUILTIN_MODULE_NAMES as readonly string[]).includes(name)) throw new ModuleReleaseError("not_found", "release_not_found", `Unknown ${origin} release ${name}`);
-  if (!rootPath) throw new ModuleReleaseError("not_found", "release_not_found", `${origin} release resources are not configured`);
-  try {
-    const codeDir = await releaseDirectory(rootPath, name);
-    const files = await readReleaseMaterial(codeDir);
+    const codeDir = await releaseDirectory(ports.moduleExternalResources, name);
+    const files = await readReleaseMaterial(codeDir), hash = moduleMaterialDigest(files);
     const file = files.find(file => file.path === "module.json");
     if (!file) throw new ModuleReleaseError("invalid", "invalid_release", "Release manifest missing");
     const manifest = releaseManifest(Buffer.from(file.bytes), name);
-    // Legacy hashes remain approval identities; new releases use their authentic Git commit.
-    if (expectedHash && /^[a-f0-9]{64}$/.test(expectedHash)) {
-      verifyLegacyReleaseHash(files, expectedHash);
-      return { name, origin, codeDir, hash: expectedHash, manifest, git: null };
-    }
-    const git = await releaseGit(rootPath, name, files);
-    if (expectedHash !== undefined && expectedHash !== git.commit) throw new ModuleReleaseError("conflict", "release_drift", "Release commit differs from the registered version");
-    return { name, origin, codeDir, hash: git.commit, manifest, git };
+    if (expectedHash !== undefined && expectedHash !== hash) throw new ModuleReleaseError("conflict", "release_drift", "Release material differs from the selected version");
+    return { name, origin: "external", codeDir, hash, manifest };
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") throw new ModuleReleaseError("not_found", "release_not_found", `Release resources missing for ${name}`);
+    if (error instanceof ModuleReleaseError) throw error;
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") throw Object.assign(new ModuleReleaseError("not_found", "release_not_found", `Release resources missing for ${name}`), { cause: error });
+    if (error instanceof StewardError) throw Object.assign(new ModuleReleaseError(error.code === "conflict" ? "conflict" : "invalid", error.code === "conflict" ? "release_drift" : "invalid_release", error.message), { cause: error });
     throw error;
   }
-}
-export function resolveBuiltinRelease(ports: Pick<StewardPorts, "moduleBuiltinResources">, name: string, expectedHash?: string): Promise<ModuleRelease> {
-  return resolveRelease(ports.moduleBuiltinResources, name, "builtin", expectedHash);
-}
-export function resolveExternalRelease(ports: Pick<StewardPorts, "moduleExternalResources">, name: string, expectedHash?: string): Promise<ModuleRelease> {
-  return resolveRelease(ports.moduleExternalResources, name, "external", expectedHash);
-}
-
-const releaseLockSchema = z.object({ version: z.literal(1), modules: z.array(z.object({
-  name: z.string(), repository: z.string().regex(/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\.git)?$/).nullable(),
-  branch: z.string().min(1), commit: z.string().regex(/^[a-f0-9]{40}$/), bundle: z.string(), bundleSha256: z.string().regex(/^[a-f0-9]{64}$/),
-}).strict()) }).strict();
-async function regularResource(root: string, path: string) {
-  const stat = await lstat(path);
-  if (!stat.isFile() || stat.isSymbolicLink() || !(await realpath(path)).startsWith(root + sep)) throw new ModuleReleaseError("forbidden", "invalid_release", "Unsafe release Git resource");
-  return readFile(path);
-}
-async function releaseGit(rootPath: string, name: string, material: ModuleFile[]): Promise<ModuleReleaseGit> {
-  const files = moduleSourceFiles(material);
-  const parent = dirname(await realpath(rootPath)), seedPath = join(parent, "module-git");
-  const stat = await lstat(seedPath);
-  if (!stat.isDirectory() || stat.isSymbolicLink()) throw new ModuleReleaseError("forbidden", "invalid_release", "Unsafe release Git directory");
-  const seedRoot = await realpath(seedPath);
-  if (!seedRoot.startsWith(parent + sep)) throw new ModuleReleaseError("forbidden", "invalid_release", "Unsafe release Git directory");
-  const bytes = await regularResource(seedRoot, join(seedRoot, "lock.json"));
-  let raw: unknown;
-  try { raw = JSON.parse(bytes.toString("utf8")); } catch { throw new ModuleReleaseError("invalid", "invalid_release", "Release Git lock is not JSON"); }
-  const parsed = releaseLockSchema.safeParse(raw);
-  if (!parsed.success) throw new ModuleReleaseError("invalid", "invalid_release", "Invalid release Git lock");
-  const entries = parsed.data.modules.filter(entry => entry.name === name), entry = entries[0];
-  if (entries.length !== 1 || entry.bundle !== `${name}.bundle`) throw new ModuleReleaseError("invalid", "invalid_release", "Release Git descriptor missing or ambiguous");
-  const bundlePath = join(seedRoot, entry.bundle), bundle = await regularResource(seedRoot, bundlePath);
-  if (createHash("sha256").update(bundle).digest("hex") !== entry.bundleSha256) throw new ModuleReleaseError("conflict", "release_drift", "Release Git bundle integrity mismatch");
-  const revision = await verifyModuleGitBundle({ bundlePath, commit: entry.commit, branch: entry.branch, repository: entry.repository });
-  if (files.length !== revision.files.length || files.some((file, index) => file.path !== revision.files[index]?.path || !Buffer.from(file.bytes).equals(revision.files[index]!.bytes) || !!file.executable !== !!revision.files[index]!.executable)) throw new ModuleReleaseError("conflict", "release_drift", "Release source differs from pinned Git commit");
-  return { repository: entry.repository, branch: entry.branch, commit: entry.commit, bundlePath };
 }

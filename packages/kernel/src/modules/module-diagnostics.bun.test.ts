@@ -19,7 +19,7 @@ async function fixture() {
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "v1" } });
   const ports = { db, dataDir: "/not-used-for-read-only-diagnostics", publicUrl: null, now: () => new Date("2026-10-25T14:00:00Z") };
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest: moduleManifestSchema.parse({ name: "example", entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [] }), source: "user", status: "approved", intent: {}, report: {} } });
-  const { activationId } = await db.$transaction(tx => recordModuleActivation(moduleContext(ports, workspace.id), tx, { moduleId: module.id, previousHash: null, hash: "v1", generationId: "fixture" }));
+  const { activationId } = await db.$transaction(tx => recordModuleActivation(moduleContext(ports, workspace.id), tx, { moduleId: module.id, previousHash: null, hash: "v1" }));
   let execution = 0;
   const fail = (extra: Partial<Parameters<typeof recordModuleFailure>[1]> = {}) => db.$transaction(tx => recordModuleFailure(tx, { workspaceId: workspace.id, moduleId: module.id, activationId, hash: "v1", now: ports.now(), retry: true, ...extra, evidence: { ...(extra.evidence ?? evidence), runId: `run-${++execution}` } }));
   const recovery = (trigger?: string, hash = "v1") => recordModuleRecovery(ports, { workspaceId: workspace.id, moduleId: module.id, hash, activationId, triggerId: trigger, ...(trigger ? { runId: `success-${++execution}` } : {}) });
@@ -185,7 +185,7 @@ test("health separates same-hash activations and legacy history, counts only att
   const mismatch = { workspaceId: f.workspace.id, moduleId: f.module.id, hash: "v1", tool: "fetch", callId: "old", issues: ["$.value"], now: f.ports.now() };
   await recordModuleOutputMismatch(f.db, { ...mismatch, activationId: f.activationId });
   await recordModuleOutputMismatch(f.db, { ...mismatch, callId: "legacy" });
-  const activation = await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.workspace.id), tx, { moduleId: f.module.id, previousHash: "v1", hash: "v1", generationId: "reactivation" }));
+  const activation = await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.workspace.id), tx, { moduleId: f.module.id, previousHash: "v1", hash: "v1" }));
   const { activationId: _id, revision: _revision, attribution: _attribution, ...legacy } = old;
   await f.db.audit.create({ data: { workspaceId: f.workspace.id, subjectId: f.module.id, actorKey: "chrona", kind: "module_runtime_incident", details: { ...legacy, id: "legacy" } } });
   const [view] = await api.diagnostics("example");
@@ -253,11 +253,11 @@ test("batched list health matches single-app diagnostics through pause, reactiva
   await check("active", "v1", 1);
   await check("paused", "v1", 0);
   await check("active", "v1", 1);
-  await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.workspace.id), tx, { moduleId: f.module.id, previousHash: "v1", hash: "v1", generationId: "reactivated" }));
+  await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.workspace.id), tx, { moduleId: f.module.id, previousHash: "v1", hash: "v1" }));
   await check("active", "v1", 0);
   const first = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.module.id, hash: "v1" } } });
   await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash: "v2", manifest: moduleManifestSchema.parse(first.manifest), source: "user", status: "approved", intent: {}, report: {} } });
-  await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.workspace.id), tx, { moduleId: f.module.id, previousHash: "v1", hash: "v2", generationId: "other-version" }));
+  await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.workspace.id), tx, { moduleId: f.module.id, previousHash: "v1", hash: "v2" }));
   await check("active", "v2", 0);
   await check("active", "v1", 0);
 });
@@ -269,7 +269,7 @@ test("a same-hash activation interleaved with list reads cannot inherit the prev
     return async (args: Parameters<typeof f.db.module.findMany>[0]) => {
       if (!reactivated) {
         reactivated = true;
-        await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.workspace.id), tx, { moduleId: f.module.id, previousHash: "v1", hash: "v1", generationId: "interleaved-reactivation" }));
+        await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.workspace.id), tx, { moduleId: f.module.id, previousHash: "v1", hash: "v1" }));
       }
       return target.findMany(args);
     };

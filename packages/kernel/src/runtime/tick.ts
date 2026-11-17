@@ -10,11 +10,9 @@ import { diagnosticText } from "../modules/module-diagnostics";
 import { callsSettled, drainCalls } from "../modules/module-calls";
 import { createProviderChannel } from "../agent/provider-channel";
 import { providerStartGate } from "../agent/provider-start";
-import { startLocalProvider, runtimeCall } from "../execution/local-runtime";
-import { registerWorkspaceModule } from "../execution/local-workspace";
-import { KERNEL_EXECUTION_LIMITS, type ProviderAdapter } from "@chrona/contracts/steward";
+import { startLocalProvider } from "../execution/local-runtime";
+import type { ProviderAdapter } from "@chrona/contracts/steward";
 import { refreshInstallationReceipts } from "../modules/module-install";
-import { executionRunInput } from "../execution/execution-context";
 import { pruneHistory } from "../retention";
 import { collectStore } from "../store-gc";
 
@@ -34,23 +32,13 @@ async function finishProvider(ports: StewardPorts, pending: Map<string, PendingF
     });
   }
 }
-function finalizeProvider(ports: StewardPorts, run: ClaimedRun, channel: ReturnType<typeof createProviderChannel>, handle: ReturnType<ProviderAdapter["start"]>, { pending, execution }: { pending: Map<string, PendingFinalization>; execution: boolean }) {
+function finalizeProvider(ports: StewardPorts, run: ClaimedRun, channel: ReturnType<typeof createProviderChannel>, handle: ReturnType<ProviderAdapter["start"]>, pending: Map<string, PendingFinalization>) {
   // Only the actual Provider handle proves process exit; the start gate may resolve before launch.
   return handle.done.then(async outcome => {
     try { await channel.close(); }
     catch (error) {
       console.error(JSON.stringify({ component: "tick", event: "interaction_persistence.failed", runId: run.id, error: diagnosticText(String(error).replaceAll(run.token, "[Redacted]"), 2000) }));
       outcome = { ...outcome, outcome: "failed", error: "Execution interaction persistence failed" };
-    }
-    if (execution) {
-      try { registerWorkspaceModule(); await runtimeCall(ports, run.workspaceId, "workspace-local.capture", { runId: run.id }); }
-      catch (error) {
-        // The Provider has exited even if the result sidecar could not be written.
-        console.error(JSON.stringify({ component: "tick", event: "execution_capture_failed", runId: run.id, error: diagnosticText(String(error).replaceAll(run.token, "[Redacted]"), 2000) }));
-        await audit(ports.db, { workspaceId: run.workspaceId, actor: "chrona", kind: "execution_capture_failed", subjectId: run.id, details: {} }).catch(error => {
-          console.error(JSON.stringify({ component: "tick", event: "capture_audit.failed", runId: run.id, error: diagnosticText(String(error).replaceAll(run.token, "[Redacted]"), 2000) }));
-        });
-      }
     }
     await finishProvider(ports, pending, { run, outcome, stopEvidence: "provider_exited" });
   }, async error => {
@@ -63,22 +51,17 @@ function finalizeProvider(ports: StewardPorts, run: ClaimedRun, channel: ReturnT
     });
   });
 }
-async function claimApplicationRuns(ports: StewardPorts, workspaceId: string, now: Date) {
-  const runs = createRuns(ports, workspaceId);
-  for (let i = 0; i < KERNEL_EXECUTION_LIMITS.codingGlobal; i++) if (!await runs.claimNext("background", now, { kind: "application" })) break;
-}
-
-function startBuild(ports: StewardPorts, builds: Map<string, Promise<void>>, buildFailures: Map<string, unknown>, workspaceId: string, now: Date) {
-    if (builds.has(workspaceId)) return;
-    builds.set(workspaceId, createModules(ports, workspaceId).buildPending(now).then(() => undefined, error => { buildFailures.set(workspaceId, error); }).finally(() => { builds.delete(workspaceId); }));
+function startInstallCheck(ports: StewardPorts, installChecks: Map<string, Promise<void>>, checkFailures: Map<string, unknown>, workspaceId: string, now: Date) {
+    if (installChecks.has(workspaceId)) return;
+    installChecks.set(workspaceId, createModules(ports, workspaceId).buildPending(now).then(() => undefined, error => { checkFailures.set(workspaceId, error); }).finally(() => { installChecks.delete(workspaceId); }));
   }
 export function createTick(ports: StewardPorts) {
-  const builds = new Map<string, Promise<void>>(), buildFailures = new Map<string, unknown>();
+  const installChecks = new Map<string, Promise<void>>(), checkFailures = new Map<string, unknown>();
   const finalizers = new Set<Promise<unknown>>();
   const pendingFinalizations = new Map<string, PendingFinalization>();
   async function tick(now = ports.now()) {
-    const failures: { workspaceId: string; stage: string; error: unknown }[] = [...buildFailures].map(([workspaceId, error]) => ({ workspaceId, stage: "modules", error }));
-    buildFailures.clear();
+    const failures: { workspaceId: string; stage: string; error: unknown }[] = [...checkFailures].map(([workspaceId, error]) => ({ workspaceId, stage: "modules", error }));
+    checkFailures.clear();
     // A backlog pass can take ~100 s on a large DB (measured); never hold up runs and timers for it.
     void pruneHistory(ports.db, now).catch(error => console.error(JSON.stringify({ component: "retention", event: "prune_failed", error: String(error).slice(0, 300) })));
     void collectStore(ports, now).catch(function (error) {
@@ -92,59 +75,55 @@ export function createTick(ports: StewardPorts) {
         if (context) return context;
         throw new Error("Run requires an application-owned Agent context");
       }
-      function providerInput(run: ClaimedRun, lane: "foreground" | "background" | "build", sessionDir: string, execution: Awaited<ReturnType<typeof executionRunInput>>, ordinary: Awaited<ReturnType<typeof runInput>> | null) {
-        if (execution) return (({ onInteraction: _observer, ...input }) => input)(execution);
-        return { runId: run.id, token: run.token, lane, cwd: run.cwd, sessionDir, sessionId: ordinary!.sessionId,
-          prompt: ordinary!.prompt, systemPrompt: ordinary!.systemPrompt, resources: ordinary!.resources, images: ordinary!.images, deadline: run.deadlineAt,
-          extraTools: ordinary!.extraTools, searchTools: ordinary!.searchTools, hostPaths: ordinary!.hostPaths, content: ordinary!.content };
+      function providerInput(run: ClaimedRun, lane: "foreground" | "background", sessionDir: string, ordinary: Awaited<ReturnType<typeof runInput>>) {
+        return { runId: run.id, token: run.token, lane, cwd: run.cwd, sessionDir, sessionId: ordinary.sessionId,
+          prompt: ordinary.prompt, systemPrompt: ordinary.systemPrompt, resources: ordinary.resources, images: ordinary.images, deadline: run.deadlineAt,
+          extraTools: ordinary.extraTools, searchTools: ordinary.searchTools, hostPaths: ordinary.hostPaths, content: ordinary.content };
       }
-      async function launchLocal(run: ClaimedRun, lane: "foreground" | "background" | "build") {
+      async function launchLocal(run: ClaimedRun, lane: "foreground" | "background") {
           const gate = providerStartGate();
           liveRuns.set(run.id, gate.handle);
           try {
-            const execution = await executionRunInput(ports, run);
-            const ordinary = execution ? null : await runInput(run);
-            const sessionDir = execution?.sessionDir ?? join(run.cwd, ".chrona", "sessions");
+            const ordinary = await runInput(run);
+            const sessionDir = join(ports.dataDir, "sessions", run.sessionId!, ".chrona", "sessions");
             await mkdir(sessionDir, { recursive: true });
-            if (!ports.provider && !await ports.db.agentRunProvider.findUnique({ where: { runId: run.id } })) { gate.fail(); await runs.finish(run.id, { outcome: "unavailable", sessionId: null, error: "Provider unconfigured" }, { stopEvidence: "never_started" }); return; }
-            const channel = createProviderChannel(ports, run, execution?.onInteraction);
+            if (!await ports.db.agentRunProvider.findUnique({ where: { runId: run.id } })) { gate.fail(); await runs.finish(run.id, { outcome: "unavailable", sessionId: null, error: "Provider unconfigured" }, { stopEvidence: "never_started" }); return; }
+            const channel = createProviderChannel(ports, run);
             let handle;
             try {
               await runs.authenticate(run.token);
-              if (gate.stopped()) { await channel.close(); return; }
-              const input = providerInput(run, lane, sessionDir, execution, ordinary);
+              if (gate.stopped()) {
+                await channel.close();
+                await runs.finish(run.id, { outcome: "failed", sessionId: null, error: "Provider launch cancelled" }, { stopEvidence: "never_started" });
+                return;
+              }
+              const input = providerInput(run, lane, sessionDir, ordinary);
               handle = await startLocalProvider(ports, workspaceId, { ...input, events: channel.events });
             } catch (error) { await channel.close(); throw error; }
             gate.attach(handle);
-            const finalized = finalizeProvider(ports, run, channel, handle, { pending: pendingFinalizations, execution: !!execution });
+            const finalized = finalizeProvider(ports, run, channel, handle, pendingFinalizations);
             finalizers.add(finalized);
             void finalized.finally(() => finalizers.delete(finalized));
             if (gate.stopped()) await handle.abort();
           } catch (error) {
             gate.fail();
             const launched = await ports.db.providerLaunch.findUnique({ where: { runId: run.id } });
+            if (!launched) liveRuns.delete(run.id);
             await runs.finish(run.id, { outcome: "unavailable", sessionId: null, error: `Provider could not start: ${String(error).slice(0, 300)}` }, launched ? {} : { stopEvidence: "never_started" });
           }
       }
       async function launch() {
-        for (const lane of ["foreground", "background", "build"] as const) {
-          const run = await runs.claimNext(lane, now, { kind: "ordinary" });
+        for (const lane of ["foreground", "background"] as const) {
+          const run = await runs.claimNext(lane, now);
           if (run) await launchLocal(run, lane);
         }
-        for (let index = 0; index < KERNEL_EXECUTION_LIMITS.codingEnvironment; index++) {
-          const run = await runs.claimNext("background", now, { kind: "execution", executorId: "server" });
-          if (!run) break;
-          await launchLocal(run, "background");
-        }
-        await claimApplicationRuns(ports, workspaceId, now);
       }
       for (const [stage, action] of [
         // Keep unrelated startup stages running even if one shipped app fails registration.
         ["installations", async () => { await refreshInstallationReceipts(ports, workspaceId); }],
-        ["modules", async () => { await createModules(ports, workspaceId).recoverMigrations(now); startBuild(ports, builds, buildFailures, workspaceId, now); }],
-        ["timers", async () => { void drainTimers(ports, workspaceId, now).catch(error => { buildFailures.set(workspaceId, error); }); }],
+        ["modules", async () => { await createModules(ports, workspaceId).recoverMigrations(now); startInstallCheck(ports, installChecks, checkFailures, workspaceId, now); }],
+        ["timers", async () => { void drainTimers(ports, workspaceId, now).catch(error => { checkFailures.set(workspaceId, error); }); }],
         ["finalize", async () => {
-          // Retry only persistence, even for unlimited Runs; close/capture already ran once.
           for (const entry of [...pendingFinalizations.values()]) if (entry.run.workspaceId === workspaceId) {
             pendingFinalizations.delete(entry.run.id);
             await finishProvider(ports, pendingFinalizations, entry);
@@ -163,12 +142,13 @@ export function createTick(ports: StewardPorts) {
     return { failures };
   }
   return Object.assign(tick, { settled: async ({ includeRuns = false } = {}) => {
-    await Promise.all([...builds.values(), ...(includeRuns ? finalizers : []), timersSettled(ports)]);
+    await Promise.all([...installChecks.values(), ...(includeRuns ? finalizers : []), timersSettled(ports)]);
     await callsSettled(ports);
   } });
 }
 
 async function genericInput(ports: StewardPorts, run: ClaimedRun, sessionId: string | null) {
-  if (!run.sessionId || !await ports.db.agentContext.findUnique({ where: { sessionId: run.sessionId } })) return null;
-  return { images: await contextRunImages(ports, run), prompt: run.prompt, inbound: null, extraTools: (await contextRunTools(ports, run))!.catalog.map(tool => tool.name), searchTools: false, sessionId, hostPaths: [], content: [], systemPrompt: "", resources: "configured" as const };
+  const tools = await contextRunTools(ports, run);
+  if (!tools) return null;
+  return { images: await contextRunImages(ports, run), prompt: run.prompt, inbound: null, extraTools: tools.catalog.map(tool => tool.name), searchTools: false, sessionId, hostPaths: [], content: [], systemPrompt: "", resources: "configured" as const };
 }

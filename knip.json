@@ -20,7 +20,7 @@
       ]
     },
     "apps/server": {
-      "entry": ["src/**/*.bun.test.ts", "src/**/*.fixture.ts", "src/__tests__/fixtures/*.ts"],
+      "entry": ["src/**/*.bun.test.ts", "src/**/*.fixture.ts"],
       "project": ["src/**/*.{ts,tsx}"]
     },
     "packages/*": {
@@ -47,7 +47,7 @@
         "transport.ts",
         "typecheck/check.ts",
         "typecheck/calls.ts",
-        "typecheck/chrona-sdk-loader.ts"
+        "chrona-sdk-loader.ts"
       ],
       "project": [
         "**/*.ts",

@@ -10,11 +10,12 @@ import { prepareData, runOffline, type Restore } from "./module-data";
 import { activateIn } from "./module-generation";
 import { assertExternalModule } from "./module-identity";
 import { ensureVersionMaterial } from "./module-source";
+import { findCandidateSet, setCandidateSetStateIn } from "./module-candidate-records";
 
 async function assertMigrationOwner(context: ModuleContext, db: ModuleContext["db"] | Prisma.TransactionClient, prepared: PreparedMigration, reason: "activate" | "rollback") {
   const current = await assertExternalModule(db, context.workspaceId, prepared.module.id, reason);
   const migration = await db.moduleMigration.findUnique({ where: { moduleId: current.id } });
-  if (current.status !== "migrating" || current.activeHash !== prepared.module.activeHash || migration?.hash !== prepared.version.hash) throw new StewardError("conflict", "Module changed during migration");
+  if (current.name !== prepared.module.name || current.status !== "migrating" || current.activeHash !== prepared.module.activeHash || migration?.hash !== prepared.version.hash) throw new StewardError("conflict", "Module changed during migration");
   return current;
 }
 
@@ -22,7 +23,7 @@ export type PreparedMigration = { module: Awaited<ReturnType<typeof requireModul
 async function withMigrationOwner<T>(context: ModuleContext, prepared: PreparedMigration, reason: "activate" | "rollback", work: (tx: Prisma.TransactionClient) => Promise<T>) {
   return context.db.$transaction(async tx => {
     // Acquire SQLite's writer lock before reading ownership; no author code runs in this transaction.
-    const locked = await tx.module.updateMany({ where: { id: prepared.module.id, workspaceId: context.workspaceId, builtin: false, status: "migrating", activeHash: prepared.module.activeHash }, data: { status: "migrating" } });
+    const locked = await tx.module.updateMany({ where: { id: prepared.module.id, workspaceId: context.workspaceId, status: "migrating", activeHash: prepared.module.activeHash }, data: { status: "migrating" } });
     if (locked.count !== 1) throw new StewardError("conflict", "Module changed during migration");
     await assertMigrationOwner(context, tx, prepared, reason);
     return work(tx);
@@ -60,6 +61,10 @@ async function finishMigration(context: ModuleContext, tx: Prisma.TransactionCli
     : `已将数据迁移 schema ${String(from)} → ${to}；迁移前数据快照保留。`;
   if (module.status === "paused") await tx.module.update({ where: { id: module.id }, data: { status: "paused" } });
   await activateIn(context, tx, { moduleId: module.id, hash: version.hash, reason, dataHandling });
+  if (reason === "activate") {
+    const receipt = await findCandidateSet({ ...context, db: tx as ModuleContext["db"] }, version);
+    if (receipt) await setCandidateSetStateIn(context, tx, receipt, "approved", receipt.approvalId);
+  }
 }
 export async function migrateData(context: ModuleContext, prepared: PreparedMigration, reason: "activate" | "rollback", restore?: Restore, completedIn?: (tx: Prisma.TransactionClient) => Promise<void>) {
   const { db, platform } = context, { module, from, to } = prepared, moduleId = module.id;

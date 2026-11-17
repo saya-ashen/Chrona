@@ -4,10 +4,10 @@ import { runtimeEventSchema, providerAnswerSchema, type ProviderRunInput, type R
 import type { StewardPorts } from "../ports";
 import { CallError, registerLocalModule, type Json } from "../modules/module-calls";
 import { tool, json } from "../system/shared";
-import { assertExecutionPrincipal } from "../execution/execution-principal";
+import { assertApprovedAgentPrincipal } from "./agent-context-state";
 
-type CallbackTarget = Pick<ProviderRunInput, "events" | "detail"> & { provider?: { moduleId: string; hash: string }; operationId?: string; settled?: (outcome: import("@chrona/contracts/steward").RuntimeEvent & { kind: "settled" }) => void };
-type Callback = { target: Pick<ProviderRunInput, "events" | "detail">; settle(value: RuntimeEvent & { kind: "settled" }): void; workspaceId: string; provider?: { moduleId: string; hash: string }; controllers: Map<string, AbortController>; interrupted: Set<string> };
+type CallbackTarget = Pick<ProviderRunInput, "events"> & { provider?: { moduleId: string; hash: string }; operationId?: string; settled?: (outcome: import("@chrona/contracts/steward").RuntimeEvent & { kind: "settled" }) => void };
+type Callback = { target: Pick<ProviderRunInput, "events">; settle(value: RuntimeEvent & { kind: "settled" }): void; workspaceId: string; provider?: { moduleId: string; hash: string }; controllers: Map<string, AbortController>; interrupted: Set<string> };
 // Match moduleSupervisor's scope: service-derived ports share its original ports' callbacks.
 const callbacks = new WeakMap<StewardPorts["db"], Map<string, Map<string, Callback>>>();
 
@@ -25,7 +25,7 @@ export function retainProviderCallbacks(ports: StewardPorts, workspaceId: string
   } });
   return { id, release() { for (const controller of controllers.values()) controller.abort(); map.delete(id); } };
 }
-async function dispatchCallback(target: Pick<ProviderRunInput, "events" | "detail">, owner: Callback, value: RuntimeEvent): Promise<Json> {
+async function dispatchCallback(target: Pick<ProviderRunInput, "events">, owner: Callback, value: RuntimeEvent): Promise<Json> {
   if (value.kind === "settled") {
     owner.settle(value);
     return null;
@@ -43,8 +43,7 @@ async function dispatchCallback(target: Pick<ProviderRunInput, "events" | "detai
     try { return json(await target.events.question(value.value, controller.signal)); }
     finally { owner.controllers.delete(value.requestId); }
   }
-  if (value.kind === "detail") await target.detail?.append(value.value);
-  else await target.events?.[value.kind]?.(value.value as never);
+  await target.events?.[value.kind]?.(value.value as never);
   return null;
 }
 export function registerProviderCallbacks() {
@@ -55,7 +54,7 @@ export function registerProviderCallbacks() {
       const callback = callbacks.get(ports.db)?.get(ports.dataDir)?.get(String(args.callbackId));
       if (!callback || callback.workspaceId !== workspaceId) throw new CallError("not_found", "Run callback ended");
       if (caller.kind !== "module" || caller.moduleId !== callback.provider?.moduleId || caller.hash !== callback.provider.hash) throw new CallError("forbidden", "Callback requires the Run's admitted provider module");
-      await assertExecutionPrincipal(ports.db, { workspaceId, ownerId: "owner", caller });
+      await assertApprovedAgentPrincipal(ports.db, { workspaceId, ownerId: "owner", caller });
       return dispatchCallback(callback.target, callback, runtimeEventSchema.parse(args.event));
     },
   });

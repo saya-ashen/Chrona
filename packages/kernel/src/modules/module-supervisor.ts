@@ -191,7 +191,7 @@ class ModuleSupervisor {
     if (contentDir) await mkdir(contentDir, { recursive: true });
     const bindings = JSON.stringify(await this.bindings(instance.scope.workspaceId));
     const current = await this.getActiveModule(instance.moduleId, instance.hash);
-    if (current.workspaceId !== instance.scope.workspaceId || current.name !== instance.manifest.name || current.builtin) throw new Error("Module identity changed before start");
+    if (current.workspaceId !== instance.scope.workspaceId || current.name !== instance.manifest.name) throw new Error("Module identity changed before start");
     if (isClosing(instance)) throw new Error("Module instance closed before start");
     const process = sandbox.startModule!({ codeDir, dataDir, contentDir, env: { CHRONA_PUBLIC_URL: ports.publicUrl ?? "", CHRONA_KERNEL_URL: ports.kernelUrl ?? "", CHRONA_MODULE_BINDINGS: bindings }, entry: instance.manifest.entry, ipcEndpoint: instance.channel.endpoint, ipcToken: instance.channel.token, network: instance.manifest.effects.includes("network") });
     instance.process = process;

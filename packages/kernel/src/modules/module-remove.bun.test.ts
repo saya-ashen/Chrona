@@ -6,6 +6,7 @@ import type { Prisma } from "@chrona/db";
 import { moduleContext } from "./module-context";
 import { requestRemove, removeApproved } from "./module-remove";
 import { moduleSupervisor } from "./module-supervisor";
+import { storeTestModuleMaterial } from "../__testing__/module-release-test-fixture";
 import { testDb } from "../__testing__/test-db";
 import type { StewardPorts } from "../ports";
 
@@ -16,11 +17,14 @@ async function fixture(name = "pi", entry = false) {
   const workspace = await db.workspace.create({ data: { name: "remove" } });
   const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => new Date("2026-11-05T12:00:00Z") };
   closes.push(async () => { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
-  const module = await db.module.create({ data: { workspaceId: workspace.id, name, activeHash: "version" } });
+  const module = await db.module.create({ data: { workspaceId: workspace.id, name, activeHash: null } });
   const manifest = moduleManifestSchema.parse({ name: module.name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [], ...(entry ? { uses: ["*"],
       authority: "owner"
 } : {}) });
-  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "version", manifest, source: "user", status: "approved", intent: {}, report: {} } });
+  const hash = await storeTestModuleMaterial(join(dataDir, "platform"), manifest);
+  module.activeHash = hash;
+  await db.module.update({ where: { id: module.id }, data: { activeHash: hash } });
+  await db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest, source: "user", status: "approved", intent: {}, report: {} } });
   const context = moduleContext(ports, workspace.id);
   const data = join(context.platform, "data", module.id);
   await mkdir(data, { recursive: true }); await writeFile(join(data, "keep.txt"), "valuable");
@@ -32,18 +36,14 @@ async function fixture(name = "pi", entry = false) {
   return { db, workspace, module, manifest, ports, context, data, approved };
 }
 
-test.each(["owned-session", "entry-session", "queued-run", "dependency", "unknown-call", "unhandled-reply", "unknown-effect"])("removal rejects %s without deleting data or creating an approval", async kind => {
+test.each(["dependency", "unknown-call", "unhandled-reply", "unknown-effect"])("removal rejects %s without deleting data or creating an approval", async kind => {
   const f = await fixture();
-  if (["owned-session", "entry-session", "queued-run"].includes(kind)) {
-    const session = await f.db.session.create({ data: { workspaceId: f.workspace.id, key: "related", source: "module", status: kind === "queued-run" ? "ended" : "active", ...(kind === "entry-session" ? { entryModuleId: f.module.id } : { moduleId: f.module.id }) } });
-    if (kind === "queued-run") await f.db.run.create({ data: { workspaceId: f.workspace.id, sessionId: session.id, lane: "background", trigger: "source", status: "queued", provider: "fake", tokenHash: "one", prompt: "work", cwd: f.ports.dataDir } });
-  }
   if (kind === "dependency") {
     const other = await f.db.module.create({ data: { workspaceId: f.workspace.id, name: "consumer", activeHash: "consumer" } });
     await f.db.moduleVersion.create({ data: { moduleId: other.id, hash: "consumer", manifest: { ...f.manifest, name: "consumer", uses: [`${f.module.name}.read`] }, source: "user", status: "approved", intent: {}, report: {} } });
   }
   if (kind === "unknown-call" || kind === "unhandled-reply") await f.db.moduleInvocation.create({ data: { workspaceId: f.workspace.id, caller: `module:${f.module.id}`, callerModuleId: f.module.id, target: "other", tool: "read", args: {}, key: "once", mode: "async", status: kind === "unknown-call" ? "unknown" : "succeeded", reply: kind === "unhandled-reply" } });
-  if (kind === "unknown-effect") await f.db.moduleCall.create({ data: { moduleId: f.module.id, hash: "version", method: "exec", key: "once", status: "failed", error: "unknown" } });
+  if (kind === "unknown-effect") await f.db.moduleCall.create({ data: { moduleId: f.module.id, hash: f.module.activeHash!, method: "exec", key: "once", status: "failed", error: "unknown" } });
   await expect(requestRemove(f.context, f.module.id, "remove")).rejects.toMatchObject({ code: "conflict" });
   expect(await f.db.approval.count()).toBe(0);
   expect(await readFile(join(f.data, "keep.txt"), "utf8")).toBe("valuable");
@@ -52,7 +52,6 @@ test.each(["owned-session", "entry-session", "queued-run", "dependency", "unknow
 
 test.each(["pi", "web", "notify", "other-entry", "files", "events"])("ordinary entry %s can be removed after approval with a data backup", async name => {
   const f = await fixture(name, true);
-  expect(f.module.builtin).toBe(false);
   const timer = await f.db.timer.create({ data: { workspaceId: f.workspace.id, moduleId: f.module.id, timerId: "retained timer", rule: { kind: "every", minutes: 60 }, status: "active", nextAt: f.ports.now() } });
   const action = await f.approved();
   expect(await f.db.timer.findUniqueOrThrow({ where: { id: timer.id } })).toMatchObject({ status: "active" });
@@ -61,6 +60,7 @@ test.each(["pi", "web", "notify", "other-entry", "files", "events"])("ordinary e
   expect(await f.db.module.findUnique({ where: { id: f.module.id } })).toBeNull();
   expect(await f.db.moduleRemoval.findUniqueOrThrow({ where: { moduleId: f.module.id } })).toMatchObject({ workspaceId: f.workspace.id, name: f.module.name, hash: f.module.activeHash });
   const removal = await f.db.audit.findFirstOrThrow({ where: { kind: "module_removed", subjectId: f.module.id } });
+  expect(await readFile(join((removal.details as { backup: string }).backup, "material/module.json"), "utf8")).toBe(JSON.stringify(f.manifest));
   expect(await readFile(join((removal.details as { backup: string }).backup, "data/keep.txt"), "utf8")).toBe("valuable");
 });
 
@@ -90,12 +90,12 @@ test.each(["unknown", "dependency"])("MCP removal rechecks %s after approval", a
   expect(await readFile(join(f.data, "keep.txt"), "utf8")).toBe("valuable");
 });
 
-test("approval restoration rechecks identity and unknown results", async () => {
+test("approval restoration rechecks the approved hash and unknown results", async () => {
   const f = await fixture(), action = await f.approved();
-  await f.db.module.update({ where: { id: f.module.id }, data: { builtin: true } });
-  await expect(removeApproved(f.context, action)).rejects.toMatchObject({ code: "forbidden" });
+  await f.db.module.update({ where: { id: f.module.id }, data: { activeHash: "changed" } });
+  await expect(removeApproved(f.context, action)).rejects.toMatchObject({ code: "conflict" });
   expect(await readFile(join(f.data, "keep.txt"), "utf8")).toBe("valuable");
-  await f.db.module.update({ where: { id: f.module.id }, data: { builtin: false } });
+  await f.db.module.update({ where: { id: f.module.id }, data: { activeHash: f.module.activeHash! } });
   await f.db.moduleInvocation.create({ data: { workspaceId: f.workspace.id, caller: "owner", target: f.module.name, tool: "read", args: {}, key: "unknown", mode: "sync", status: "unknown" } });
   await expect(removeApproved(f.context, action)).rejects.toMatchObject({ code: "conflict" });
   expect((await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).status).toBe("active");
@@ -106,7 +106,7 @@ test("final deletion transaction rechecks associations created during backup", a
   let transactions = 0;
   const db = new Proxy(f.db, { get(target, key, receiver) {
     if (key === "$transaction") return async (callback: (tx: Prisma.TransactionClient) => Promise<unknown>) => {
-      if (++transactions === 2) await f.db.session.create({ data: { workspaceId: f.workspace.id, key: "late", source: "module", moduleId: f.module.id } });
+      if (++transactions === 2) await f.db.moduleInvocation.create({ data: { workspaceId: f.workspace.id, caller: `module:${f.module.id}`, callerModuleId: f.module.id, target: "other", tool: "read", args: {}, key: "late", mode: "async", status: "unknown" } });
       return f.db.$transaction(callback);
     };
     const value = Reflect.get(target, key, receiver);
@@ -119,32 +119,33 @@ test("final deletion transaction rechecks associations created during backup", a
 
 test("ended history and completed calls do not block removal; backup preserves data", async () => {
   const f = await fixture();
-  const history = await f.db.session.create({ data: { workspaceId: f.workspace.id, key: "history", source: "module", moduleId: f.module.id, entryModuleId: f.module.id, status: "ended" } });
+  const history = await f.db.agentContext.create({ data: { workspaceId: f.workspace.id, ownerId: "owner", moduleId: f.module.id, hash: f.module.activeHash!, status: "ended" } });
   await f.db.moduleInvocation.create({ data: { workspaceId: f.workspace.id, caller: `module:${f.module.id}`, callerModuleId: f.module.id, target: "other", tool: "read", args: {}, key: "done", mode: "async", status: "succeeded", reply: true, repliedAt: f.ports.now() } });
   await removeApproved(f.context, await f.approved());
   expect(await f.db.module.findUnique({ where: { id: f.module.id } })).toBeNull();
-  expect(await f.db.session.findUniqueOrThrow({ where: { id: history.id } })).toMatchObject({ moduleId: null, entryModuleId: f.module.id, status: "ended" });
+  expect(await f.db.agentContext.findUniqueOrThrow({ where: { id: history.id } })).toMatchObject({ moduleId: null, status: "ended" });
   const removal = await f.db.audit.findFirstOrThrow({ where: { kind: "module_removed", subjectId: f.module.id } });
+  expect(await readFile(join((removal.details as { backup: string }).backup, "material/module.json"), "utf8")).toBe(JSON.stringify(f.manifest));
   expect(await readFile(join((removal.details as { backup: string }).backup, "data/keep.txt"), "utf8")).toBe("valuable");
 });
 
-test.each(["pi", "web", "notify", "other-entry"])("idle audited Agent context permits removal of %s", async name => {
+test.each(["pi", "web", "notify", "other-entry"])("idle Agent context permits removal of %s and retains stopped history", async name => {
   const f = await fixture(name, true);
-  const session = await f.db.session.create({ data: { workspaceId: f.workspace.id, key: "context", source: "module", moduleId: f.module.id, entryModuleId: f.module.id } });
-  await f.db.agentContext.create({ data: { workspaceId: f.workspace.id, moduleId: f.module.id, sessionId: session.id, hash: "" } });
+  const context = await f.db.agentContext.create({ data: { workspaceId: f.workspace.id, ownerId: "owner", moduleId: f.module.id, hash: f.module.activeHash! } });
+  const run = await f.db.run.create({ data: { workspaceId: f.workspace.id, sessionId: context.id, lane: "foreground", trigger: "module", status: "finished", stopStatus: "confirmed", endedAt: f.ports.now(), provider: "fake", tokenHash: "stopped", prompt: "work", cwd: f.ports.dataDir } });
   await removeApproved(f.context, await f.approved());
-  expect(await f.db.session.findUniqueOrThrow({ where: { id: session.id } })).toMatchObject({ status: "active", moduleId: null });
+  expect(await f.db.agentContext.findUniqueOrThrow({ where: { id: context.id } })).toMatchObject({ moduleId: null });
+  expect(await f.db.run.findUniqueOrThrow({ where: { id: run.id } })).toMatchObject({ sessionId: context.id, status: "finished", stopStatus: "confirmed" });
 });
 
-test.each(["queued", "running", "unknown-stop", "held-directory", "wrong-actor", "wrong-session", "wrong-source", "wrong-module"])("ordinary context removal retains %s guard", async kind => {
+test.each(["queued", "running", "unknown-stop"])("ordinary context removal retains %s guard", async kind => {
   const f = await fixture("web", true);
-  const session = await f.db.session.create({ data: { workspaceId: f.workspace.id, key: "context", source: kind === "wrong-source" ? "cli" : "module", moduleId: kind === "wrong-module" ? null : f.module.id, entryModuleId: f.module.id } });
-  if (kind !== "wrong-session") await f.db.agentContext.create({ data: { workspaceId: f.workspace.id, moduleId: kind === "wrong-actor" ? "other" : f.module.id, sessionId: session.id, hash: "" } });
-  if (["queued", "running", "unknown-stop", "held-directory"].includes(kind)) {
-    const run = await f.db.run.create({ data: { workspaceId: f.workspace.id, sessionId: session.id, lane: "foreground", trigger: "module", status: kind === "queued" || kind === "running" ? kind : "failed", stopStatus: kind === "unknown-stop" ? "unknown" : "pending", error: kind === "unknown-stop" ? "Execution stop is unconfirmed" : null, provider: "fake", tokenHash: "context", prompt: "work", cwd: f.ports.dataDir } });
-    if (kind === "held-directory") await f.db.executionAttempt.create({ data: { workspaceId: f.workspace.id, ownerId: "owner", callerKey: `module:${f.module.id}`, workId: "work", commandKey: "start", requestDigest: "fixture", runId: run.id, moduleId: f.module.id, projectRef: "fixture", projectDigest: "fixture", logDir: f.data, baseline: "fixture", budget: {}, heldDirectory: f.data } });
-  }
+  const context = await f.db.agentContext.create({ data: { workspaceId: f.workspace.id, ownerId: "owner", moduleId: f.module.id, hash: f.module.activeHash! } });
+  const run = await f.db.run.create({ data: { workspaceId: f.workspace.id, sessionId: context.id, lane: "foreground", trigger: "module", status: kind === "unknown-stop" ? "failed" : kind, stopStatus: kind === "unknown-stop" ? "unknown" : "pending", provider: "fake", tokenHash: "context", prompt: "work", cwd: f.ports.dataDir } });
+  await f.db.providerLaunch.create({ data: { runId: run.id, digest: "launched" } });
   await expect(requestRemove(f.context, f.module.id, "remove")).rejects.toMatchObject({ code: "conflict" });
   expect(await f.db.approval.count()).toBe(0);
   expect(await readFile(join(f.data, "keep.txt"), "utf8")).toBe("valuable");
+  expect(await f.db.agentContext.findUnique({ where: { id: context.id } })).not.toBeNull();
+  expect(await f.db.run.findUnique({ where: { id: run.id } })).not.toBeNull();
 });

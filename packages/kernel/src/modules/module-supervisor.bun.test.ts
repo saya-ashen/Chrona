@@ -41,7 +41,7 @@ async function fixture({ shared = false, keepAlive = false, idleMs, listen, uses
   const peer = testModuleProcess(handler), fakeClock = clock();
   let now = 0;
   const ports: StewardPorts = { db, dataDir, now: () => new Date(Date.UTC(2026, 9, 21) + now++), publicUrl: null, sandbox: { available: true, isolated: true, startModule: peer.startModule } };
-  const activation = await db.$transaction(tx => recordModuleActivation(moduleContext(ports, workspace.id), tx, { moduleId: module.id, previousHash: null, hash: "v1", generationId: "fixture" }));
+  const activation = await db.$transaction(tx => recordModuleActivation(moduleContext(ports, workspace.id), tx, { moduleId: module.id, previousHash: null, hash: "v1" }));
   const supervisor = shared ? moduleSupervisor(ports) : createModuleSupervisor(ports, { timers: fakeClock.timers, idleMs });
   let stopErrors: Error[] | undefined;
   cleanups.push(async () => {
@@ -143,7 +143,7 @@ test.each([false, true] as const)("start failure rolls back once before delivery
       const peer = testModuleProcess(async () => ({}));
       return input => input.codeDir.endsWith("/v2") || oldFails ? (() => { throw new Error("synthetic start failure"); })() : peer.startModule(input);
     })() } };
-  const outcome = await db.$transaction(tx => recordModuleActivation(moduleContext(ports, workspace.id), tx, { moduleId: module.id, previousHash: "v1", hash: "v2", generationId: "g-v2" }));
+  const outcome = await db.$transaction(tx => recordModuleActivation(moduleContext(ports, workspace.id), tx, { moduleId: module.id, previousHash: "v1", hash: "v2" }));
   const supervisor = createModuleSupervisor(ports);
   cleanups.push(async () => { await supervisor.stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   await supervisor.reconcile();
@@ -170,7 +170,7 @@ test.each(["handler", "lost"] as const)("post-delivery %s failures never trigger
       });
       return peer.startModule;
     })() } };
-  const outcome = await db.$transaction(tx => recordModuleActivation(moduleContext(ports, workspace.id), tx, { moduleId: module.id, previousHash: "v1", hash: "v2", generationId: "g-v2" }));
+  const outcome = await db.$transaction(tx => recordModuleActivation(moduleContext(ports, workspace.id), tx, { moduleId: module.id, previousHash: "v1", hash: "v2" }));
   const supervisor = createModuleSupervisor(ports);
   cleanups.push(async () => { await supervisor.stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   await expect(supervisor.deliver(module.id, "v2", event)).rejects.toMatchObject({ stage });
@@ -182,7 +182,7 @@ test("failed recovery diagnostics persistence does not convert a successful deli
   let finish!: () => void; const gate = new Promise<void>(resolve => { finish = resolve; });
   const f = await fixture({ handler: async () => { await gate; return {}; } });
   const context = moduleContext(f.ports, f.module.workspaceId);
-  await f.db.$transaction(tx => recordModuleActivation(context, tx, { moduleId: f.module.id, previousHash: null, hash: "v1", generationId: "audit-failure-test" }));
+  await f.db.$transaction(tx => recordModuleActivation(context, tx, { moduleId: f.module.id, previousHash: null, hash: "v1" }));
   const delivery = f.deliver(); await until(() => f.processes.length === 1);
   const rawDb = f.db as unknown as { $transaction: (...args: unknown[]) => unknown };
   const original = rawDb.$transaction;
@@ -198,10 +198,10 @@ test("a successful stale callback after same-hash reactivation cannot verify the
   let finish!: () => void; const gate = new Promise<void>(resolve => { finish = resolve; });
   const f = await fixture({ handler: async () => { await gate; return {}; } });
   const context = moduleContext(f.ports, f.module.workspaceId);
-  const first = await f.db.$transaction(tx => recordModuleActivation(context, tx, { moduleId: f.module.id, previousHash: null, hash: "v1", generationId: "epoch-1" }));
+  const first = await f.db.$transaction(tx => recordModuleActivation(context, tx, { moduleId: f.module.id, previousHash: null, hash: "v1" }));
   await updateModuleEvolution(f.db, { workspaceId: f.module.workspaceId, moduleId: f.module.id, activationId: first.activationId, hash: "v1", status: "failed", now: f.ports.now() });
   const delivery = f.deliver(); await until(() => f.processes.length === 1);
-  const second = await f.db.$transaction(tx => recordModuleActivation(context, tx, { moduleId: f.module.id, previousHash: "v1", hash: "v1", generationId: "epoch-2" }));
+  const second = await f.db.$transaction(tx => recordModuleActivation(context, tx, { moduleId: f.module.id, previousHash: "v1", hash: "v1" }));
   finish(); await delivery;
   const outcomes = await moduleEvolutionOutcomes(f.db, f.module.workspaceId, f.module.id);
   expect(outcomes.find(item => item.activationId === first.activationId)).toMatchObject({ status: "failed", observedCapabilities: [] });
@@ -304,7 +304,7 @@ test("same-hash reactivation starts a fresh failure streak and incident", async 
   await expect(f.deliver()).rejects.toThrow("bad event");
   await expect(f.deliver()).rejects.toThrow("bad event");
   const [old] = await moduleIncidents(f.db, f.module.workspaceId, f.module.id);
-  const next = await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.module.workspaceId), tx, { moduleId: f.module.id, previousHash: "v1", hash: "v1", generationId: "reactivation" }));
+  const next = await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.module.workspaceId), tx, { moduleId: f.module.id, previousHash: "v1", hash: "v1" }));
   await expect(f.deliver()).rejects.toThrow("bad event");
   expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ status: "active" });
   const incidents = await moduleIncidents(f.db, f.module.workspaceId, f.module.id);
@@ -354,7 +354,7 @@ test("one real exit seen by both the socket and process observers counts once", 
   await until(() => f.supervisor.status(f.module.id, "v1", true).state === "backoff");
   await Bun.sleep(60);
   expect(await f.db.moduleRun.count()).toBe(1);
-  expect(await f.db.audit.count({ where: { kind: "module_execution_result" } })).toBe(1);
+  expect(await f.db.audit.count({ where: { kind: "module_execution_result" } })).toBe(0);
   expect(await moduleIncidents(f.db, f.module.workspaceId, f.module.id)).toMatchObject([{ failures: 1, revision: 1 }]);
   expect(await moduleFailurePolicy(f.db, { workspaceId: f.module.workspaceId, moduleId: f.module.id, hash: "v1", activationId: f.activation.activationId })).toMatchObject({ consecutiveFailures: 1 });
 });
@@ -406,7 +406,7 @@ test.each(["same activation", "new hash", "new activation"])("rejected exit reta
     await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash, manifest: f.manifest, source: "user", intent: {}, report: {}, status: "approved" } });
     await f.db.module.update({ where: { id: f.module.id }, data: { activeHash: hash } });
   }
-  if (replacement !== "same activation") await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.module.workspaceId), tx, { moduleId: f.module.id, previousHash: "v1", hash, generationId: replacement }));
+  if (replacement !== "same activation") await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.module.workspaceId), tx, { moduleId: f.module.id, previousHash: "v1", hash }));
   await expect(f.supervisor.deliver(f.module.id, hash, event)).rejects.toMatchObject({ stage: "unavailable", message: unknown.message });
   await expect(f.supervisor.settleModule(f.module.id)).rejects.toBe(unknown);
   await expect(f.supervisor.stop()).rejects.toMatchObject({ name: "AggregateError", errors: [unknown] });
@@ -726,16 +726,15 @@ test("internal delivery fence rejects before execution and never sends an event"
 });
 
 
-test.each(["user", "build", "builtin"])("approved ordinary Pi from %s runs from store without a privileged host binding", async source => {
+test.each(["user", "build"])("approved ordinary Pi from %s runs from store without a privileged host binding", async source => {
   const f = await fixture({ keepAlive: true }), hash = "a".repeat(40);
   const manifest = moduleManifestSchema.parse({ ...f.manifest, name: "pi" });
-  await f.db.module.update({ where: { id: f.module.id }, data: { name: "pi", builtin: false, activeHash: hash } });
+  await f.db.module.update({ where: { id: f.module.id }, data: { name: "pi", activeHash: hash } });
   await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash, manifest, source, status: "approved", intent: {}, report: {} } });
-  await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.module.workspaceId), tx, { moduleId: f.module.id, hash, previousHash: "v1", generationId: "custom" }));
-  f.ports.moduleBuiltinResources = join(f.ports.dataDir, "missing-release");
+  await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.module.workspaceId), tx, { moduleId: f.module.id, hash, previousHash: "v1" }));
   await f.supervisor.reconcile();
   expect(f.processes.map(process => process.input.codeDir)).toEqual([join(f.ports.dataDir, "platform/store", hash)]);
-  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ builtin: false, activeHash: hash, status: "active" });
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ activeHash: hash, status: "active" });
 });
 
 test("audit retention cannot reset activation ownership, failure streak or receipt deduplication", async () => {

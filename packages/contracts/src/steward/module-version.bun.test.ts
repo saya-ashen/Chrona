@@ -1,18 +1,15 @@
 import { expect, test } from "bun:test";
-import { expectedModuleTargetSchema, modulesToolInputSchemas, moduleInstallResultSchema, moduleUpstreamRequestSchema, moduleVersionHashSchema } from "./index";
+import { expectedModuleTargetSchema, modulesToolInputSchemas, moduleInstallResultSchema, moduleVersionHashSchema } from "./index";
 
-test.each([40, 64])("module source versions accept %i hex characters throughout lifecycle inputs", length => {
+test.each([64])("module source versions accept %i hex characters throughout lifecycle inputs", length => {
   const hash = "a".repeat(length);
   expect(moduleVersionHashSchema.parse(hash)).toBe(hash);
   expect(modulesToolInputSchemas.rollback.parse({ moduleId: "example-id", hash, reason: "user selected version" })).toMatchObject({ hash });
   expect(moduleInstallResultSchema.parse({ package: "qq", requestKey: "install", status: "building", moduleId: "module", hash, approvalId: null, error: null }).hash).toBe(hash);
-  expect(moduleUpstreamRequestSchema.parse({ action: "merge", moduleId: "module", commit: "b".repeat(40), baseHash: hash, requestKey: "merge" })).toMatchObject({ baseHash: hash });
 });
 
-test("Git source compatibility preserves module identity and Git commit validation", () => {
-  for (const hash of ["a".repeat(39), "a".repeat(41), "a".repeat(63), "A".repeat(40)]) expect(moduleVersionHashSchema.safeParse(hash).success).toBe(false);
+test("material versions preserve module identity and reject retired Git hashes", () => {
+  for (const hash of ["a".repeat(40), "a".repeat(39), "a".repeat(41), "a".repeat(63), "A".repeat(40)]) expect(moduleVersionHashSchema.safeParse(hash).success).toBe(false);
   expect(expectedModuleTargetSchema.parse({ moduleId: "module" })).toEqual({ moduleId: "module" });
   expect(expectedModuleTargetSchema.safeParse({ moduleId: "module", extra: "obsolete" }).success).toBe(false);
-  expect(moduleUpstreamRequestSchema.safeParse({ action: "status", moduleId: "module" }).success).toBe(true);
-  expect(moduleUpstreamRequestSchema.safeParse({ action: "fetch", moduleId: "module", repository: "https://example.com" }).success).toBe(false);
 });

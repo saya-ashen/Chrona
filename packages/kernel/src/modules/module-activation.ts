@@ -1,15 +1,15 @@
-import { fenceExecutionVersionChange } from "../execution/execution-delivery-controls";
+import { fenceAgentVersionChange } from "../agent/module-drain";
 import { join } from "node:path";
 import type { Prisma } from "@chrona/db";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { createApprovals } from "../approvals";
 import type { ApprovedAction } from "../ports";
 import { StewardError } from "../errors";
-import { assertDynamicModuleActivation, expireModuleApprovals, isGroupPayload, requireModule, type ModuleContext } from "./module-context";
+import { assertDynamicModuleActivation, expireModuleApprovals, requireModule, type ModuleContext } from "./module-context";
 import { dataEmpty, snapshotAt, type Restore } from "./module-data";
 import { activateIn, startMigration } from "./module-generation";
 import { migrateData } from "./module-migration";
-import { activateFixedCandidateApprovedIn, activateGroupIn } from "./module-group";
+import { assertCandidateVersionIn, setCandidateSetStateIn } from "./module-candidate-records";
 import { removeApproved } from "./module-remove";
 import { moduleRemovePayloadSchema } from "./module-remove-payload";
 import { assertExternalModule } from "./module-identity";
@@ -39,8 +39,10 @@ async function prepareApproved(context: ModuleContext, tx: Prisma.TransactionCli
   await checkApproval(context, tx, action, module.id);
   if (module.activeHash === hash) return null;
   const version = await approvedVersion(tx, moduleId, hash, restore);
+  const receipt = restore ? null : await assertCandidateVersionIn(context, tx, version);
+  if (receipt && (receipt.state !== "pending_approval" || receipt.approvalId !== action.approvalId)) throw new StewardError("conflict", "Approval does not bind this fixed receipt");
   if (!restore) await assertExactReleaseUpdateIn(context, tx, moduleId, version.report as BuildReport, module);
-  await assertDynamicModuleActivation(tx, context.workspaceId, moduleId, { hash });
+  await assertDynamicModuleActivation(tx, context.workspaceId, moduleId);
   const manifest = moduleManifestSchema.parse(version.manifest), from = module.dataSchema, to = manifest.data.schema;
   if (restore && (restore.schema !== to || await snapshotAt(context, moduleId, to) !== restore.snapshotAt)) throw new StewardError("conflict", "Module restore snapshot is missing or changed");
   if (restore || (from !== null && to > from && !await dataEmpty(join(context.platform, "data", moduleId)))) {
@@ -50,20 +52,19 @@ async function prepareApproved(context: ModuleContext, tx: Prisma.TransactionCli
   await tx.moduleVersion.update({ where: { id: version.id }, data: { status: "approved" } });
   await tx.module.update({ where: { id: moduleId }, data: { dataSchema: to } });
   await activateIn(context, tx, { moduleId, hash, reason: "activate" });
+  if (receipt) await setCandidateSetStateIn(context, tx, receipt, "approved", action.approvalId);
   return null;
 }
 export async function activateApprovedIn(context: ModuleContext, tx: Prisma.TransactionClient, action: ApprovedAction) {
   const payload = action.payload;
   if (!payload || typeof payload !== "object" || Array.isArray(payload) || payload.kind !== "activate_module") return;
   if (action.workspaceId !== context.workspaceId || typeof payload.moduleId !== "string" || typeof payload.hash !== "string") throw new StewardError("invalid", "Invalid module approval");
-  if (await activateFixedCandidateApprovedIn(context, tx, action)) return;
   const { moduleId, hash } = payload, restore = parseRestore(payload.restore);
   return prepareApproved(context, tx, action, { moduleId, hash, restore });
 }
 function approvalVersions(payload: ApprovedAction["payload"]) {
-  const group = isGroupPayload(payload) ? payload as { versions: { moduleId: string; hash: string }[] } : null;
   const single = payload as { kind?: string; moduleId?: string; hash?: string } | null;
-  return group?.versions ?? (single?.kind === "activate_module" && single.moduleId && single.hash ? [{ moduleId: single.moduleId, hash: single.hash }] : []);
+  return (single?.kind === "activate_module" && single.moduleId && single.hash ? [{ moduleId: single.moduleId, hash: single.hash }] : []);
 }
 export async function onApproved(context: ModuleContext, action: ApprovedAction) {
   await applyApproved(context, action);
@@ -75,12 +76,15 @@ async function applyApproved(context: ModuleContext, action: ApprovedAction) {
   const versions = approvalVersions(action.payload);
   for (const target of versions) {
     const version = await context.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: target.moduleId, hash: target.hash } } });
-    await fenceExecutionVersionChange(context.ports, context.workspaceId, target.moduleId, target.hash,
+    await fenceAgentVersionChange(context.ports, context.workspaceId, target.moduleId, target.hash,
       version?.status === "pending_review"
-        ? (tx, current) => assertExactReleaseUpdateIn(context, tx, target.moduleId, version.report as BuildReport, current)
+        ? async (tx, current) => {
+          const receipt = await assertCandidateVersionIn(context, tx, version);
+          if (receipt && receipt.approvalId !== action.approvalId) throw new StewardError("conflict", "Approval does not bind this fixed receipt");
+          await assertExactReleaseUpdateIn(context, tx, target.moduleId, version.report as BuildReport, current);
+        }
         : undefined);
   }
-  if (isGroupPayload(action.payload)) { await context.db.$transaction(tx => activateGroupIn(context, tx, action)); return; }
   if (moduleRemovePayloadSchema.safeParse(action.payload).success) { await removeApproved(context, action); return; }
   const prepared = await context.db.$transaction(tx => activateApprovedIn(context, tx, action));
   if (!prepared) return;
@@ -95,7 +99,7 @@ async function prepareRollback(context: ModuleContext, tx: Prisma.TransactionCli
   const manifest = moduleManifestSchema.parse(version.manifest), from = module.dataSchema, to = manifest.data.schema;
   if (await dataEmpty(join(context.platform, "data", moduleId)) || to === from) {
     await tx.module.update({ where: { id: moduleId }, data: { dataSchema: to } });
-    return { generation: await activateIn(context, tx, { moduleId, hash, reason: "rollback" }) };
+    return { activation: await activateIn(context, tx, { moduleId, hash, reason: "rollback" }) };
   }
   if (from !== null && to < from) {
     const at = await snapshotAt(context, moduleId, to);
@@ -109,7 +113,7 @@ export async function rollback(context: ModuleContext, moduleId: string, hash: s
   await assertExternalModule(context.db, context.workspaceId, moduleId, "rollback");
   const version = await context.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash } } });
   if (!version || version.status !== "approved") throw new StewardError("conflict", "Module version is not approved");
-  await fenceExecutionVersionChange(context.ports, context.workspaceId, moduleId, hash);
+  await fenceAgentVersionChange(context.ports, context.workspaceId, moduleId, hash);
   const prepared = await context.db.$transaction(tx => prepareRollback(context, tx, moduleId, hash));
   if (prepared.restore) {
     await expireModuleApprovals(context, moduleId);

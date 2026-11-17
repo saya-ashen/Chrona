@@ -6,8 +6,8 @@ import { StewardError } from "../errors";
 import { audit } from "../audit";
 import { CallError, callSync, listSystemModules, type SystemTool } from "./module-calls";
 
-/** Tools belong to the workspace; session focus controls only catalog exposure. `audience` is who will call them. */
-type Scope = { workspaceId: string; sessionId?: string | null; audience?: "provider" | "owner" | "modules" };
+/** Tools belong to the workspace; `audience` determines visibility. */
+type Scope = { workspaceId: string; audience?: "provider" | "owner" | "modules" };
 type Entry = { name: string; module: { id: string; name: string; activeHash: string | null }; manifest: { description?: string; tools: (SystemTool | ModuleTool)[] }; tool: SystemTool | ModuleTool; direct: boolean; system?: true };
 /** Chrona's own interfaces visible to the audience (v2-13): always direct, few, and part of how the Provider works. */
 function systemEntries(audience: "provider" | "owner" | "modules"): Entry[] {
@@ -17,10 +17,9 @@ function systemEntries(audience: "provider" | "owner" | "modules"): Entry[] {
       manifest: { tools: visible }, tool, direct: true, system: true as const }));
   });
 }
-async function addModuleTools(ports: StewardPorts, modules: Awaited<ReturnType<StewardPorts["db"]["module"]["findMany"]>>, audience: "provider" | "owner" | "modules", focus: unknown[], catalog: { tools: Entry[]; names: Set<string>; toolsets: Set<string> }) {
+async function addModuleTools(ports: StewardPorts, modules: Awaited<ReturnType<StewardPorts["db"]["module"]["findMany"]>>, audience: "provider" | "owner" | "modules", catalog: { tools: Entry[]; names: Set<string>; toolsets: Set<string> }) {
   const { db } = ports, { tools, names, toolsets } = catalog;
   for (const module of modules) {
-
     // One toolset per module name, like one MCP server per name.
     if (toolsets.has(module.name)) continue;
     const version = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } });
@@ -33,18 +32,16 @@ async function addModuleTools(ports: StewardPorts, modules: Awaited<ReturnType<S
       const name = `m_${module.name.replaceAll("-", "_")}_${tool.name.replaceAll("-", "_")}`;
       if (name.length > 64 || names.has(name)) continue;
       names.add(name);
-      tools.push({ name, module, manifest: { ...parsed.data, tools: visible }, tool, direct: focus.includes(module.name) });
+      tools.push({ name, module, manifest: { ...parsed.data, tools: visible }, tool, direct: false });
     }
   }
 }
 /** System tools visible to the audience (v2-13), then the workspace's active module tools it may call, ordered deterministically. */
 export async function moduleTools(ports: StewardPorts, scope: Scope): Promise<Entry[]> {
-  const { db } = ports, { workspaceId, sessionId, audience = "provider" } = scope;
-  const session = sessionId ? await db.session.findFirst({ where: { id: sessionId, workspaceId } }) : null;
-  const focus = Array.isArray(session?.focus) ? session.focus : [];
+  const { db } = ports, { workspaceId, audience = "provider" } = scope;
   const modules = await db.module.findMany({ where: { workspaceId, status: "active", activeHash: { not: null } }, orderBy: [{ name: "asc" }, { id: "asc" }] });
   const tools = systemEntries(audience), names = new Set(tools.map(tool => tool.name)), toolsets = new Set<string>();
-  await addModuleTools(ports, modules, audience, focus, { tools, names, toolsets });
+  await addModuleTools(ports, modules, audience, { tools, names, toolsets });
   return tools;
 }
 type Resolved = Awaited<ReturnType<typeof moduleTools>>[number];
@@ -62,7 +59,7 @@ export function catalogEntry(resolved: Resolved) {
     idempotent: tool.idempotent,
     retry: tool.idempotent ? "May be redelivered after an unknown async outcome; target declares idempotent." : "Unknown async outcomes are not redelivered automatically." };
 }
-/** Focused tools are direct; all others are deferred and grouped per module. */
+/** Application tools are deferred; Agent admission selects direct tools for each Run. */
 export async function moduleToolCatalog(ports: StewardPorts, scope: Scope) {
   return (await moduleTools(ports, scope)).map(catalogEntry);
 }
@@ -88,7 +85,7 @@ async function callSystemTool(ports: StewardPorts, caller: { workspaceId: string
   }
 }
 /** Runs a workspace-owned module tool for a Provider run or the owner (`via`: the entry module that relayed an owner request). */
-export async function callModuleTool(ports: StewardPorts, caller: Omit<Scope, "audience"> & { runId: string | null; via?: string | null; deadline?: number; key?: string }, name: string, raw: unknown) {
+export async function callModuleTool(ports: StewardPorts, caller: Omit<Scope, "audience"> & { sessionId?: string | null; runId: string | null; via?: string | null; deadline?: number; key?: string }, name: string, raw: unknown) {
   const audience = caller.runId ? "provider" as const : "owner" as const;
   const resolved = (await moduleTools(ports, { ...caller, audience })).find(tool => tool.name === name);
   if (!resolved) throw new StewardError("not_found", "Module tool not found");

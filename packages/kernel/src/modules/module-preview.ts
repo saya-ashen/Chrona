@@ -1,23 +1,5 @@
-import { readFile, readdir } from "node:fs/promises";
-import { join } from "node:path";
-import { StewardError } from "../errors";
 import type { ContinuityReport } from "./module-context";
-import { INSTALLED_DIRS } from "./module-files";
 
-export async function readModuleFiles(root: string, unsafe: string) {
-  const files: { path: string; bytes: Buffer }[] = [];
-  async function walk(relative: string): Promise<void> {
-    for (const entry of await readdir(join(root, relative), { withFileTypes: true })) {
-      if (!relative && INSTALLED_DIRS.has(entry.name)) continue;
-      const path = relative ? `${relative}/${entry.name}` : entry.name;
-      if (entry.isDirectory()) await walk(path);
-      else if (entry.isFile()) files.push({ path, bytes: await readFile(join(root, path)) });
-      else throw new StewardError("forbidden", unsafe);
-    }
-  }
-  await walk("");
-  return files;
-}
 function lcsTable(a: string[], b: string[]) {
   const width = b.length + 1, lcs = new Uint32Array((a.length + 1) * width);
   for (let i = a.length - 1; i >= 0; i--) for (let j = b.length - 1; j >= 0; j--) {
@@ -82,7 +64,7 @@ export function codeDifference(activeFiles: { path: string; bytes: Buffer }[], f
   return code.join("\n") + "\n";
 }
 export function continuityPreview(continuity: ContinuityReport, needsMigration: boolean) {
-  return `数据 schema：${continuity.fromSchema ?? "null"} → ${continuity.toSchema}；${needsMigration ? "需要迁移" : "无需迁移"}\n连续性：${continuity.status}${continuity.reason ? ` (${continuity.reason})` : ""}\n在数据副本上运行模块自带测试，不调用业务工具。\n`;
+  return `数据 schema：${continuity.fromSchema ?? "null"} → ${continuity.toSchema}；${needsMigration ? "需要迁移" : "无需迁移"}\n连续性：${continuity.status}${continuity.reason ? ` (${continuity.reason})` : ""}\n应用测试由应用仓执行；数据迁移在批准后备份并执行。\n`;
 }
 export function insertCodeDiff(prefix: string, suffix: string, codeDiff: string, hash: string, limit = 20_000) {
   const available = limit - (prefix.length + suffix.length);

@@ -41,7 +41,7 @@ async function read(ports: StewardPorts, principal: ModulePrincipal, args: Retur
     try {
       const binding = await runProviderBinding(ports, principal.workspaceId, run.id), declaration = providerSnapshot(binding.declaration);
       if (declaration.endpoints.transcript) {
-        const raw = await callProviderEndpoint(ports, principal.workspaceId, binding, "transcript", { sessionDir: join(run.cwd, ".chrona", "sessions"), limit: args.limit });
+        const raw = await callProviderEndpoint(ports, principal.workspaceId, binding, "transcript", { sessionDir: join(ports.dataDir, "sessions", run.sessionId!, ".chrona", "sessions"), limit: args.limit });
         // A normalized conversation is a collection of messages, not a native RPC reply.
         // Keep its complete bounded transcript below the 32 MiB module transport envelope.
         transcript = runtimeTranscriptSchema.parse(maskProviderPayload(runtimeTranscriptSchema.parse(raw), [], 16 * 1024 * 1024));
@@ -100,7 +100,10 @@ export const agent: SystemModule = {
         if (handle) await handle.abort();
         else if (await ports.db.providerLaunch.findUnique({ where: { runId: args.runId } })) await callProviderEndpoint(ports, workspaceId, binding, "abort", { operationId: args.runId }, `provider-stop:${args.runId}:${call.key}`);
         await admitContextPrimitive(ports, principal, "interrupt", command, true);
-        const status = await callProviderEndpoint(ports, workspaceId, binding, "status", { operationId: args.runId }).catch(() => null);
+        const status = await callProviderEndpoint(ports, workspaceId, binding, "status", { operationId: args.runId }).catch(error => {
+          console.error(JSON.stringify({ component: "agent", event: "stop_status.failed", runId: args.runId, error: String(error) }));
+          return null;
+        });
         await finishRunFromProviderStatus(ports, workspaceId, args.runId, status);
       }
       const current = await ownedRun(ports.db, principal, args.runId);

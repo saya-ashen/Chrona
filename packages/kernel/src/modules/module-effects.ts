@@ -1,6 +1,5 @@
 import { currentCallerManifest } from "./module-owner";
 import { publicCallError, publicCallReason } from "./module-call-error";
-import { z } from "zod";
 import type { Prisma } from "@chrona/db";
 import { type ModuleCall, type moduleCallReplySchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "../ports";
@@ -11,9 +10,7 @@ import { moduleContext } from "./module-context";
 import { moduleIncidents } from "./module-diagnostics";
 import { pauseIn } from "./module-status";
 import { moduleFailurePolicy } from "./module-failure-policy";
-import { fenceExecutionModuleIn } from "../execution/execution-delivery-controls";
-import { liveRuns } from "../execution/run-live";
-import { EXECUTION_DELIVERY_CARRIER, callExecutionDeliveryCarrier } from "../execution/execution-delivery-carrier";
+import { fenceAgentModuleIn, abortDrainedAgentRuns } from "../agent/module-drain";
 export type { CallScope } from "./module-supervisor";
 
 type ModuleExecution = { workspaceId: string; moduleId: string; hash: string; activationId: string | null; triggerId: string; firedAt: Date };
@@ -40,11 +37,6 @@ async function recordRejectedCall(ports: StewardPorts, data: Prisma.ModuleCallUn
 async function routedCall(ports: StewardPorts, scope: CallScope, call: Extract<ModuleCall, { method: "call" }>): Promise<Reply> {
   const { args, mode, key, reply, timeoutMs, expectedTarget } = call.params, target = call.params.target;
   try {
-    if (target === EXECUTION_DELIVERY_CARRIER) {
-      if (mode !== "sync") throw new CallError("invalid", "Execution delivery carrier requires a synchronous call");
-      const output = z.json().parse(await callExecutionDeliveryCarrier(ports, scope, args));
-      return { id: call.id, result: { output } };
-    }
     if (mode === "sync") {
       const result = await callSync(ports, originOf(scope), target, args, { timeoutMs, expectedTarget, key });
       return { id: call.id, result: { output: result.output } };
@@ -75,11 +67,11 @@ export async function pauseFailedModule(ports: StewardPorts, execution: ModuleEx
     await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${workspaceId}`;
     const module = await tx.module.findFirst({ where });
     if (!module || !activationId || !(await moduleFailurePolicy(tx, execution))?.shouldPause) return null;
-    const drain = await fenceExecutionModuleIn(ports, tx, workspaceId, moduleId);
+    const drain = await fenceAgentModuleIn(ports, tx, workspaceId, moduleId);
     return { ...drain, receiverActivationId: module.activationId };
   });
   if (!fenced) return;
-  for (const id of fenced.localRunIds) await liveRuns.get(id)?.abort().catch(() => {});
+  await abortDrainedAgentRuns(ports, workspaceId, fenced.runIds);
   await ports.db.$transaction(async tx => {
     await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${workspaceId}`;
     const module = await tx.module.findFirst({ where: { ...where, activationId: fenced.receiverActivationId } });

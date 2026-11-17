@@ -1,5 +1,4 @@
 export { createStewardService } from "./runtime/service";
-export { createRegisteredProviderClient } from "./agent/agent-client";
 export { stopAgentRuns } from "./execution/local-runtime";
 export { createTools } from "./tools";
 export type { ApprovedAction, OnApproved } from "./ports";

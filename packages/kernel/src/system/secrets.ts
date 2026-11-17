@@ -72,7 +72,18 @@ export const secrets: SystemModule = {
 async function readSecret(ports: StewardPorts, store: ReturnType<typeof createSecrets>, manifest: ModuleManifest | null, secret: string) {
   if (!manifest || !secretNames(manifest).includes(secret)) throw new CallError("forbidden", "Secret not declared");
   // User-saved credentials take precedence over optional host-private defaults for any declared name.
-  const value = await store.read(secret).then(value => value ?? ports.secrets?.(secret)).catch(() => null);
+  let source = "saved";
+  const value = await store.read(secret).then(value => {
+    if (value) return value;
+    source = "host";
+    return ports.secrets?.(secret);
+  }).catch(error => {
+    const code = (error as NodeJS.ErrnoException | null)?.code;
+    const reason = error instanceof SyntaxError ? "invalid_json"
+      : error instanceof Error && ["Unsafe secret file", "Unsafe secrets directory", "Unsafe data directory", "Invalid secret file", "Invalid secret id"].includes(error.message) ? error.message : "credential_read_failed";
+    console.error(JSON.stringify({ component: "secrets", event: "read.failed", source, error: { reason, code: ["EACCES", "EPERM", "ELOOP", "EIO", "ENOENT", "ENOTDIR"].includes(code ?? "") ? code : undefined } }));
+    return null;
+  });
   if (!value) throw new CallError("unavailable", "Secret not configured");
   // Refresh tokens the kernel manages stay in the kernel (v2-30 §4); modules get access tokens from secrets.token.
   return json({ value: Object.fromEntries(Object.entries(value).filter(([field]) => !hiddenField(field, value))) });

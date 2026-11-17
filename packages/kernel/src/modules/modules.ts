@@ -1,9 +1,7 @@
-import { fenceExecutionModule, fenceExecutionVersionChange } from "../execution/execution-delivery-controls";
+import { fenceAgentModule, fenceAgentVersionChange } from "../agent/module-drain";
 import { z } from "zod";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { assertExternalModule, moduleIdentity } from "./module-identity";
-import { moduleUpstream } from "./module-upstream";
-import { moduleUpstreamRequestSchema } from "@chrona/contracts/steward";
 import { installExternal, externalPackageCatalog, refreshInstallationReceipts, rejectionSummary } from "./module-install";
 import { moduleSupervisor } from "./module-supervisor";
 import type { StewardPorts } from "../ports";
@@ -100,7 +98,7 @@ export async function moduleHealthSummary(ports: StewardPorts, workspaceId: stri
 async function list(context: ModuleContext, position?: { after?: string; limit: number }) {
   const { db, workspaceId } = context;
   const rows = await db.module.findMany({ where: { workspaceId, ...(position?.after ? { id: { gt: position.after } } : {}) }, ...(position ? { take: position.limit + 1 } : {}), orderBy: { id: "asc" }, select: {
-    id: true, name: true, builtin: true, status: true, activeHash: true,
+    id: true, name: true, status: true, activeHash: true,
   } });
   // Nested relation take is applied by Prisma after reading all parents' history.
   // Query each parent's indexed tail so LIMIT is enforced by SQLite.
@@ -113,12 +111,12 @@ async function list(context: ModuleContext, position?: { after?: string; limit: 
       row.activeHash ? db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: row.id, hash: row.activeHash } }, select: { manifest: true } }) : null,
     ]);
     const manifest = moduleManifestSchema.safeParse(active?.manifest).data;
-    return { id: row.id, name: row.name, builtin: row.builtin, status: row.status, activeHash: row.activeHash, ...moduleIdentity(row), description: manifest?.description ?? null,
+    return { id: row.id, name: row.name, status: row.status, activeHash: row.activeHash, ...moduleIdentity(row), description: manifest?.description ?? null,
       health: await moduleHealthSummary(context.ports, workspaceId, row, active),
       versions: versions.map(({ report, ...version }) => {
-        const metadata = z.object({ errors: z.array(z.string()).optional(), git: z.object({ commit: z.string().regex(/^[a-f0-9]{40}$/), tree: z.string().regex(/^[a-f0-9]{40}$/) }).optional() }).safeParse(report).data;
+        const metadata = z.object({ errors: z.array(z.string()).optional() }).safeParse(report).data;
         const errors = metadata?.errors?.length ? metadata.errors : metadata && version.status === "rejected" ? [rejectionSummary(report)] : null;
-        return { ...version, errors: errors?.slice(0, 5).map(error => diagnosticText(error, 300).slice(0, 300)) ?? null, git: metadata?.git ?? null };
+        return { ...version, errors: errors?.slice(0, 5).map(error => diagnosticText(error, 300).slice(0, 300)) ?? null };
       }),
       runs: runs.map(run => ({ ...run, error: run.error === null ? null : diagnosticText(run.error, 1000).slice(0, 1000) })),
     };
@@ -131,9 +129,9 @@ async function checkout(context: ModuleContext, moduleId: string, hash: string |
   const files = await readVersionMaterial(context, moduleId, selected);
   await checkoutModule(root, dir, files);
 }
-/** Approvals the module system carries out (activation, groups, removal); every path that resolves approvals must route these here. */
+/** Approvals the module system carries out (activation, removal); every path that resolves approvals must route these here. */
 export const isModuleApproval = (payload: unknown) => !!payload && typeof payload === "object" && !Array.isArray(payload)
-  && ["activate_module", "activate_modules", "module_remove"].includes(String((payload as { kind?: unknown }).kind));
+  && ["activate_module", "module_remove"].includes(String((payload as { kind?: unknown }).kind));
 export function createModules(ports: StewardPorts, workspaceId: string) {
   const context = moduleContext(ports, workspaceId);
   async function reconcile<T>(operation: Promise<T>) {
@@ -147,27 +145,26 @@ export function createModules(ports: StewardPorts, workspaceId: string) {
     }
   }
   return {
-    upstream: (request: z.input<typeof moduleUpstreamRequestSchema>) => moduleUpstream(ports, workspaceId, moduleUpstreamRequestSchema.parse(request)),
     propose: (input: Parameters<typeof propose>[1], source: ModuleSource) => propose(context, input, source),
     buildPending: (now = ports.now()) => reconcile(buildPending(context, now)),
     recoverMigrations: (now = ports.now()) => reconcile(recoverMigrations(context, now)),
     activate: (moduleId: string, hash: string, reason: "activate" | "rollback") => reconcile((async () => {
       await assertExternalModule(ports.db, workspaceId, moduleId, reason);
       if (!await ports.db.moduleVersion.findFirst({ where: { moduleId, hash, status: "approved" } })) throw new StewardError("conflict", "Module version is not approved");
-      await fenceExecutionVersionChange(ports, workspaceId, moduleId, hash);
+      await fenceAgentVersionChange(ports, workspaceId, moduleId, hash);
       return ports.db.$transaction(tx => activateIn(context, tx, { moduleId, hash, reason }));
     })()),
     install: (request: Parameters<typeof installExternal>[2]) => installExternal(ports, workspaceId, request),
     catalog: () => externalPackageCatalog(ports, workspaceId),
     onApproved: (action: ApprovedAction) => reconcile(onApproved(context, action)),
     rollback: (moduleId: string, hash: string) => reconcile(rollback(context, moduleId, hash)),
-    disable: (moduleId: string, source: "cli") => reconcile((async () => { await fenceExecutionModule(ports, workspaceId, moduleId); return ports.db.$transaction(tx => setStatusIn(context, tx, moduleId, "paused", source)); })()),
+    disable: (moduleId: string, source: "cli") => reconcile((async () => { await fenceAgentModule(ports, workspaceId, moduleId); return ports.db.$transaction(tx => setStatusIn(context, tx, moduleId, "paused", source)); })()),
     /** v2-26 `modules.rollback/disable/enable/remove`: the user pauses or resumes directly; Chrona (the Provider) only asks, and the user decides once; removing always asks (red). */
     lifecycle: (name: string, moduleId: string, args: Record<string, unknown>, asUser: boolean) => {
       if (name === "rollback") return reconcile(rollback(context, moduleId, String(args.hash)));
       if (name === "remove") return requestRemove(context, moduleId, String(args.reason ?? ""));
       const status = name === "disable" ? "paused" : "active";
-      return asUser ? reconcile((async () => { if (status === "paused") await fenceExecutionModule(ports, workspaceId, moduleId); return ports.db.$transaction(tx => setStatusIn(context, tx, moduleId, status, { source: "owner", reason: String(args.reason ?? "owner") })); })()) : requestStatus(context, moduleId, status, String(args.reason ?? ""));
+      return asUser ? reconcile((async () => { if (status === "paused") await fenceAgentModule(ports, workspaceId, moduleId); return ports.db.$transaction(tx => setStatusIn(context, tx, moduleId, status, { source: "owner", reason: String(args.reason ?? "owner") })); })()) : requestStatus(context, moduleId, status, String(args.reason ?? ""));
     },
     list: (position?: { after?: string; limit: number }) => list(context, position),
     health: async (input: { open?: boolean; cursor?: string } = {}, targets?: string[]) => {

@@ -2,22 +2,49 @@
   "version": 1,
   "runtimes": [
     {
-      "extensions": [".ts"],
-      "programs": { "default": ["bun"] },
-      "argv": ["--no-install"],
+      "extensions": [
+        ".ts"
+      ],
+      "programs": {
+        "default": [
+          "bun"
+        ]
+      },
+      "argv": [
+        "--no-install"
+      ],
       "sdk": true,
-      "preload": "chrona-sdk-loader.ts",
-      "check": { "programs": { "default": ["bun"] }, "argv": ["--no-install", "{typecheck}/check.ts", "{module}", "{sdk}"] }
+      "preload": "chrona-sdk-loader.ts"
     },
     {
-      "extensions": [".py"],
-      "programs": { "default": ["python3", "python"], "win32": ["python", "py"] },
+      "extensions": [
+        ".py"
+      ],
+      "programs": {
+        "default": [
+          "python3",
+          "python"
+        ],
+        "win32": [
+          "python",
+          "py"
+        ]
+      },
       "argv": [],
-      "venv": { "default": ".venv/bin/python", "win32": ".venv/Scripts/python.exe" }
+      "venv": {
+        "default": ".venv/bin/python",
+        "win32": ".venv/Scripts/python.exe"
+      }
     },
     {
-      "extensions": [".sh"],
-      "programs": { "default": ["sh"] },
+      "extensions": [
+        ".sh"
+      ],
+      "programs": {
+        "default": [
+          "sh"
+        ]
+      },
       "argv": []
     }
   ]

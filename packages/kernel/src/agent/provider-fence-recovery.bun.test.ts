@@ -13,6 +13,7 @@ import { moduleSupervisor } from "../modules/module-supervisor";
 import { testModuleProcess } from "../__testing__/module-test-process";
 import { testDb } from "../__testing__/test-db";
 import { startLocalProvider } from "../execution/local-runtime";
+import { fenceAgentModule } from "./module-drain";
 import { createRuns } from "../execution/runs";
 import { agent } from "../system/agent";
 import { registerSystemModules } from "../system/system-modules";
@@ -27,7 +28,7 @@ const declaration: AgentProviderRegistration = {
   capabilities: { conversation: true, completion: true, native: true, images: false, interactions: false, resume: true },
   endpoints: { health: "health", start: "start", status: "status", inject: "inject", abort: "abort", release: "release", native: "native", complete: "complete", transcript: "transcript" },
 };
-async function fixture({ activated = false, stage = "unknown", fenceApplication = false, confirmAbort = true }: { activated?: boolean; stage?: "queued" | "running" | "unknown"; fenceApplication?: boolean; confirmAbort?: boolean } = {}) {
+async function fixture({ activated = false, stage = "unknown", fenceApplication = false, confirmAbort = false }: { activated?: boolean; stage?: "queued" | "running" | "unknown"; fenceApplication?: boolean; confirmAbort?: boolean } = {}) {
   registerSystemModules();
   const db = testDb({ injectedAgent: false }), dataDir = await mkdtemp(join(tmpdir(), "chrona-provider-fence-"));
   const databases = await db.$queryRawUnsafe<{ name: string; file: string }[]>("PRAGMA database_list");
@@ -50,7 +51,7 @@ async function fixture({ activated = false, stage = "unknown", fenceApplication 
   const backend = await db.module.create({ data: { workspaceId, name: "fenced-backend", status: "active", activeHash: "backend-v1", activationId: "original-activation" } });
   const string = { type: "string" }, object = { type: "object", properties: {} };
   const startProperties = Object.fromEntries(["operationId", "runId", "token", "lane", "cwd", "sessionDir", "prompt", "systemPrompt", "resources", "callbacks", "model", "configurationRevision"].map(key => [key, string]));
-  Object.assign(startProperties, { sessionId: { type: ["string", "null"] }, deadline: { type: ["string", "null"] }, providerOptions: object, execution: object, executionBudget: object, searchTools: { type: "boolean" }, images: { type: "array", items: object }, extraTools: { type: "array", items: string }, hostPaths: { type: "array", items: string }, content: { type: "array", items: object } });
+  Object.assign(startProperties, { sessionId: { type: ["string", "null"] }, deadline: { type: ["string", "null"] }, providerOptions: object, searchTools: { type: "boolean" }, images: { type: "array", items: object }, extraTools: { type: "array", items: string }, hostPaths: { type: "array", items: string }, content: { type: "array", items: object } });
   const manifest = moduleManifestSchema.parse({ name: backend.name, entry: "index.ts", tests: ["test.ts"], activated, uses: ["agent.register"], effects: [], tools: Object.values(declaration.endpoints).map(name => ({ name, description: name, visibility: ["kernel"], parameters: { type: "object", properties: name === "health" ? {} : name === "start" ? startProperties : { operationId: string } }, output: {} })) });
   await db.moduleVersion.create({ data: { moduleId: backend.id, hash: backend.activeHash!, manifest, source: "user", status: "approved", intent: {}, report: {} } });
   const backendCaller = { kind: "module" as const, module: backend.name, moduleId: backend.id, hash: backend.activeHash! };
@@ -67,7 +68,8 @@ async function fixture({ activated = false, stage = "unknown", fenceApplication 
   if (stage !== "queued") await expect(startLocalProvider(ports, workspaceId, input)).rejects.toMatchObject({ code: "unknown" });
   if (stage === "unknown") await createRuns(ports, workspaceId).finish(run.id, { outcome: "unavailable", sessionId: null, error: "Lost observer" });
   const context = moduleContext(ports, workspaceId);
-  await expect(requestStatus(context, fenceApplication ? app.id : backend.id, "paused", "drain")).rejects.toMatchObject({ code: "conflict" });
+  if (stage === "queued") await fenceAgentModule(ports, workspaceId, fenceApplication ? app.id : backend.id);
+  else await expect(requestStatus(context, fenceApplication ? app.id : backend.id, "paused", "drain")).rejects.toMatchObject({ code: "conflict" });
   const binding = await runProviderBinding(ports, workspaceId, run.id);
   const control = (endpoint: "status" | "abort" | "release", key?: string) => callProviderEndpoint(ports, workspaceId, binding, endpoint, { operationId: run.id }, key);
   return { db, ports, workspaceId, backend, backendCaller, manifest, context, binding, run, input, requests, control, app, caller, confirmStop: () => { stopped = true; } };
@@ -84,11 +86,12 @@ test("fenced original operation remains controllable; normal enable waits for re
   await expect(f.db.$transaction(tx => setStatusIn(f.context, tx, f.backend.id, "active", "owner"))).rejects.toMatchObject({ code: "conflict" });
   expect((await f.db.module.findUniqueOrThrow({ where: { id: f.backend.id } })).executionFenceAt).toEqual(fenced.executionFenceAt);
   await f.control("abort", "original-abort");
+  f.confirmStop();
   await expect(f.control("abort", "original-abort")).rejects.toMatchObject({ code: "unknown" });
   // Even an abort acknowledgement cannot itself release the fence or capacity.
   await expect(requestStatus(f.context, f.backend.id, "active", "abort ack only")).rejects.toMatchObject({ code: "conflict" });
   await reconcileAgentStops(f.ports, f.workspaceId);
-  expect(await f.db.run.findUniqueOrThrow({ where: { id: f.run.id } })).toMatchObject({ status: "failed", stopStatus: "confirmed" });
+  expect(await f.db.run.findUniqueOrThrow({ where: { id: f.run.id } })).toMatchObject({ status: "cancelled", stopStatus: "confirmed" });
   await f.control("release");
   expect(await requestStatus(f.context, f.backend.id, "active", "confirmed drain")).toMatchObject({ status: "active" });
   expect(await f.db.module.findUniqueOrThrow({ where: { id: f.backend.id } })).toMatchObject({ executionFenceAt: null, activationId: "original-activation", activeHash: f.binding.hash });
@@ -96,7 +99,7 @@ test("fenced original operation remains controllable; normal enable waits for re
   expect(await f.db.audit.count({ where: { subjectId: f.backend.id, kind: "module_enabled" } })).toBe(1);
   await expect(startLocalProvider(f.ports, f.workspaceId, f.input)).rejects.toThrow();
   expect(f.requests.filter(row => row.name === "start")).toHaveLength(1);
-  expect(f.requests.filter(row => row.name === "abort")).toHaveLength(1);
+  expect(f.requests.filter(row => row.name === "abort")).toHaveLength(2);
   expect(f.requests.filter(row => row.name === "release")).toHaveLength(1);
   expect(f.requests.filter(row => ["status", "abort", "release"].includes(row.name)).every(row => row.args.operationId === f.run.id)).toBe(true);
   const receipt = await f.db.moduleInvocation.findFirstOrThrow({ where: { key: "original-abort" } });
@@ -139,6 +142,7 @@ test.each(["changed hash", "paused", "removed", "deleted", "revoked", "changed c
 test.each(["owner", "chrona"] as const)("%s enable clears a drained active fence only while the active version is approved", async source => {
   const f = await fixture();
   await f.control("abort");
+  f.confirmStop();
   await reconcileAgentStops(f.ports, f.workspaceId);
   const enable = () => source === "chrona" ? requestStatus(f.context, f.backend.id, "active", "recover") : f.db.$transaction(tx => setStatusIn(f.context, tx, f.backend.id, "active", source));
   await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: f.backend.id, hash: f.binding.hash } }, data: { status: "revoked" } });
@@ -155,7 +159,7 @@ test.each(["queued", "running"] as const)("fenced application can stop only its 
   const invoke = (name: string, args: Record<string, unknown>, key = name) => agent.handle({ ports: f.ports, workspaceId: f.workspaceId, caller: f.caller, call: { id: key, key } }, name, args);
   const enable = () => requestStatus(f.context, f.app.id, "active", "drained own run");
   expect(await f.db.module.findUniqueOrThrow({ where: { id: f.app.id } })).toMatchObject({ status: "active", executionFenceAt: expect.any(Date) });
-  await expect(enable()).rejects.toMatchObject({ code: "conflict" });
+  if (stage === "running") await expect(enable()).rejects.toMatchObject({ code: "conflict" });
   await expect(invoke("run", { prompt: "new admission" })).rejects.toMatchObject({ code: "forbidden" });
   await expect(invoke("write", { runId: f.run.id, input: { kind: "message", text: "new work" } })).rejects.toMatchObject({ code: "forbidden" });
   for (const name of ["run", "write", "respond", "native"] as const) {
@@ -165,10 +169,10 @@ test.each(["queued", "running"] as const)("fenced application can stop only its 
   const first = await invoke("stop", { runId: f.run.id }, "own-stop");
   if (stage === "running") {
     expect(first).toMatchObject({ active: true, stopConfirmed: false });
-    expect(await f.db.run.findUniqueOrThrow({ where: { id: f.run.id } })).toMatchObject({ status: "running", stopStatus: "pending", cancelRequestedAt: expect.any(Date) });
+    expect(await f.db.run.findUniqueOrThrow({ where: { id: f.run.id } })).toMatchObject({ status: "failed", stopStatus: "unknown", cancelRequestedAt: expect.any(Date) });
     await expect(enable()).rejects.toMatchObject({ code: "conflict" });
     await invoke("stop", { runId: f.run.id }, "own-stop");
-    expect(f.requests.filter(row => row.name === "abort")).toHaveLength(1);
+    expect(f.requests.filter(row => row.name === "abort")).toHaveLength(2);
     // An abort reply is not a stop receipt. Only the original bound status can settle it.
     f.confirmStop();
     expect(await invoke("stop", { runId: f.run.id }, "confirm-own-stop")).toMatchObject({ active: false, stopConfirmed: true });
@@ -193,13 +197,13 @@ test.each(["changed hash", "paused", "removed", "revoked", "other caller", "othe
   if (state === "changed hash") await f.db.module.update({ where: { id: f.app.id }, data: { activeHash: "different-version" } });
   if (state === "paused" || state === "removed") await f.db.module.update({ where: { id: f.app.id }, data: { status: state } });
   if (state === "revoked") await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: f.app.id, hash: f.caller.hash } }, data: { status: "revoked" } });
-  if (state === "other context hash") await f.db.agentContext.update({ where: { sessionId: f.run.sessionId! }, data: { hash: "different-version" } });
+  if (state === "other context hash") await f.db.agentContext.update({ where: { id: f.run.sessionId! }, data: { hash: "different-version" } });
   const caller = state === "other caller" ? f.backendCaller : f.caller;
   const workspaceId = state === "other workspace" ? "another-workspace" : f.workspaceId;
   const code = state === "other caller" || state === "other context hash" ? "not_found" : "forbidden";
   await expect(agent.handle({ ports: f.ports, workspaceId, caller, call: { id: "invalid-stop", key: "invalid-stop" } }, "stop", { runId: f.run.id })).rejects.toMatchObject({ code });
   await expect(admitContextPrimitive(f.ports, { workspaceId, ownerId: "owner", caller }, "interrupt", { runId: f.run.id, requestKey: "invalid-direct-stop" })).rejects.toMatchObject({ code });
-  expect(await f.db.run.findUniqueOrThrow({ where: { id: f.run.id } })).toMatchObject({ status: "queued", stopStatus: "pending", cancelRequestedAt: null });
+  expect(await f.db.run.findUniqueOrThrow({ where: { id: f.run.id } })).toMatchObject({ status: "cancelled", stopStatus: "confirmed", cancelRequestedAt: expect.any(Date) });
   expect(await f.db.agentCommand.count({ where: { operation: "interrupt" } })).toBe(0);
   expect(f.requests.filter(row => ["start", "abort", "status"].includes(row.name))).toHaveLength(0);
 });

@@ -1,3 +1,4 @@
+import { seedTestModuleRelease } from "../__testing__/module-release-test-fixture";
 import { afterEach, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -40,6 +41,7 @@ async function fixture({ effects = [], uses = ["notify.send"] }: { effects?: str
   await writeFile(join(dir, "module.json"), JSON.stringify({ name: "price-watch", entry: "index.ts", tools: [{ name: "inspect", description: "Inspect price state", visibility: ["owner", "provider", "modules"], output: {}, parameters: { type: "object", properties: {} } }], effects, uses, params: { threshold: { type: "number", value: 42 } }, tests: ["test.ts"] }));
   await writeFile(join(dir, "index.ts"), source);
   await writeFile(join(dir, "test.ts"), "process.exit(0)");
+  await seedTestModuleRelease(root, "price-watch");
   const proposal = await service.modules.propose({ root, dir: "price-watch", intent: { changes: ["Watch prices"], preserves: [] } }, "provider");
   expect(proposal.status).toBe("building");
   await service.modules.buildPending();

@@ -14,7 +14,9 @@ Chrona 源码仓只维护通用内核及其运行所需的宿主、CLI、数据�
 | HTTP | 健康、内核工具桥接、凭据 OAuth 回调及应用 listener 转发；应用客户端鉴权和会话由 listener 拥有者负责 |
 | 独立应用 | 业务策略、会话、提示词、记忆、内容、页面、配置、通知和交付；具体 Provider 自行登记端点、管理适配器及模型配置 |
 
-内核允许没有应用或 Provider 时启动。不自动安装或恢复应用，不按应用名暂停或授权，也不拼接某个官方应用仓库地址。显式本地发行输入可通过 `CHRONA_MODULE_RESOURCES` 配置，安装仍绑定真实 Git 材料、审批和受控生命周期。
+本轮删除远程交付、签名停止、模型中继及专用 Execution 表，也删除旧本地项目执行、build Run 通道、成组发布、网络 Git 开发流程和安装中的应用 tests/typecheck/调用方影响检查。Author 与 CLI 的单应用固定材料均经过同一安装检查和激活路径；真实数据迁移保留审批、备份与恢复。普通 `agent.run` 可指定已准备好的绝对 `cwd`，内核固定 context/Run 的目录，session 日志独立存放，Provider options 不授予身份或改写目录。
+
+内核允许没有应用或 Provider 时启动。不自动安装或恢复应用，不按应用名暂停或授权，也不拼接某个官方应用仓库地址。显式本地发行输入可通过 `CHRONA_MODULE_RESOURCES` 配置，安装绑定 schema 1 完整材料的 SHA256、审批和受控生命周期。源码、锁、构建输入、材料记录、制品字节与 executable mode 存入不可变材料；恢复与 runtime store 的 GC 不依赖 Git。Git 历史、分支和可选 bundle 由 Author 或发行方管理。
 
 公开目标为 `modules / approvals / settings / secrets / activity / timers / agent`。通用 Agent 七工具归 kernel，执行委托给已登记并绑定身份的 Provider。内部 `runtime-callback`、`workspace-local` 是执行边界，不是业务应用或公开命名空间。
 
@@ -51,3 +53,5 @@ HTTP 转发保持应用的 Authorization、Cookie 和 Set-Cookie，替换内部�
 默认数据库位于平台用户数据目录的 `chrona.db`，支持显式 `CHRONA_DATA_DIR`／`DATABASE_URL`。根 `prisma/` 已按用户授权删除，不再是数据默认位置；`packages/db/prisma` 是源码，不能与本地运行数据混同。本轮没有生成 Prisma Client，也没有迁移其他实例的数据。完整数据及恢复边界见[运维](operations.md)。
 
 源码修改、静态核对、测试、隔离验收、部署和真实使用分别报告。旧文档中的应用组合和测试计数仅描述历史版本，不证明当前内核已通过验证。
+
+003 后续源码整合将执行身份收为一个 `AgentContext`，保存真实 owner/module/hash、cwd、Provider revision/session 与状态；内部 `Run.sessionId/session` 指向它，不再保存业务 Session。应用删除仅置空历史 context 的 moduleId，queued/running/unknown Run 仍阻止生命周期切换。全应用 Generation 快照及 Activation/ExecutionResult 的完整 Audit 镜像已移除，单应用 activation 与精确提交、动作回执分别保留。本次只有静态源码检查，Prisma Client、应用固定制品及运行验收尚未刷新。

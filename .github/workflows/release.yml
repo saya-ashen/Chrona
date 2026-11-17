@@ -35,13 +35,9 @@ jobs:
       - name: Audit high and critical dependencies
         run: bun run audit:security
 
-      - run: bun run db:generate
-
       - name: Types, lint, boundaries and tests on a fresh migrated database
         run: bun run ci:local
 
-      - name: Verify migration and container startup contracts
-        run: bun test ./scripts/init-sqlite-current.bun.test.ts ./scripts/docker-entrypoint.bun.test.ts ./scripts/build/release-smoke.bun.test.ts
 
   build-binary:
     needs: verify

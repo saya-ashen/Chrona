@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { testDb } from "./__testing__/test-db";
-import { BUILTIN_MODULE_NAMES, KERNEL_MODULE_NAMES, moduleManifestSchema } from "@chrona/contracts/steward";
+import { KERNEL_MODULE_NAMES, moduleManifestSchema } from "@chrona/contracts/steward";
 import { registerSystemModules } from "./system/system-modules";
 import { callSync, kernelOrigin, listLocalModules } from "./modules/module-calls";
 import { moduleTools } from "./modules/module-tools";
@@ -61,12 +61,11 @@ test("private event host stays undiscoverable and accepts only its admitted Prov
 });
 test("Agent is a reserved kernel manifest name while approved Pi is an ordinary module", async () => {
   expect(KERNEL_MODULE_NAMES).toContain("agent");
-  expect(BUILTIN_MODULE_NAMES).toEqual([]);
   const parsed = moduleManifestSchema.safeParse({ name: "agent", entry: "index.ts", tests: ["test.ts"], effects: [] });
   expect(parsed.success).toBe(false);
   if (!parsed.success) expect(parsed.error.issues).toContainEqual(expect.objectContaining({ path: ["name"], code: "custom", message: "Name is reserved for a Chrona system module" }));
   const f = await fixture(), pi = await f.app("pi");
-  expect(await f.db.module.findUniqueOrThrow({ where: { id: pi.moduleId } })).toMatchObject({ name: "pi", builtin: false, activeHash: pi.hash });
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: pi.moduleId } })).toMatchObject({ name: "pi", activeHash: pi.hash });
   expect(await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: pi.moduleId, hash: pi.hash } } })).toMatchObject({ status: "approved" });
   expect(await f.db.module.count({ where: { workspaceId: f.workspaceId, name: "agent" } })).toBe(0);
 });
@@ -102,14 +101,15 @@ test("tool discovery exposes only the current approved application version", asy
   await f.db.module.update({ where: { id: application.moduleId }, data: { status: "active" } });
   expect((await read()).output).toMatchObject({ items: [{ target: { moduleId: application.moduleId, tool: "read" } }] });
 });
-test("resolving a legacy session-linked approval never resurrects a retired conversation Run", async () => {
+test("resolving an application approval does not start or reopen its execution context", async () => {
   const f = await fixture();
-  const session = await f.db.session.create({ data: { workspaceId: f.workspaceId, source: "module", key: "old", title: "Old", status: "waiting_approval" } });
+  const app = await f.app("request-owner");
+  const session = await f.db.agentContext.create({ data: { workspaceId: f.workspaceId, ownerId: "owner", moduleId: app.moduleId, hash: app.hash, status: "ended" } });
   const api = createApprovals({ ...f.ports, workspaceId: f.workspaceId });
   const approval = await api.create({ action: "delete_data", title: "Old request", detail: "", preview: "", payload: { sessionId: session.id } });
   await api.resolve(approval.id, { decision: "approve", scope: "once" });
   expect(await f.db.run.count({ where: { workspaceId: f.workspaceId } })).toBe(0);
-  expect((await f.db.session.findUniqueOrThrow({ where: { id: session.id } })).status).toBe("waiting_approval");
+  expect((await f.db.agentContext.findUniqueOrThrow({ where: { id: session.id } })).status).toBe("ended");
   expect((await f.db.approval.findUniqueOrThrow({ where: { id: approval.id } })).status).toBe("approved");
 
 });

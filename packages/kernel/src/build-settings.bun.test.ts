@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { createSettings } from "./settings";
 import { createRuns } from "./execution/runs";
+import { createTestAgentContext } from "./__testing__/test-provider";
 import { testDb } from "./__testing__/test-db";
 import type { StewardPorts } from "./ports";
 
@@ -45,13 +46,14 @@ test("kernel settings reject application authoring policy atomically", async () 
   expect(await f.db.audit.count({ where: { kind: "settings_updated" } })).toBe(0);
 });
 
-for (const lane of ["foreground", "background"] as const) test(`build settings do not impose a timeout on ${lane}`, async () => {
+for (const lane of ["foreground", "background"] as const) test(`retired build settings do not change the ${lane} prompt or timeout`, async () => {
   const f = await fixture();
   await f.db.workspace.update({ where: { id: f.workspaceId }, data: { settings: { builds: { timeoutMinutes: 120 } } } });
   const runs = createRuns(f.ports, f.workspaceId);
-  const session = await f.db.session.create({ data: { workspaceId: f.workspaceId, key: "web:other", source: "owner" } });
+  const session = await createTestAgentContext(f.db, f.workspaceId);
   await runs.enqueue({ sessionId: session.id, lane, trigger: "message", prompt: "Other work" });
   const run = (await runs.claimNext(lane))!;
+  expect(run.prompt).toBe("Other work");
   expect(run.deadlineAt).toBeNull();
   expect(run.leaseUntil).toBeNull();
 });

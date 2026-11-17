@@ -1,39 +1,25 @@
-import { execFileSync } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, symlink, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import { commitModuleSource, moduleGitPath } from "../modules/module-git";
-import { snapshotModuleMaterial } from "../modules/module-artifacts";
+import { snapshotModule } from "../modules/module-files";
+import { moduleMaterialDigest, snapshotModuleMaterial, storeVersionMaterial } from "../modules/module-artifacts";
 import { existsSync } from "node:fs";
 import type { StewardPorts } from "../ports";
-import runtimeDeclarations from "../../../host/src/runtimes.json";
 
-/** Use the shipped SDK and runtime checks; installation fixtures must not silently skip typechecking. */
-export function testReleaseRuntimeChecks(): Pick<StewardPorts, "moduleSdk" | "moduleTypecheck" | "moduleRuntimes"> {
+/** Use the shipped SDK for installation and startup checks. */
+export function testReleaseRuntimeChecks(): Pick<StewardPorts, "moduleSdk"> {
   const sdk = resolve(import.meta.dirname, "../../../app-sdk");
-  return { moduleSdk: sdk, moduleTypecheck: join(sdk, "typecheck"), moduleRuntimes: runtimeDeclarations };
+  return { moduleSdk: sdk };
 }
 
-/** Synthetic fixtures retain ancestry across release edits, without any network or user database. */
-export async function seedTestModuleRelease(resourcesRoot: string, name: string, repository: string | null = null) {
-  const platform = join(resourcesRoot, ".test-release-git"), moduleId = name;
-  // Validate complete material first. commitModuleSource stores its verified
-  // artifact bytes separately and selects only source + record for Git.
+export async function seedTestModuleRelease(resourcesRoot: string, name: string) {
+  const record = join(resourcesRoot, name, "chrona-material.json");
+  if (!existsSync(record)) {
+    const files = await snapshotModule(resourcesRoot, name);
+    await writeFile(record, JSON.stringify({ schema: 1, source: files.map(file => file.path), artifacts: [], build: { commands: [], toolchain: "interpreted fixture", target: "host" } }));
+  }
   const files = await snapshotModuleMaterial(resourcesRoot, name, { verifyTree: true });
-  const revision = await commitModuleSource({ platform, moduleId, versionId: randomUUID(), files, message: "Synthetic module release" });
-  const seedDir = join(dirname(resourcesRoot), "module-git"); await mkdir(seedDir, { recursive: true });
-  const bundlePath = join(seedDir, `${name}.bundle`), repo = moduleGitPath(platform, moduleId);
-  execFileSync("git", ["--git-dir", repo, "update-ref", "refs/heads/main", revision.commit]);
-  await rm(bundlePath, { force: true });
-  execFileSync("git", ["--git-dir", repo, "bundle", "create", bundlePath, "refs/heads/main"]);
-  const entry = { name, repository, branch: "main", commit: revision.commit, bundle: `${name}.bundle`, bundleSha256: createHash("sha256").update(await readFile(bundlePath)).digest("hex") };
-  let modules: typeof entry[] = [];
-  try { modules = (JSON.parse(await readFile(join(seedDir, "lock.json"), "utf8")) as { modules: typeof entry[] }).modules; }
-  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
-  await writeFile(join(seedDir, "lock.json"), JSON.stringify({ version: 1, modules: [...modules.filter(item => item.name !== name), entry] }));
-  return { ...revision, bundlePath, repository, branch: "main" };
+  return { hash: moduleMaterialDigest(files) };
 }
-
 
 /** Reuse fixture resources' installed dependencies without package installation or network access. */
 export function testReleasePackages(resourcesRoot: string): NonNullable<StewardPorts["packages"]> {
@@ -54,4 +40,12 @@ export function testReleasePackages(resourcesRoot: string): NonNullable<StewardP
     }
     return { errors: [], installed: { npm, python: false, packages: {} } };
   } };
+}
+
+export async function storeTestModuleMaterial(platform: string, manifest: Record<string, unknown>, label = "fixture") {
+  const paths = new Set(["index.ts", ...((manifest.tests ?? []) as string[]), ...((manifest.data as { migrate?: string } | undefined)?.migrate ? [(manifest.data as { migrate: string }).migrate] : [])]);
+  const files = [{ path: "module.json", bytes: Buffer.from(JSON.stringify(manifest)) },
+    ...[...paths].map(path => ({ path, bytes: Buffer.from(`export const fixtureVersion = ${JSON.stringify(label)};\n`) }))];
+  files.push({ path: "chrona-material.json", bytes: Buffer.from(JSON.stringify({ schema: 1, source: files.map(file => file.path), artifacts: [], build: { commands: [], toolchain: "interpreted fixture", target: "host" } })) });
+  return storeVersionMaterial(platform, files);
 }

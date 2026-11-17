@@ -4,10 +4,10 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { BUILTIN_MODULE_NAMES, KERNEL_MODULE_NAMES, MODULE_OPERATIONS, moduleManifestSchema, moduleInstallRequestSchema } from "@chrona/contracts/steward";
+import { KERNEL_MODULE_NAMES, MODULE_OPERATIONS, moduleManifestSchema, moduleInstallRequestSchema } from "@chrona/contracts/steward";
 import { assertExternalName, assertExternalModule, assertModuleOperation, moduleIdentity } from "./module-identity";
 import { seedTestModuleRelease } from "../__testing__/module-release-test-fixture";
-import { resolveBuiltinRelease, resolveExternalRelease } from "./module-release";
+import { resolveExternalRelease } from "./module-release";
 import { installExternal, recordInstallationResult, externalPackageCatalog } from "./module-install";
 import { testDb } from "../__testing__/test-db";
 import type { StewardPorts } from "../ports";
@@ -28,8 +28,8 @@ async function fixture() {
   const dataDir = await mkdtemp(join(tmpdir(), "chrona-p0-")), db = testDb({ injectedAgent: false });
   cleanups.push(async () => { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "p0" } });
-  const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-11-05T00:00:00Z"), publicUrl: null, moduleBuiltinResources: join(dataDir, "builtin"), moduleExternalResources: join(dataDir, "external") };
-  for (const [root, names] of [[ports.moduleBuiltinResources!, BUILTIN_MODULE_NAMES], [ports.moduleExternalResources!, ["fixture-backend", "fixture-entry", "fixture-notifier", "pi", "qq"]]] as const) {
+  const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-11-05T00:00:00Z"), publicUrl: null, moduleExternalResources: join(dataDir, "external") };
+  for (const [root, names] of [[ports.moduleExternalResources!, ["fixture-backend", "fixture-entry", "fixture-notifier", "pi", "qq"]]] as const) {
     for (const name of names) {
       const dir = join(root, name); await mkdir(dir, { recursive: true });
       await writeFile(join(dir, "module.json"), JSON.stringify(moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [] })));
@@ -45,28 +45,26 @@ test("kernel Agent rejects persisted impostors; Pi retains ordinary lifecycle ri
   const f = await fixture();
   for (const operation of MODULE_OPERATIONS) {
     for (const name of [...KERNEL_MODULE_NAMES]) {
-      for (const builtin of [false, true]) expect(() => assertModuleOperation({ name, builtin }, operation)).toThrow("reserved identity");
+      expect(() => assertModuleOperation({ name }, operation)).toThrow("reserved identity");
     }
     expect(() => assertModuleOperation(fixtures.pi.row, operation)).not.toThrow();
     expect(() => assertModuleOperation(fixtures.external.row, operation)).not.toThrow();
     expect(() => assertModuleOperation(fixtures.forgedRow, operation)).toThrow("reserved identity");
   }
-  for (const name of [...KERNEL_MODULE_NAMES, ...BUILTIN_MODULE_NAMES]) {
+  for (const name of [...KERNEL_MODULE_NAMES]) {
     await expect(assertExternalName(f.db, f.workspaceId, name, "propose")).rejects.toMatchObject({ code: "forbidden", reason: "reserved_module_name" });
   }
   expect(moduleManifestSchema.safeParse(fixtures.forgedManifest).success).toBe(false);
-  expect(moduleIdentity({ name: "qq", builtin: false }).origin).toBe("external");
+  expect(moduleIdentity({ name: "qq" }).origin).toBe("external");
   const row = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "alpha" } });
-  await f.db.module.update({ where: { id: row.id }, data: { builtin: true } });
-  await expect(f.db.$transaction(tx => assertExternalModule(tx, f.workspaceId, row.id, "activate"))).rejects.toMatchObject({ reason: "immutable_module" });
+  await f.db.module.update({ where: { id: row.id }, data: { name: "agent" } });
+  await expect(f.db.$transaction(tx => assertExternalModule(tx, f.workspaceId, row.id, "activate"))).rejects.toMatchObject({ reason: "module_identity_conflict" });
 });
 
 test("trusted release binds manifest and exact code hash; missing, drift, mismatches and symlinks fail closed", async () => {
   const f = await fixture(), release = await resolveExternalRelease(f.ports, "pi");
   expect(release).toMatchObject({ name: "pi", origin: "external", codeDir: join(f.ports.moduleExternalResources!, "pi") });
-  await expect(resolveBuiltinRelease(f.ports, "agent")).rejects.toMatchObject({ reason: "release_not_found" });
-  expect(release.hash).toMatch(/^[a-f0-9]{40}$/);
-  expect(release.git?.commit).toBe(release.hash);
+  expect(release.hash).toMatch(/^[a-f0-9]{64}$/);
   expect((await resolveExternalRelease(f.ports, "qq")).origin).toBe("external");
   await expect(resolveExternalRelease(f.ports, "../pi")).rejects.toMatchObject({ reason: "release_not_found" });
   await expect(resolveExternalRelease({ moduleExternalResources: join(f.dataDir, "missing") }, "pi")).rejects.toMatchObject({ reason: "release_not_found" });
@@ -159,14 +157,10 @@ test("approval creation refuses reserved kernel identities without records and p
   for (const name of ["agent", "modules"]) {
     const invalid = await f.db.module.create({ data: { workspaceId: f.workspaceId, name, activeHash: "c".repeat(64) } });
     await f.db.moduleVersion.create({ data: { moduleId: invalid.id, hash: invalid.activeHash!, source: "user", status: "approved", manifest: { ...fixtures.external.manifest, name }, intent: {}, report: {} } });
-    for (const builtin of [false, true]) {
-      await f.db.module.update({ where: { id: invalid.id }, data: { builtin } });
-      for (const request of [
+    for (const request of [
         { ...common, action: "delete_data", payload: { kind: "module_remove", moduleId: invalid.id, name, hash: invalid.activeHash } },
         { ...common, action: "activate_module", moduleId: invalid.id, payload: { kind: "activate_module", moduleId: invalid.id, hash: invalid.activeHash } },
-        { ...common, action: "activate_module", payload: { kind: "activate_modules", versions: [{ moduleId: pi.id, hash: pi.activeHash }, { moduleId: invalid.id, hash: invalid.activeHash }] } },
-      ]) await expect(approvals.create(request)).rejects.toMatchObject({ reason: "module_identity_conflict" });
-    }
+    ]) await expect(approvals.create(request)).rejects.toMatchObject({ reason: "module_identity_conflict" });
   }
   expect(await f.db.approval.count()).toBe(0);
   expect(await f.db.audit.count({ where: { kind: "approval_created" } })).toBe(0);
@@ -177,7 +171,7 @@ test("approval creation refuses reserved kernel identities without records and p
 
 test.each(["pi", "web", "notify", "other-entry"])("list exposes ordinary entry %s lifecycle rights", async name => {
   const f = await fixture(); createStewardService(f.ports);
-  const row = await f.db.module.create({ data: { workspaceId: f.workspaceId, name, builtin: false, activeHash: "a".repeat(64) } });
+  const row = await f.db.module.create({ data: { workspaceId: f.workspaceId, name, activeHash: "a".repeat(64) } });
   const manifest = moduleManifestSchema.parse({ ...fixtures.external.manifest, name, uses: ["*"],
       authority: "owner"
 });

@@ -29,12 +29,12 @@ export type RedactionOptions = { maxLength?: number; seen?: WeakSet<object> };
 export function redactSensitiveValue(value: unknown, options: RedactionOptions = {}): unknown {
   const maxLength = options.maxLength ?? MAX_STRING_LENGTH;
   const seen = options.seen ?? new WeakSet<object>();
-  if (value instanceof Error) return safeError(value, maxLength, seen);
   if (typeof value === "string") return redactSensitiveText(value, maxLength);
   if (typeof value !== "object" || value === null) return value;
   if (value instanceof Date) return value.toISOString();
   if (seen.has(value)) return "[Circular]";
   seen.add(value);
+  if (value instanceof Error) return safeError(value, maxLength, seen);
   if (Array.isArray(value)) return value.slice(0, MAX_ARRAY_LENGTH).map((item) => redactSensitiveValue(item, { maxLength, seen }));
 
   const entries = Object.entries(value as Record<string, unknown>).slice(0, MAX_OBJECT_KEYS);

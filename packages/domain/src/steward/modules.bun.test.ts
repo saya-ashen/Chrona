@@ -10,6 +10,8 @@ const manifest = {
 describe("module manifest contract", () => {
   test("defaults and all parameter value types", () => {
     expect(moduleManifestSchema.parse(manifest)).toMatchObject({ params: {}, data: { schema: 1 } });
+    expect(moduleManifestSchema.parse({ ...manifest, tests: undefined }).tests).toEqual([]);
+    expect(moduleManifestSchema.parse({ ...manifest, tests: [] }).tests).toEqual([]);
     const params = { threshold: { type: "number", value: 2100 }, label: { type: "string", value: "watch" }, enabled: { type: "boolean", value: true } } as const;
     expect(moduleManifestSchema.parse({ ...manifest, params }).params).toEqual(params);
     for (const ext of ["ts", "py", "sh"]) expect(moduleManifestSchema.safeParse({ ...manifest, entry: `index.${ext}`, tests: [`test.${ext}`], effects: [] }).success).toBe(true);
@@ -39,7 +41,7 @@ describe("module manifest contract", () => {
     { effects: ["network", "network"] },
     { effects: ["shell"] }, { effects: Array(4).fill("network") },
     { name: "X" }, { entry: "../index.ts" }, { entry: "folder/index.ts" }, { entry: "index.js" },
-    { tests: [] }, { tests: ["../test.ts"] }, { tests: Array(11).fill("test.ts") },
+    { tests: ["../test.ts"] }, { tests: Array(11).fill("test.ts") },
     { triggers: [] }, { triggers: Array(11).fill({ id: "daily", schedule: { kind: "daily", time: "08:00" } }) },
     { triggers: [{ id: "daily", schedule: { kind: "daily", time: "08:00" }, extra: true }] },
     { triggers: [{ id: "daily", schedule: { kind: "every", minutes: 1 } }] },
@@ -63,7 +65,8 @@ describe("module channel contract", () => {
   test("event replies default result and preserve JSON beyond the retired 256 KiB cap", () => {
     const result = "x".repeat(256 * 1024 - 2);
     expect(moduleEventReplySchema.parse({ id: "1" })).toEqual({ id: "1", result: {} });
-    expect(moduleEventReplySchema.parse({ id: "1", result: { handled: true, result } })).toEqual({ id: "1", result: { handled: true, result } });
+    expect(moduleEventReplySchema.parse({ id: "1", result: { result } })).toEqual({ id: "1", result: { result } });
+    expect(moduleEventReplySchema.safeParse({ id: "1", result: { handled: true, result } }).success).toBe(false);
     for (const value of [`${result}x`, "界".repeat(90_000)]) {
       expect(Buffer.byteLength(JSON.stringify(value))).toBeGreaterThan(256 * 1024);
       expect(moduleEventReplySchema.parse({ id: "1", result: { result: value } })).toEqual({ id: "1", result: { result: value } });

@@ -15,9 +15,8 @@ model Workspace {
   settings Json @default(dbgenerated("'{}'"))
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  sessions Session[]
+  agentContexts AgentContext[]
   modules Module[]
-  generations Generation[]
   timers Timer[]
   runs Run[]
   approvals Approval[]
@@ -29,48 +28,15 @@ model Workspace {
   kernelFacts KernelFact[]
   factConsumer KernelFactConsumer?
   candidateAdmissions CandidateAdmission[]
-  upstreamMerges ModuleUpstreamMerge[]
   installations ModuleInstallation[]
   installationHeads ModuleInstallationHead[]
   moduleRemovals ModuleRemoval[]
-  executions ExecutionAttempt[]
-}
-
-/// A conversation with the Provider. Entries choose keys; at most one active session per key (enforced by Chrona).
-model Session {
-  id String @id @default(uuid())
-  workspaceId String
-  key String
-  source String
-  title String?
-  status String @default("active")
-  moduleId String?
-  originSessionId String?
-  providerSessionId String?
-  /// Current bounded execution round for this Provider context; changed atomically at admission.
-  executionHeadAttemptId String?
-  /// The owning application that supplies this execution context and receives its results.
-  entryModuleId String?
-  /// Module names whose tools are directly exposed in this session's catalog.
-  focus Json @default(dbgenerated("'[\"files\"]'"))
-  lastActivityAt DateTime @default(now())
-  createdAt DateTime @default(now())
-  endedAt DateTime?
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  module Module? @relation(fields: [moduleId], references: [id], onDelete: SetNull)
-  origin Session? @relation("SessionOrigin", fields: [originSessionId], references: [id], onDelete: SetNull)
-  spawned Session[] @relation("SessionOrigin")
-  runs Run[]
-  agentContext AgentContext?
-  @@index([workspaceId, key, status])
-  @@index([workspaceId, source, lastActivityAt])
 }
 
 model Module {
   id String @id @default(uuid())
   workspaceId String
   name String
-  builtin Boolean @default(false)
   activeHash String?
   activationId String @default(uuid())
   executionFenceAt DateTime?
@@ -78,23 +44,20 @@ model Module {
   status String @default("active")
   createdAt DateTime @default(now())
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  executions ExecutionAttempt[]
   versions ModuleVersion[]
   runs ModuleRun[]
   calls ModuleCall[]
   timers Timer[]
-  sessions Session[]
+  agentContexts AgentContext[]
   approvals Approval[]
   executionResults ModuleExecutionResult[]
   activations ModuleActivation[]
-  upstream ModuleUpstream?
   migration ModuleMigration?
   @@unique([workspaceId, name])
   @@index([workspaceId, status])
 }
 
 model ModuleVersion {
-  review ModuleReview?
   id String @id @default(uuid())
   moduleId String
   hash String
@@ -108,17 +71,6 @@ model ModuleVersion {
   @@unique([moduleId, hash])
   @@index([moduleId, status, createdAt])
   @@index([moduleId, createdAt, id])
-}
-
-model Generation {
-  id String @id @default(uuid())
-  workspaceId String
-  seq Int
-  modules Json
-  reason String
-  createdAt DateTime @default(now())
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  @@unique([workspaceId, seq])
 }
 
 model ModuleRun {
@@ -238,7 +190,6 @@ model Run {
   trigger String
   status String @default("queued")
   provider String
-  execution ExecutionAttempt?
   agentAdmission AgentRunAdmission?
   agentProvider AgentRunProvider?
   providerLaunch ProviderLaunch?
@@ -263,187 +214,11 @@ model Run {
   endedAt DateTime?
   createdAt DateTime @default(now())
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  session Session? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  session AgentContext? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
   @@index([workspaceId, lane, status, createdAt])
   @@index([workspaceId, status, leaseUntil])
   @@index([workspaceId, status, deadlineAt])
   @@index([sessionId, createdAt])
-}
-
-/// Run owns lifecycle and queue status. This row binds admission, authorization and retained evidence.
-model ExecutionAttempt {
-  id String @id @default(uuid())
-  workspaceId String
-  ownerId String
-  /// owner or module:<immutable module id>; hash remains separate authorization evidence.
-  callerKey String
-  moduleId String?
-  callerHash String?
-  callerActivationId String?
-  placement Json?
-  targetBinding Json?
-  capacityKey String @default("local")
-  workId String
-  commandKey String
-  requestDigest String
-  runId String @unique
-  projectRef String
-  projectDigest String
-  /// P2 device attempts have no server filesystem path; v1/server retain their canonical cwd.
-  resolvedCwd String?
-  executorId String @default("server")
-  executorGeneration Int @default(1)
-  mappingRevision Int @default(1)
-  directoryIdentity String?
-  queueExpiresAt DateTime?
-  workspaceRef String?
-  workspaceMode String?
-  sourceManifest Json?
-  sourceReceipt Json?
-  logDir String
-  baseline String
-  budget Json
-  cancelRequestedAt DateTime?
-  capabilityRevokedAt DateTime?
-  stopConfirmedAt DateTime?
-  stopEvidence Json?
-  /// Canonical cwd while occupied, NULL only after confirmed stop; SQLite allows multiple released NULLs.
-  heldDirectory String? @unique
-  /// Current charges: active headroom, terminal actual bytes; never historical maximum reservations.
-  snapshotChargeBytes Int @default(0)
-  controlChargeBytes Int @default(0)
-  detailBytes Int @default(0)
-  highWatermark Int @default(0)
-  createdAt DateTime @default(now())
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
-  module Module? @relation(fields: [moduleId], references: [id], onDelete: Restrict)
-  run Run @relation(fields: [runId], references: [id], onDelete: Restrict)
-  events ExecutionDetail[]
-  snapshot ExecutionSnapshot?
-  controls ExecutionControl[]
-  commands ExecutionCommand[]
-  delivery ExecutionDelivery?
-  @@index([capacityKey, stopConfirmedAt])
-  @@index([executorId, stopConfirmedAt])
-  @@index([moduleId, stopConfirmedAt])
-  @@unique([workspaceId, ownerId, callerKey, commandKey])
-  @@index([workspaceId, ownerId, workId, createdAt])
-}
-
-/// Approved receiver authority; subjectId remains stable across authority epochs.
-model ExecutionAuthority {
-  id String @id @default(uuid())
-  workspaceId String
-  ownerId String
-  receiverModuleId String
-  receiverHash String
-  receiverActivationId String
-  subjectId String
-  epoch Int
-  keyId String
-  publicKey String
-  verifierId String
-  verifierVersion String
-  scope Json
-  approvalId String
-  approvedAt DateTime
-  revokedAt DateTime?
-  deliveries ExecutionDelivery[]
-  @@unique([receiverModuleId, receiverActivationId, subjectId, epoch, keyId])
-  @@index([workspaceId, ownerId, revokedAt])
-  @@index([receiverModuleId, receiverActivationId, revokedAt])
-  @@index([subjectId, epoch])
-}
-
-/// Durable transport journal for an admitted attempt in the existing Run queue.
-model ExecutionDelivery {
-  id String @id @default(uuid())
-  attemptId String @unique
-  authorityId String
-  receiverModuleId String
-  receiverHash String
-  receiverActivationId String
-  launchDigest String
-  launch Json
-  createdAt DateTime @default(now())
-  offeredAt DateTime?
-  acceptedAt DateTime?
-  startedAt DateTime?
-  processIdentity Json?
-  sourceThrough Int @default(0)
-  finalDigest String?
-  final Json?
-  finalCommittedAt DateTime?
-  settledAt DateTime?
-  attempt ExecutionAttempt @relation(fields: [attemptId], references: [id], onDelete: Restrict)
-  authority ExecutionAuthority @relation(fields: [authorityId], references: [id], onDelete: Restrict)
-  receipts ExecutionReceipt[]
-  @@index([authorityId, settledAt])
-  @@index([receiverModuleId, receiverActivationId, settledAt])
-}
-
-model ExecutionReceipt {
-  id String @id @default(cuid())
-  deliveryId String
-  operation String
-  requestKey String
-  requestDigest String
-  direction String @default("inbound")
-  bytes Int @default(0)
-  payload Json?
-  receipt Json
-  createdAt DateTime @default(now())
-  offeredAt DateTime?
-  acceptedAt DateTime?
-  delivery ExecutionDelivery @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
-  @@unique([deliveryId, operation, requestKey])
-  @@index([deliveryId, direction, acceptedAt])
-}
-
-/// Normalized, redacted v1 events only; no raw Provider envelopes.
-model ExecutionDetail {
-  attemptId String
-  seq Int
-  event Json
-  bytes Int
-  expiresAt DateTime
-  attempt ExecutionAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  @@id([attemptId, seq])
-  @@index([expiresAt])
-}
-
-model ExecutionSnapshot {
-  attemptId String @id
-  snapshot Json
-  bytes Int
-  expiresAt DateTime
-  attempt ExecutionAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  @@index([expiresAt])
-}
-
-/// Four fixed v1 slots, validated by G before upsert in F's transaction.
-model ExecutionControl {
-  attemptId String
-  slot String
-  fact Json
-  bytes Int
-  attempt ExecutionAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  @@id([attemptId, slot])
-}
-
-/// F deduplicates send/answer/cancel without storing their sensitive input again.
-model ExecutionCommand {
-  attemptId String
-  commandKey String
-  operation String
-  requestDigest String
-  receipt Json
-  /// One-shot inject transport intent, never the text or an answer body.
-  offeredAt DateTime?
-  effect String?
-  createdAt DateTime @default(now())
-  attempt ExecutionAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  @@id([attemptId, commandKey])
 }
 
 model Approval {
@@ -483,16 +258,25 @@ model StewardState {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
-/// Version-bound application ownership of a Provider context, independent of audit retention.
+/// Version-bound execution context; removed applications leave stopped history intact.
 model AgentContext {
-  sessionId String @id
+  id String @id @default(uuid())
   workspaceId String
-  moduleId String
+  ownerId String
+  moduleId String?
   hash String
+  cwd String?
   providerId String?
   providerRevision String?
-  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  providerSessionId String?
+  status String @default("active")
+  createdAt DateTime @default(now())
+  lastActivityAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  module Module? @relation(fields: [moduleId], references: [id], onDelete: SetNull)
+  runs Run[]
   @@index([workspaceId, moduleId])
+  @@index([workspaceId, status, lastActivityAt])
 }
 
 /// Workspace-local registration owned permanently by its actual registering module.
@@ -550,7 +334,7 @@ model AgentCommand {
   @@index([workspaceId, moduleId])
 }
 
-/// Admission of the immutable builtin Agent's exact Provider launch.
+/// Admission of the exact Provider launch bound to its Run.
 model ProviderLaunch {
   runId String @id
   digest String
@@ -654,17 +438,14 @@ model ModuleExecutionResult {
 
 /// One governed activation epoch; updates never replace its identity or ordering.
 model ModuleActivation {
-  grouped Boolean @default(false)
   activationId String @id
   moduleId String
   previousHash String?
   candidateHash String
-  generationId String
   activatedAt String
   status String
   changes Json
   checks Json
-  affectedCallers Json
   observedCapabilities Json
   dataHandling String
   nextAction String
@@ -674,30 +455,6 @@ model ModuleActivation {
   module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   @@index([moduleId, candidateHash, createdAt])
   @@index([moduleId, updatedAt])
-}
-
-model ModuleUpstream {
-  moduleId String @id
-  repository String?
-  branch String
-  commit String
-  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-}
-
-/// Retained after module removal so a request key cannot authorize a second merge.
-model ModuleUpstreamMerge {
-  id String @id
-  workspaceId String
-  requestKey String
-  moduleId String
-  baseHash String
-  requestedCommit String
-  preparedCommit String?
-  result Json?
-  failed Boolean @default(false)
-  createdAt DateTime
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  @@unique([workspaceId, requestKey])
 }
 
 /// Private installation request and its current bounded receipt, retained after removal.
@@ -751,16 +508,6 @@ model ModuleRemoval {
   createdAt DateTime
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   @@index([workspaceId, name, hash, createdAt])
-}
-
-model ModuleReview {
-  versionId String @id
-  prefix String
-  suffix String
-  codeDiff String
-  detail String
-  needsMigration Boolean
-  version ModuleVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
 }
 
 model ModuleMigration {

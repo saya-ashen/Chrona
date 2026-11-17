@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { fenceExecutionModule } from "../execution/execution-delivery-controls";
+import { fenceAgentModule } from "../agent/module-drain";
 import type { Prisma } from "@chrona/db";
 import { audit } from "../audit";
 import { StewardError } from "../errors";
@@ -57,7 +57,7 @@ export async function requestStatus(context: ModuleContext, moduleId: string, st
   if (!module.activeHash) throw new StewardError("conflict", "Module has no active version");
   if (module.status === status && !(status === "active" && module.executionFenceAt)) return { moduleId, status };
   if (status === "active" && module.status !== "paused" && module.status !== "active") throw new StewardError("conflict", "Module is not paused");
-  if (status === "paused") await fenceExecutionModule(context.ports, context.workspaceId, moduleId);
+  if (status === "paused") await fenceAgentModule(context.ports, context.workspaceId, moduleId);
   return context.db.$transaction(async tx => {
     const result = await setStatusIn(context, tx, moduleId, status, { source: "chrona", reason });
     await audit(tx, { workspaceId: context.workspaceId, actor: "chrona", kind: "module_status_changed", subjectId: moduleId, details: { status, reason } });

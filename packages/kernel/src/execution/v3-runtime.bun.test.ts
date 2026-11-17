@@ -1,15 +1,17 @@
+import { createTestAgentContext } from "../__testing__/test-provider";
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { RUN_LIMITS } from "@chrona/contracts/steward";
+import { assertPoisonedHeadDoesNotStarveTail } from "../__testing__/state-machine-invariants";
 import { createRuns } from "./runs";
 import { testDb } from "../__testing__/test-db";
 import type { StewardPorts } from "../ports";
 let db: ReturnType<typeof testDb>, ports: StewardPorts, workspaceId: string, sessionId: string;
 beforeEach(async () => {
   db = testDb(); workspaceId = (await db.workspace.create({ data: { name: "runtime" } })).id;
-  sessionId = (await db.session.create({ data: { workspaceId, key: "web:first", source: "owner" } })).id;
+  sessionId = (await createTestAgentContext(db, workspaceId)).id;
   ports = { db, dataDir: await mkdtemp(join(tmpdir(), "chrona-runtime-")), now: () => new Date("2026-10-15T04:00:00Z"), publicUrl: null };
 });
 afterEach(async () => { await db.$disconnect(); });
@@ -42,6 +44,9 @@ test.each(["foreground", "background"] as const)("%s uses the setting at claim; 
   ports.now = () => boundary;
   await expect(runs.authenticate(bounded.token)).rejects.toMatchObject({ code: "forbidden" });
   expect(await runs.expireLeases()).toBe(1);
+  expect(await db.run.findUniqueOrThrow({ where: { id: bounded.id } })).toMatchObject({ status: "failed", stopStatus: "unknown" });
+  expect(await runs.claimNext(lane)).toBeNull();
+  await runs.finish(bounded.id, { outcome: "finished", sessionId: null, error: null }, { stopEvidence: "provider_exited" });
   expect((await db.run.findUniqueOrThrow({ where: { id: bounded.id } })).status).toBe("timed_out");
   await runs.enqueue({ sessionId, lane, trigger: "message", prompt: "Unlimited work" });
   const unlimited = (await runs.claimNext(lane))!;
@@ -57,16 +62,47 @@ test("one session never runs two lanes concurrently; other sessions remain indep
   await runs.enqueue({ sessionId, lane: "background", trigger: "schedule", prompt: "Two" });
   expect(await runs.claimNext("foreground")).not.toBeNull();
   expect(await runs.claimNext("background")).toBeNull();
-  const other = await db.session.create({ data: { workspaceId, key: "web:second", source: "owner" } });
+  const other = await createTestAgentContext(db, workspaceId);
   await runs.enqueue({ sessionId: other.id, lane: "background", trigger: "schedule", prompt: "Separate" });
   expect((await runs.claimNext("background"))?.sessionId).toBe(other.id);
 });
 for (const scope of ["session", "global"] as const) test(`${scope} daily run limit defers until local midnight`, async () => {
   const runs = createRuns(ports, workspaceId);
-  const other = await db.session.create({ data: { workspaceId, key: "web:other", source: "owner" } });
+  const other = await createTestAgentContext(db, workspaceId);
   const count = scope === "session" ? RUN_LIMITS.maxRunsPerSessionPerDay : RUN_LIMITS.maxRunsPerDay;
   await db.run.createMany({ data: Array.from({ length: count }, (_, index) => ({ workspaceId, sessionId: scope === "session" ? sessionId : other.id, lane: "foreground", trigger: "message", status: "finished", provider: "fixture", tokenHash: `history-${index}`, cwd: "unused", prompt: "", startedAt: ports.now(), endedAt: ports.now() })) });
   const queued = await runs.enqueue({ sessionId, lane: "foreground", trigger: "message", prompt: "Limited" });
   expect(await runs.claimNext("foreground")).toBeNull();
   expect((await db.run.findUniqueOrThrow({ where: { id: queued.id } })).leaseUntil?.toISOString()).toBe("2026-10-15T16:00:00.000Z");
+});
+
+for (const cwd of [undefined, "prepared"] as const) test(`Run binds ${cwd ?? "default session"} cwd independently of Provider options`, async () => {
+  const runs = createRuns(ports, workspaceId);
+  const directory = cwd ? join(ports.dataDir, cwd) : undefined;
+  const queued = await runs.enqueue({ sessionId, lane: "background", trigger: "source", prompt: "Work", cwd: directory, providerOptions: { cwd: "/provider-option", runId: "forged" } });
+  const claimed = (await runs.claimNext("background"))!;
+  expect(claimed.id).toBe(queued.id);
+  expect(claimed.cwd).toBe(directory ?? join(ports.dataDir, "sessions", sessionId));
+  expect((await runs.authenticate(claimed.token)).run.cwd).toBe(claimed.cwd);
+});
+
+test("a session-limited head does not starve another session in the generic queue", async () => {
+  const runs = createRuns(ports, workspaceId);
+  let healthyId = "", claimedId: string | undefined;
+  await assertPoisonedHeadDoesNotStarveTail({
+    windowSize: 2,
+    async seedBlockedHead(count) {
+      await db.run.createMany({ data: Array.from({ length: RUN_LIMITS.maxRunsPerSessionPerDay }, (_, index) => ({ workspaceId, sessionId, lane: "background", trigger: "source", status: "finished", provider: "fixture", tokenHash: `limited-${index}`, cwd: "unused", prompt: "", startedAt: ports.now(), endedAt: ports.now() })) });
+      for (let index = 0; index < count; index++) {
+        const run = await runs.enqueue({ sessionId, lane: "background", trigger: "source", prompt: "Limited" });
+        await db.run.update({ where: { id: run.id }, data: { createdAt: new Date(ports.now().getTime() - 1000) } });
+      }
+    },
+    async seedHealthyTail() {
+      const session = await createTestAgentContext(db, workspaceId);
+      healthyId = (await runs.enqueue({ sessionId: session.id, lane: "background", trigger: "source", prompt: "Healthy" })).id;
+    },
+    async tick() { claimedId = (await runs.claimNext("background"))?.id; },
+    isTailProcessed: () => claimedId === healthyId,
+  });
 });

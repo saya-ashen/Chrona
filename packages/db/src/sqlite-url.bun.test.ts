@@ -56,6 +56,8 @@ describe("sqlite url helpers", () => {
   });
 
   it("detects safe test database urls", () => {
+    expect(isSafeTestDatabaseUrl("file:./prisma/chrona.db")).toBe(false);
+    expect(isSafeTestDatabaseUrl("file:/data/chrona.db")).toBe(false);
     expect(isSafeTestDatabaseUrl(undefined)).toBe(false);
     expect(isSafeTestDatabaseUrl("file:./prisma/dev.db")).toBe(false);
     expect(isSafeTestDatabaseUrl("file:./.tmp/bun-test.db")).toBe(true);

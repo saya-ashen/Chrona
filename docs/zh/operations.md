@@ -26,7 +26,7 @@ schema 和唯一初始 SQL 位于 `packages/db/prisma/`，Client 生成路径为
 
 `chrona admin install <package> --request-key <key>` 受理受检构建，`building` 或 `pending_approval` 不表示已激活。查询未知结果使用原 key，明确重试才使用新 key。`--update --exact-release` 仍要求真实材料和当前批准身份，不是跳过检查的入口。应用移除后启动不自动补装，首装不存在免审批路径。
 
-Git 来源关联、状态和显式推送使用 `chrona admin git-associate`、`git-status`、`git-push`；推送需要具体授权、提交与预期远端身份，不随激活自动执行。参见[Git 工作流](module-git.md)。
+Git checkout、worktree、历史和可选 bundle 由 Author 或发行方通过现有工具维护。内核不提供 Git 关联或推送命令；安装、源码导出与回滚使用精确 SHA256 完整材料。参见[材料与 Git 边界](module-git.md)。
 
 `chrona doctor` 检查本地运行配置、数据库、完整性、权限、锁、迁移及显式安装资源。它不调用真实模型、不验证应用业务。确认进程退出后才使用 `--repair-stale-lock`；畸形锁须核对原因。
 

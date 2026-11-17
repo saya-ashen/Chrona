@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
+import { z } from "zod";
 import { mkdir } from "node:fs/promises";
-import { MODULE_MATERIAL_FILE, MODULE_SOURCE_MAX_BYTES, MODULE_SOURCE_MAX_FILES, MODULE_ARTIFACT_MAX_BYTES, MODULE_ARTIFACT_MAX_FILE_BYTES, moduleMaterialSchema, type ModuleMaterial } from "../../../contracts/src/steward/module-material";
-import { ModuleSnapshot, openModuleDirectory, snapshotModule, type ModuleFile } from "./module-files";
+import { MODULE_MATERIAL_FILE, MODULE_SOURCE_MAX_BYTES, MODULE_SOURCE_MAX_FILES, MODULE_ARTIFACT_MAX_BYTES, MODULE_ARTIFACT_MAX_FILE_BYTES, isModuleMaterialPath, moduleMaterialSchema, type ModuleMaterial } from "../../../contracts/src/steward/module-material";
+import { ModuleSnapshot, openModuleDirectory, type ModuleFile } from "./module-files";
 import { StewardError } from "../errors";
 
 const sorted = (files: ModuleFile[]) => [...files].sort((a, b) => a.path.localeCompare(b.path));
@@ -11,21 +12,17 @@ export function moduleMaterialRecord(files: ModuleFile[]): ModuleMaterial | null
   if (!file) return null;
   if (file.bytes.byteLength > MODULE_SOURCE_MAX_BYTES) throw new StewardError("invalid", "Material record exceeds source limits");
   try { return moduleMaterialSchema.parse(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(file.bytes))); }
-  catch { throw new StewardError("invalid", "Invalid chrona-material.json"); }
+  catch (error) { throw Object.assign(new StewardError("invalid", "Invalid chrona-material.json"), { cause: error }); }
 }
 function assertSources(files: ModuleFile[], record: ModuleMaterial) {
   const paths = new Set(files.map(file => file.path));
-  if (paths.size !== files.length || files.length !== record.source.length + 1 || !paths.has(MODULE_MATERIAL_FILE) || !record.source.every(path => paths.has(path))) throw new StewardError("invalid", "Git source does not match its material record");
+  if (paths.size !== files.length || files.length !== record.source.length + 1 || !paths.has(MODULE_MATERIAL_FILE) || !record.source.every(path => paths.has(path))) throw new StewardError("invalid", "Source does not match its material record");
   if (files.length > MODULE_SOURCE_MAX_FILES || files.reduce((total, file) => total + file.bytes.byteLength, 0) > MODULE_SOURCE_MAX_BYTES) throw new StewardError("invalid", "Module exceeds source file limits");
 }
-export function validateModuleSourceRecord(files: ModuleFile[]) {
-  const record = moduleMaterialRecord(files);
-  if (record) assertSources(files, record);
-}
-/** Returns exactly the bytes that belong in Git, verifying the entire submitted material. */
+/** Source includes the exact record and build inputs; artifacts are verified separately. */
 export function moduleSourceFiles(files: ModuleFile[]): ModuleFile[] {
   const record = moduleMaterialRecord(files);
-  if (!record) return files;
+  if (!record) throw new StewardError("invalid", "chrona-material.json is required");
   const source = files.filter(file => file.path === MODULE_MATERIAL_FILE || record.source.includes(file.path));
   assertSources(source, record);
   if (new Set(files.map(file => file.path)).size !== files.length || files.length !== source.length + record.artifacts.length) throw new StewardError("invalid", "Unexpected or duplicate material files");
@@ -46,7 +43,7 @@ export async function snapshotModuleMaterial(root: string, path: string, options
     const directory = await openModuleDirectory(root, path, false, snapshot);
     let recordFile: ModuleFile;
     try { recordFile = await directory.read(MODULE_MATERIAL_FILE, MODULE_SOURCE_MAX_BYTES); }
-    catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return snapshotModule(root, path); throw error; }
+    catch (error) { throw Object.assign(new StewardError("invalid", "chrona-material.json is required and must be readable"), { cause: error }); }
     const record = moduleMaterialRecord([recordFile])!;
     const files = [recordFile];
     let sourceTotal = recordFile.bytes.byteLength, artifactTotal = 0;
@@ -99,7 +96,7 @@ export async function storeModuleArtifacts(platform: string, files: ModuleFile[]
 /** Reconstruct exact version material; never run build commands or use a mutable output. */
 export async function restoreModuleArtifacts(platform: string, source: ModuleFile[]): Promise<ModuleFile[]> {
   const record = moduleMaterialRecord(source);
-  if (!record) return source;
+  if (!record) throw new StewardError("invalid", "chrona-material.json is required");
   assertSources(source, record);
   const files = [...source];
   if (record.artifacts.length) {
@@ -115,13 +112,61 @@ export async function restoreModuleArtifacts(platform: string, source: ModuleFil
   }
   return sorted(files);
 }
-/** Length-delimited, mode-bound material digest; legacy receipts retain their original digest. */
+/** Version identity binds every selected path, byte length, byte and executable mode. */
 export function moduleMaterialDigest(files: ModuleFile[]) {
-  const digest = createHash("sha256"), explicit = !!moduleMaterialRecord(files);
+  const digest = createHash("sha256");
   for (const file of sorted(files)) {
     digest.update(file.path).update("\0");
-    if (explicit) digest.update(`${file.executable ? "755" : "644"}:${file.bytes.byteLength}:`);
+    digest.update(`${file.executable ? "755" : "644"}:${file.bytes.byteLength}:`);
     digest.update(file.bytes).update("\0");
   }
   return digest.digest("hex");
+}
+
+const storedSourceSchema = z.array(z.object({
+  path: z.string().refine(isModuleMaterialPath),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/),
+  executable: z.boolean(),
+}).strict()).min(1).max(MODULE_SOURCE_MAX_FILES);
+
+export async function storeVersionMaterial(platform: string, files: ModuleFile[]): Promise<string> {
+  const source = await storeModuleArtifacts(platform, files), hash = moduleMaterialDigest(files);
+  await mkdir(platform, { recursive: true });
+  const objects = await openModuleDirectory(platform, "artifacts/sha256", true);
+  try {
+    for (const file of source) {
+      const digest = sha256(file.bytes);
+      await objects.publishImmutable(digest, file.bytes);
+      await readArtifact(objects, digest, MODULE_SOURCE_MAX_BYTES);
+    }
+  } finally { await objects.close(); }
+  const index = source.map(file => ({ path: file.path, sha256: sha256(file.bytes), executable: !!file.executable }));
+  const materials = await openModuleDirectory(platform, "materials/sha256", true);
+  try { await materials.publishImmutable(hash, Buffer.from(JSON.stringify(index))); }
+  finally { await materials.close(); }
+  await readStoredVersionMaterial(platform, hash);
+  return hash;
+}
+
+export async function readStoredVersionMaterial(platform: string, hash: string): Promise<ModuleFile[]> {
+  if (!/^[a-f0-9]{64}$/.test(hash)) throw new StewardError("invalid", "Invalid material SHA256 identity");
+  const materials = await openModuleDirectory(platform, `materials/sha256/${hash}`);
+  let index: z.infer<typeof storedSourceSchema>;
+  try {
+    const entries = await materials.entries(), file = await materials.read("bytes", MODULE_SOURCE_MAX_BYTES);
+    if (entries.length !== 1 || entries[0]?.name !== "bytes" || file.executable) throw new StewardError("conflict", "Stored material index layout mismatch; object preserved");
+    index = storedSourceSchema.parse(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(file.bytes)));
+  } finally { await materials.close(); }
+  const objects = await openModuleDirectory(platform, "artifacts/sha256"), source: ModuleFile[] = [];
+  let total = 0;
+  try {
+    for (const entry of index) {
+      const file = await readArtifact(objects, entry.sha256, MODULE_SOURCE_MAX_BYTES - total);
+      total += file.bytes.byteLength;
+      source.push({ path: entry.path, bytes: file.bytes, ...(entry.executable ? { executable: true } : {}) });
+    }
+  } finally { await objects.close(); }
+  const files = await restoreModuleArtifacts(platform, source);
+  if (moduleMaterialDigest(files) !== hash) throw new StewardError("conflict", "Stored material differs from its SHA256 identity; objects preserved");
+  return files;
 }

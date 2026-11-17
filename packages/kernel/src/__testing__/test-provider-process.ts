@@ -2,7 +2,7 @@ import { randomUUID, createHash } from "node:crypto";
 import { basename } from "node:path";
 import { z } from "zod";
 import { moduleManifestSchema, runtimeStartSchema, runtimeOperationSchema, runtimeOutcomeSchema, runtimeHealthSchema, runtimeTranscriptSchema, runtimeCompletionSchema, providerAnswerSchema, THINKING_LEVELS, type ModuleTool, type ProviderAdapter, type ProviderRunInput, type RuntimeEvent } from "@chrona/contracts/steward";
-import type { StewardPorts } from "../ports";
+import type { TestProviderPorts } from "./test-provider";
 import { CallError } from "../modules/module-calls";
 import { testModuleProcess } from "./module-test-process";
 
@@ -63,7 +63,6 @@ function providerInput(call: Call, raw: unknown): ProviderRunInput {
         } finally { signal.removeEventListener("abort", abort); }
       },
     },
-    detail: { async append(value) { await event(call, callbacks, { kind: "detail", value }); } },
   } : {}) };
 }
 async function controlOperation(operations: Map<string, Operation>, key: string, name: string, args: Record<string, unknown>) {
@@ -94,7 +93,7 @@ async function completion(provider: ProviderAdapter, args: unknown) {
 async function health(provider: ProviderAdapter | undefined) {
   return { result: runtimeHealthSchema.parse({ name: provider?.name ?? "unconfigured", supportsRunModel: provider?.supportsRunModel ?? false, complete: !!provider?.complete, ...(provider ? await provider.health() : { available: false, sandboxed: false, error: null }) }) };
 }
-export function testProviderProcess(ports: StewardPorts, modules: Map<string, string>) {
+export function testProviderProcess(ports: TestProviderPorts, modules: Map<string, string>) {
   const operations = new Map<string, Operation>();
   const completed = new Set<string>();
   function startOperation(key: string, provider: ProviderAdapter, args: unknown, call: Call) {

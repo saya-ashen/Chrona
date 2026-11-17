@@ -12,21 +12,33 @@ import { createProgram } from "./program";
 import { moduleContext } from "../../../packages/kernel/src/modules/module-context";
 import { propose } from "../../../packages/kernel/src/modules/module-proposal";
 import { seedTestModuleRelease } from "../../../packages/kernel/src/__testing__/module-release-test-fixture";
+import { storeVersionMaterial } from "../../../packages/kernel/src/modules/module-artifacts";
 
 
 const dbs: PrismaClient[] = [];
 afterEach(async () => { for (const db of dbs.splice(0)) await db.$disconnect(); });
-async function fixture(hashLength = 64, name = "entry") {
+async function fixture(name = "entry") {
   const dataDir = mkdtempSync(join(tmpdir(), "chrona-admin-test-")), databaseUrl = `file:${join(dataDir, "chrona.db")}`;
   ensureSqliteDatabase({ databaseUrl, migrationsDir: resolve("packages/db/prisma/migrations") });
   const db = new PrismaClient({ adapter: new PrismaBunSqlite({ url: databaseUrl }) }); dbs.push(db);
   await db.workspace.create({ data: { id: "ws_default", name: "Personal" } });
-  const module = await db.module.create({ data: { workspaceId: "ws_default", name, status: "active", activeHash: "a".repeat(hashLength), dataSchema: 1 } });
-  const manifest = { name, entry: "index.ts", keepAlive: true, effects: [], uses: ["chat.send"], tests: ["test.ts"] };
-  for (const hash of ["a", "b"]) await db.moduleVersion.create({ data: { moduleId: module.id, hash: hash.repeat(hashLength), manifest, intent: {}, report: {}, source: hash === "a" ? "builtin" : "user", status: "approved" } });
+  let module = await db.module.create({ data: { workspaceId: "ws_default", name, status: "active", dataSchema: 1 } });
+  const manifest = { name, entry: "index.ts", keepAlive: true, effects: [], uses: [], tests: [] };
+  const hashes: string[] = [];
+  for (const variant of ["a", "b"]) {
+    const files = [
+      { path: "module.json", bytes: Buffer.from(JSON.stringify(manifest)) },
+      { path: "index.ts", bytes: Buffer.from(`export const variant = "${variant}";`) },
+      { path: "chrona-material.json", bytes: Buffer.from(JSON.stringify({ schema: 1, source: ["module.json", "index.ts"], artifacts: [], build: { commands: [], toolchain: "bun", target: "host" } })) },
+    ];
+    const hash = await storeVersionMaterial(join(dataDir, "platform"), files);
+    hashes.push(hash);
+    await db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest, intent: {}, report: {}, source: "user", status: "approved" } });
+  }
+  module = await db.module.update({ where: { id: module.id }, data: { activeHash: hashes[0]! } });
   const ports = { db, dataDir, now: () => new Date(), publicUrl: null };
   const api = createStewardService(ports).forWorkspace("ws_default");
-  return { db, module, api, options: { dataDir, databaseUrl } };
+  return { db, module, api, rollbackHash: hashes[1]!, options: { dataDir, databaseUrl } };
 }
 async function offlineResources(dataDir: string, name: string) {
   const root = join(dataDir, "resources"), external = join(root, "external"), dir = join(external, name);
@@ -42,7 +54,7 @@ async function offlineResources(dataDir: string, name: string) {
 }
 test("admin commands are registered", () => {
   const admin = createProgram().commands.find(c => c.name() === "admin")!;
-  expect(admin.commands.map(c => c.name())).toEqual(["git-status", "git-associate", "git-push", "modules", "catalog", "install", "diagnostics", "approvals", "rollback", "disable", "enable", "remove", "approve", "reject", "secret-set", "secret-remove"]);
+  expect(admin.commands.map(c => c.name())).toEqual(["modules", "catalog", "install", "diagnostics", "approvals", "rollback", "disable", "enable", "remove", "approve", "reject", "secret-set", "secret-remove"]);
 });
 
 
@@ -81,7 +93,7 @@ test("admin remove requires a target in the default workspace and retains the ru
 });
 
 test.each(["web", "notify"])("admin remove requests %s deletion offline and only separate approval removes it with a backup", async name => {
-  const f = await fixture(64, name), log = spyOn(console, "log").mockImplementation(() => {});
+  const f = await fixture(name), log = spyOn(console, "log").mockImplementation(() => {});
   const data = join(f.options.dataDir, "platform", "data", f.module.id);
   const content = join(f.options.dataDir, "platform", "content", f.module.id);
   for (const dir of [data, content]) { mkdirSync(dir, { recursive: true }); writeFileSync(join(dir, "keep.txt"), "valuable"); }
@@ -116,14 +128,13 @@ test.each(["web", "notify"])("admin remove requests %s deletion offline and only
   } finally { log.mockRestore(); }
 });
 
-test.each([40, 64])("admin rollback accepts an approved %i-character hash and disable pauses schedules", async hashLength => {
-  const f = await fixture(hashLength), log = spyOn(console, "log").mockImplementation(() => {}), hash = "b".repeat(hashLength);
+test("admin rollback accepts an approved material hash and disable pauses the application", async () => {
+  const f = await fixture(), log = spyOn(console, "log").mockImplementation(() => {}), hash = f.rollbackHash;
   try {
     await runAdmin("rollback", [f.module.name, hash], f.options);
     expect(await f.db.module.findUnique({ where: { id: f.module.id } })).toMatchObject({ activeHash: hash });
     expect(await f.db.approval.count({ where: { moduleId: f.module.id } })).toBe(0);
     expect(await f.db.audit.findFirst({ where: { kind: "admin_rollback" } })).toMatchObject({ actorKey: "user", details: { source: "cli", hash } });
-    expect(await f.db.generation.count()).toBe(1);
     expect(await f.db.stewardState.count()).toBe(0);
     expect(await f.db.run.count()).toBe(0);
     expect(await f.db.moduleRun.count()).toBe(0);
@@ -155,21 +166,19 @@ test("admin enable respects the runtime lock and resumes with a new activation",
 
 test("admin rollback rejects malformed hashes and builtin token without changing state", async () => {
   const f = await fixture();
-  for (const hash of [undefined, "", "builtin", "a".repeat(39), "a".repeat(41), "a".repeat(63), "a".repeat(65), "A".repeat(40), "A".repeat(64), "g".repeat(40), "g".repeat(64)]) {
+  for (const hash of [undefined, "", "builtin", "a".repeat(39), "a".repeat(40), "a".repeat(41), "a".repeat(63), "a".repeat(65), "A".repeat(40), "A".repeat(64), "g".repeat(40), "g".repeat(64)]) {
     await expect(runAdmin("rollback", hash === undefined ? [f.module.name] : [f.module.name, hash], f.options)).rejects.toThrow("external module version hash");
   }
-  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ activeHash: "a".repeat(64) });
-  expect(await f.db.generation.count()).toBe(0);
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ activeHash: f.module.activeHash });
   expect(await f.db.audit.count({ where: { kind: "admin_rollback" } })).toBe(0);
 });
 
-test.each([40, 64])("admin rollback still rejects unapproved or absent %i-character hashes", async hashLength => {
-  const f = await fixture(hashLength);
-  const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.module.id, hash: "b".repeat(hashLength) } } });
+test("admin rollback still rejects unapproved or absent material hashes", async () => {
+  const f = await fixture();
+  const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.module.id, hash: f.rollbackHash } } });
   await f.db.moduleVersion.update({ where: { id: version.id }, data: { status: "pending_review" } });
-  for (const hash of [version.hash, "c".repeat(hashLength)]) await expect(runAdmin("rollback", [f.module.name, hash], f.options)).rejects.toThrow("Module version is not approved");
-  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ activeHash: "a".repeat(hashLength) });
-  expect(await f.db.generation.count()).toBe(0);
+  for (const hash of [version.hash, "c".repeat(64)]) await expect(runAdmin("rollback", [f.module.name, hash], f.options)).rejects.toThrow("Module version is not approved");
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ activeHash: f.module.activeHash });
   expect(await f.db.audit.count({ where: { kind: "admin_rollback" } })).toBe(0);
 });
 
@@ -197,8 +206,7 @@ test("admin install queues trusted official code offline, preserves the lock and
   }
 });
 
-test("admin exact release requires update, takes the runtime lock and queues only the host-pinned commit", async () => {
-  await expect(createProgram().parseAsync(["admin", "install", "pi", "--exact-release", "--request-key", "invalid"], { from: "user" })).rejects.toThrow("requires --update");
+test("admin update takes the runtime lock and queues only the selected material", async () => {
   const f = await fixture(), log = spyOn(console, "log").mockImplementation(() => {});
   const previous = process.env.CHRONA_RESOURCE_DIR;
   const root = await offlineResources(f.options.dataDir, "author");
@@ -208,18 +216,17 @@ test("admin exact release requires update, takes the runtime lock and queues onl
     const local = await propose(context, { root: join(root, "external"), dir: "author", intent: { changes: ["Owner source submission"] } }, "user");
     await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: local.moduleId!, hash: local.hash } }, data: { status: "approved" } });
     await f.db.module.update({ where: { id: local.moduleId! }, data: { activeHash: local.hash, dataSchema: 1 } });
-    const args = ["author", "update", "exact-cli", "exact-release"];
+    const args = ["author", "update", "exact-cli"];
     const lock = acquireSqliteRuntimeLock(f.options.databaseUrl);
     try { await expect(runAdmin("install", args, f.options)).rejects.toThrow("already in use"); } finally { lock.release(); }
-    const lockFile = JSON.parse(readFileSync(join(root, "module-git/lock.json"), "utf8"));
-    const hash = lockFile.modules.find((entry: { name: string }) => entry.name === "author").commit;
+    writeFileSync(join(root, "external/author/index.ts"), "export const updated = true;\n");
+    const { hash } = await seedTestModuleRelease(join(root, "external"), "author");
     expect(hash).not.toBe(local.hash);
     const queued = await runAdmin("install", args, f.options);
     expect(queued).toMatchObject({ status: "building", hash, moduleId: local.moduleId });
     expect(await runAdmin("install", args, f.options)).toEqual(queued);
     expect((await f.db.module.findUniqueOrThrow({ where: { id: local.moduleId! } })).activeHash).toBe(local.hash);
-    await expect(runAdmin("install", ["author", "update", "exact-cli"], f.options)).rejects.toMatchObject({ code: "conflict" });
-    await expect(runAdmin("install", ["author", "update", "forged", "arbitrary-commit"], f.options)).rejects.toThrow("Invalid install selection");
+    await expect(runAdmin("install", ["author", "update", "forged", "arbitrary-commit"], f.options)).rejects.toThrow("Invalid install arguments");
   } finally {
     if (previous === undefined) delete process.env.CHRONA_RESOURCE_DIR; else process.env.CHRONA_RESOURCE_DIR = previous;
     log.mockRestore();
@@ -239,7 +246,7 @@ test.each(["author", "files", "events", "mcp", "mind"])("stopped-service officia
     const receipt = await runAdmin("install", [name, "install", `recover-${name}`], f.options);
     expect(receipt).toMatchObject({ package: name, status: "building", moduleId: expect.any(String), hash: expect.any(String) });
     expect(await runAdmin("install", [name, "install", `recover-${name}`], f.options)).toEqual(receipt);
-    expect(await f.db.module.findFirstOrThrow({ where: { name } })).toMatchObject({ builtin: false, activeHash: null });
+    expect(await f.db.module.findFirstOrThrow({ where: { name } })).toMatchObject({ activeHash: null });
     expect(await f.db.moduleVersion.count({ where: { module: { name }, status: "building" } })).toBe(1);
     expect(await f.db.module.count()).toBe(2);
     expect(await f.db.stewardState.count()).toBe(0);

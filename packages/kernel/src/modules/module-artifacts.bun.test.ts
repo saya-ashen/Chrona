@@ -1,6 +1,5 @@
 import { afterAll, afterEach, expect, spyOn, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
 import { mkdtempSync } from "node:fs";
 import { chmod, link, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -10,8 +9,8 @@ import { MODULE_MATERIAL_FILE, MODULE_SOURCE_MAX_BYTES, MODULE_SOURCE_MAX_FILES,
 // Engine imports must never inherit a developer/live database URL.
 const databaseRoot = mkdtempSync(join(tmpdir(), "chrona-material-test-db-"));
 process.env.DATABASE_URL = `file:${join(databaseRoot, "test.db")}`;
-const [{ snapshotModuleMaterial, moduleMaterialDigest, moduleSourceFiles, storeModuleArtifacts }, { commitModuleSource, importLegacyModuleSource, moduleGitPath, readModuleSource, readModuleMaterial }, { snapshotModule, ModuleDirectory, checkoutModule }, { admitCandidates, submitCandidates, candidateSource }, { testDb }, { moduleContext }, { buildPending }, { ensureVersionMaterial }, { rollback }, { testModuleProcess }, { createExternalModuleInstaller, installExternal }] = await Promise.all([
-  import("./module-artifacts"), import("./module-git"), import("./module-files"), import("./module-candidates"), import("../__testing__/test-db"), import("./module-context"), import("./module-build"), import("./module-source"), import("./module-activation"), import("../__testing__/module-test-process"), import("./module-install"),
+const [{ snapshotModuleMaterial, moduleMaterialDigest, moduleSourceFiles, storeModuleArtifacts, storeVersionMaterial, readStoredVersionMaterial }, { snapshotModule, ModuleDirectory, checkoutModule }, { admitCandidates, submitCandidates, candidateSource }, { testDb }, { moduleContext }, { buildPending }, { ensureVersionMaterial }, { rollback }, { testModuleProcess }, { createExternalModuleInstaller, installExternal }] = await Promise.all([
+  import("./module-artifacts"), import("./module-files"), import("./module-candidates"), import("../__testing__/test-db"), import("./module-context"), import("./module-build"), import("./module-source"), import("./module-activation"), import("../__testing__/module-test-process"), import("./module-install"),
 ]);
 const roots: string[] = [];
 const closes: (() => Promise<unknown>)[] = [];
@@ -30,12 +29,12 @@ async function fixture() {
   const repository = { platform: join(root, "platform"), moduleId: "fixture" };
   return { root, dir, binary, record, manifest, repository };
 }
-test("explicit material keeps ignored source inputs in Git and binary bytes outside Git, restoring executable copies", async () => {
+test("explicit material keeps ignored source inputs and binary bytes in retained CAS, restoring executable copies", async () => {
   const f = await fixture(), files = await snapshotModuleMaterial(f.root, "submitted");
   expect(files).toHaveLength(8);
   await expect(snapshotModule(f.root, "submitted")).rejects.toMatchObject({ code: "invalid" });
-  const revision = await commitModuleSource({ ...f.repository, versionId: "first", files, message: "submit" });
-  const source = await readModuleSource({ ...f.repository, commit: revision.commit });
+  const revision = await storeVersionMaterial(f.repository.platform, files);
+  const source = moduleSourceFiles(await readStoredVersionMaterial(f.repository.platform, revision));
   expect(source.map(file => file.path)).toEqual(moduleSourceFiles(files).map(file => file.path));
   expect(source.some(file => file.path === "bin/program")).toBe(false);
   const blob = join(f.repository.platform, "artifacts/sha256", f.record.artifacts[0]!.sha256, "bytes");
@@ -43,30 +42,30 @@ test("explicit material keeps ignored source inputs in Git and binary bytes outs
   expect((await stat(blob)).mode & 0o777).toBe(0o444);
   // The mutable submitted output can disappear; immutable restoration does not rebuild it.
   await rm(f.dir, { recursive: true });
-  expect(moduleMaterialDigest(await readModuleMaterial({ ...f.repository, commit: revision.commit }))).toBe(moduleMaterialDigest(files));
-  await checkoutModule(f.root, "checkout", await readModuleMaterial({ ...f.repository, commit: revision.commit }));
+  expect(moduleMaterialDigest(await readStoredVersionMaterial(f.repository.platform, revision))).toBe(moduleMaterialDigest(files));
+  await checkoutModule(f.root, "checkout", await readStoredVersionMaterial(f.repository.platform, revision));
   expect(await readFile(join(f.root, "checkout/bin/program"))).toEqual(f.binary);
   expect((await stat(join(f.root, "checkout/bin/program"))).mode & 0o777).toBe(0o755);
   expect((await stat(blob)).nlink).toBe(1);
   await writeFile(join(f.root, "checkout/bin/program"), "edited copy");
   expect(await readFile(blob)).toEqual(f.binary);
 });
-test("artifact bytes and executable mode bind the receipt and Git version", async () => {
+test("artifact bytes and executable mode bind the receipt and material version", async () => {
   const f = await fixture(), first = await snapshotModuleMaterial(f.root, "submitted");
-  const a = await commitModuleSource({ ...f.repository, versionId: "first", files: first, message: "first" });
+  const a = await storeVersionMaterial(f.repository.platform, first);
   const replacement = Buffer.from([0, 1, 2, 255]);
   await writeFile(join(f.dir, "bin/program"), replacement);
   f.record.artifacts[0]!.sha256 = digest(replacement);
   await writeFile(join(f.dir, MODULE_MATERIAL_FILE), JSON.stringify(f.record));
   const second = await snapshotModuleMaterial(f.root, "submitted");
-  const b = await commitModuleSource({ ...f.repository, versionId: "second", files: second, message: "second" });
-  expect(b.commit).not.toBe(a.commit); expect(moduleMaterialDigest(second)).not.toBe(moduleMaterialDigest(first));
-  expect((await readModuleMaterial({ ...f.repository, commit: a.commit })).find(file => file.path === "bin/program")!.bytes).toEqual(f.binary);
+  const b = await storeVersionMaterial(f.repository.platform, second);
+  expect(b).not.toBe(a); expect(moduleMaterialDigest(second)).not.toBe(moduleMaterialDigest(first));
+  expect((await readStoredVersionMaterial(f.repository.platform, a)).find(file => file.path === "bin/program")!.bytes).toEqual(f.binary);
   f.record.artifacts[0]!.executable = false; await chmod(join(f.dir, "bin/program"), 0o644);
   await writeFile(join(f.dir, MODULE_MATERIAL_FILE), JSON.stringify(f.record));
   const third = await snapshotModuleMaterial(f.root, "submitted");
-  const c = await commitModuleSource({ ...f.repository, versionId: "third", files: third, message: "mode" });
-  expect(c.commit).not.toBe(b.commit); expect(moduleMaterialDigest(third)).not.toBe(moduleMaterialDigest(second));
+  const c = await storeVersionMaterial(f.repository.platform, third);
+  expect(c).not.toBe(b); expect(moduleMaterialDigest(third)).not.toBe(moduleMaterialDigest(second));
 });
 test("digest mismatch and mode mismatch fail before persistence", async () => {
   const f = await fixture();
@@ -93,7 +92,7 @@ test("artifact bounds are separate from the source limit and checked before over
   await writeFile(join(f.dir, "index.ts"), Buffer.alloc(MODULE_SOURCE_MAX_BYTES));
   await expect(snapshotModuleMaterial(f.root, "submitted")).rejects.toMatchObject({ code: "invalid" });
 });
-test("explicit source at 2 MiB roundtrips through Git and export; one extra byte is rejected", async () => {
+test("explicit source at 2 MiB roundtrips through CAS and export; one extra byte is rejected", async () => {
   const f = await fixture(), initial = await snapshotModuleMaterial(f.root, "submitted");
   const otherBytes = moduleSourceFiles(initial).filter(file => file.path !== "index.ts").reduce((total, file) => total + file.bytes.byteLength, 0);
   const bytes = Buffer.alloc(MODULE_SOURCE_MAX_BYTES - otherBytes, 0x61);
@@ -101,59 +100,42 @@ test("explicit source at 2 MiB roundtrips through Git and export; one extra byte
   await writeFile(join(f.dir, "index.ts"), bytes);
   const files = await snapshotModuleMaterial(f.root, "submitted");
   expect(moduleSourceFiles(files).reduce((total, file) => total + file.bytes.byteLength, 0)).toBe(2 * 1024 * 1024);
-  const revision = await commitModuleSource({ ...f.repository, versionId: "boundary", files, message: "source budget" });
-  expect(await readModuleSource({ ...f.repository, commit: revision.commit })).toEqual(moduleSourceFiles(files));
-  await checkoutModule(f.root, "exported", await readModuleMaterial({ ...f.repository, commit: revision.commit }));
+  const revision = await storeVersionMaterial(f.repository.platform, files);
+  expect(moduleSourceFiles(await readStoredVersionMaterial(f.repository.platform, revision))).toEqual(moduleSourceFiles(files));
+  await checkoutModule(f.root, "exported", await readStoredVersionMaterial(f.repository.platform, revision));
   expect(moduleMaterialDigest(await snapshotModuleMaterial(f.root, "exported"))).toBe(moduleMaterialDigest(files));
   const oversized = Buffer.concat([bytes, Buffer.from("x")]);
   await writeFile(join(f.dir, "index.ts"), oversized);
   await expect(snapshotModuleMaterial(f.root, "submitted")).rejects.toMatchObject({ code: "invalid" });
-  await expect(commitModuleSource({ ...f.repository, versionId: "oversized", files: files.map(file => file.path === "index.ts" ? { ...file, bytes: oversized } : file), message: "oversized" })).rejects.toMatchObject({ code: "invalid" });
+  await expect(storeVersionMaterial(f.repository.platform, files.map(file => file.path === "index.ts" ? { ...file, bytes: oversized } : file))).rejects.toMatchObject({ code: "invalid" });
 });
 
-test("legacy snapshots and imports share the 2 MiB budget and Git reads reject oversized blobs", async () => {
+test("source-only legacy layouts cannot enter retained materials", async () => {
   const f = await fixture();
-  await rm(f.dir, { recursive: true }); await mkdir(f.dir);
-  const bytes = Buffer.alloc(MODULE_SOURCE_MAX_BYTES - 2, 0x62);
-  await writeFile(join(f.dir, "module.json"), "{}"); await writeFile(join(f.dir, "index.ts"), bytes);
-  const files = await snapshotModule(f.root, "submitted");
-  expect(files.reduce((total, file) => total + file.bytes.byteLength, 0)).toBe(2 * 1024 * 1024);
-  const revision = await importLegacyModuleSource({ ...f.repository, legacyHash: moduleMaterialDigest(files), files });
-  expect(await readModuleSource({ ...f.repository, commit: revision.commit })).toEqual(files);
-  await checkoutModule(f.root, "exported", await readModuleMaterial({ ...f.repository, commit: revision.commit }));
-  expect(await snapshotModule(f.root, "exported")).toEqual(files);
-  await writeFile(join(f.dir, "index.ts"), Buffer.concat([bytes, Buffer.from("x")]));
-  await expect(snapshotModule(f.root, "submitted")).rejects.toMatchObject({ code: "invalid" });
-  const oversized = [{ path: "index.ts", bytes: Buffer.alloc(MODULE_SOURCE_MAX_BYTES + 1) }];
-  await expect(commitModuleSource({ ...f.repository, versionId: "oversized", files: oversized, message: "oversized" })).rejects.toMatchObject({ code: "invalid" });
-  await expect(importLegacyModuleSource({ ...f.repository, legacyHash: moduleMaterialDigest(oversized), files: oversized })).rejects.toMatchObject({ code: "invalid" });
-  // External Git objects bypass submission validation and must still hit the source bound.
-  const repo = moduleGitPath(f.repository.platform, f.repository.moduleId);
-  const blob = execFileSync("git", ["--git-dir", repo, "hash-object", "-w", "--stdin"], { input: oversized[0]!.bytes, encoding: "utf8" }).trim();
-  const tree = execFileSync("git", ["--git-dir", repo, "mktree"], { input: `100644 blob ${blob}\tindex.ts\n`, encoding: "utf8" }).trim();
-  const commit = execFileSync("git", ["--git-dir", repo, "-c", "user.name=Test", "-c", "user.email=test@localhost", "commit-tree", tree], { input: "oversized", encoding: "utf8" }).trim();
-  await expect(readModuleSource({ ...f.repository, commit })).rejects.toMatchObject({ code: "invalid" });
+  await rm(join(f.dir, MODULE_MATERIAL_FILE));
+  await expect(snapshotModuleMaterial(f.root, "submitted")).rejects.toMatchObject({ code: "invalid" });
+  await expect(storeVersionMaterial(f.repository.platform, [{ path: "index.ts", bytes: Buffer.from("unrecorded") }])).rejects.toMatchObject({ code: "invalid" });
 });
 
 test("source file counts remain bounded independently of bytes", async () => {
   const f = await fixture();
   const files = Array.from({ length: MODULE_SOURCE_MAX_FILES + 1 }, (_, index) => ({ path: `file-${index}`, bytes: Buffer.alloc(0) }));
-  await expect(commitModuleSource({ ...f.repository, versionId: "too-many", files, message: "too many files" })).rejects.toMatchObject({ code: "invalid" });
+  await expect(storeVersionMaterial(f.repository.platform, files)).rejects.toMatchObject({ code: "invalid" });
   expect(moduleMaterialSchema.safeParse({ ...f.record, source: ["module.json", ...files.slice(0, MODULE_SOURCE_MAX_FILES - 2).map(file => file.path)] }).success).toBe(true);
   expect(moduleMaterialSchema.safeParse({ ...f.record, source: ["module.json", ...files.slice(0, MODULE_SOURCE_MAX_FILES - 1).map(file => file.path)] }).success).toBe(false);
 });
 
 test("corrupt or missing immutable objects stop restoration and are preserved", async () => {
   const f = await fixture(), files = await snapshotModuleMaterial(f.root, "submitted");
-  const revision = await commitModuleSource({ ...f.repository, versionId: "first", files, message: "first" });
+  const revision = await storeVersionMaterial(f.repository.platform, files);
   const blob = join(f.repository.platform, "artifacts/sha256", f.record.artifacts[0]!.sha256, "bytes");
   await chmod(blob, 0o644); await writeFile(blob, "corrupt");
-  await expect(readModuleMaterial({ ...f.repository, commit: revision.commit })).rejects.toMatchObject({ code: "conflict" });
-  await expect(commitModuleSource({ ...f.repository, versionId: "second", files, message: "retry" })).rejects.toMatchObject({ code: "conflict" });
+  await expect(readStoredVersionMaterial(f.repository.platform, revision)).rejects.toMatchObject({ code: "conflict" });
+  await expect(storeVersionMaterial(f.repository.platform, files)).rejects.toMatchObject({ code: "conflict" });
   expect(await readFile(blob, "utf8")).toBe("corrupt");
   await rm(blob);
-  await expect(readModuleMaterial({ ...f.repository, commit: revision.commit })).rejects.toMatchObject({ code: "ENOENT" });
-  await expect(commitModuleSource({ ...f.repository, versionId: "third", files, message: "partial object" })).rejects.toMatchObject({ code: "ENOENT" });
+  await expect(readStoredVersionMaterial(f.repository.platform, revision)).rejects.toMatchObject({ code: "ENOENT" });
+  await expect(storeVersionMaterial(f.repository.platform, files)).rejects.toMatchObject({ code: "ENOENT" });
   expect((await stat(join(blob, ".."))).isDirectory()).toBe(true);
 });
 test("record paths are disjoint, portable, bounded and include module.json", async () => {
@@ -163,10 +145,16 @@ test("record paths are disjoint, portable, bounded and include module.json", asy
   }
   expect(moduleMaterialSchema.safeParse({ ...f.record, artifacts: Array.from({ length: 1001 }, (_, index) => ({ path: `bin/${index}`, sha256: "a".repeat(64) })) }).success).toBe(false);
 });
-test("candidate receipts freeze complete materials, replay after deletion and export an admitted baseline", async () => {
+test.each([true, false])("candidate receipts freeze materials, replay and export an admitted baseline (artifacts=%s)", async artifacts => {
   const f = await fixture(), db = testDb(); closes.push(() => db.$disconnect());
+  if (!artifacts) {
+    await rm(join(f.dir, "bin"), { recursive: true });
+    f.record.artifacts = [];
+    f.record.build.commands = [];
+    await writeFile(join(f.dir, MODULE_MATERIAL_FILE), JSON.stringify(f.record));
+  }
   const workspace = await db.workspace.create({ data: { name: "material test" } });
-  const authorHash = "a".repeat(40), author = await db.module.create({ data: { workspaceId: workspace.id, name: "author", activeHash: authorHash } });
+  const authorHash = "a".repeat(64), author = await db.module.create({ data: { workspaceId: workspace.id, name: "author", activeHash: authorHash } });
   await db.moduleVersion.create({ data: { moduleId: author.id, hash: authorHash, manifest: { ...f.manifest, name: "author", uses: ["*"],
       authority: "owner"
 }, intent: {}, report: {}, source: "user", status: "approved" } });
@@ -174,19 +162,27 @@ test("candidate receipts freeze complete materials, replay after deletion and ex
   const caller = { kind: "module" as const, module: "author", moduleId: author.id, hash: authorHash };
   const content = join(f.root, "platform/content", author.id); await mkdir(content, { recursive: true });
   const { rename } = await import("node:fs/promises"); await rename(f.dir, join(content, "submitted"));
-  const admission = await admitCandidates(ports, workspace.id, owner, { requestKey: "admit", submitter: { moduleId: author.id, hash: authorHash }, targets: [{ name: "fixture", moduleId: null, expectedActiveHash: null }] });
-  const input = { admissionId: admission.admissionId, requestKey: "submit", items: [{ name: "fixture", dir: "submitted", intent: { changes: ["material"], preserves: [] } }] };
-  const files = await snapshotModuleMaterial(content, "submitted"), receipt = await submitCandidates(ports, workspace.id, caller, input), member = receipt.members[0]!;
+  const admission = await admitCandidates(ports, workspace.id, owner, { requestKey: "admit", submitter: { moduleId: author.id, hash: authorHash }, target: { name: "fixture", moduleId: null, expectedActiveHash: null } });
+  const input = { admissionId: admission.admissionId, requestKey: "submit", item: { name: "fixture", dir: "submitted", intent: { changes: ["material"], preserves: [] } } };
+  const files = await snapshotModuleMaterial(content, "submitted"), receipt = await submitCandidates(ports, workspace.id, caller, input), member = receipt.member;
   expect(member.materialDigest).toBe(moduleMaterialDigest(files));
   await rm(join(content, "submitted"), { recursive: true });
   expect(await submitCandidates(ports, workspace.id, caller, input)).toEqual(receipt);
-  await db.moduleVersion.update({ where: { id: member.versionId }, data: { status: "approved" } });
+  const version = await db.moduleVersion.update({ where: { id: member.versionId }, data: { status: "approved" } });
   await db.module.update({ where: { id: member.moduleId }, data: { activeHash: member.hash } });
-  const baseline = await admitCandidates(ports, workspace.id, owner, { requestKey: "baseline", submitter: { moduleId: author.id, hash: authorHash }, targets: [{ name: "fixture", moduleId: member.moduleId, expectedActiveHash: member.hash }] });
+  const baseline = await admitCandidates(ports, workspace.id, owner, { requestKey: "baseline", submitter: { moduleId: author.id, hash: authorHash }, target: { name: "fixture", moduleId: member.moduleId, expectedActiveHash: member.hash } });
   const exported = await candidateSource(ports, workspace.id, caller, { admissionId: baseline.admissionId, moduleId: member.moduleId, hash: member.hash, to: "exported" });
   expect(exported.materialDigest).toBe(member.materialDigest);
-  expect(await readFile(join(content, "exported/bin/program"))).toEqual(f.binary);
-  expect((await stat(join(content, "exported/bin/program"))).mode & 0o111).toBe(0o111);
+  if (artifacts) {
+    expect(await readFile(join(content, "exported/bin/program"))).toEqual(f.binary);
+    expect((await stat(join(content, "exported/bin/program"))).mode & 0o111).toBe(0o111);
+  } else {
+    const context = moduleContext(ports, workspace.id), checkout = join(context.store, member.hash);
+    await expect(stat(checkout)).rejects.toMatchObject({ code: "ENOENT" });
+    await ensureVersionMaterial(context, version);
+    expect(await readFile(join(checkout, "index.ts"), "utf8")).toBe("export {};");
+    expect(moduleMaterialDigest(await snapshotModuleMaterial(context.platform, `store/${member.hash}`, { verifyTree: true }))).toBe(member.materialDigest);
+  }
 });
 
 test.each(["none", "bytes", "extra"])("the native checker preserves frozen artifacts and rollback bytes (mutation=%s)", async mutate => {
@@ -197,8 +193,8 @@ test.each(["none", "bytes", "extra"])("the native checker preserves frozen artif
   await writeFile(join(f.dir, "module.json"), JSON.stringify(manifest));
   const context = moduleContext({ db, dataDir: f.root, publicUrl: null, now: () => new Date() }, workspace.id);
   const files = await snapshotModuleMaterial(f.root, "submitted");
-  const revision = await commitModuleSource({ platform: context.platform, moduleId: module.id, versionId: "first", files, message: "native fixture" });
-  const version = await db.moduleVersion.create({ data: { moduleId: module.id, hash: revision.commit, manifest, source: "user", intent: { changes: ["native artifact"], preserves: [] }, status: "building", report: { tests: [], git: revision } } });
+  const revision = await storeVersionMaterial(context.platform, files);
+  const version = await db.moduleVersion.create({ data: { moduleId: module.id, hash: revision, manifest, source: "user", intent: { changes: ["native artifact"], preserves: [] }, status: "building", report: { tests: [] } } });
   await rm(f.dir, { recursive: true });
   let checked = 0;
   const assertCopy = async (codeDir: string) => {
@@ -224,18 +220,18 @@ test.each(["none", "bytes", "extra"])("the native checker preserves frozen artif
   const result = await db.moduleVersion.findUniqueOrThrow({ where: { id: version.id } });
   if (mutate !== "none") {
     expect(result.status).toBe("rejected");
-    await expect(stat(join(context.store, revision.commit))).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(stat(join(context.store, revision))).rejects.toMatchObject({ code: "ENOENT" });
     expect((await db.module.findUniqueOrThrow({ where: { id: module.id } })).activeHash).toBeNull();
-    expect((await readModuleMaterial({ platform: context.platform, moduleId: module.id, commit: revision.commit })).find(file => file.path === "bin/program")!.bytes).toEqual(f.binary);
+    expect((await readStoredVersionMaterial(context.platform, revision)).find(file => file.path === "bin/program")!.bytes).toEqual(f.binary);
     return;
   }
   expect(result.status).toBe("approved");
-  const installed = join(context.store, revision.commit);
+  const installed = join(context.store, revision);
   expect(await readFile(join(installed, "bin/program"))).toEqual(f.binary);
   expect((await stat(join(installed, "bin/program"))).mode & 0o777).toBe(0o555);
-  // An absent runtime copy is reconstructed from Git and CAS, without running a compiler.
+  // An absent runtime copy is reconstructed from retained CAS, without running a compiler.
   await rm(installed, { recursive: true });
-  await rollback(context, module.id, revision.commit);
+  await rollback(context, module.id, revision);
   expect(await readFile(join(installed, "bin/program"))).toEqual(f.binary);
   expect((await stat(join(installed, "bin/program"))).mode & 0o777).toBe(0o555);
   await chmod(join(installed, "bin/program"), 0o755);
@@ -244,45 +240,33 @@ test.each(["none", "bytes", "extra"])("the native checker preserves frozen artif
   expect(await readFile(join(installed, "bin/program"), "utf8")).toBe("changed runtime copy");
 });
 
-test("official source-only bundles install and update complete verified artifact material", async () => {
+test("offline releases install and update complete verified material without Git", async () => {
   const f = await fixture(), db = testDb(); closes.push(() => db.$disconnect());
-  const resources = join(f.root, "external"), dir = join(resources, "files"), seeds = join(f.root, "module-git");
-  await mkdir(resources); await mkdir(seeds);
-  const { rename } = await import("node:fs/promises"); await rename(f.dir, dir);
+  const resources = join(f.root, "external"), dir = join(resources, "files");
+  await mkdir(resources); await rename(f.dir, dir);
   await writeFile(join(dir, "module.json"), JSON.stringify({ ...f.manifest, name: "files", entry: { path: "bin/program", args: [] } }));
-  const releaseRepo = { platform: join(f.root, "release-platform"), moduleId: "files" };
-  const publish = async (versionId: string) => {
-    const files = await snapshotModuleMaterial(resources, "files");
-    const revision = await commitModuleSource({ ...releaseRepo, versionId, files, message: versionId });
-    const repo = moduleGitPath(releaseRepo.platform, "files"), bundlePath = join(seeds, "files.bundle");
-    execFileSync("git", ["--git-dir", repo, "update-ref", "refs/heads/main", revision.commit]);
-    await rm(bundlePath, { force: true });
-    execFileSync("git", ["--git-dir", repo, "bundle", "create", bundlePath, "refs/heads/main"]);
-    await writeFile(join(seeds, "lock.json"), JSON.stringify({ version: 1, modules: [{ name: "files", repository: null, branch: "main", commit: revision.commit, bundle: "files.bundle", bundleSha256: digest(await readFile(bundlePath)) }] }));
-    return revision;
-  };
-  const first = await publish("first");
+  const first = moduleMaterialDigest(await snapshotModuleMaterial(resources, "files"));
   const workspace = await db.workspace.create({ data: { name: "artifact release test" } });
   const ports = { db, dataDir: join(f.root, "runtime"), moduleExternalResources: resources, publicUrl: null, now: () => new Date() };
   const installerPorts = { ...ports, moduleExternalInstaller: createExternalModuleInstaller(ports) };
   const installed = await installExternal(installerPorts, workspace.id, { package: "files", mode: "install", requestKey: "native-install" });
-  expect(installed).toMatchObject({ status: "building", hash: first.commit });
-  const location = { platform: join(ports.dataDir, "platform"), moduleId: installed.moduleId! };
-  const material = await readModuleMaterial({ ...location, commit: first.commit });
+  expect(installed).toMatchObject({ status: "building", hash: first });
+  const platform = join(ports.dataDir, "platform");
+  const material = await readStoredVersionMaterial(platform, first);
   expect(material.find(file => file.path === "bin/program")!.bytes).toEqual(f.binary);
   expect(material.find(file => file.path === "bin/program")!.executable).toBe(true);
-  await db.moduleVersion.update({ where: { moduleId_hash: { moduleId: location.moduleId, hash: first.commit } }, data: { status: "approved" } });
-  await db.module.update({ where: { id: location.moduleId }, data: { activeHash: first.commit } });
+  await db.moduleVersion.update({ where: { moduleId_hash: { moduleId: installed.moduleId!, hash: first } }, data: { status: "approved" } });
+  await db.module.update({ where: { id: installed.moduleId! }, data: { activeHash: first } });
   const next = Buffer.from([0, 255, 127, 10]);
   await writeFile(join(dir, "bin/program"), next);
   f.record.artifacts[0]!.sha256 = digest(next);
   await writeFile(join(dir, MODULE_MATERIAL_FILE), JSON.stringify(f.record));
-  const second = await publish("second");
+  const second = moduleMaterialDigest(await snapshotModuleMaterial(resources, "files"));
   const updated = await installExternal(installerPorts, workspace.id, { package: "files", mode: "update", requestKey: "native-update" });
-  expect(updated).toMatchObject({ status: "building", hash: second.commit, moduleId: location.moduleId });
-  expect((await readModuleMaterial({ ...location, commit: second.commit })).find(file => file.path === "bin/program")!.bytes).toEqual(next);
-  expect((await readModuleMaterial({ ...location, commit: first.commit })).find(file => file.path === "bin/program")!.bytes).toEqual(f.binary);
-  expect((await readModuleSource({ ...location, commit: second.commit })).some(file => file.path === "bin/program")).toBe(false);
+  expect(updated).toMatchObject({ status: "building", hash: second, moduleId: installed.moduleId });
+  expect((await readStoredVersionMaterial(platform, second)).find(file => file.path === "bin/program")!.bytes).toEqual(next);
+  expect((await readStoredVersionMaterial(platform, first)).find(file => file.path === "bin/program")!.bytes).toEqual(f.binary);
+  expect(moduleSourceFiles(await readStoredVersionMaterial(platform, second)).some(file => file.path === "bin/program")).toBe(false);
 });
 
 test.each(["mixed", "mode", "replacement", "ancestor", "artifact", "root"] as const)("material snapshot rejects deferred %s changes", async change => {
@@ -375,10 +359,10 @@ test.each(["missing", "intact", "bytes", "extra", "mode", "cas"] as const)("ordi
   const peer = testModuleProcess(async () => ({}));
   const ports = { db, dataDir: f.root, publicUrl: null, now: () => new Date(), sandbox: { available: true, isolated: false, startModule: peer.startModule } };
   const context = moduleContext(ports, workspace.id), files = await snapshotModuleMaterial(f.root, "submitted");
-  const revision = await commitModuleSource({ platform: context.platform, moduleId: module.id, versionId: "startup", files, message: "startup" });
-  const version = await db.moduleVersion.create({ data: { moduleId: module.id, hash: revision.commit, manifest, source: "user", intent: {}, status: "approved", report: { tests: [], git: revision } } });
-  await db.module.update({ where: { id: module.id }, data: { activeHash: revision.commit } });
-  const installed = join(context.store, revision.commit);
+  const revision = await storeVersionMaterial(context.platform, files);
+  const version = await db.moduleVersion.create({ data: { moduleId: module.id, hash: revision, manifest, source: "user", intent: {}, status: "approved", report: { tests: [] } } });
+  await db.module.update({ where: { id: module.id }, data: { activeHash: revision } });
+  const installed = join(context.store, revision);
   if (state !== "missing") await ensureVersionMaterial(context, version);
   if (state === "bytes") { await chmod(join(installed, "bin/program"), 0o755); await writeFile(join(installed, "bin/program"), "poison"); }
   if (state === "extra") await writeFile(join(installed, "helper.js"), "unbound");
@@ -399,4 +383,65 @@ test.each(["missing", "intact", "bytes", "extra", "mode", "cas"] as const)("ordi
   }
   if (state === "bytes") expect(await readFile(join(installed, "bin/program"), "utf8")).toBe("poison");
   if (state === "extra") expect(await readFile(join(installed, "helper.js"), "utf8")).toBe("unbound");
+});
+
+test("source bytes and executable modes remain recoverable independently of checkout copies", async () => {
+  const f = await fixture();
+  await chmod(join(f.dir, "build.sh"), 0o755);
+  const files = await snapshotModuleMaterial(f.root, "submitted"), hash = await storeVersionMaterial(f.repository.platform, files);
+  await chmod(join(f.dir, "build.sh"), 0o644);
+  const changed = await snapshotModuleMaterial(f.root, "submitted");
+  expect(moduleMaterialDigest(changed)).not.toBe(hash);
+  await rm(f.dir, { recursive: true });
+  const restored = await readStoredVersionMaterial(f.repository.platform, hash);
+  expect(restored.find(file => file.path === "build.sh")!.executable).toBe(true);
+  expect(restored.find(file => file.path === "deps.lock")!.bytes).toEqual(Buffer.from("pinned"));
+  expect(restored.find(file => file.path === ".gitignore")!.bytes).toEqual(Buffer.from("bin/\n"));
+  expect(restored.find(file => file.path === MODULE_MATERIAL_FILE)!.bytes).toEqual(files.find(file => file.path === MODULE_MATERIAL_FILE)!.bytes);
+});
+
+test.each(["source", "index", "mode", "extra"] as const)("retained material rejects and preserves %s pollution", async kind => {
+  const f = await fixture(), files = await snapshotModuleMaterial(f.root, "submitted"), hash = await storeVersionMaterial(f.repository.platform, files);
+  const index = join(f.repository.platform, "materials/sha256", hash, "bytes");
+  if (kind === "source") {
+    const blob = join(f.repository.platform, "artifacts/sha256", digest(Buffer.from("pinned")), "bytes");
+    await chmod(blob, 0o644); await writeFile(blob, "polluted source lock");
+    await expect(readStoredVersionMaterial(f.repository.platform, hash)).rejects.toThrow();
+    await expect(storeVersionMaterial(f.repository.platform, files)).rejects.toThrow();
+    expect(await readFile(blob, "utf8")).toBe("polluted source lock");
+  } else {
+    const changed = JSON.parse(await readFile(index, "utf8"));
+    if (kind === "index") changed[0].sha256 = "a".repeat(64);
+    if (kind === "mode") changed[0].executable = !changed[0].executable;
+    if (kind === "extra") await writeFile(join(index, "..", "extra"), "keep");
+    else { await chmod(index, 0o644); await writeFile(index, JSON.stringify(changed)); }
+    const before = await readFile(index);
+    await expect(readStoredVersionMaterial(f.repository.platform, hash)).rejects.toThrow();
+    await expect(storeVersionMaterial(f.repository.platform, files)).rejects.toThrow();
+    expect(await readFile(index)).toEqual(before);
+    if (kind === "extra") expect(await readFile(join(index, "..", "extra"), "utf8")).toBe("keep");
+  }
+});
+
+test.each([false, true])("source index publication verifies the concurrent winner (poison=%s)", async poison => {
+  const f = await fixture(), files = await snapshotModuleMaterial(f.root, "submitted"), hash = moduleMaterialDigest(files);
+  const index = join(f.repository.platform, "materials/sha256", hash);
+  const publish = ModuleDirectory.prototype.publishImmutable;
+  let entered!: () => void, release!: () => void, first = true;
+  const ready = new Promise<void>(resolve => { entered = resolve; }), gate = new Promise<void>(resolve => { release = resolve; });
+  const spy = spyOn(ModuleDirectory.prototype, "publishImmutable").mockImplementation(async function (this: InstanceType<typeof ModuleDirectory>, name, bytes) {
+    if (first && name === hash) { first = false; entered(); await gate; }
+    return publish.call(this, name, bytes);
+  });
+  const pending = storeVersionMaterial(f.repository.platform, files).then(() => null, error => error);
+  try {
+    await ready;
+    if (poison) await mkdir(index);
+    else await storeVersionMaterial(f.repository.platform, files);
+    const before = await stat(index);
+    release();
+    if (poison) { expect(await pending).not.toBeNull(); expect(await readdir(index)).toEqual([]); }
+    else { expect(await pending).toBeNull(); expect(moduleMaterialDigest(await readStoredVersionMaterial(f.repository.platform, hash))).toBe(hash); }
+    expect((await stat(index)).ino).toBe(before.ino);
+  } finally { release(); await pending; spy.mockRestore(); }
 });

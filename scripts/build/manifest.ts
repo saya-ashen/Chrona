@@ -14,7 +14,7 @@ export const buildArtifacts = {
     { from: "packages/db/prisma/migrations", to: "resources/prisma/migrations", required: true },
     { from: ".env.example", to: "resources/.env.example", required: false },
     { from: "packages/app-sdk/package.json", to: "resources/module-sdk/package.json", required: true },
-    { from: "packages/app-sdk/typecheck/chrona-sdk-loader.ts", to: "resources/module-sdk/chrona-sdk-loader.ts", required: true },
+    { from: "packages/app-sdk/chrona-sdk-loader.ts", to: "resources/module-sdk/chrona-sdk-loader.ts", required: true },
     { from: "packages/app-sdk/sdk.ts", to: "resources/module-sdk/sdk.ts", required: true },
     { from: "packages/app-sdk/transport.ts", to: "resources/module-sdk/transport.ts", required: true },
     { from: "packages/app-sdk/process.ts", to: "resources/module-sdk/process.ts", required: true },
@@ -23,18 +23,8 @@ export const buildArtifacts = {
     { from: "packages/app-sdk/module-entry.ts", to: "resources/module-sdk/module-entry.ts", required: true },
     { from: "packages/app-sdk/preview.ts", to: "resources/module-sdk/preview.ts", required: true },
     { from: "packages/app-sdk/build-contract.md", to: "resources/module-sdk/build-contract.md", required: true },
-    { from: "packages/app-sdk/group-build-contract.md", to: "resources/module-sdk/group-build-contract.md", required: true },
     { from: "packages/app-sdk/calls.d.ts", to: "resources/module-sdk/calls.d.ts", required: true },
-    // The packaged checker resolves TypeScript and Bun types beside its script.
     { from: "packages/host/src/runtimes.json", to: "resources/runtimes.json", required: true },
-    { from: "packages/app-sdk/typecheck/chrona-sdk-loader.ts", to: "resources/module-typecheck/chrona-sdk-loader.ts", required: true },
-    { from: "packages/app-sdk/typecheck/calls.ts", to: "resources/module-typecheck/calls.ts", required: true },
-    { from: "packages/app-sdk/typecheck/check.ts", to: "resources/module-typecheck/check.ts", required: true },
-    { from: "node_modules/typescript/package.json", to: "resources/module-typecheck/node_modules/typescript/package.json", required: true },
-    { from: "node_modules/typescript/lib", to: "resources/module-typecheck/node_modules/typescript/lib", required: true },
-    { from: "node_modules/@types/bun", to: "resources/module-typecheck/node_modules/@types/bun", required: true },
-    { from: "node_modules/bun-types", to: "resources/module-typecheck/node_modules/bun-types", required: true },
-    { from: "node_modules/@types/node", to: "resources/module-typecheck/node_modules/@types/node", required: true },
   ] satisfies ReleaseResource[],
 } as const;
 

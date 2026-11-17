@@ -32,8 +32,8 @@ async function fixture() {
       await writeFile(join(code, "module.json"), JSON.stringify(manifest));
       await writeFile(join(code, "index.ts"), "// Synthetic peer transport; never executed\n");
       await writeFile(join(code, "test.ts"), "// Synthetic release fixture\n");
-      const git = await seedTestModuleRelease(resources, name);
-      const candidate = await propose(moduleContext(ports, workspace.id), { root: resources, dir: name, sourceCommit: git.commit, gitBundle: git, intent: { changes: ["Offline release fixture"] } }, "user");
+      const material = await seedTestModuleRelease(resources, name);
+      const candidate = await propose(moduleContext(ports, workspace.id), { root: resources, dir: name, expectedHash: material.hash, intent: { changes: ["Offline release fixture"] } }, "user");
       const moduleId = candidate.moduleId!, activeHash = candidate.hash;
       await db.moduleVersion.update({ where: { moduleId_hash: { moduleId, hash: activeHash } }, data: { status: "approved" } });
       module = await db.module.update({ where: { id: moduleId }, data: { activeHash } });
@@ -100,8 +100,8 @@ test("web removal approval backs up data, removes the app and schedules, and cle
   const pi = await f.app("pi", [], true);
   const removePi = await f.call("modules.remove", { moduleId: pi.id, reason: "remove ordinary Provider application" }) as { status: string; approvalId: string };
   expect(removePi.status).toBe("pending_approval");
-  expect(await f.db.module.findUniqueOrThrow({ where: { id: pi.id } })).toMatchObject({ builtin: false, activeHash: pi.activeHash });
-  expect(await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: pi.id, hash: pi.activeHash! } } })).toMatchObject({ source: "user", status: "approved", report: { git: { commit: pi.activeHash } } });
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: pi.id } })).toMatchObject({ activeHash: pi.activeHash });
+  expect(await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: pi.id, hash: pi.activeHash! } } })).toMatchObject({ source: "user", status: "approved", report: { tests: [] } });
   await f.call("approvals.resolve", { approval: removePi.approvalId, decision: "approve" });
   expect(await f.db.module.findUnique({ where: { id: pi.id } })).toBeNull();
   expect(await f.db.moduleVersion.count({ where: { moduleId: pi.id } })).toBe(0);
@@ -109,7 +109,7 @@ test("web removal approval backs up data, removes the app and schedules, and cle
   const owner: Caller = { kind: "owner", via: "test" };
   const removeWeb = await f.call("modules.remove", { moduleId: f.entry.id, reason: "remove ordinary application" }, owner) as { status: string; approvalId: string };
   expect(removeWeb.status).toBe("pending_approval");
-  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.entry.id } })).toMatchObject({ builtin: false, activeHash: f.entry.activeHash });
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.entry.id } })).toMatchObject({ activeHash: f.entry.activeHash });
   await f.call("approvals.resolve", { approval: removeWeb.approvalId, decision: "approve" }, owner);
   expect(await f.db.module.findUnique({ where: { id: f.entry.id } })).toBeNull();
 });

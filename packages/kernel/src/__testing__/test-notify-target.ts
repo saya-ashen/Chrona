@@ -8,7 +8,7 @@ import { testModuleProcess } from "./module-test-process";
 export async function installNotifyTarget(ports: StewardPorts, workspaceId: string, mockDelivery = false) {
   const hash = "test-notify-target";
   const manifest = moduleManifestSchema.parse({ name: "notify", entry: "index.ts", tests: ["test.ts"], effects: [], tools: [{ name: "send", description: "Synthetic delivery target", visibility: ["modules"], parameters: { type: "object", properties: {}, additionalProperties: true }, output: {} }] });
-  const module = await ports.db.module.create({ data: { workspaceId, name: "notify", status: "active", builtin: false, activeHash: hash } });
+  const module = await ports.db.module.create({ data: { workspaceId, name: "notify", status: "active", activeHash: hash } });
   await ports.db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest, source: "user", status: "approved", intent: {}, report: {} } });
   const codeDir = join(ports.dataDir, "platform/store", hash);
   await mkdir(codeDir, { recursive: true });

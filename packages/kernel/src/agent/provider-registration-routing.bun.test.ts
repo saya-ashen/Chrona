@@ -86,7 +86,7 @@ test("new context pins its provider, request replay keeps the same Run, and anot
   const result = await admitContextPrimitive(f.ports, principal, "run", request) as { contextId: string; runId: string };
   expect(await admitContextPrimitive(f.ports, principal, "run", request)).toEqual(result);
   const pinned = await f.db.agentRunProvider.findUniqueOrThrow({ where: { runId: result.runId } });
-  const context = await f.db.agentContext.findUniqueOrThrow({ where: { sessionId: result.contextId } });
+  const context = await f.db.agentContext.findUniqueOrThrow({ where: { id: result.contextId } });
   expect(context).toMatchObject({ providerId: "offline", providerRevision: pinned.revision });
   const other = await f.install("backend-alternative");
   await registerAgentProvider(f.ports, f.workspaceId, other.caller, declaration("alternative"));

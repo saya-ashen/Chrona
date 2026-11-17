@@ -6,7 +6,7 @@ import { createScriptSandbox } from "../../../host/src/runtime/script-sandbox";
 import { moduleSupervisor } from "../modules/module-supervisor";
 import { testDb } from "./test-db";
 import { testProviderPorts } from "./test-provider";
-import type { StewardPorts } from "../ports";
+import type { TestProviderPorts } from "./test-provider";
 
 export async function agentContextFixture() {
   const root = await mkdtemp(join(tmpdir(), "chrona-context-fixture-"));
@@ -21,7 +21,7 @@ export async function agentContextFixture() {
       return { done: new Promise(resolve => { settle = resolve; }), async inject() {}, async abort() { settle({ outcome: "finished", sessionId: null, error: null }); } };
     },
   };
-  const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => new Date(), provider, sandbox: { ...sandbox.health, ...sandbox } };
+  const ports: TestProviderPorts = { db, dataDir, publicUrl: null, now: () => new Date(), provider, sandbox: { ...sandbox.health, ...sandbox } };
   const databases = await db.$queryRawUnsafe<{ name: string; file: string }[]>("PRAGMA database_list");
   async function close() {
     try { await moduleSupervisor(ports).stop(); }

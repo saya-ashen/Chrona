@@ -1,7 +1,7 @@
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { z } from "zod";
-import { chronaToolInputSchemas, moduleManifestSchema } from "@chrona/contracts/steward";
+import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { moduleWireMessageSchema, moduleWireTransport } from "../packages/contracts/src/steward/module-wire";
 import { publicSystemTools } from "../packages/kernel/src/system/tool-contract-declarations";
 import { normalizedToolInputSchema } from "../packages/kernel/src/modules/module-tool-input";
@@ -16,8 +16,6 @@ export function generateContractSchemas() {
       output: tool.output ? z.toJSONSchema(tool.output) : null,
       visibility: [...tool.visibility].sort(), idempotent: tool.idempotent },
   ])));
-  // The public build response tool has no module handler or application runtime.
-  systemTools.chrona_reply = { input: z.toJSONSchema(chronaToolInputSchemas.chrona_reply, { io: "input" }), output: null, visibility: ["provider"], idempotent: false };
   return {
     "system-tools.json": systemTools,
     "module-wire.json": { ...z.toJSONSchema(moduleWireMessageSchema, { io: "input", unrepresentable: "any" }), $id: "https://chrona.local/contracts/module-wire.json", title: "Chrona module wire protocol v1", "x-chrona-transport": moduleWireTransport },

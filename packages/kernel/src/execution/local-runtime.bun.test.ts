@@ -3,7 +3,7 @@ import { mkdtemp, open, rm } from "node:fs/promises";
 import { constants } from "node:fs";
 import { dirname, join } from "node:path";
 import { moduleManifestSchema, type ProviderAdapter, type ProviderRunInput } from "@chrona/contracts/steward";
-import type { StewardPorts } from "../ports";
+import type { TestProviderPorts } from "../__testing__/test-provider";
 import { testDb } from "../__testing__/test-db";
 import { testProviderPorts } from "../__testing__/test-provider";
 import { runtimeCall, startLocalProvider } from "./local-runtime";
@@ -28,7 +28,7 @@ async function callFailure(promise: Promise<unknown>): Promise<unknown> {
 async function fixture(provider?: ProviderAdapter) {
   const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-local-modules-");
   const files = await db.$queryRawUnsafe<{ name: string; file: string }[]>("PRAGMA database_list");
-  const ports: StewardPorts = { db, dataDir, now: () => new Date(), publicUrl: null, provider };
+  const ports: TestProviderPorts = { db, dataDir, now: () => new Date(), publicUrl: null, provider };
   await testProviderPorts(ports);
   const workspace = await db.workspace.create({ data: { name: "local-modules" } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "entry-app", activeHash: "entry-v1", status: "active" } });

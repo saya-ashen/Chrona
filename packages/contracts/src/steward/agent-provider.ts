@@ -25,6 +25,7 @@ export const agentProviderViewSchema = z.object({
 export const agentRunViewSchema = z.object({ runId: id, contextId: id, status: z.string(), active: z.boolean() }).strict();
 export const agentRunInput = z.object({
   providerId: z.string().min(1).max(64).optional(), contextId: id.optional(), prompt: z.string().trim().min(1).max(200_000),
+  cwd: z.string().min(1).max(8192).optional(),
   content: z.array(z.string().min(1).max(1000)).max(10).default([]), lane: z.enum(["foreground", "background"]).default("background"),
   tools: z.array(routedTargetSchema).max(100).default([]), providerOptions: providerOptionsSchema.default({}), kind: z.enum(["conversation", "completion"]).default("conversation"),
 }).strict();

@@ -10,8 +10,7 @@ export const approvalRequestOutput = z.object({ approval: z.string(), decision: 
 export const approvalStatusOutput = z.object({ approval: z.string(), status: z.enum(APPROVAL_STATUSES), hash: z.string(), resolvedAt: z.string().nullable() });
 export const modulesListOutput = z.array(appSchema.extend({
   health: moduleHealthSummarySchema,
-  versions: z.array(z.object({ hash: z.string(), status: z.string(), createdAt: z.string(), errors: z.array(z.string().max(300)).max(5).nullable(),
-    git: z.object({ commit: z.string().regex(/^[a-f0-9]{40}$/), tree: z.string().regex(/^[a-f0-9]{40}$/) }).nullable().default(null) })).max(5),
+  versions: z.array(z.object({ hash: z.string(), status: z.string(), createdAt: z.string(), errors: z.array(z.string().max(300)).max(5).nullable() })).max(5),
   runs: z.array(z.object({ id: z.string(), hash: z.string(), triggerId: z.string(), firedAt: z.string(), exitCode: z.number(), error: z.string().max(1000).nullable(), createdAt: z.string() })).max(5),
 }));
 const toolExampleOutput = z.object({ description: z.string().optional(), args: z.record(z.string(), z.json()), result: z.json().optional() });

@@ -1,3 +1,4 @@
+import { createTestAgentContext } from "../__testing__/test-provider";
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
@@ -21,7 +22,7 @@ beforeEach(async () => {
 });
 afterEach(async () => { await Promise.all(channels.splice(0).map(channel => channel.close())); liveRuns.clear(); await db.$disconnect(); });
 async function fixture(observer?: (request: ProviderInteraction) => Promise<void>) {
-  const session = await db.session.create({ data: { workspaceId, key: "web:test", source: "owner" } });
+  const session = await createTestAgentContext(db, workspaceId);
   await api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Work" });
   const run = (await api.runs.claimNext("foreground"))!, controller = new AbortController(), channel = createProviderChannel(ports, run, observer); channels.push(channel);
   liveRuns.set(run.id, { done: new Promise(() => {}), inject: async () => {}, abort: async () => { controller.abort(); await channel.close(); await api.runs.finish(run.id, { outcome: "failed", sessionId: null, error: "Abort" }); } });
@@ -99,12 +100,16 @@ test("restart/no live process cannot reuse pending requests", async () => {
   await expect(api.provider.answer(request.id, { decision: "submit", value: true })).rejects.toMatchObject({ code: "conflict" });
   f.controller.abort(); expect(await result).toEqual({ decision: "cancel" });
 });
-test("owner cancel blocks tools immediately, retains input and never retries the aborted run", async () => {
+test("owner cancel blocks tools and holds unknown capacity until actual Provider exit", async () => {
   const f = await fixture(), result = f.channel.events.question(question(), f.controller.signal), request = await waiting();
   await api.provider.cancel(f.run.id);
   expect(await result).toEqual({ decision: "cancel" });
-  expect((await db.run.findUniqueOrThrow({ where: { id: f.run.id } })).status).toBe("cancelled");
-  expect(await db.run.count({ where: { status: "queued" } })).toBe(0);
+  expect(await db.run.findUniqueOrThrow({ where: { id: f.run.id } })).toMatchObject({ status: "failed", stopStatus: "unknown" });
+  const next = await api.runs.enqueue({ sessionId: f.session.id, lane: "foreground", trigger: "source", prompt: "Explicit next attempt" });
+  expect(await api.runs.claimNext("foreground")).toBeNull();
+  await api.runs.finish(f.run.id, { outcome: "finished", sessionId: null, error: null }, { stopEvidence: "provider_exited" });
+  expect(await db.run.findUniqueOrThrow({ where: { id: f.run.id } })).toMatchObject({ status: "cancelled", stopStatus: "confirmed" });
+  expect((await api.runs.claimNext("foreground"))?.id).toBe(next.id);
   await expect(api.runs.authenticate(f.run.token)).rejects.toMatchObject({ code: "forbidden" });
   await expect(api.provider.answer(request.id, { decision: "submit", value: true })).rejects.toMatchObject({ code: "conflict" });
 });
@@ -159,11 +164,11 @@ test("a failed reply receipt never releases a positive answer", async () => {
   } finally { await db.$executeRawUnsafe("DROP TRIGGER fail_provider_receipt"); }
 });
 test("a durable queued cancel is never claimed after restart", async () => {
-  const session = await db.session.create({ data: { workspaceId, key: "web:queued", source: "owner" } });
+  const session = await createTestAgentContext(db, workspaceId);
   const run = await api.runs.enqueue({ sessionId: session.id, lane: "background", trigger: "schedule", prompt: "Keep" });
   await db.run.update({ where: { id: run.id }, data: { cancelRequestedAt: new Date() } });
   expect(await api.runs.claimNext("background")).toBeNull();
-  expect((await db.run.findUniqueOrThrow({ where: { id: run.id } })).status).toBe("cancelled");
+  expect(await db.run.findUniqueOrThrow({ where: { id: run.id } })).toMatchObject({ status: "cancelled", stopStatus: "confirmed", startedAt: null });
 });
 
 test("invalid questions never consume the accepted question budget", async () => {

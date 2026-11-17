@@ -6,7 +6,6 @@ import { resolveRuntimeDatabaseUrl, sqlitePathFromFileUrl } from "@chrona/db/sql
 import { createExternalModuleInstaller, type StewardPorts } from "@chrona/kernel";
 import { createScriptSandbox } from "./script-sandbox";
 import { createModulePackages } from "../packages/module-packages";
-import runtimeDeclarations from "../runtimes.json";
 
 function publicOrigin(): string | null {
   try {
@@ -38,13 +37,12 @@ export function processHelperPath(): string {
 /** Shared offline install/build resources; construction never starts a Provider, tick, or module. */
 export function createModuleRuntimePorts(db: PrismaClient, options: { dataDir?: string; now?: () => Date; sandbox?: StewardPorts["sandbox"] } = {}): StewardPorts {
   const moduleSdk = resourcePath("module-sdk", "packages/app-sdk");
-  const moduleTypecheck = resourcePath("module-typecheck", "packages/app-sdk/typecheck");
   const processHelper = processHelperPath();
-  const scriptSandbox = createScriptSandbox({ executionMode: executionMode(), dataDir: resolve(options.dataDir ?? stewardDataDir()), moduleSdk, moduleTypecheck, processHelper });
+  const scriptSandbox = createScriptSandbox({ executionMode: executionMode(), dataDir: resolve(options.dataDir ?? stewardDataDir()), moduleSdk, processHelper });
   const ports: StewardPorts = {
     db, now: options.now ?? (() => new Date()), dataDir: options.dataDir ?? stewardDataDir(), publicUrl: publicOrigin(),
     packages: createModulePackages({ processHelper }), moduleSdk,
-    moduleTypecheck, processHelper, moduleRuntimes: runtimeDeclarations,
+    processHelper,
     moduleExternalResources: process.env.CHRONA_MODULE_RESOURCES ? resolve(process.env.CHRONA_MODULE_RESOURCES) : undefined,
     sandbox: options.sandbox ?? { ...scriptSandbox.health, executionMode: executionMode(), runModule: input => scriptSandbox.runModule(input), startModule: input => scriptSandbox.startModule(input) },
   };

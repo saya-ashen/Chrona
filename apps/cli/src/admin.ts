@@ -4,7 +4,7 @@ import { PrismaClient } from "@chrona/db/generated/prisma/client";
 import { acquireSqliteRuntimeLock } from "@chrona/db/sqlite-runtime-lock";
 import { sqlitePathFromFileUrl } from "@chrona/db/sqlite-url";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
-import { createSecrets, createStewardService, moduleSupervisor, installExactRelease, refreshInstallationReceipts, type StewardPorts } from "@chrona/kernel";
+import { createSecrets, createStewardService, moduleSupervisor, refreshInstallationReceipts, type StewardPorts } from "@chrona/kernel";
 import { getChronaDataDir } from "./start-server";
 import { createModuleRuntimePorts } from "@chrona/host";
 import { moduleInstallRequestSchema, moduleVersionHashSchema } from "@chrona/contracts/steward";
@@ -49,7 +49,7 @@ export async function runAdmin(command: AdminCommand, args: string[] = [], optio
   let ports: StewardPorts = { db, dataDir, now: () => new Date(), publicUrl: null };
   try {
     ports = adminPorts(db, dataDir, command);
-    // Offline administration updates generations without starting long-running modules.
+    // Offline administration updates active versions without starting long-running modules.
     await moduleSupervisor(ports).stop();
     const workspaceId = "ws_default";
     const api = createStewardService(ports).forWorkspace(workspaceId);
@@ -58,10 +58,9 @@ export async function runAdmin(command: AdminCommand, args: string[] = [], optio
       diagnostics: () => api.modules.diagnostics(args[0]),
       catalog: () => api.modules.catalog(),
       install: () => {
-        const selection = args.at(3);
-        if (args.length > 4 || (selection !== undefined && selection !== "exact-release")) throw new Error("Invalid install selection");
+        if (args.length > 3) throw new Error("Invalid install arguments");
         const request = moduleInstallRequestSchema.parse({ package: args[0], mode: args[1], requestKey: args[2] });
-        return selection === "exact-release" ? installExactRelease(ports, workspaceId, request, { kind: "owner", via: null }) : api.modules.install(request);
+        return api.modules.install(request);
       },
       approvals: () => api.approvals.list("open"),
       approve: async () => { const resolved = (await api.approvals.resolve(args[0]!, { decision: "approve", scope: "once" }, "cli")).approval; await refreshInstallationReceipts(ports, workspaceId); return resolved; },
@@ -70,7 +69,7 @@ export async function runAdmin(command: AdminCommand, args: string[] = [], optio
     const handler = Object.hasOwn(handlers, command) ? handlers[command] : undefined;
     const result = handler ? await handler() : await changeModule(db, api, command, args);
     console.log(JSON.stringify(result, null, 2));
-    if (!readOnly) console.log("Restart Chrona after changes to start modules with the new generation.");
+    if (!readOnly) console.log("Restart Chrona after changes to start modules with their selected versions.");
     return result;
   } finally {
     await moduleSupervisor(ports).stop();

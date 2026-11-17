@@ -7,9 +7,10 @@ import { createStewardService } from "../runtime/service";
 import { createModules } from "./modules";
 import { buildPending } from "./module-build";
 import { reviewManifest } from "./module-build-review";
-import { commitModuleSource, readModuleSource } from "./module-git";
+import { readStoredVersionMaterial, moduleSourceFiles, snapshotModuleMaterial, moduleMaterialDigest } from "./module-artifacts";
 import { snapshotModule } from "./module-files";
 import { moduleContext } from "./module-context";
+import { moduleEvolutionOutcomes } from "./module-evolution";
 import { createTick } from "../runtime/tick";
 import type { StewardPorts } from "../ports";
 import type { ApprovedAction } from "../ports";
@@ -19,7 +20,6 @@ import { moduleSupervisor } from "./module-supervisor";
 import { notice, notices } from "../__testing__/test-notices";
 import { modulesListOutput } from "../system/system-outputs";
 import { callSync, listSystemModules } from "./module-calls";
-import { RUN_LIMITS } from "@chrona/contracts/steward";
 import { MODULE_SOURCE_MAX_BYTES } from "../../../contracts/src/steward/module-material";
 
 const cleanups: (() => Promise<unknown>)[] = [];
@@ -30,6 +30,7 @@ async function fixture(credentials = true) {
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "test" } });
   const calls: Parameters<NonNullable<NonNullable<StewardPorts["sandbox"]>["runModule"]>>[0][] = [];
+  const starts: Parameters<NonNullable<NonNullable<StewardPorts["sandbox"]>["startModule"]>>[0][] = [];
   const forwarded: ApprovedAction[] = [];
   let fail = false;
   const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-20T04:00:00Z"), publicUrl: null,
@@ -43,7 +44,12 @@ async function fixture(credentials = true) {
       return { status: fail ? "failed" : "succeeded", output: "public stdout", error: fail ? "public stderr" : null, exitCode: fail ? 1 : 0 };
     } },
   };
-  ports.sandbox!.startModule = testModuleSandbox(input => ports.sandbox!.runModule!(input)).startModule;
+  const start = testModuleSandbox(input => ports.sandbox!.runModule!(input)).startModule;
+  ports.sandbox!.startModule = input => {
+    starts.push(input);
+    if (fail) throw new Error("Synthetic startup failure");
+    return start(input);
+  };
   cleanups.push(() => moduleSupervisor(ports).stop());
   const service = createStewardService(ports).forWorkspace(workspace.id);
   const root = join(dataDir, "sessions", "test"), dir = join(root, "price-watch");
@@ -55,7 +61,12 @@ async function fixture(credentials = true) {
     await writeFile(join(dir, "test.ts"), "process.exit(0)");
   }
   await write();
-  const submit = () => service.modules.propose({ root, dir: "price-watch", intent }, "provider");
+  async function material() {
+    const files = (await snapshotModule(root, "price-watch")).filter(file => file.path !== "chrona-material.json");
+    await writeFile(join(dir, "chrona-material.json"), JSON.stringify({ schema: 1, source: files.map(file => file.path), artifacts: [], build: { commands: [], toolchain: "interpreted fixture", target: "host" } }));
+    return snapshotModuleMaterial(root, "price-watch");
+  }
+  const submit = async () => { await material(); return service.modules.propose({ root, dir: "price-watch", intent }, "provider"); };
   const propose = async () => {
     const result = await submit();
     if (result.status !== "building") return result;
@@ -65,7 +76,7 @@ async function fixture(credentials = true) {
     return { ...result, status: version.status, report: version.report, approvalId: approval?.id };
   };
   const approve = (id: string) => service.approvals.resolve(id, { decision: "approve", scope: "once" }, "web");
-  return { db, dataDir, workspace, ports, service, root, dir, calls, forwarded, write, submit, propose, approve, fail: (value = true) => { fail = value; } };
+  return { db, dataDir, workspace, ports, service, root, dir, calls, starts, forwarded, write, material, submit, propose, approve, fail: (value = true) => { fail = value; } };
 }
 
 test("checks-passing fresh apps and updates activate without a card and send digest notices", async () => {
@@ -203,7 +214,8 @@ test.each(["open", "expired", "approved", "denied"])("review recovery never recr
 test("activation exposes declared tools without producing calendar rows", async () => {
   const f = await fixture();
   const result = await f.propose();
-  expect(f.calls.filter(call => call.entry === "test.ts")).toMatchObject([{ network: false, timeoutMs: RUN_LIMITS.jobTimeoutMs }]);
+  expect(f.calls).toHaveLength(0);
+  expect(f.starts).toMatchObject([{ network: false }]);
   await f.approve(result.approvalId!);
   const schedules = await f.db.timer.findMany({ where: { moduleId: result.moduleId! } });
   expect(schedules).toEqual([]);
@@ -269,7 +281,7 @@ async function rollbackFixture() {
 test("cross-schema rollback fences execution while awaiting approval, restores data, and can roll forward again", async () => {
   const f = await rollbackFixture();
   await writeFile(join(f.live, "nested/state"), "new writes");
-  const before = await f.db.module.findFirstOrThrow(), schedules = await f.db.timer.findMany(), generations = await f.db.generation.count();
+  const before = await f.db.module.findFirstOrThrow(), schedules = await f.db.timer.findMany(), activations = await moduleEvolutionOutcomes(f.db, f.workspace.id, f.first.moduleId!);
   expect(before.executionFenceAt).toBeNull();
   const request = () => f.service.modules.rollback(f.moduleId, f.first.hash);
   const firstFenceAt = new Date(f.ports.now().getTime() + 60_000);
@@ -282,10 +294,10 @@ test("cross-schema rollback fences execution while awaiting approval, restores d
   expect(pending.status).toBe("pending_approval");
   if (pending.status !== "pending_approval" || older.status !== "pending_approval") throw new Error("Expected approval");
   expect(await f.db.approval.findUniqueOrThrow({ where: { id: older.approvalId } })).toMatchObject({ status: "expired" });
-  // Requesting approval commits only the execution fence; version, data and generation stay intact.
+  // Waiting for approval preserves the version, data and activation history.
   expect(await f.db.module.findFirstOrThrow()).toEqual({ ...before, executionFenceAt: renewedFenceAt });
   expect(await f.db.timer.findMany()).toEqual(schedules);
-  expect(await f.db.generation.count()).toBe(generations);
+  expect(await moduleEvolutionOutcomes(f.db, f.workspace.id, f.first.moduleId!)).toEqual(activations);
   expect(await readFile(join(f.live, "nested/state"), "utf8")).toBe("new writes");
   expect(await readdir(f.snapshots)).toEqual(["schema-1"]);
   const approval = await f.db.approval.findUniqueOrThrow({ where: { id: pending.approvalId } });
@@ -297,7 +309,7 @@ test("cross-schema rollback fences execution while awaiting approval, restores d
   expect(await readFile(join(f.live, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
   const backup = (await readdir(f.snapshots)).find(name => name.startsWith("before-rollback-"))!;
   expect(await readFile(join(f.snapshots, backup, "nested/state"), "utf8")).toBe("new writes");
-  expect(await f.db.generation.findFirstOrThrow({ orderBy: { seq: "desc" } })).toMatchObject({ reason: "rollback", modules: { [f.moduleId]: f.first.hash } });
+  expect((await moduleEvolutionOutcomes(f.db, f.workspace.id, f.moduleId))[0]).toMatchObject({ previousHash: f.second.hash, candidateHash: f.first.hash });
   let migrated = false;
   f.ports.sandbox!.runModule = async input => {
     migrated = true;
@@ -312,7 +324,7 @@ test("cross-schema rollback fences execution while awaiting approval, restores d
   expect(migrated).toBe(true);
   expect(await f.db.module.findFirstOrThrow()).toMatchObject({ activeHash: f.second.hash, dataSchema: 2, status: "active" });
   expect(await readFile(join(f.live, "nested/state"), "utf8")).toBe("forward again");
-  expect(await f.db.generation.findFirstOrThrow({ orderBy: { seq: "desc" } })).toMatchObject({ reason: "rollback" });
+  expect((await moduleEvolutionOutcomes(f.db, f.workspace.id, f.moduleId))[0]).toMatchObject({ previousHash: f.first.hash, candidateHash: f.second.hash });
 });
 
 test("snapshot restore retains only the newest three before-rollback backups", async () => {
@@ -333,7 +345,7 @@ test.each(["no snapshot", "migrating", "missing snapshot", "changed snapshot", "
   const f = await rollbackFixture();
   if (kind === "no snapshot") await rm(join(f.snapshots, "schema-1"), { recursive: true });
   if (kind === "migrating") await f.db.module.update({ where: { id: f.moduleId }, data: { status: "migrating" } });
-  const before = await f.db.module.findFirstOrThrow(), schedules = await f.db.timer.findMany(), generations = await f.db.generation.count();
+  const before = await f.db.module.findFirstOrThrow(), schedules = await f.db.timer.findMany(), activations = await moduleEvolutionOutcomes(f.db, f.workspace.id, f.first.moduleId!);
   expect(before.executionFenceAt).toBeNull();
   const fenceAt = new Date(f.ports.now().getTime() + 60_000);
   f.ports.now = () => fenceAt;
@@ -356,7 +368,7 @@ test.each(["no snapshot", "migrating", "missing snapshot", "changed snapshot", "
     if (["copy failure", "forward failure"].includes(kind)) {
       await f.approve(result.approvalId);
       if (kind === "forward failure") {
-        const restored = await f.db.module.findFirstOrThrow(), restoredSchedules = await f.db.timer.findMany(), restoredGenerations = await f.db.generation.count();
+        const restored = await f.db.module.findFirstOrThrow(), restoredSchedules = await f.db.timer.findMany(), restoredActivations = await moduleEvolutionOutcomes(f.db, f.workspace.id, f.moduleId);
         expect(restored.executionFenceAt).toBeNull();
         const forwardFenceAt = new Date(fenceAt.getTime() + 60_000);
         f.ports.now = () => forwardFenceAt;
@@ -370,7 +382,7 @@ test.each(["no snapshot", "migrating", "missing snapshot", "changed snapshot", "
         expect(duringMigration).toEqual({ ...restored, status: "migrating", executionFenceAt: forwardFenceAt });
         expect(await f.db.module.findFirstOrThrow()).toEqual({ ...restored, executionFenceAt: forwardFenceAt });
         expect(await f.db.timer.findMany()).toEqual(restoredSchedules);
-        expect(await f.db.generation.count()).toBe(restoredGenerations);
+        expect(await moduleEvolutionOutcomes(f.db, f.workspace.id, f.moduleId)).toEqual(restoredActivations);
         expect(await f.db.moduleVersion.findFirstOrThrow({ where: { hash: f.second.hash } })).toMatchObject({ status: "approved" });
         expect((await notices(f.db)).length).toBe(0);
         expect(await readFile(join(f.live, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
@@ -382,7 +394,7 @@ test.each(["no snapshot", "migrating", "missing snapshot", "changed snapshot", "
   // Lifecycle failure preserves the committed fence and every other module field.
   expect(await f.db.module.findFirstOrThrow()).toEqual({ ...before, executionFenceAt: fenceAt });
   expect(await f.db.timer.findMany()).toEqual(schedules);
-  expect(await f.db.generation.count()).toBe(generations);
+  expect(await moduleEvolutionOutcomes(f.db, f.workspace.id, f.first.moduleId!)).toEqual(activations);
   expect(await readFile(join(f.live, "nested/state"), "utf8")).toBe("schema 2");
 });
 
@@ -394,7 +406,7 @@ test.each(["empty", "missing", "same schema"])('rollback switches directly with 
   expect(await f.service.modules.rollback(f.moduleId, hash)).toMatchObject({ status: "active", activeHash: hash });
   expect(await f.db.module.findFirstOrThrow()).toMatchObject({ dataSchema: kind === "same schema" ? 2 : 1, activeHash: hash });
   expect(await f.db.approval.count()).toBe(count);
-  expect(await f.db.generation.findFirstOrThrow({ orderBy: { seq: "desc" } })).toMatchObject({ reason: "rollback" });
+  expect((await moduleEvolutionOutcomes(f.db, f.workspace.id, f.moduleId))[0]).toMatchObject({ candidateHash: hash });
 });
 
 test("activation snapshots and migrates current data, then the next routed tool reads schema 2", async () => {
@@ -408,7 +420,7 @@ test("activation snapshots and migrates current data, then the next routed tool 
       migrations++;
       expect(input).toMatchObject({ network: false, timeoutMs: 60_000, maxOutputBytes: 64 * 1024, input: { migrate: { from: 1, to: 2 }, now: f.ports.now().toISOString() } });
       expect(input.dataDir).not.toBe(f.live);
-      if (migrations === 2) expect((await f.db.module.findFirstOrThrow()).status).toBe("migrating");
+      if (migrations === 1) expect((await f.db.module.findFirstOrThrow()).status).toBe("migrating");
       await writeFile(join(input.dataDir, "nested/state"), "schema 2");
       return { status: "succeeded", exitCode: 0, output: "public migration", error: null };
     }
@@ -417,13 +429,13 @@ test("activation snapshots and migrates current data, then the next routed tool 
     return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null };
   };
   const result = await f.propose();
-  expect(migrations).toBe(1);
+  expect(migrations).toBe(0);
   // Approval must snapshot current data, not the build-time copy, and replace the previous snapshot.
   await writeFile(join(f.live, "nested/state"), "changed after build");
   const snapshot = join(f.dataDir, "platform/snapshots", f.first.moduleId!, "schema-1");
   await mkdir(snapshot, { recursive: true }); await writeFile(join(snapshot, "stale"), "old snapshot");
   await f.approve(result.approvalId!);
-  expect(migrations).toBe(2);
+  expect(migrations).toBe(1);
   expect(await readFile(join(snapshot, "nested/state"), "utf8")).toBe("changed after build");
   expect(await readdir(snapshot)).toEqual(["nested"]);
   expect(await readFile(join(f.live, "nested/state"), "utf8")).toBe("schema 2");
@@ -443,7 +455,7 @@ test.each(["empty", "missing"])("activation with %s data records schema without 
   const result = await f.propose();
   expect(result.status).toBe("approved");
   expect(await f.db.module.findFirstOrThrow()).toMatchObject({ activeHash: result.hash, dataSchema: 2, status: "active" });
-  expect(f.calls.map(call => call.entry)).toEqual(["test.ts", "test.ts"]);
+  expect(f.calls.map(call => call.entry)).toEqual([]);
   expect(await f.db.audit.count({ where: { kind: "module_migration_started" } })).toBe(0);
 });
 
@@ -462,7 +474,7 @@ test.each(["failed", "timeout", "unavailable", "throw", "output", "bytes", "syml
     return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null };
   };
   const result = await f.propose();
-  const schedules = await f.db.timer.findMany(), generations = await f.db.generation.count();
+  const schedules = await f.db.timer.findMany(), activations = await moduleEvolutionOutcomes(f.db, f.workspace.id, f.first.moduleId!);
   await writeFile(join(f.live, "nested/state"), "changed after build");
   if (kind === "bytes") { await writeFile(join(f.live, "large"), ""); await truncate(join(f.live, "large"), 50 * 1024 * 1024 + 1); }
   if (kind === "symlink") await symlink(join(f.live, "nested/state"), join(f.live, "link"));
@@ -471,7 +483,7 @@ test.each(["failed", "timeout", "unavailable", "throw", "output", "bytes", "syml
   await f.approve(result.approvalId!);
   expect(await f.db.module.findFirstOrThrow()).toMatchObject({ activeHash: f.first.hash, dataSchema: 1, status: "active" });
   expect(await f.db.timer.findMany()).toEqual(schedules);
-  expect(await f.db.generation.count()).toBe(generations);
+  expect(await moduleEvolutionOutcomes(f.db, f.workspace.id, f.first.moduleId!)).toEqual(activations);
   expect(await readFile(join(f.live, "nested/state"), "utf8")).toBe("changed after build");
   const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.first.moduleId!, hash: result.hash } } });
   expect(version.status).toBe("rejected");
@@ -525,81 +537,15 @@ test.each(["live", "rename-back", "swapped", "recent"])("tick skips migrating mo
   }
 });
 
-test("continuity runs author tests on disposable data without invoking business handlers", async () => {
+test("installation checks neither copy private data nor execute application tests", async () => {
   const f = await dataFixture(true);
-  let copy = "";
-  f.ports.sandbox!.runModule = async input => {
-    expect(input.entry).toBe("test.ts");
-    if (!(await stat(join(input.dataDir, "nested")).catch(() => null))) return f.original(input);
-    copy = input.dataDir;
-    expect(copy).not.toBe(f.live);
-    expect(input.network).toBe(false);
-    expect(await readFile(join(copy, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
-    await writeFile(join(copy, "nested/state"), "test mutation");
-    return { status: "succeeded", exitCode: 0, output: "author checked copied data", error: null };
-  };
+  let applicationRuns = 0;
+  f.ports.sandbox!.runModule = async () => { applicationRuns++; throw new Error("Application code must not run before approval"); };
   const result = await f.propose();
   expect(result.status).toBe("pending_review");
-  expect(result.report).toMatchObject({ continuity: { status: "passed", migrated: false } });
-  expect(JSON.stringify(result.report)).not.toContain('"effects"');
-  expect(JSON.stringify(result.report)).not.toContain("author checked copied data");
-  expect(result).toMatchObject({ moduleId: f.first.moduleId, hash: expect.any(String), status: "pending_review" });
+  expect(result.report).toMatchObject({ tests: [], continuity: { status: "skipped", migrated: false } });
+  expect(applicationRuns).toBe(0);
   expect(await readFile(join(f.live, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
-  await expect(stat(copy)).rejects.toMatchObject({ code: "ENOENT" });
-  expect(await f.db.run.count()).toBe(0);
-});
-
-test.each([false, true])("author tests rejecting copied data block activation; throws=%s", async throws => {
-  const f = await dataFixture();
-  let copy = "";
-  f.ports.sandbox!.runModule = async input => {
-    expect(input.entry).toBe("test.ts");
-    if (!(await stat(join(input.dataDir, "nested")).catch(() => null))) return f.original(input);
-    copy = input.dataDir;
-    await writeFile(join(copy, "nested/state"), "test mutation");
-    if (throws) throw new Error("private host diagnostic");
-    return { status: "failed", exitCode: 1, output: "incompatible copied data", error: null };
-  };
-  const result = await f.propose();
-  expect(result.status).toBe("rejected");
-  expect(result.report).toMatchObject({ continuity: { status: "failed", reason: "author tests failed on copied data" } });
-  expect(JSON.stringify(result.report)).not.toContain("private host diagnostic");
-  expect(await readFile(join(f.live, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
-  await expect(stat(copy)).rejects.toMatchObject({ code: "ENOENT" });
-});
-
-test.each([false, true])("schema upgrade migrates only the copy; migration failure=%s", async failed => {
-  const f = await dataFixture();
-  await f.schema(2, "migrate.py");
-  let copy = "", entryRan = false;
-  f.ports.sandbox!.runModule = async input => {
-    if (input.entry === "test.ts" && !(await stat(join(input.dataDir, "nested")).catch(() => null))) return f.original(input);
-    if (/chrona-module-(probe|smoke)-/.test(input.dataDir)) return f.original(input);
-    expect(input.network).toBe(false);
-    expect(input.timeoutMs).toBe(60_000);
-    expect(input.maxOutputBytes).toBe(64 * 1024);
-    if (input.entry === "migrate.py") {
-      copy = input.dataDir;
-      expect(input.input).toEqual({ migrate: { from: 1, to: 2 }, now: f.ports.now().toISOString() });
-      expect(copy).not.toBe(f.live);
-      await writeFile(join(copy, "nested/state"), "schema 2");
-      return { status: failed ? "failed" : "succeeded", exitCode: failed ? 1 : 0, output: "public migration output", error: failed ? "public migration stderr" : null };
-    }
-    entryRan = true;
-    expect(input.entry).toBe("test.ts");
-    expect(input.dataDir).not.toBe(copy);
-    expect(await readFile(join(copy, "nested/state"), "utf8")).toBe("schema 2");
-    return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null };
-  };
-  const result = await f.propose();
-  expect(result.status).toBe(failed ? "rejected" : "pending_review");
-  expect(entryRan).toBe(!failed);
-  expect(result.report).toMatchObject({ continuity: { status: failed ? "failed" : "passed", fromSchema: 1, toSchema: 2, migrated: !failed, migration: { stdout: "public migration output", exitCode: failed ? 1 : 0 } } });
-  expect(await readFile(join(f.live, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
-  expect((await f.db.module.findFirstOrThrow()).dataSchema).toBe(1);
-  await expect(stat(copy)).rejects.toMatchObject({ code: "ENOENT" });
-  if (failed) expect(JSON.stringify((await f.db.audit.findFirstOrThrow({ where: { kind: "module_build_failed" } })).details)).toContain("public migration stderr");
-  else expect((await f.db.approval.findUniqueOrThrow({ where: { id: result.approvalId! } })).preview).toContain("1 → 2；需要迁移");
 });
 
 test.each(["nonempty", "empty", "missing", "unknown schema"])("schema upgrade without migrate: %s", async kind => {
@@ -613,7 +559,7 @@ test.each(["nonempty", "empty", "missing", "unknown schema"])("schema upgrade wi
   }
   const result = await f.propose();
   expect(result.status).toBe(kind === "nonempty" ? "rejected" : "approved");
-  expect(result.report).toMatchObject({ continuity: { status: kind === "nonempty" ? "failed" : kind === "unknown schema" ? "passed" : "skipped", migrated: false, toSchema: 2, ...(kind === "nonempty" ? { reason: "schema 升级需要 migrate" } : {}) } });
+  expect(result.report).toMatchObject({ continuity: { status: kind === "nonempty" ? "failed" : "skipped", migrated: false, toSchema: 2, ...(kind === "nonempty" ? { reason: "schema 升级需要 migrate" } : {}) } });
   if (kind === "nonempty") expect(JSON.stringify((await f.db.audit.findFirstOrThrow({ where: { kind: "module_build_failed" } })).details)).toContain("schema 升级需要 migrate");
 });
 
@@ -627,56 +573,6 @@ test.each([false, true])("schema downgrade rejects even with empty data=%s", asy
   expect(await f.db.approval.count({ where: { status: "open" } })).toBe(0);
 });
 
-test.each(["bytes", "files"])("oversized live data skips continuity visibly: %s", async kind => {
-  const f = await dataFixture(true);
-  if (kind === "bytes") {
-    await writeFile(join(f.live, "large"), "");
-    await truncate(join(f.live, "large"), 50 * 1024 * 1024 + 1);
-  } else for (let i = 0; i < 5000; i++) await writeFile(join(f.live, `file-${i}`), "");
-  const result = await f.propose();
-  expect(result.status).toBe("pending_review");
-  expect(result.report).toMatchObject({ continuity: { status: "skipped", reason: "data too large", migrated: false } });
-  expect(f.calls).toHaveLength(2);
-  expect((await f.db.approval.findUniqueOrThrow({ where: { id: result.approvalId! } })).preview).toContain("skipped (data too large)");
-  expect(await readFile(join(f.live, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
-});
-
-test.each(["file", "directory", "root"])("continuity refuses live data symlink: %s", async kind => {
-  const f = await dataFixture();
-  if (kind === "root") { await rename(f.live, `${f.live}-actual`); await symlink(`${f.live}-actual`, f.live); }
-  else await symlink(join(f.live, kind === "file" ? "nested/state" : "nested"), join(f.live, "linked"));
-  const result = await f.propose();
-  expect(result.status).toBe("rejected");
-  expect(result.report).toMatchObject({ continuity: { status: "failed" } });
-  expect(f.calls).toHaveLength(2);
-  expect(await readFile(join(f.live, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
-});
-
-test("test, continuity and schema failures retain bounded diagnostics and one lifecycle fact per streak", async () => {
-  const f = await dataFixture();
-  f.fail();
-  expect((await f.propose()).status).toBe("rejected");
-  f.fail(false);
-  await f.write(3);
-  f.ports.sandbox!.runModule = async input => {
-    if (input.entry === "test.ts" && !(await stat(join(input.dataDir, "nested")).catch(() => null))) return { status: "succeeded", exitCode: 0, output: "x".repeat(64 * 1024), error: null };
-    return { status: "failed", exitCode: 1, output: "public failure after verbose tests", error: null };
-  };
-  expect((await f.propose()).status).toBe("rejected");
-  const failures = await f.db.audit.findMany({ where: { kind: "module_build_failed" } });
-  expect(failures).toHaveLength(2);
-  expect(failures.some(row => JSON.stringify(row.details).includes("author tests failed on copied data"))).toBe(true);
-  expect(failures.every(row => (row.details as { report: string }).report.length <= 8000)).toBe(true);
-  expect(JSON.stringify(failures)).not.toContain("x".repeat(2000));
-  for (let i = 4; i <= 5; i++) {
-    await f.write(i); await f.schema(2);
-    expect((await f.propose()).status).toBe("rejected");
-  }
-  expect(await f.db.run.count()).toBe(0);
-  expect(await f.db.audit.count({ where: { kind: "module_build_failed" } })).toBe(2);
-  expect((await notices(f.db, { kind: "module-build-failed" })).length).toBe(1);
-});
-
 test.each(["migrate.ts", "migrate.py", "migrate.sh"])("declared %s must exist before a proposal is queued", async migrate => {
   const f = await fixture();
   const manifest = JSON.parse(await readFile(join(f.dir, "module.json"), "utf8"));
@@ -684,18 +580,18 @@ test.each(["migrate.ts", "migrate.py", "migrate.sh"])("declared %s must exist be
   expect((await f.submit()).status).toBe("rejected");
   expect(await f.db.moduleVersion.count()).toBe(0);
   expect(await f.db.approval.count()).toBe(0);
-  expect(f.calls).toHaveLength(0);
+  expect(f.starts).toHaveLength(0);
   await writeFile(join(f.dir, migrate), "");
   expect((await f.propose()).status).toBe("pending_review");
-  expect(f.calls).toHaveLength(1);
-  expect(f.calls[0]!.entry).toBe("test.ts");
+  expect(f.starts).toHaveLength(1);
+  expect(f.starts[0]!.entry).toBe("index.ts");
 });
 
 test("proposal returns building without sandbox work; identical in-flight hashes reuse the version and snapshot", async () => {
   const f = await fixture();
   const first = await f.submit();
   expect(first.status).toBe("building");
-  expect(f.calls).toHaveLength(0);
+  expect(f.starts).toHaveLength(0);
   expect(await f.db.approval.count()).toBe(0);
   const version = await f.db.moduleVersion.findFirstOrThrow();
   expect(await readdir(join(f.dataDir, "platform/staging"))).toEqual([version.id]);
@@ -704,25 +600,30 @@ test("proposal returns building without sandbox work; identical in-flight hashes
   expect(await readdir(join(f.dataDir, "platform/staging"))).toEqual([version.id]);
   await f.write(99);
   await f.service.modules.buildPending();
-  expect(f.calls).toHaveLength(1);
+  expect(f.starts).toHaveLength(1);
   expect(await readFile(join(f.dataDir, "platform/store", first.hash, "index.ts"), "utf8")).toBe("console.log(1)");
   expect(await f.db.moduleVersion.findFirstOrThrow()).toMatchObject({ status: "pending_review" });
   expect(await f.db.approval.count()).toBe(1);
   // Returning a pending hash must not run tests or create another approval.
   await f.write();
   expect((await f.submit()).status).toBe("pending_review");
-  expect(f.calls).toHaveLength(1);
+  expect(f.starts).toHaveLength(1);
   expect(await f.db.approval.count()).toBe(1);
 });
 
 test("concurrent builders atomically claim once and testing re-proposals do not duplicate", async () => {
   const f = await fixture();
   await f.submit();
-  const original = f.ports.sandbox!.runModule!;
+  const original = f.ports.sandbox!.startModule!;
   let release!: () => void, started!: () => void;
   const gate = new Promise<void>(resolve => { release = resolve; });
   const entered = new Promise<void>(resolve => { started = resolve; });
-  f.ports.sandbox!.runModule = async input => { started(); await gate; return original(input); };
+  f.ports.sandbox!.startModule = input => {
+    const process = original(input);
+    const exited = process.exited;
+    process.exited = exited.then(async result => { started(); await gate; return result; });
+    return process;
+  };
   const first = f.service.modules.buildPending();
   await entered;
   try {
@@ -730,7 +631,7 @@ test("concurrent builders atomically claim once and testing re-proposals do not 
     expect((await f.submit()).status).toBe("testing");
     expect(await f.db.moduleVersion.count()).toBe(1);
   } finally { release(); await first; }
-  expect(f.calls).toHaveLength(1);
+  expect(f.starts).toHaveLength(1);
   expect(await f.db.approval.count()).toBe(1);
 });
 
@@ -741,20 +642,20 @@ test("stale testing is retried, while a recent claim is left alone", async () =>
   await f.db.moduleVersion.update({ where: { id: version.id }, data: { status: "testing", createdAt: new Date(f.ports.now().getTime() - 20 * 60_000) } });
   await f.db.audit.create({ data: { workspaceId: f.workspace.id, actorKey: "chrona", kind: "module_build_started", subjectId: version.id, details: {}, createdAt: f.ports.now() } });
   await f.service.modules.buildPending();
-  expect(f.calls).toHaveLength(0);
+  expect(f.starts).toHaveLength(0);
   await f.service.modules.buildPending(new Date(f.ports.now().getTime() + 16 * 60_000));
-  expect(f.calls).toHaveLength(1);
+  expect(f.starts).toHaveLength(1);
   expect(await f.db.moduleVersion.findFirstOrThrow()).toMatchObject({ status: "pending_review" });
 });
 
-test("missing transient staging is rebuilt from the pinned Git commit", async () => {
+test("missing transient staging is rebuilt from retained immutable material", async () => {
   const f = await fixture();
   const proposal = await f.submit();
   const version = await f.db.moduleVersion.findFirstOrThrow();
   await rm(join(f.dataDir, "platform/staging", version.id), { recursive: true });
   await f.service.modules.buildPending();
-  expect(await f.db.moduleVersion.findFirstOrThrow()).toMatchObject({ hash: proposal.hash, status: "pending_review", report: { git: { commit: proposal.hash } } });
-  expect(f.calls).toHaveLength(1);
+  expect(await f.db.moduleVersion.findFirstOrThrow()).toMatchObject({ hash: proposal.hash, status: "pending_review" });
+  expect(f.starts).toHaveLength(1);
 });
 
 test("rejected versions retain two failure audits and emit only one lifecycle fact per streak", async () => {
@@ -806,10 +707,7 @@ test("user proposals emit no provider failure audit and rejected hashes can be r
   expect(await f.db.run.count()).toBe(0);
   expect(await f.db.audit.count({ where: { kind: "module_build_failed" } })).toBe(0);
   expect(await f.db.moduleVersion.findFirstOrThrow()).toMatchObject({ status: "rejected" });
-  const rejected = await f.db.moduleVersion.findFirstOrThrow();
-  await f.db.moduleReview.create({ data: { versionId: rejected.id, prefix: "stale review", suffix: "", codeDiff: "", detail: "old", needsMigration: false } });
   expect(await f.submit()).toMatchObject({ hash: first.hash, status: "building" });
-  expect(await f.db.moduleReview.count()).toBe(0);
   const version = await f.db.moduleVersion.findFirstOrThrow();
   expect(await readdir(join(f.dataDir, "platform/staging"))).toEqual([version.id]);
   await f.service.modules.buildPending();
@@ -823,23 +721,21 @@ test("each workspace build call processes at most three versions and never forei
   for (let i = 1; i <= 4; i++) { await f.write(i); await f.submit(); }
   const other = await f.db.workspace.create({ data: { name: "other" } });
   await createModules(f.ports, other.id).buildPending();
-  expect(f.calls).toHaveLength(0);
+  expect(f.starts).toHaveLength(0);
   await f.service.modules.buildPending();
-  expect(f.calls).toHaveLength(3);
+  expect(f.starts).toHaveLength(3);
   expect(await f.db.moduleVersion.count({ where: { status: "building" } })).toBe(1);
   await f.service.modules.buildPending();
-  expect(f.calls).toHaveLength(4);
+  expect(f.starts).toHaveLength(4);
 });
 
 test("proposal tests a private snapshot and creates a hash-bound plain-text approval", async () => {
   const f = await fixture(), result = await f.propose();
   expect(result.status).toBe("pending_review");
   expect(result.moduleId).toBeString();
-  expect(result.report).toEqual({ git: { commit: result.hash, tree: expect.stringMatching(/^[a-f0-9]{40}$/) }, tests: [{ stdout: "public stdout", stderr: "", exitCode: 0 }], continuity: { status: "skipped", reason: "no data", fromSchema: null, toSchema: 1, migrated: false }, outputImpacts: [] });
-  expect(f.calls).toHaveLength(1);
-  expect(f.calls[0]!.timeoutMs).toBe(60_000);
-  expect(f.calls[0]!.maxOutputBytes).toBe(64 * 1024);
-  expect(f.calls[0]!.codeDir).toContain("/platform/staging/");
+  expect(result.report).toEqual({ tests: [], continuity: { status: "skipped", reason: "Application checks belong to the application; migration runs only after approval", fromSchema: null, toSchema: 1, migrated: false } });
+  expect(f.starts).toHaveLength(1);
+  expect(f.starts[0]!.codeDir).toContain("/platform/staging/");
   expect(await readdir(join(f.dataDir, "platform/staging"))).toEqual([]);
   const approval = (await f.service.approvals.list())[0]!;
   expect(approval.preview.startsWith("联网：否\n")).toBe(true);
@@ -852,7 +748,7 @@ test("proposal tests a private snapshot and creates a hash-bound plain-text appr
   expect((await f.service.modules.list())[0]!.activeHash).toBeNull();
 });
 
-test("approval switches approved hashes atomically and rollback records full generations without calendar work", async () => {
+test("approval switches approved hashes atomically and rollback preserves single-app activation history", async () => {
   const f = await fixture(), first = await f.propose();
   await f.approve(first.approvalId!);
   await f.write(2);
@@ -865,10 +761,11 @@ test("approval switches approved hashes atomically and rollback records full gen
   await f.service.modules.rollback(first.moduleId!, first.hash);
   expect((await f.service.modules.list())[0]!.activeHash).toBe(first.hash);
   expect(await f.db.timer.count()).toBe(0);
-  const generations = await f.db.generation.findMany({ orderBy: { seq: "asc" } });
-  expect(generations.map(row => [row.seq, row.reason, row.modules])).toEqual([
-    [1, "activate", { [first.moduleId!]: first.hash }], [2, "activate", { [first.moduleId!]: second.hash }], [3, "rollback", { [first.moduleId!]: first.hash }],
+  const activations = await moduleEvolutionOutcomes(f.db, f.workspace.id, first.moduleId!);
+  expect(activations.map(row => [row.previousHash, row.candidateHash, row.status])).toEqual([
+    [second.hash, first.hash, "awaiting-verification"], [first.hash, second.hash, "rolled-back"], [null, first.hash, "awaiting-verification"],
   ]);
+  expect(new Set(activations.map(row => row.activationId)).size).toBe(3);
   expect(f.forwarded).toEqual([]);
 
   expect(await f.db.audit.count({ where: { kind: "module_rollback" } })).toBe(1);
@@ -922,11 +819,11 @@ test("huge code diff truncates with checkout hash while manifest and intent stay
   expect(preview.endsWith(`…代码差异过长，已截断；完整代码可用 m_modules_checkout 检出 hash ${second.hash}`)).toBe(true);
 });
 
-test("hash is a Git commit; identical trees reuse the approved version without approval", async () => {
+test("hash binds complete material; identical bytes reuse the approved version without approval", async () => {
   const f = await fixture(), first = await f.propose();
-  expect(first.hash).toMatch(/^[a-f0-9]{40}$/);
-  expect(first.report).toMatchObject({ git: { commit: first.hash, tree: expect.stringMatching(/^[a-f0-9]{40}$/) } });
-  expect(await readModuleSource({ platform: join(f.dataDir, "platform"), moduleId: first.moduleId!, commit: first.hash })).toEqual(await snapshotModule(f.root, "price-watch"));
+  expect(first.hash).toMatch(/^[a-f0-9]{64}$/);
+  expect(first.report).not.toHaveProperty("git");
+  expect(moduleSourceFiles(await readStoredVersionMaterial(join(f.dataDir, "platform"), first.hash))).toEqual(await snapshotModuleMaterial(f.root, "price-watch"));
   await f.approve(first.approvalId!);
   const second = await f.propose();
   expect(second).toMatchObject({ moduleId: first.moduleId, hash: first.hash, status: "approved" });
@@ -952,17 +849,17 @@ test("session edits after propose never change store hash/content; checkout make
   // A version rejected before it was stored has a record but no files: say so instead of an internal error.
   const unstored = "f".repeat(64);
   await f.db.moduleVersion.create({ data: { moduleId: result.moduleId!, hash: unstored, manifest: {}, source: "build", intent: {}, report: {}, status: "rejected" } });
-  await expect(f.service.modules.checkout(result.moduleId!, unstored, "unstored", f.root)).rejects.toMatchObject({ code: "not_found", message: expect.stringContaining("no stored source") });
+  await expect(f.service.modules.checkout(result.moduleId!, unstored, "unstored", f.root)).rejects.toMatchObject({ code: "ENOENT" });
 });
 
-test("failing tests reject with public outputs only, no approval, staging cleaned", async () => {
+test("failed startup check rejects with a bounded reason and no approval", async () => {
   const f = await fixture(); f.fail();
   const result = await f.propose();
   expect(result.status).toBe("rejected");
-  expect(result.report).toEqual({ git: { commit: result.hash, tree: expect.stringMatching(/^[a-f0-9]{40}$/) }, tests: [{ stdout: "public stdout", stderr: "public stderr", exitCode: 1 }] });
+  expect(result.report).toMatchObject({ tests: [], errors: ["Module startup or SDK connection failed"] });
   expect(await f.db.approval.count()).toBe(0);
   expect(await f.db.run.count()).toBe(0);
-  expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_build_failed" } })).toMatchObject({ subjectId: result.moduleId, details: { versionId: expect.any(String), hash: result.hash, report: JSON.stringify(result.report) } });
+  expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_build_failed" } })).toMatchObject({ subjectId: result.moduleId, details: { versionId: expect.any(String), hash: result.hash, report: JSON.stringify({ continuity: (result.report as { continuity: unknown }).continuity }) } });
   expect((await f.service.modules.list())[0]!.versions[0]!.status).toBe("rejected");
   expect(await readdir(join(f.dataDir, "platform/staging"))).toEqual([]);
 });
@@ -992,19 +889,17 @@ test.each(["symlink", "bytes", "files"])("reject unsafe module contents: %s", as
   expect(await f.db.module.count()).toBe(0);
 });
 
-test("all tests run independently even after a failure; declared network never enables build networking", async () => {
+test("installation skips declared application tests and never enables startup networking", async () => {
   const f = await fixture();
   const manifest = JSON.parse(await readFile(join(f.dir, "module.json"), "utf8"));
-  manifest.effects.push("network");
-  manifest.tests.push("other.py");
+  manifest.effects.push("network"); manifest.tests.push("other.py");
   await writeFile(join(f.dir, "module.json"), JSON.stringify(manifest));
-  await writeFile(join(f.dir, "other.py"), "exit(0)");
-  f.fail();
+  await writeFile(join(f.dir, "other.py"), "raise RuntimeError('must not run')");
   const result = await f.propose();
-  expect(result.status).toBe("rejected");
-  expect(f.calls).toHaveLength(2);
-  expect(f.calls[0]!.dataDir).not.toBe(f.calls[1]!.dataDir);
-  expect(result.report).toMatchObject({ tests: [{ exitCode: 1 }, { exitCode: 1 }] });
+  expect(result.status).toBe("pending_review");
+  expect(f.calls).toHaveLength(0);
+  expect(f.starts).toMatchObject([{ network: false }]);
+  expect(result.report).toMatchObject({ tests: [] });
 });
 
 test("invalid manifests reject without inventing a module identity or leaking parser diagnostics", async () => {
@@ -1038,12 +933,12 @@ test("pending versions cannot activate directly", async () => {
   await expect(f.service.modules.activate(result.moduleId!, result.hash, "activate")).rejects.toThrow("not approved");
   expect((await f.db.moduleVersion.findFirstOrThrow()).status).toBe("pending_review");
   expect((await f.db.module.findFirstOrThrow()).activeHash).toBeNull();
-  expect(await f.db.generation.count()).toBe(0);
+  expect(await moduleEvolutionOutcomes(f.db, f.workspace.id, result.moduleId!)).toEqual([]);
   expect(await f.db.timer.count()).toBe(0);
 
 });
 
-test("workspace isolation, full snapshots, last five run summaries and nonmodule approval forwarding", async () => {
+test("workspace isolation, independent application activation, last five run summaries and nonmodule approval forwarding", async () => {
   const f = await fixture(), first = await f.propose();
   const other = await f.db.workspace.create({ data: { name: "other" } });
   const foreign = createModules(f.ports, other.id);
@@ -1052,7 +947,9 @@ test("workspace isolation, full snapshots, last five run summaries and nonmodule
   await expect(foreign.checkout(first.moduleId!, first.hash, "copy", f.root)).rejects.toThrow("not found");
   const pending = await f.db.module.create({ data: { workspaceId: f.workspace.id, name: "another" } });
   await f.approve(first.approvalId!);
-  expect((await f.db.generation.findFirstOrThrow()).modules).toEqual({ [first.moduleId!]: first.hash, [pending.id]: null });
+  expect(await moduleEvolutionOutcomes(f.db, f.workspace.id, first.moduleId!)).toMatchObject([{ moduleId: first.moduleId, candidateHash: first.hash }]);
+  expect(await moduleEvolutionOutcomes(f.db, f.workspace.id, pending.id)).toEqual([]);
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: pending.id } })).toMatchObject({ activeHash: null });
   for (let i = 0; i < 7; i++) await f.db.moduleRun.create({ data: { moduleId: first.moduleId!, hash: first.hash, triggerId: "daily", firedAt: f.ports.now(), exitCode: 0, createdAt: new Date(i * 1000) } });
   const listed = (await f.service.modules.list()).find(row => row.id === first.moduleId)!;
   expect(listed.runs).toHaveLength(5);
@@ -1089,8 +986,12 @@ test("tick starts builds without waiting for them and reports build errors on th
   const f = await fixture();
   let release!: () => void;
   const gate = new Promise<void>(resolve => { release = resolve; });
-  const run = f.ports.sandbox!.runModule!;
-  f.ports.sandbox = testModuleSandbox(async input => { await gate; return run(input); });
+  const start = f.ports.sandbox!.startModule!;
+  f.ports.sandbox!.startModule = input => {
+    const process = start(input), exited = process.exited;
+    process.exited = exited.then(async result => { await gate; return result; });
+    return process;
+  };
   const tick = createStewardService(f.ports).tick;
   const proposal = await f.submit();
   expect((await tick()).failures).toEqual([]);
@@ -1099,7 +1000,7 @@ test("tick starts builds without waiting for them and reports build errors on th
   release();
   await tick.settled();
   expect((await f.db.moduleVersion.findFirstOrThrow({ where: { hash: proposal.hash } })).status).toBe("pending_review");
-  expect(f.calls).toHaveLength(1);
+  expect(f.starts).toHaveLength(1);
   f.ports.sandbox = { available: true, isolated: true, runModule: async () => { throw new Error("sandbox crashed"); } };
   const findMany = f.db.moduleVersion.findMany.bind(f.db.moduleVersion);
   f.db.moduleVersion.findMany = (async () => { throw new Error("db down"); }) as unknown as typeof findMany;
@@ -1126,15 +1027,12 @@ test("Chrona pauses and resumes an app while preserving its timer state", async 
   expect((await f.db.audit.findMany({ where: { subjectId: moduleId, kind: { in: ["module_disabled", "module_enabled"] } }, orderBy: { createdAt: "asc" } })).map(row => row.kind)).toEqual(["module_disabled", "module_enabled"]);
 });
 
-test("removing an app asks once from any entry; built-ins are refused; data and code are backed up", async () => {
+test("removing an app asks once from any entry and backs up data and code", async () => {
   const f = await fixture(), result = await f.propose();
   await f.approve(result.approvalId!);
   const moduleId = result.moduleId!, data = join(f.dataDir, "platform", "data", moduleId);
   await mkdir(data, { recursive: true });
   await writeFile(join(data, "prices.json"), "[1]");
-  await f.db.module.update({ where: { id: moduleId }, data: { builtin: true } });
-  await expect(f.service.modules.lifecycle("remove", moduleId, { reason: "x" }, true)).rejects.toThrow("Built-in price-watch cannot remove");
-  await f.db.module.update({ where: { id: moduleId }, data: { builtin: false } });
   const request = await f.service.modules.lifecycle("remove", moduleId, { reason: "三个月没用过" }, false);
   const approvalId = "approvalId" in request ? request.approvalId : undefined;
   if (!approvalId) throw new Error("expected an approval");
@@ -1162,17 +1060,17 @@ test("the review shows output contracts and examples as digests, and every autho
   expect(shown.length).toBeLessThan(JSON.stringify(output).length / 2);
 });
 
-test("trusted pinned proposals preserve the selected Git commit and reject different source", async () => {
+test("trusted pinned proposals preserve the selected material and reject different bytes", async () => {
   const f = await fixture(false), first = await f.submit();
   await f.write(2);
-  const git = await commitModuleSource({ platform: join(f.dataDir, "platform"), moduleId: first.moduleId!, versionId: "official-candidate", files: await snapshotModule(f.root, "price-watch"), parent: first.hash, message: "upstream ancestry" });
-  const input = { root: f.root, dir: "price-watch", intent, allowed: ["price-watch"], sourceCommit: git.commit, expectedLocal: git.commit };
+  const hash = moduleMaterialDigest(await f.material());
+  const input = { root: f.root, dir: "price-watch", intent, allowed: ["price-watch"], expectedHash: hash };
   await expect(f.service.modules.propose({ ...input, expectedModuleId: "removed-module" }, "user")).rejects.toMatchObject({ code: "conflict", message: "Module identity changed before proposal" });
   await expect(f.service.modules.propose({ ...input, expectedModuleId: null }, "user")).rejects.toMatchObject({ code: "conflict", message: "Module identity changed before proposal" });
   const pinned = await f.service.modules.propose({ ...input, expectedModuleId: first.moduleId! }, "user");
-  expect(pinned).toMatchObject({ moduleId: first.moduleId, hash: git.commit, status: "building", report: { git } });
+  expect(pinned).toMatchObject({ moduleId: first.moduleId, hash, status: "building" });
   await f.write(3);
-  await expect(f.service.modules.propose(input, "user")).rejects.toMatchObject({ code: "conflict", message: "Submitted source differs from its selected Git commit" });
+  await expect(f.service.modules.propose(input, "user")).rejects.toMatchObject({ code: "conflict", message: "Submitted material differs from the selected release" });
   expect(await f.db.moduleVersion.count()).toBe(2);
 });
 
@@ -1189,8 +1087,8 @@ test("proposals omit local Git metadata from the committed source", async () => 
   await mkdir(join(f.dir, ".git"));
   await writeFile(join(f.dir, ".git", "config"), "private local metadata");
   const proposed = await f.submit();
-  const files = await readModuleSource({ platform: join(f.dataDir, "platform"), moduleId: proposed.moduleId!, commit: proposed.hash });
-  expect(files.map(file => file.path)).toEqual(["index.ts", "module.json", "test.ts"]);
+  const files = moduleSourceFiles(await readStoredVersionMaterial(join(f.dataDir, "platform"), proposed.hash));
+  expect(files.map(file => file.path)).toEqual(["chrona-material.json", "index.ts", "module.json", "test.ts"]);
 });
 
 test("registered module routes retain fixed materials and reject removed upstream authority", async () => {
@@ -1199,7 +1097,8 @@ test("registered module routes retain fixed materials and reject removed upstrea
   expect(system.tools.map(tool => tool.name)).toEqual(["list", "describe", "health", "admit", "source", "submit", "receipt", "enable", "disable", "rollback", "remove", "operation"]);
   const scope = { workspaceId: f.workspace.id, caller: { kind: "owner" as const, via: null }, chain: [], path: [] };
   const list = modulesListOutput.parse(((await callSync(f.ports, scope, "modules.list", {})).output as {items: unknown}).items);
-  expect(list.find(item => item.id === proposal.moduleId)?.versions[0]?.git?.commit).toBe(proposal.hash);
+  expect(list.find(item => item.id === proposal.moduleId)?.versions[0]).toMatchObject({ hash: proposal.hash });
+  expect(list.find(item => item.id === proposal.moduleId)?.versions[0]).not.toHaveProperty("git");
   for (const caller of [scope.caller, { kind: "provider" as const, runId: "untrusted-provider" }]) {
     await expect(callSync(f.ports, { ...scope, caller }, "modules.upstream", { action: "status", moduleId: proposal.moduleId! })).rejects.toMatchObject({ code: "not_found" });
   }

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { createServerApp as createApp } from "./app";
 import { createStewardRuntime } from "./steward-runtime";
-const createServerApp = () => createApp({ steward: createStewardRuntime(db, { provider: null }) });
+const createServerApp = () => createApp({ steward: createStewardRuntime(db, {}) });
 import { resetEnvCacheForTests } from "./config/env";
 import { db, resetTestDb } from "./__tests__/bun-test-helpers";
 

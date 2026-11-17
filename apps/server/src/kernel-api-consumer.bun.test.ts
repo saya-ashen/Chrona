@@ -52,7 +52,7 @@ test("independent consumer crosses HTTP and real SDK, then resumes persisted rec
     async function restart() {
       server?.stop(true); await runtime?.stop(); await db.$disconnect(); db = connect();
       const selected = createScriptSandbox({ dataDir, executionMode: "trusted-local" });
-      runtime = createStewardRuntime(db, { provider: null, dataDir, sandbox: { ...selected.health, startModule: selected.startModule } });
+      runtime = createStewardRuntime(db, { dataDir, sandbox: { ...selected.health, startModule: selected.startModule } });
       const app = await createServerApp({ steward: runtime });
       server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: app.fetch });
     }

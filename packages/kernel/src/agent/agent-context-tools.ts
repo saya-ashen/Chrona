@@ -1,15 +1,15 @@
 import { z } from "zod";
-import type { ExecutionPrincipal, RoutedTarget } from "@chrona/contracts/steward";
+import type { RoutedTarget } from "@chrona/contracts/steward";
 import type { StewardPorts } from "../ports";
 import { admitted, callSync, CallError, type Caller, type CallOrigin } from "../modules/module-calls";
 import { moduleTools, catalogEntry } from "../modules/module-tools";
-import { assertExecutionPrincipal } from "../execution/execution-principal";
+import { assertApprovedAgentPrincipal, type ModulePrincipal } from "./agent-context-state";
 import { runExpired } from "../execution/run-finish";
 
 import { withAgentContextEntry } from "./agent-context-entry";
 
 /** Select only interfaces that the originating module itself can call. No Provider or owner upgrade. */
-export async function selectContextTools(ports: StewardPorts, principal: ExecutionPrincipal, targets: RoutedTarget[]) {
+export async function selectContextTools(ports: StewardPorts, principal: ModulePrincipal, targets: RoutedTarget[]) {
   if (principal.caller.kind !== "module") throw new CallError("forbidden", "Agent contexts require a module caller");
   const module = await ports.db.module.findUniqueOrThrow({ where: { id: principal.caller.moduleId }, select: { name: true } });
   const caller = { ...principal.caller, module: module.name } satisfies Caller;
@@ -26,14 +26,14 @@ export async function selectContextTools(ports: StewardPorts, principal: Executi
 }
 export async function contextRunTools(ports: StewardPorts, run: { id: string; sessionId: string | null; workspaceId: string }) {
   if (!run.sessionId) return null;
-  const grant = await ports.db.agentContext.findFirst({ where: { sessionId: run.sessionId, workspaceId: run.workspaceId } });
-  if (!grant) return null;
-  const { hash } = grant;
-  const session = await ports.db.session.findFirstOrThrow({ where: { id: run.sessionId, workspaceId: run.workspaceId, source: "module" } });
-  if (!session.moduleId || grant.moduleId !== session.moduleId) throw new CallError("forbidden", "Agent context owner is missing");
-  const principal: ExecutionPrincipal = { workspaceId: run.workspaceId, ownerId: "owner", caller: { kind: "module", moduleId: session.moduleId, hash } };
-  await assertExecutionPrincipal(ports.db, principal);
-  const tools = await ports.db.agentRunAdmission.findFirstOrThrow({ where: { runId: run.id, moduleId: session.moduleId, hash } });
+  const context = await ports.db.agentContext.findFirst({ where: { id: run.sessionId, workspaceId: run.workspaceId } });
+  if (!context) return null;
+  const { hash, moduleId, ownerId } = context;
+  if (!moduleId) throw new CallError("forbidden", "Agent context owner is missing");
+  const principal: ModulePrincipal = { workspaceId: run.workspaceId, ownerId, caller: { kind: "module", moduleId, hash } };
+  await assertApprovedAgentPrincipal(ports.db, principal, false);
+  const tools = await ports.db.agentRunAdmission.findFirst({ where: { runId: run.id, moduleId, hash } });
+  if (!tools) return null;
   const { targets } = z.object({ targets: z.array(z.object({ target: z.string(), moduleId: z.string(), contractHash: z.string().optional() }).strict()).max(100) }).parse(tools);
   const selected = await selectContextTools(ports, principal, targets.map(item => item.target));
   for (const entry of selected.entries) {
@@ -44,7 +44,7 @@ export async function contextRunTools(ports: StewardPorts, run: { id: string; se
 }
 export async function callContextTool(ports: StewardPorts, context: NonNullable<Awaited<ReturnType<typeof contextRunTools>>>, name: string, raw: unknown, { deadline, key }: { deadline: number; key?: string }) {
   const now = ports.now();
-  const run = context.runId && context.workspaceId ? await ports.db.run.findFirst({ where: { id: context.runId, workspaceId: context.workspaceId, status: "running", execution: null } }) : null;
+  const run = context.runId && context.workspaceId ? await ports.db.run.findFirst({ where: { id: context.runId, workspaceId: context.workspaceId, status: "running" } }) : null;
   if (!run || runExpired(run, now) || run.cancelRequestedAt) throw new CallError("forbidden", "Agent run is no longer active");
   const current = await contextRunTools(ports, run);
   if (!current || current.caller.moduleId !== context.caller.moduleId || current.caller.hash !== context.caller.hash || current.caller.module !== context.caller.module) throw new CallError("forbidden", "Agent context caller changed");

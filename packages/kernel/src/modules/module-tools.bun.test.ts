@@ -38,30 +38,29 @@ async function fixture() {
   const notify = await db.module.create({ data: { workspaceId, name: "notify", activeHash: "notify-fixture" } });
   await db.moduleVersion.create({ data: { moduleId: notify.id, hash: "notify-fixture", manifest: notifyManifest, intent: {}, source: "user", report: {}, status: "approved" } });
   const api = createModules(ports, workspaceId);
-  const session = await db.session.create({ data: { workspaceId, source: "module", key: "tools:test", focus: ["mail-sort"] } });
   const module = await db.module.create({ data: { workspaceId, name: "mail-sort", activeHash: "hash" } });
   const tool: ModuleManifest["tools"][number] = { name: "find-mail", description: "Find matching mail", visibility: ["provider", "owner"], idempotent: false, parameters: { type: "object", properties: { query: { type: "string" }, count: { type: "number" }, unread: { type: "boolean" }, folder: { type: "string", enum: ["inbox", "sent"] } }, required: ["query"] },
       output: {}
 };
   const manifest = { name: module.name, entry: "index.ts", tests: ["test.ts"], effects: ["network"], uses: ["notify.send"], params: { limit: { type: "number", value: 3 } }, tools: [tool] };
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "hash", manifest, intent: {}, source: "user", report: {}, status: "approved" } });
-  await db.$transaction(tx => recordModuleActivation(moduleContext(ports, workspaceId), tx, { moduleId: module.id, previousHash: null, hash: "hash", generationId: "fixture" }));
+  await db.$transaction(tx => recordModuleActivation(moduleContext(ports, workspaceId), tx, { moduleId: module.id, previousHash: null, hash: "hash" }));
+  const session = await db.agentContext.create({ data: { workspaceId, ownerId: "owner", moduleId: module.id, hash: "hash" } });
   const run = await db.run.create({ data: { workspaceId, sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Find mail", provider: "fake", tokenHash: "fixture-provider-token", cwd: dataDir } });
   return { db, ports, api, module, manifest, tool, session, run, calls, workspaceId,
-    catalog: () => moduleToolCatalog(ports, { workspaceId, sessionId: session.id }),
+    catalog: () => moduleToolCatalog(ports, { workspaceId }),
     call: (args: unknown = { query: "hello" }, name = "m_mail_sort_find_mail") => callModuleTool(ports, { workspaceId, sessionId: session.id, runId: run.id }, name, args),
     fail: (message = "public stderr") => { error = message; } };
 }
-test("catalog appends focused module tools with schema, meaningful description and their toolset", async () => {
+test("catalog groups deferred application tools with their schema and description", async () => {
   const f = await fixture(), catalog = await f.catalog();
-  expect(catalog.at(-1)).toEqual({ name: "m_mail_sort_find_mail", exposure: "direct", namespace: { name: "module_mail_sort", description: "Find matching mail" }, description: "Find matching mail",
+  expect(catalog.at(-1)).toEqual({ name: "m_mail_sort_find_mail", exposure: "deferred", namespace: { name: "module_mail_sort", description: "Find matching mail" }, description: "Find matching mail",
     inputSchema: { ...f.tool.parameters, additionalProperties: false, description: "[module mail-sort] Find matching mail" }, outputSchema: {}, examples: null, sideEffects: null, errors: null,
     idempotent: false, retry: "Unknown async outcomes are not redelivered automatically." });
 });
-test("unfocused sessions find deferred module tools", async () => {
+test("deferred tools retain routed caller identity", async () => {
   const f = await fixture();
   await f.db.moduleVersion.updateMany({ where: { moduleId: f.module.id }, data: { manifest: { ...f.manifest, description: "Sort and search work mail" } } });
-  await f.db.session.update({ where: { id: f.session.id }, data: { focus: [] } });
   expect((await f.catalog()).at(-1)).toMatchObject({ name: "m_mail_sort_find_mail", exposure: "deferred", namespace: { name: "module_mail_sort", description: "Sort and search work mail" } });
   expect(await f.call()).toMatchObject({ result: { found: 3 } });
   expect(await notice(f.db)).toMatchObject({ moduleId: f.module.id });

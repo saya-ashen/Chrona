@@ -9,7 +9,7 @@ import { liveRuns } from "../execution/runs";
 import { cancelProviderRun } from "./provider-cancel";
 import { notifyUser, withdrawNotice } from "../notify-user";
 import { drainCalls } from "../modules/module-calls";
-import { providerJournal, providerReceipt, providerRuns, providerWrite, type ProviderWriteGuard } from "./provider-journal";
+import { providerJournal, providerReceipt, providerRuns } from "./provider-journal";
 
 type Pending = { runId: string; workspaceId: string; db: StewardPorts["db"]; request: ProviderInteraction; claimed: boolean; closed: boolean; settle(value: ProviderAnswer, status: ProviderInteraction["status"]): Promise<void> };
 const pending = new Map<string, Pending>();
@@ -24,11 +24,9 @@ const alreadyClosed = (entry: Pending) => entry.closed;
 type RunIdentity = { id: string; workspaceId: string; sessionId: string | null; deadlineAt: Date | null; token?: string };
 
 /** Technical event journal only: no raw RPC, answer body, new permission grant or replayable authorization. */
-export function createProviderChannel(ports: StewardPorts, run: RunIdentity, onInteraction?: (request: ProviderInteraction) => Promise<void>, guard?: ProviderWriteGuard) {
-  const { db, now } = ports, write = providerJournal(db, run.id, now, guard);
-  const withdraw = () => guard
-    ? providerWrite(db, guard, tx => withdrawNotice(tx, ports, run.workspaceId, `provider-input:${run.id}`))
-    : withdrawNotice(db, ports, run.workspaceId, `provider-input:${run.id}`);
+export function createProviderChannel(ports: StewardPorts, run: RunIdentity, onInteraction?: (request: ProviderInteraction) => Promise<void>) {
+  const { db, now } = ports, write = providerJournal(db, run.id, now);
+  const withdraw = () => withdrawNotice(db, ports, run.workspaceId, `provider-input:${run.id}`);
   let closed = false, questions = 0, previous = "", observerFailure: unknown;
   async function observe(request: ProviderInteraction) {
     if (!onInteraction) return;
@@ -57,8 +55,7 @@ export function createProviderChannel(ports: StewardPorts, run: RunIdentity, onI
       if (entry.closed) return;
       entry.closed = true; clearTimeout(timer); signal.removeEventListener("abort", abort);
       try {
-        if (guard) await providerWrite(db, guard, tx => providerReceipt(tx, run.workspaceId, request.id, status, now()));
-        else await providerReceipt(db, run.workspaceId, request.id, status, now());
+        await providerReceipt(db, run.workspaceId, request.id, status, now());
         request.status = status;
         await observe(request);
         if (owned.size === 1) { await withdraw(); void drainCalls(ports, run.workspaceId).catch(error => console.error(JSON.stringify({ component: "provider-channel", event: "drain_calls.failed", workspaceId: run.workspaceId, error: String(error).slice(0, 2000) }))); }
@@ -72,7 +69,7 @@ export function createProviderChannel(ports: StewardPorts, run: RunIdentity, onI
     signal.addEventListener("abort", abort, { once: true });
     let admitted = false;
     try {
-      await providerWrite(db, guard, async tx => {
+      await db.$transaction(async tx => {
         const { method, title, message, options, timeoutMs } = safe;
         const stored = { ...request, question: { method, title, message, options, timeoutMs } };
         await tx.runInteraction.create({ data: { id: request.id, runId: run.id, request: stored, createdAt: at } });
@@ -130,7 +127,7 @@ export async function validateExecutionAnswer(ports: StewardPorts, tx: Prisma.Tr
 export function createProviderControl(ports: StewardPorts, workspaceId: string) {
   const { db, now } = ports;
   async function activeRun(id: string) {
-    const run = await db.run.findFirst({ where: { workspaceId, id }, include: { session: true } });
+    const run = await db.run.findFirst({ where: { workspaceId, id } });
     if (!run) throw new StewardError("not_found", "Run not found");
     if (!providerRunActive(run, liveRuns.has(id), now())) throw new StewardError("conflict", "Run is no longer active");
     return run;

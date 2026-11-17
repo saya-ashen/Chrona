@@ -9,7 +9,6 @@ import { testDb } from "../__testing__/test-db";
 import type { StewardPorts } from "../ports";
 import { callSync, listSystemModules, moduleCallbackContractHash, type Caller } from "./module-calls";
 import { registerSystemModules } from "../system/system-modules";
-import { callsContracts } from "./module-contracts";
 import { references, interfaceReference } from "./module-reference";
 import { committedToolContract } from "./module-tool-contract";
 import { catalogEntry } from "./module-tools";
@@ -21,7 +20,6 @@ async function fixture() {
   const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-reference-"));
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => new Date(),
-    provider: { name: "fake", async health() { throw new Error("Reference must not probe a Provider"); }, start() { throw new Error("Reference must not start a Provider"); } },
     sandbox: { available: true, isolated: false, startModule() { throw new Error("Reference must not start a module"); } } };
   const workspace = await db.workspace.create({ data: { name: "reference" } });
   const owner: Caller = { kind: "owner", via: null };
@@ -69,7 +67,6 @@ test("references expose the current public contracts without runtime execution",
 
 test("system references, catalogs and calls use the same committed contracts", async () => {
   const f = await fixture();
-  const calls = await callsContracts(f.ports, f.workspace.id);
   for (const system of listSystemModules()) for (const tool of system.tools) {
     const target = `${system.name}.${tool.name}`, contract = committedToolContract(target);
     const reference = await interfaceReference(f.ports, f.workspace.id, target);
@@ -88,7 +85,7 @@ test("system references, catalogs and calls use the same committed contracts", a
   }
 });
 
-test("app output references preserve original JSON Schema and generated call types", async () => {
+test("app output references preserve original JSON Schema", async () => {
   const f = await fixture(), module = await active(f, "typed");
   const schema = { type: "object", properties: { zeta: { type: "string" }, alpha: { type: "integer" } }, required: ["zeta", "alpha"], additionalProperties: false };
   const tool = { ...manifest.tools[0]!, parameters: { type: "object", properties: { filters: { type: "array", items: { type: "object", properties: { state: { type: "string", enum: ["ready", "done"] }, limit: { type: "number" } }, required: ["state"] } } }, required: ["filters"] }, output: schema };
@@ -96,7 +93,6 @@ test("app output references preserve original JSON Schema and generated call typ
   const reference = await f.call("modules.describe", { target: "typed.read" }) as { outputSchema: unknown; inputSchema: { properties: { filters: { items: { additionalProperties: boolean } } } } };
   expect(JSON.stringify(reference.outputSchema)).toBe(JSON.stringify(schema));
   expect(reference.inputSchema.properties.filters.items.additionalProperties).toBe(false);
-  expect((await callsContracts(f.ports, f.workspace.id))["typed.read"]).toMatchObject({ input: { type: "object", properties: { filters: { type: "array" } } }, output: { type: "object", required: ["zeta", "alpha"] } });
 });
 
 test("reference hash describes the live tool and ignores documentation and object-key order", async () => {
@@ -123,7 +119,6 @@ test.each(["building", "testing", "pending_review", "rejected", "active", "missi
   else await f.db.moduleVersion.updateMany({ where: { moduleId: module.id }, data: { status: state } });
   expect((await references(f.ports, f.workspace.id)).some(entry => entry.target === "target.read")).toBe(false);
   await expect(f.call("modules.describe", { target: "target.read" })).rejects.toMatchObject({ code: "not_found" });
-  expect(await callsContracts(f.ports, f.workspace.id)).not.toHaveProperty("target.read");
 });
 
 test("discovery stays workspace scoped and honors the current caller admission", async () => {

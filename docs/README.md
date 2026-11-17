@@ -10,7 +10,7 @@
 | 当前代码与开发规则 | [架构](zh/architecture.md)、[开发指引](../AGENTS.md)、[贡献说明](../CONTRIBUTING.md) |
 | 安装与运维 | [中文 README](../README.zh.md)、[English README](../README.md)、[运维](zh/operations.md) |
 | 通用 Agent 与 Provider | [Agent 边界](zh/agent-builtin-application.md)、[Provider 运行](zh/provider-runtime.md)、[任务时限](zh/task-timeout.md) |
-| 应用接入与材料 | [独立应用边界](zh/independent-applications.md)、[依赖方向](zh/module-dependency-direction.md)、[Git 材料](zh/module-git.md)、[安装就绪](zh/module-installation-readiness.md)、[恢复](zh/module-recovery.md) |
+| 应用接入与材料 | [独立应用边界](zh/independent-applications.md)、[依赖方向](zh/module-dependency-direction.md)、[版本材料与 Git 边界](zh/module-git.md)、[安装就绪](zh/module-installation-readiness.md)、[恢复](zh/module-recovery.md) |
 | 内核事实与唤醒 | [有限事实](zh/kernel-notification-facts.md)、[API 规范](zh/kernel-api-design.md) |
 | 实施证据与后续工作 | [API 实施记录](zh/kernel-api-implementation.md)、[路线](zh/development-roadmap.md)、[可移植方案](zh/kernel-portability-plan.md)、[历史验证](zh/kernel-portability-verification.md) |
 | 按需代理工具 | [context-mode / CodeGraph](agents/tooling.md)，仅在当前会话提供时读取 |

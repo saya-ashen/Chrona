@@ -1,3 +1,4 @@
+import { createTestAgentContext } from "../__testing__/test-provider";
 import { afterEach, expect, test } from "bun:test";
 import type { Prisma } from "@chrona/db";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -41,9 +42,9 @@ async function fixture() {
     await registerAgentProvider(ports, workspaceId, { kind: "module", module: module.name, moduleId: module.id, hash: module.activeHash! }, declaration);
     return { module, registration: await db.agentProvider.findUniqueOrThrow({ where: { workspaceId_id: { workspaceId, id } } }) };
   }
-  async function session() { return db.session.create({ data: { workspaceId, key: crypto.randomUUID(), source: "build" } }); }
+  async function session() { return createTestAgentContext(db, workspaceId); }
   async function run(sessionId: string, registration: Awaited<ReturnType<typeof register>>["registration"], createdAt = new Date("2026-11-11T00:00:00Z")) {
-    const run = await db.run.create({ data: { workspaceId, sessionId, lane: "build", trigger: "build", provider: registration.id, tokenHash: crypto.randomUUID(), prompt: "fake", cwd: join(dataDir, "admitted", crypto.randomUUID()), createdAt } });
+    const run = await db.run.create({ data: { workspaceId, sessionId, lane: "background", trigger: "source", provider: registration.id, tokenHash: crypto.randomUUID(), prompt: "fake", cwd: join(dataDir, "admitted", crypto.randomUUID()), createdAt } });
     await db.agentRunProvider.create({ data: { runId: run.id, providerId: registration.id, moduleId: registration.moduleId, hash: registration.hash, revision: registration.revision, declaration: registration.declaration as Prisma.InputJsonValue, providerOptions: { model: "vendor/exact-model" }, kind: "conversation" } });
     return run;
   }
@@ -71,7 +72,7 @@ test("provider lifecycle guard holds unrelated consumers until queued, running a
   }
   await f.db.run.update({ where: { id: run.id }, data: { status: "finished", stopStatus: "confirmed" } });
   await f.db.$transaction(tx => assertExecutionModuleIdle(tx, backend.module.id));
-  expect(await f.db.agentContext.count()).toBe(0);
+  expect(await f.db.agentContext.count()).toBe(1);
 });
 
 test("concurrent health reads share an ongoing probe without caching later results or revoked eligibility", async () => {

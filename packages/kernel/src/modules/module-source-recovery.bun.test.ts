@@ -9,8 +9,8 @@ import type { StewardPorts } from "../ports";
 // Set this before importing engine modules, which initialize the database singleton.
 const databaseRoot = mkdtempSync(join(tmpdir(), "chrona-recovery-db-"));
 process.env.DATABASE_URL = `file:${join(databaseRoot, "test.db")}`;
-const [{ moduleContext }, { commitModuleSource, readModuleMaterial }, { ensureVersionMaterial }, { moduleMaterialDigest }, { ModuleDirectory }, { testDb }, { testModuleProcess }] = await Promise.all([
-  import("./module-context"), import("./module-git"), import("./module-source"), import("./module-artifacts"), import("./module-files"), import("../__testing__/test-db"), import("../__testing__/module-test-process"),
+const [{ moduleContext }, { ensureVersionMaterial, publishRestoredMaterial }, { moduleMaterialDigest, storeVersionMaterial, readStoredVersionMaterial }, { ModuleDirectory }, { testDb }, { testModuleProcess }] = await Promise.all([
+  import("./module-context"), import("./module-source"), import("./module-artifacts"), import("./module-files"), import("../__testing__/test-db"), import("../__testing__/module-test-process"),
 ]);
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -43,13 +43,37 @@ async function fixture(python = false) {
   } };
   const ports = { db, dataDir: root, publicUrl: null, now: () => new Date(), packages };
   const context = moduleContext(ports, workspace.id);
-  const revision = await commitModuleSource({ platform: context.platform, moduleId: module.id, versionId: "recovery", files, message: "recovery" });
-  const version = await db.moduleVersion.create({ data: { moduleId: module.id, hash: revision.commit, manifest, source: "user", status: "approved", intent: {}, report: { tests: [], git: revision } } });
+  const revision = await storeVersionMaterial(context.platform, files);
+  const version = await db.moduleVersion.create({ data: { moduleId: module.id, hash: revision, manifest, source: "user", status: "approved", intent: {}, report: { tests: [] } } });
   await mkdir(context.store, { recursive: true });
   const final = join(context.store, version.hash);
-  const immutable = async () => expect(moduleMaterialDigest(await readModuleMaterial({ platform: context.platform, moduleId: module.id, commit: revision.commit }))).toBe(moduleMaterialDigest(files));
+  const immutable = async () => expect(moduleMaterialDigest(await readStoredVersionMaterial(context.platform, revision))).toBe(moduleMaterialDigest(files));
   return { root, db, workspace, module, context, ports, packages, version, final, files, binary, calls, immutable };
 }
+
+test.each(["absent", "empty", "nonempty"] as const)("publication from a different source parent preserves the destination (%s)", async winner => {
+  const root = await mkdtemp(join(tmpdir(), "chrona-directory-publication-"));
+  cleanups.push(() => rm(root, { recursive: true, force: true }));
+  const store = join(root, "store"), staging = join(root, "source", "temporary"), hash = "b".repeat(64), destination = join(store, hash);
+  await mkdir(store);
+  await mkdir(staging, { recursive: true });
+  await writeFile(join(staging, "submitted"), "complete source");
+  if (winner !== "absent") {
+    await mkdir(destination);
+    if (winner === "nonempty") await writeFile(join(destination, "winner"), "existing winner");
+  }
+  const before = winner === "absent" ? null : await stat(destination);
+  await publishRestoredMaterial(store, staging, hash);
+  if (before) {
+    expect((await stat(destination)).ino).toBe(before.ino);
+    expect(await readdir(destination)).toEqual(winner === "empty" ? [] : ["winner"]);
+    if (winner === "nonempty") expect(await readFile(join(destination, "winner"), "utf8")).toBe("existing winner");
+    expect(await readFile(join(staging, "submitted"), "utf8")).toBe("complete source");
+  } else {
+    expect(await readFile(join(destination, "submitted"), "utf8")).toBe("complete source");
+    await expect(stat(staging)).rejects.toMatchObject({ code: "ENOENT" });
+  }
+});
 
 test.each([false, true])("ordinary restart installs dependencies before launching missing material (python=%s)", async python => {
   const f = await fixture(python);

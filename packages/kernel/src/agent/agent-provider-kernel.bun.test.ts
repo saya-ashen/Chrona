@@ -1,12 +1,12 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { moduleManifestSchema, type AgentProviderRegistration, type ProviderRunInput, type ProviderTranscriptItem } from "@chrona/contracts/steward";
 import { agent } from "../system/agent";
 import { registerAgentProvider } from "./agent-provider";
 import { startLocalProvider, stopAgentRuns } from "../execution/local-runtime";
-import { createRegisteredProviderClient } from "./agent-client";
+import { registeredProviderHealth } from "./agent-client";
 import { createRuns, liveRuns } from "../execution/runs";
 import { admitContextPrimitive, type ModulePrincipal } from "./agent-context";
 import { callSync, kernelOrigin, CallError } from "../modules/module-calls";
@@ -17,6 +17,9 @@ import { testDb } from "../__testing__/test-db";
 import type { StewardPorts } from "../ports";
 import "../modules/module-effects";
 import { registerSystemModules } from "../system/system-modules";
+import { fenceAgentModule } from "./module-drain";
+import { requestRemove } from "../modules/module-remove";
+import { moduleContext } from "../modules/module-context";
 
 const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await close(); }, 30000);
@@ -59,7 +62,7 @@ async function fixture(onControl?: (name: string) => Promise<void>) {
   const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => new Date(), sandbox: { available: true, isolated: false, startModule: peer.startModule } };
   cleanups.push(async () => { await stopAgentRuns(ports); await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); await rm(dirname(databases.find(row => row.name === "main")!.file), { recursive: true, force: true }); });
   const startProperties = Object.fromEntries(["operationId", "runId", "token", "lane", "cwd", "sessionDir", "prompt", "systemPrompt", "resources", "callbacks", "model", "configurationRevision"].map(key => [key, string]));
-  Object.assign(startProperties, { sessionId: { type: ["string", "null"] }, deadline: { type: ["string", "null"] }, providerOptions: object, searchTools: { type: "boolean" }, execution: object, executionBudget: object, images: { type: "array", items: object }, extraTools: { type: "array", items: string }, hostPaths: { type: "array", items: string }, content: { type: "array", items: object } });
+  Object.assign(startProperties, { sessionId: { type: ["string", "null"] }, deadline: { type: ["string", "null"] }, providerOptions: object, searchTools: { type: "boolean" }, images: { type: "array", items: object }, extraTools: { type: "array", items: string }, hostPaths: { type: "array", items: string }, content: { type: "array", items: object } });
   const backend = await db.module.create({ data: { workspaceId, name: "test-backend", status: "active", activeHash: "backend-v1" } });
   const manifest = moduleManifestSchema.parse({ name: backend.name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: ["runtime-callback.event"], tools: Object.values(declaration.endpoints).map(name => ({ name, description: name, visibility: ["kernel"], parameters: { type: "object", properties: name === "health" ? {} : name === "start" ? startProperties : name === "native" ? { operationId: string, request: object } : name === "transcript" ? { sessionDir: string, limit: { type: "number" } } : name === "complete" ? { commandKey: string, prompt: string, system: string, model: string, thinking: string, configurationRevision: string, maxOutputTokens: { type: "number" }, timeoutMs: { type: "number" } } : { operationId: string, message: string } }, output: {} })).concat([{ name: "configure", description: "Provider configuration", visibility: ["owner"], parameters: { type: "object", properties: {} }, output: {} }]) });
   await db.moduleVersion.create({ data: { moduleId: backend.id, hash: backend.activeHash!, manifest, source: "user", status: "approved", intent: {}, report: {} } });
@@ -92,7 +95,7 @@ async function fixture(onControl?: (name: string) => Promise<void>) {
 
 test("kernel boots without a provider and reports explicit unavailability", async () => {
   const f = await fixture();
-  expect(await createRegisteredProviderClient(() => f.ports).health()).toMatchObject({ available: false });
+  expect(await registeredProviderHealth(f.ports)).toMatchObject({ available: false });
   await expect(f.run("unconfigured")).rejects.toMatchObject({ code: "unavailable" });
   expect(await f.db.run.count()).toBe(0);
 });
@@ -228,6 +231,18 @@ test("completion uses the same queue and admitted token and time budgets", async
   expect(await f.invoke("read", { runId: admitted.runId })).toMatchObject({ items: [{ kind: "completion", payload: { text: "bounded completion" } }] });
 });
 
+
+test.each(["stop", "caller-drain", "provider-drain"] as const)("unstarted completion %s settles its reservation and permits removal", async action => {
+  const f = await fixture();
+  await f.db.workspace.update({ where: { id: f.workspaceId }, data: { settings: { moduleModel: { maxCallsPerEvent: 2, maxOutputTokens: 20, dailyCalls: 10, eventTimeoutMs: 5000 } } } });
+  await registerAgentProvider(f.ports, f.workspaceId, f.backendCaller, declaration);
+  const admitted = await f.run("unstarted-completion", { kind: "completion", providerOptions: { maxOutputTokens: 10 } });
+  if (action === "stop") await f.invoke("stop", { runId: admitted.runId }, "stop-unstarted");
+  else await fenceAgentModule(f.ports, f.workspaceId, action === "caller-drain" ? f.caller.moduleId : f.backendCaller.moduleId);
+  expect(await f.invoke("read", { runId: admitted.runId })).toMatchObject({ run: { status: "cancelled", active: false } });
+  expect(await requestRemove(moduleContext(f.ports, f.workspaceId), f.caller.moduleId, "remove drained caller")).toMatchObject({ status: "pending_approval" });
+  expect(f.requests.filter(request => ["start", "complete", "abort"].includes(request.name))).toEqual([]);
+});
 
 test("stop confirms only the bound backend outcome receipt", async () => {
   const f = await fixture();
@@ -367,10 +382,10 @@ test("drain blocks public and low-level admission while old reads, stops, and qu
   expect((await f.db.module.findUniqueOrThrow({ where: { id: f.caller.moduleId } })).executionFenceAt).not.toBeNull();
 }, 10000);
 
-test("low-level module-session admission requires the owning approved active module", async () => {
+test("low-level Agent context admission requires the owning approved active module", async () => {
   const f = await fixture();
   await registerAgentProvider(f.ports, f.workspaceId, f.backendCaller, declaration);
-  const session = await f.db.session.create({ data: { workspaceId: f.workspaceId, key: "low-level-module", source: "module", moduleId: f.caller.moduleId } });
+  const session = await f.db.agentContext.create({ data: { workspaceId: f.workspaceId, ownerId: "owner", moduleId: f.caller.moduleId, hash: f.caller.hash } });
   const runs = createRuns(f.ports, f.workspaceId);
   const enqueue = { sessionId: session.id, lane: "background" as const, trigger: "source" as const, prompt: "ordinary module session" };
   await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: f.caller.moduleId, hash: f.caller.hash } }, data: { status: "draft" } });
@@ -383,4 +398,38 @@ test("low-level module-session admission requires the owning approved active mod
   expect((await runs.claimNext("background"))?.runId).toBe(run.id);
   await runs.finish(run.id, { outcome: "finished", sessionId: null, error: null }, { stopEvidence: "provider_exited" });
   expect(await f.db.run.count()).toBe(1);
+});
+
+test("Agent cwd is fixed for its context while Provider sessions stay in the session area", async () => {
+  const f = await fixture();
+  await registerAgentProvider(f.ports, f.workspaceId, f.backendCaller, declaration);
+  const cwd = join(f.ports.dataDir, "prepared-project");
+  const other = join(f.ports.dataDir, "other-project");
+  await mkdir(cwd); await mkdir(other);
+  const admitted = await f.run("prepared-cwd", { cwd });
+  const input = await f.claim(admitted.runId);
+  expect(input.cwd).toBe(cwd);
+  expect(input.sessionDir).toBe(join(f.ports.dataDir, "sessions", admitted.contextId, ".chrona", "sessions"));
+  const handle = await startLocalProvider(f.ports, f.workspaceId, input);
+  expect(f.requests.find(row => row.name === "start")!.args).toMatchObject({ cwd, sessionDir: input.sessionDir });
+  await f.invoke("stop", { runId: admitted.runId }, "stop-prepared-cwd");
+  await handle.done;
+  await expect(f.run("changed-cwd", { contextId: admitted.contextId, cwd: other })).rejects.toMatchObject({ code: "conflict" });
+  const continued = await f.run("same-cwd", { contextId: admitted.contextId });
+  expect(await f.db.run.findUniqueOrThrow({ where: { id: continued.runId } })).toMatchObject({ cwd });
+  await f.invoke("stop", { runId: continued.runId }, "stop-same-cwd");
+  const explicit = await f.run("explicit-same-cwd", { contextId: admitted.contextId, cwd });
+  expect(await f.db.run.findUniqueOrThrow({ where: { id: explicit.runId } })).toMatchObject({ cwd });
+});
+
+test("Agent defaults cwd to its session directory and rejects unprepared paths before admission", async () => {
+  const f = await fixture();
+  await registerAgentProvider(f.ports, f.workspaceId, f.backendCaller, declaration);
+  const file = join(f.ports.dataDir, "plain-file");
+  await writeFile(file, "file");
+  for (const cwd of ["relative/path", join(f.ports.dataDir, "missing"), file]) {
+    await expect(f.run(`invalid-cwd-${cwd}`, { cwd })).rejects.toMatchObject({ code: "invalid" });
+  }
+  const admitted = await f.run("default-cwd");
+  expect(await f.db.run.findUniqueOrThrow({ where: { id: admitted.runId } })).toMatchObject({ cwd: join(f.ports.dataDir, "sessions", admitted.contextId) });
 });

@@ -9,7 +9,7 @@ import { callSync, kernelOrigin } from "../modules/module-calls";
 import { startLocalProvider } from "../execution/local-runtime";
 import { createRuns } from "../execution/runs";
 import { moduleSupervisor } from "../modules/module-supervisor";
-import type { StewardPorts } from "../ports";
+import type { TestProviderPorts } from "./test-provider";
 
 type Outcome = Awaited<ReturnType<ProviderAdapter["start"]>["done"]>;
 const cleanups: (() => Promise<void>)[] = [];
@@ -17,7 +17,7 @@ afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await 
 async function fixture(provider?: ProviderAdapter) {
   const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-test-provider-wire-"));
   const files = await db.$queryRawUnsafe<{ name: string; file: string }[]>("PRAGMA database_list");
-  const ports: StewardPorts = { db, dataDir, now: () => new Date(), publicUrl: null, provider };
+  const ports: TestProviderPorts = { db, dataDir, now: () => new Date(), publicUrl: null, provider };
   cleanups.push(async () => {
     await moduleSupervisor(ports).stop();
     await db.$disconnect();
@@ -26,7 +26,7 @@ async function fixture(provider?: ProviderAdapter) {
   });
   return { db, ports };
 }
-async function caller(ports: StewardPorts, workspaceId: string) {
+async function caller(ports: TestProviderPorts, workspaceId: string) {
   const module = await ports.db.module.create({ data: { workspaceId, name: "entry-app", activeHash: "entry-v1", status: "active" } });
   await ports.db.moduleVersion.create({ data: { moduleId: module.id, hash: "entry-v1", status: "approved", source: "user", intent: {}, report: {}, manifest: { name: module.name, entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["agent.run", "agent.providers"], keepAlive: true, model: { tier: "any", maxCalls: 2, maxOutputTokens: 20 } } } });
   return { ...kernelOrigin(workspaceId), run: { eventKey: "execution:fixture" }, caller: { kind: "module" as const, module: module.name, moduleId: module.id, hash: "entry-v1" } };

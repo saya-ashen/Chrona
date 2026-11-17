@@ -66,7 +66,6 @@ export async function createServerApp(options: { steward?: StewardRuntime } = {}
     app.use("*", loopbackHostGuard(extra));
   }
   const steward = options.steward ?? createStewardRuntime((await import("@chrona/db")).db);
-  await steward.initialize();
   const api = createApiRouter({ steward });
   const allowedOrigins = getAllowedOrigins();
 

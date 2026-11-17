@@ -12,7 +12,7 @@ import { testModuleSandbox } from "../__testing__/module-test-process";
 import { liveRuns } from "../execution/runs";
 import { testDb } from "../__testing__/test-db";
 import { createTick } from "./tick";
-import type { StewardPorts } from "../ports";
+import type { TestProviderPorts } from "../__testing__/test-provider";
 
 type Outcome = Awaited<ReturnType<ProviderAdapter["start"]>["done"]>;
 test.each([
@@ -25,9 +25,8 @@ test.each([
   let time = new Date("2026-11-01T05:00:00Z");
   const starts: ProviderRunInput[] = [], finished: string[] = [];
   const completion = Promise.withResolvers<Outcome>();
-  const ports: StewardPorts = { db, dataDir, now: () => time, publicUrl: null,
+  const ports: TestProviderPorts = { db, dataDir, now: () => time, publicUrl: null,
     moduleSdk: fileURLToPath(new URL("../../../app-sdk", import.meta.url)),
-    moduleTypecheck: fileURLToPath(new URL("../../../app-sdk/typecheck", import.meta.url)),
     sandbox: testModuleSandbox(async () => ({ status: "succeeded", output: "{}", error: null, exitCode: 0 })),
     onRunFinished: async (_, runId) => { finished.push(runId); },
     provider: { name: "fixture", async health() { return { available: true, sandboxed: true, error: null }; }, start(input) {
@@ -63,7 +62,7 @@ test.each([
     if (item.reject) expect(diagnostics).toContainEqual(expect.objectContaining({ event: "provider_completion.failed", runId, error: expect.stringContaining("Provider completion requires reconciliation") }));
     expect(await db.audit.count({ where: { kind: "run_finished", subjectId: runId } })).toBe(0);
     expect(await db.run.findUniqueOrThrow({ where: { id: runId } })).toMatchObject({ status: "running", endedAt: null });
-    expect((await db.session.findUniqueOrThrow({ where: { id: run.contextId } })).providerSessionId).toBeNull();
+    expect((await db.agentContext.findUniqueOrThrow({ where: { id: run.contextId } })).providerSessionId).toBeNull();
     expect(finished).toEqual([]);
     await db.$executeRawUnsafe("DROP TRIGGER fail_run_finish");
 
@@ -74,7 +73,7 @@ test.each([
     await tick.settled({ includeRuns: true });
     const status = item.cancel ? "cancelled" : item.outcome;
     expect(await db.run.findUniqueOrThrow({ where: { id: runId } })).toMatchObject({ status, stopStatus: item.reject ? "unknown" : "confirmed", error: item.reject ? "Execution stop is unconfirmed" : item.cancel ? "Cancelled by owner" : item.error, endedAt: time });
-    expect((await db.session.findUniqueOrThrow({ where: { id: run.contextId } })).providerSessionId).toBe(item.reject ? null : "original-provider-session");
+    expect((await db.agentContext.findUniqueOrThrow({ where: { id: run.contextId } })).providerSessionId).toBe(item.reject ? null : "original-provider-session");
     expect((await callSync(ports, origin, "agent.read", { runId })).output).toMatchObject({ run: { status: item.reject ? "unknown" : status, active: item.reject } });
     expect(finished).toEqual([runId]);
     expect(await db.audit.count({ where: { kind: "run_finished", subjectId: runId } })).toBe(1);

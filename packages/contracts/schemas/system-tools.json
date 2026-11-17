@@ -495,6 +495,11 @@
           "minLength": 1,
           "maxLength": 128
         },
+        "cwd": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8192
+        },
         "prompt": {
           "type": "string",
           "minLength": 1,
@@ -2367,28 +2372,6 @@
                                   "status"
                                 ],
                                 "additionalProperties": false
-                              },
-                              {
-                                "type": "object",
-                                "properties": {
-                                  "kind": {
-                                    "type": "string",
-                                    "const": "build-paused"
-                                  },
-                                  "status": {
-                                    "type": "string",
-                                    "enum": [
-                                      "failed",
-                                      "timed_out",
-                                      "provider_unavailable"
-                                    ]
-                                  }
-                                },
-                                "required": [
-                                  "kind",
-                                  "status"
-                                ],
-                                "additionalProperties": false
                               }
                             ]
                           }
@@ -3011,9 +2994,6 @@
                   "paused"
                 ]
               },
-              "builtin": {
-                "type": "boolean"
-              },
               "activeHash": {
                 "anyOf": [
                   {
@@ -3029,7 +3009,6 @@
                 "type": "string",
                 "enum": [
                   "kernel",
-                  "builtin",
                   "external"
                 ]
               },
@@ -3040,9 +3019,6 @@
                     "type": "boolean"
                   },
                   "propose": {
-                    "type": "boolean"
-                  },
-                  "group": {
                     "type": "boolean"
                   },
                   "activate": {
@@ -3076,7 +3052,6 @@
                 "required": [
                   "build",
                   "propose",
-                  "group",
                   "activate",
                   "update",
                   "rollback",
@@ -3375,40 +3350,13 @@
                           "type": "null"
                         }
                       ]
-                    },
-                    "git": {
-                      "default": null,
-                      "anyOf": [
-                        {
-                          "type": "object",
-                          "properties": {
-                            "commit": {
-                              "type": "string",
-                              "pattern": "^[a-f0-9]{40}$"
-                            },
-                            "tree": {
-                              "type": "string",
-                              "pattern": "^[a-f0-9]{40}$"
-                            }
-                          },
-                          "required": [
-                            "commit",
-                            "tree"
-                          ],
-                          "additionalProperties": false
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
                     }
                   },
                   "required": [
                     "hash",
                     "status",
                     "createdAt",
-                    "errors",
-                    "git"
+                    "errors"
                   ],
                   "additionalProperties": false
                 }
@@ -3467,7 +3415,6 @@
               "name",
               "description",
               "status",
-              "builtin",
               "activeHash",
               "origin",
               "capabilities",
@@ -4818,9 +4765,6 @@
                         "candidateHash": {
                           "type": "string"
                         },
-                        "generationId": {
-                          "type": "string"
-                        },
                         "activatedAt": {
                           "type": "string"
                         },
@@ -4847,13 +4791,6 @@
                           },
                           "additionalProperties": {
                             "$ref": "#/$defs/__schema0"
-                          }
-                        },
-                        "affectedCallers": {
-                          "maxItems": 100,
-                          "type": "array",
-                          "items": {
-                            "type": "string"
                           }
                         },
                         "observedCapabilities": {
@@ -4907,12 +4844,10 @@
                         "moduleId",
                         "previousHash",
                         "candidateHash",
-                        "generationId",
                         "activatedAt",
                         "status",
                         "changes",
                         "checks",
-                        "affectedCallers",
                         "observedCapabilities",
                         "dataHandling",
                         "nextAction",
@@ -5278,7 +5213,7 @@
             },
             "hash": {
               "type": "string",
-              "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+              "pattern": "^[a-f0-9]{64}$"
             }
           },
           "required": [
@@ -5287,53 +5222,48 @@
           ],
           "additionalProperties": false
         },
-        "targets": {
-          "minItems": 1,
-          "maxItems": 4,
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string",
-                "pattern": "^[a-z][a-z0-9-]{1,40}$"
-              },
-              "moduleId": {
-                "anyOf": [
-                  {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 128
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "expectedActiveHash": {
-                "anyOf": [
-                  {
-                    "type": "string",
-                    "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              }
+        "target": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{1,40}$"
             },
-            "required": [
-              "name",
-              "moduleId",
-              "expectedActiveHash"
-            ],
-            "additionalProperties": false
-          }
+            "moduleId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "expectedActiveHash": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "name",
+            "moduleId",
+            "expectedActiveHash"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
         "submitter",
-        "targets"
+        "target"
       ],
       "additionalProperties": false
     },
@@ -5361,7 +5291,7 @@
             },
             "hash": {
               "type": "string",
-              "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+              "pattern": "^[a-f0-9]{64}$"
             }
           },
           "required": [
@@ -5370,55 +5300,50 @@
           ],
           "additionalProperties": false
         },
-        "targets": {
-          "minItems": 1,
-          "maxItems": 4,
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string",
-                "pattern": "^[a-z][a-z0-9-]{1,40}$"
-              },
-              "moduleId": {
-                "anyOf": [
-                  {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 128
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "expectedActiveHash": {
-                "anyOf": [
-                  {
-                    "type": "string",
-                    "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              }
+        "target": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{1,40}$"
             },
-            "required": [
-              "name",
-              "moduleId",
-              "expectedActiveHash"
-            ],
-            "additionalProperties": false
-          }
+            "moduleId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "expectedActiveHash": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "name",
+            "moduleId",
+            "expectedActiveHash"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
         "admissionId",
         "requestKey",
         "submitter",
-        "targets"
+        "target"
       ],
       "additionalProperties": false
     },
@@ -5444,7 +5369,7 @@
         },
         "hash": {
           "type": "string",
-          "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+          "pattern": "^[a-f0-9]{64}$"
         },
         "to": {
           "type": "string",
@@ -5471,7 +5396,7 @@
         },
         "hash": {
           "type": "string",
-          "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+          "pattern": "^[a-f0-9]{64}$"
         },
         "materialDigest": {
           "type": "string",
@@ -5500,64 +5425,59 @@
           "minLength": 1,
           "maxLength": 128
         },
-        "items": {
-          "minItems": 1,
-          "maxItems": 4,
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string",
-                "pattern": "^[a-z][a-z0-9-]{1,40}$"
-              },
-              "dir": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 500
-              },
-              "intent": {
-                "type": "object",
-                "properties": {
-                  "changes": {
-                    "minItems": 1,
-                    "maxItems": 20,
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 500
-                    }
-                  },
-                  "preserves": {
-                    "default": [],
-                    "maxItems": 20,
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 500
-                    }
+        "item": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{1,40}$"
+            },
+            "dir": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "intent": {
+              "type": "object",
+              "properties": {
+                "changes": {
+                  "minItems": 1,
+                  "maxItems": 20,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
                   }
                 },
-                "required": [
-                  "changes"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "required": [
-              "name",
-              "dir",
-              "intent"
-            ],
-            "additionalProperties": false
-          }
+                "preserves": {
+                  "default": [],
+                  "maxItems": 20,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                }
+              },
+              "required": [
+                "changes"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "name",
+            "dir",
+            "intent"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
         "admissionId",
-        "items"
+        "item"
       ],
       "additionalProperties": false
     },
@@ -5590,7 +5510,7 @@
             },
             "hash": {
               "type": "string",
-              "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+              "pattern": "^[a-f0-9]{64}$"
             }
           },
           "required": [
@@ -5620,72 +5540,67 @@
             }
           ]
         },
-        "members": {
-          "minItems": 1,
-          "maxItems": 4,
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string",
-                "pattern": "^[a-z][a-z0-9-]{1,40}$"
-              },
-              "moduleId": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 128
-              },
-              "hash": {
-                "type": "string",
-                "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
-              },
-              "versionId": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 128
-              },
-              "expectedActiveHash": {
-                "anyOf": [
-                  {
-                    "type": "string",
-                    "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "materialDigest": {
-                "type": "string",
-                "pattern": "^[a-f0-9]{64}$"
-              },
-              "status": {
-                "type": "string",
-                "enum": [
-                  "building",
-                  "testing",
-                  "pending_review",
-                  "approved",
-                  "rejected"
-                ]
-              },
-              "selected": {
-                "type": "boolean"
-              }
+        "member": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{1,40}$"
             },
-            "required": [
-              "name",
-              "moduleId",
-              "hash",
-              "versionId",
-              "expectedActiveHash",
-              "materialDigest",
-              "status",
-              "selected"
-            ],
-            "additionalProperties": false
-          }
+            "moduleId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "hash": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "versionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "expectedActiveHash": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "materialDigest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "building",
+                "testing",
+                "pending_review",
+                "approved",
+                "rejected"
+              ]
+            },
+            "selected": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "name",
+            "moduleId",
+            "hash",
+            "versionId",
+            "expectedActiveHash",
+            "materialDigest",
+            "status",
+            "selected"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
@@ -5695,7 +5610,7 @@
         "submitter",
         "state",
         "approvalId",
-        "members"
+        "member"
       ],
       "additionalProperties": false
     },
@@ -5783,7 +5698,7 @@
             },
             "hash": {
               "type": "string",
-              "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+              "pattern": "^[a-f0-9]{64}$"
             }
           },
           "required": [
@@ -5813,72 +5728,67 @@
             }
           ]
         },
-        "members": {
-          "minItems": 1,
-          "maxItems": 4,
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string",
-                "pattern": "^[a-z][a-z0-9-]{1,40}$"
-              },
-              "moduleId": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 128
-              },
-              "hash": {
-                "type": "string",
-                "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
-              },
-              "versionId": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 128
-              },
-              "expectedActiveHash": {
-                "anyOf": [
-                  {
-                    "type": "string",
-                    "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "materialDigest": {
-                "type": "string",
-                "pattern": "^[a-f0-9]{64}$"
-              },
-              "status": {
-                "type": "string",
-                "enum": [
-                  "building",
-                  "testing",
-                  "pending_review",
-                  "approved",
-                  "rejected"
-                ]
-              },
-              "selected": {
-                "type": "boolean"
-              }
+        "member": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{1,40}$"
             },
-            "required": [
-              "name",
-              "moduleId",
-              "hash",
-              "versionId",
-              "expectedActiveHash",
-              "materialDigest",
-              "status",
-              "selected"
-            ],
-            "additionalProperties": false
-          }
+            "moduleId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "hash": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "versionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "expectedActiveHash": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "materialDigest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "building",
+                "testing",
+                "pending_review",
+                "approved",
+                "rejected"
+              ]
+            },
+            "selected": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "name",
+            "moduleId",
+            "hash",
+            "versionId",
+            "expectedActiveHash",
+            "materialDigest",
+            "status",
+            "selected"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
@@ -5888,7 +5798,7 @@
         "submitter",
         "state",
         "approvalId",
-        "members"
+        "member"
       ],
       "additionalProperties": false
     },
@@ -6417,7 +6327,7 @@
         },
         "hash": {
           "type": "string",
-          "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+          "pattern": "^[a-f0-9]{64}$"
         }
       },
       "required": [
@@ -8220,38 +8130,5 @@
       "owner"
     ],
     "idempotent": true
-  },
-  "chrona_reply": {
-    "input": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "text": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 8000
-        },
-        "files": {
-          "default": [],
-          "description": "Files written in this build's actual working directory, copied into the receiving application's content; at most 20 MiB each.",
-          "maxItems": 10,
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 500
-          }
-        }
-      },
-      "required": [
-        "text"
-      ],
-      "additionalProperties": false
-    },
-    "output": null,
-    "visibility": [
-      "provider"
-    ],
-    "idempotent": false
   }
 }

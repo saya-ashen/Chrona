@@ -4,6 +4,7 @@ import { join } from "node:path";
 import * as filesystem from "node:fs/promises";
 import type { Prisma } from "@chrona/db";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
+import { storeTestModuleMaterial } from "../__testing__/module-release-test-fixture";
 import { testDb } from "../__testing__/test-db";
 import { moduleContext } from "./module-context";
 import { startMigration } from "./module-generation";
@@ -24,11 +25,11 @@ async function fixture() {
   const context = moduleContext(ports, workspaceId);
   const module = await db.module.create({ data: { workspaceId, name: "sample", activeHash: "old", dataSchema: 1 } });
   const manifest = moduleManifestSchema.parse({ name: "sample", entry: "index.ts", keepAlive: true, tests: ["test.ts"], data: { schema: 2, migrate: "migrate.ts" }, effects: [] });
-  const version = await db.moduleVersion.create({ data: { moduleId: module.id, hash: "next", manifest, source: "user", status: "approved", intent: {}, report: {} } });
+  const version = await db.moduleVersion.create({ data: { moduleId: module.id, hash: await storeTestModuleMaterial(context.platform, manifest), manifest, source: "user", status: "approved", intent: {}, report: {} } });
   const live = join(dataDir, "platform/data", module.id);
   await mkdir(live, { recursive: true }); await writeFile(join(live, "state"), "original");
   const prepared: PreparedMigration = { module, version, manifest, from: 1, to: 2 };
-  const start = (hash = "next") => db.$transaction(tx => startMigration(context, tx, module.id, hash, { from: 1, to: 2 }));
+  const start = (hash = version.hash) => db.$transaction(tx => startMigration(context, tx, module.id, hash, { from: 1, to: 2 }));
   return { db, context, ports, module, version, prepared, start, live, now, workspaceId };
 }
 for (const reason of ["activate", "rollback"] as const) test(`paused cross-schema ${reason} retains the intended status`, async () => {
@@ -36,7 +37,7 @@ for (const reason of ["activate", "rollback"] as const) test(`paused cross-schem
   await f.db.module.update({ where: { id: f.module.id }, data: { status: "paused" } });
   f.prepared.module.status = "paused";
   await f.start(); await f.db.audit.deleteMany(); await migrateData(f.context, f.prepared, reason);
-  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ activeHash: "next", dataSchema: 2, status: reason === "activate" ? "paused" : "active" });
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ activeHash: f.version.hash, dataSchema: 2, status: reason === "activate" ? "paused" : "active" });
   expect(await readFile(join(f.live, "state"), "utf8")).toBe("migrated");
 });
 for (const offset of [-60_000, 0, 60_000]) test(`migration admission orders same-clock transactions after prior offset ${offset}`, async () => {
@@ -44,40 +45,40 @@ for (const offset of [-60_000, 0, 60_000]) test(`migration admission orders same
   await f.db.audit.create({ data: { workspaceId: f.workspaceId, subjectId: f.module.id, actorKey: "chrona", kind: "module_migration_started", details: { hash: "history" }, createdAt: new Date(f.now.getTime() + offset) } });
   await f.db.moduleMigration.create({ data: { moduleId: f.module.id, hash: "history", fromSchema: 1, toSchema: 2, previousStatus: "active", createdAt: new Date(f.now.getTime() + offset) } });
   // Real database transactions serialize concurrent writers; each reads the preceding committed timestamp.
-  await Promise.all([f.start("first"), f.start("next")]);
+  await Promise.all([f.start("first"), f.start()]);
   const rows = await f.db.audit.findMany({ where: { subjectId: f.module.id, kind: "module_migration_started" }, orderBy: { createdAt: "asc" } });
   expect(rows).toHaveLength(3);
   expect(rows[1]!.createdAt.getTime()).toBeGreaterThan(rows[0]!.createdAt.getTime());
   expect(rows[2]!.createdAt.getTime()).toBeGreaterThan(rows[1]!.createdAt.getTime());
   const owner = (rows[2]!.details as { hash: string }).hash;
-  if (owner !== "next") await f.start();
+  if (owner !== f.version.hash) await f.start();
   await migrateData(f.context, f.prepared, "rollback");
-  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ activeHash: "next", status: "active" });
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ activeHash: f.version.hash, status: "active" });
 });
 for (const changed of ["candidate", "hash", "status", "identity"] as const) test(`failed migration cannot compensate after losing ${changed} ownership`, async () => {
   const f = await fixture(); await f.start();
   f.ports.sandbox!.runModule = async input => {
     await writeFile(join(input.dataDir, "state"), "partial");
     if (changed === "candidate") await f.start("newer");
-    else await f.db.module.update({ where: { id: f.module.id }, data: changed === "hash" ? { activeHash: "new-owner" } : changed === "status" ? { status: "paused" } : { builtin: true } });
+    else await f.db.module.update({ where: { id: f.module.id }, data: changed === "hash" ? { activeHash: "new-owner" } : changed === "status" ? { status: "paused" } : { name: "changed-owner" } });
     return { status: "failed", exitCode: 1, output: "", error: "synthetic" };
   };
   await expect(migrateData(f.context, f.prepared, "activate")).rejects.toThrow();
   const current = await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } });
   expect(current.status).toBe(changed === "status" ? "paused" : "migrating");
   expect(current.activeHash).toBe(changed === "hash" ? "new-owner" : "old");
-  expect(current.builtin).toBe(changed === "identity");
+  expect(current.name).toBe(changed === "identity" ? "changed-owner" : f.module.name);
   expect(await readFile(join(f.live, "state"), "utf8")).toBe("original");
   expect(await f.db.moduleVersion.findUniqueOrThrow({ where: { id: f.version.id } })).toMatchObject({ status: "approved" });
 });
 
-function beforeActivation(tx: Prisma.TransactionClient, work: () => Promise<void>) {
+function beforeActivation(tx: Prisma.TransactionClient, preparedHash: string, work: () => Promise<void>) {
   return new Proxy(tx, { get(target, key) {
     if (key !== "module") return Reflect.get(target, key);
     return new Proxy(target.module, { get(delegate, property) {
       if (property !== "update") return Reflect.get(delegate, property);
       return async (args: Prisma.ModuleUpdateArgs) => {
-        if (args.data.activeHash === "next") await work();
+        if (args.data.activeHash === preparedHash) await work();
         return delegate.update(args);
       };
     } });
@@ -93,9 +94,9 @@ for (const failure of ["activation", "commit"] as const) test(`post-swap ${failu
     armed = false; throw new Error(`synthetic ${failure} rejection`);
   };
   f.db.$transaction = ((work: (tx: Prisma.TransactionClient) => Promise<unknown>) => transaction(async tx => {
-    const result = await work(beforeActivation(tx, async () => { if (armed && failure === "activation") await fail(); }));
+    const result = await work(beforeActivation(tx, f.version.hash, async () => { if (armed && failure === "activation") await fail(); }));
     // Callback returned normally. Reject before durable commit; the real adapter rolls the DB transaction back.
-    if (armed && failure === "commit" && (await tx.module.findUniqueOrThrow({ where: { id: f.module.id } })).activeHash === "next") await fail();
+    if (armed && failure === "commit" && (await tx.module.findUniqueOrThrow({ where: { id: f.module.id } })).activeHash === f.version.hash) await fail();
     return result;
   })) as typeof f.db.$transaction;
   await migrateData(f.context, f.prepared, "activate");
@@ -111,7 +112,7 @@ test("post-swap competing candidate waits for activation commit and keeps the co
   // Launch outside the transaction callback so it is an independent database writer.
   const contender = (async () => { await swapping; await f.start("newer"); admitted = true; })();
   const transaction = f.db.$transaction.bind(f.db);
-  f.db.$transaction = ((work: (tx: Prisma.TransactionClient) => Promise<unknown>) => transaction(tx => work(beforeActivation(tx, async () => {
+  f.db.$transaction = ((work: (tx: Prisma.TransactionClient) => Promise<unknown>) => transaction(tx => work(beforeActivation(tx, f.version.hash, async () => {
     observedSwap = true; signal();
     expect(await readFile(join(f.live, "state"), "utf8")).toBe("migrated");
     await new Promise<void>(resolve => setImmediate(resolve));
@@ -120,12 +121,12 @@ test("post-swap competing candidate waits for activation commit and keeps the co
   await migrateData(f.context, f.prepared, "activate"); await contender;
   expect(observedSwap).toBe(true); expect(admitted).toBe(true);
   expect(await readFile(join(f.live, "state"), "utf8")).toBe("migrated");
-  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ status: "migrating", activeHash: "next", dataSchema: 2 });
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ status: "migrating", activeHash: f.version.hash, dataSchema: 2 });
 });
 test("failed in-lock data restoration retains data-old for crash recovery and reports both failures", async () => {
   const f = await fixture(); await f.start();
   const transaction = f.db.$transaction.bind(f.db);
-  f.db.$transaction = ((work: (tx: Prisma.TransactionClient) => Promise<unknown>) => transaction(tx => work(beforeActivation(tx, async () => { throw new Error("synthetic activation failure"); })))) as typeof f.db.$transaction;
+  f.db.$transaction = ((work: (tx: Prisma.TransactionClient) => Promise<unknown>) => transaction(tx => work(beforeActivation(tx, f.version.hash, async () => { throw new Error("synthetic activation failure"); })))) as typeof f.db.$transaction;
   const rename = filesystem.rename;
   const broken = spyOn(filesystem, "rename").mockImplementation(async (from, to) => {
     if (String(from).includes("/data-old/")) throw new Error("synthetic recovery failure");
@@ -151,6 +152,6 @@ test("post-commit cleanup failure retains old data without undoing committed act
     await expect(migrateData(f.context, f.prepared, "activate")).rejects.toThrow("synthetic cleanup failure");
     expect(await readFile(join(f.context.platform, "data-old", f.module.id, "state"), "utf8")).toBe("original");
     expect(await readFile(join(f.live, "state"), "utf8")).toBe("migrated");
-    expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ status: "active", activeHash: "next", dataSchema: 2 });
+    expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ status: "active", activeHash: f.version.hash, dataSchema: 2 });
   } finally { broken.mockRestore(); }
 });

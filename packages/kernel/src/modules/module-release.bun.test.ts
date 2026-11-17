@@ -1,45 +1,46 @@
-import { expect, test } from "bun:test";
-import { createHash } from "node:crypto";
-import { appendFile, readFile, rm, symlink, writeFile } from "node:fs/promises";
-
+import { afterEach, expect, test } from "bun:test";
+import { chmod, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { resolveExternalRelease } from "./module-release";
+import { seedTestModuleRelease } from "../__testing__/module-release-test-fixture";
 
-import { resolveBuiltinRelease, resolveExternalRelease } from "./module-release";
-
-import { readModuleFiles } from "./module-preview";
-
-test.each(["pi", "files", "author", "mind"])("offline %s release identity is its real commit with no invented upstream", async name => {
-  const f = await fixture(name), release = await resolveExternalRelease(f.ports, name);
-  expect(release.hash).toBe(f.git.commit);
-  expect(release.git).toEqual({ repository: null, branch: "main", commit: f.git.commit, bundlePath: f.git.bundlePath });
+const roots: string[] = [];
+afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
+async function fixture() {
+  const root = await mkdtemp(join(tmpdir(), "chrona-release-")); roots.push(root);
+  const resources = join(root, "external"), code = join(resources, "fixture");
+  await mkdir(code, { recursive: true });
+  await writeFile(join(code, "module.json"), JSON.stringify({ name: "fixture", entry: "index.ts", keepAlive: true, effects: [] }));
+  await writeFile(join(code, "index.ts"), "export {};\n");
+  const release = await seedTestModuleRelease(resources, "fixture");
+  return { root, code, release, ports: { moduleExternalResources: resources } };
+}
+test("offline interpreted release uses full SHA256 material identity without Git", async () => {
+  const f = await fixture(), release = await resolveExternalRelease(f.ports, "fixture");
+  expect(release.hash).toMatch(/^[a-f0-9]{64}$/);
+  expect(release.hash).toBe(f.release.hash);
+  expect(release).not.toHaveProperty("git");
 });
-test.each(["files", "events", "web", "notify"])("extracted official %s still verifies registered legacy approval hashes", async name => {
-  const f = await fixture(name), digest = createHash("sha256");
-  for (const file of (await readModuleFiles(f.codeDir, "Unsafe legacy fixture")).sort((a, b) => a.path.localeCompare(b.path))) digest.update(file.path).update("\0").update(file.bytes).update("\0");
-  const hash = digest.digest("hex");
-  expect(await resolveExternalRelease(f.ports, name, hash)).toMatchObject({ name, origin: "external", hash, git: null });
-  await writeFile(join(f.codeDir, "index.ts"), "// changed after approval\n");
-  await expect(resolveExternalRelease(f.ports, name, hash)).rejects.toMatchObject({ reason: "release_drift" });
+test.each(["bytes", "mode"])("release selection detects source %s drift", async kind => {
+  const f = await fixture();
+  if (kind === "bytes") await writeFile(join(f.code, "index.ts"), "changed");
+  else await chmod(join(f.code, "index.ts"), 0o755);
+  await expect(resolveExternalRelease(f.ports, "fixture", f.release.hash)).rejects.toMatchObject({ reason: "release_drift" });
 });
-test.each(["pi", "files", "author", "mind"])("%s bundle integrity and source commit drift both fail closed", async name => {
-  const f = await fixture(name);
-  await writeFile(join(f.codeDir, "index.ts"), "// drift\n");
-  await expect(resolveExternalRelease(f.ports, name)).rejects.toMatchObject({ reason: "release_drift" });
-  await writeFile(join(f.codeDir, "index.ts"), "// release\n");
-  await appendFile(f.git.bundlePath, "tampered");
-  await expect(resolveExternalRelease(f.ports, name)).rejects.toMatchObject({ reason: "release_drift" });
+test("missing record and undeclared files have no legacy layout fallback", async () => {
+  const f = await fixture();
+  await writeFile(join(f.code, "extra.ts"), "unbound");
+  await expect(resolveExternalRelease(f.ports, "fixture")).rejects.toMatchObject({ reason: "release_drift" });
+  await rm(join(f.code, "extra.ts"));
+  await rm(join(f.code, "chrona-material.json"));
+  await expect(resolveExternalRelease(f.ports, "fixture")).rejects.toMatchObject({ reason: "invalid_release" });
 });
-test.each(["pi", "files", "author", "mind"])("new %s release has no snapshot fallback when lock is missing or ambiguous", async name => {
-  const f = await fixture(name), lockPath = join(f.root, "module-git", "lock.json");
-  const lock = JSON.parse(await readFile(lockPath, "utf8"));
-  lock.modules.push(lock.modules[0]); await writeFile(lockPath, JSON.stringify(lock));
-  await expect(resolveExternalRelease(f.ports, name)).rejects.toMatchObject({ reason: "invalid_release" });
-  await rm(lockPath);
-  await expect(resolveExternalRelease(f.ports, name)).rejects.toMatchObject({ reason: "release_not_found" });
-});
-test("bundle symlink and former builtin Agent identity are rejected", async () => {
-  const f = await fixture(), backup = join(f.root, "bundle-copy");
-  await writeFile(backup, await readFile(f.git.bundlePath)); await rm(f.git.bundlePath); await symlink(backup, f.git.bundlePath);
-  await expect(resolveExternalRelease(f.ports, "files")).rejects.toMatchObject({ reason: "invalid_release" });
-  await expect(resolveBuiltinRelease({ moduleBuiltinResources: join(f.root, "builtin") }, "agent")).rejects.toMatchObject({ reason: "release_not_found" });
+test("release directories and selected files reject symlinks", async () => {
+  const f = await fixture();
+  await rm(join(f.code, "index.ts"));
+  await symlink(join(f.code, "module.json"), join(f.code, "index.ts"));
+  await expect(resolveExternalRelease(f.ports, "fixture")).rejects.toMatchObject({ reason: "invalid_release" });
+  await symlink(f.code, join(f.ports.moduleExternalResources, "other"));
+  await expect(resolveExternalRelease(f.ports, "other")).rejects.toMatchObject({ reason: "invalid_release" });
 });

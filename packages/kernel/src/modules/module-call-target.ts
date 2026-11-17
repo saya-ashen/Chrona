@@ -71,7 +71,7 @@ export function splitTarget(target: string) {
   return { module, tool };
 }
 async function localIdentityConflict(db: Db, workspaceId: string, name: string) {
-  const installed = await db.module.findFirst({ where: { workspaceId, name }, select: { id: true, builtin: true } });
+  const installed = await db.module.findFirst({ where: { workspaceId, name }, select: { id: true } });
   if (!installed) return false;
   return true;
 }
