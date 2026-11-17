@@ -1,7 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@latest/schema.json",
   "ignore": [
-    "packages/cli/src/bun-entry.ts",
+    "apps/cli/src/bun-entry.ts",
     "packages/db/src/generated/**"
   ],
   "workspaces": {
@@ -33,22 +33,6 @@
         "!**/__tests__/**"
       ]
     },
-    "packages/*/*": {
-      "project": [
-        "src/**/*.{ts,tsx}",
-        "!**/*.test.ts",
-        "!**/*.test.tsx",
-        "!**/__tests__/**"
-      ]
-    },
-    "packages/*/*/*": {
-      "project": [
-        "src/**/*.{ts,tsx}",
-        "!**/*.test.ts",
-        "!**/*.test.tsx",
-        "!**/__tests__/**"
-      ]
-    },
     "packages/skills/chrona-node": {
       "entry": [
         "SKILL.md",
@@ -57,6 +41,41 @@
         "bin/chrona"
       ],
       "project": []
+    },
+    "apps/cli": {
+      "entry": [
+        "src/index.ts",
+        "src/bun-entry.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "!**/*.test.ts"
+      ]
+    },
+    "packages/app-sdk": {
+      "entry": [
+        "sdk.ts",
+        "testing.ts",
+        "process.ts",
+        "transport.ts",
+        "typecheck/check.ts",
+        "typecheck/calls.ts",
+        "typecheck/chrona-sdk-loader.ts"
+      ],
+      "project": [
+        "**/*.ts",
+        "!**/*.test.ts"
+      ]
+    },
+    "packages/app-common": {
+      "entry": [
+        "src/*.ts",
+        "src/*.tsx"
+      ],
+      "project": [
+        "src/**/*.{ts,tsx}",
+        "!**/*.test.ts"
+      ]
     }
   }
 }

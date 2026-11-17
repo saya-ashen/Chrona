@@ -5,7 +5,7 @@ import { mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { moduleGitReleaseSource } from "./module-git-release";
 
-export const applicationSourcePath = "packages/engine/src/modules/steward/applications";
+export const applicationSourcePath = ".generated/applications";
 export type ApplicationInput = {
   name: string; commit: string; bundle: string; bundleSha256: string; sourceSha256: string;
   artifacts: { file: string; sha256: string } | null;

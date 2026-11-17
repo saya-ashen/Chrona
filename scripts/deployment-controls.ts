@@ -11,7 +11,7 @@ import { sqlitePathFromFileUrl } from "../packages/db/src/sqlite-url";
 import { verifyReleaseIdentity } from "../build/release-identity";
 import { buildTargets, type BuildTargetName } from "../build/manifest";
 import { smokeRelease } from "../build/release-smoke";
-import { findResourceDir } from "../packages/cli/src/start-server";
+import { findResourceDir } from "../apps/cli/src/start-server";
 
 const TERMINAL_RUNS = ["finished", "failed", "cancelled", "timed_out", "provider_unavailable"];
 const TERMINAL_INVOCATIONS = ["succeeded", "failed"];
@@ -101,7 +101,7 @@ function processObservation(pid: number): DeploymentReport["process"] {
   const environment = readFileSync(`${processRoot}/environ`).toString().split("\0").filter(Boolean);
   const envValue = (key: string) => environment.find(value => value.startsWith(`${key}=`))?.slice(key.length + 1);
   const command = readFileSync(`${processRoot}/cmdline`).toString().split("\0").filter(Boolean);
-  const sourceEntry = command.map(value => resolve(cwd, value)).find(value => value.endsWith("/packages/cli/src/bun-entry.ts"));
+  const sourceEntry = command.map(value => resolve(cwd, value)).find(value => value.endsWith("/apps/cli/src/bun-entry.ts"));
   const packageDir = envValue("CHRONA_PACKAGE_DIR") ?? (sourceEntry ? resolve(dirname(sourceEntry), "../..") : undefined);
   const resourceRoot = resolve(cwd, findResourceDir({
     cwd, executable, argv0: command[0] ?? executable, resourceDir: envValue("CHRONA_RESOURCE_DIR"), packageDir,

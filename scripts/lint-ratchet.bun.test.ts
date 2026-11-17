@@ -71,6 +71,16 @@ test("renamed and split files share the original lint budget, then use their own
     git(["-c", "core.hooksPath=/dev/null", "commit", "--quiet", "-m", "split"]);
     expect(lint("HEAD", ["left.js", "right.js"]).exitCode).toBe(0);
     expect(lint("HEAD", ["--staged", "left.js", "right.js"]).exitCode).toBe(0);
+    await writeFile(join(fixture, "scripts/lint-path-renames.json"), JSON.stringify({
+      "renamed.js": "left.js", "left.js": "old.js", "right.js": "old.js",
+    }));
+    await writeFile(join(fixture, "renamed.js"), line);
+    await rm(join(fixture, "left.js"));
+    expect(lint(original).exitCode).toBe(0);
+    expect(lint("HEAD").exitCode).toBe(0);
+    await rm(join(fixture, "renamed.js"));
+    await writeFile(join(fixture, "left.js"), line);
+    await writeFile(join(fixture, "scripts/lint-path-renames.json"), JSON.stringify({ "left.js": "old.js", "right.js": "old.js" }));
     await writeFile(join(fixture, "right.js"), line + line);
     expect(lint("HEAD").exitCode).toBe(1);
     await writeFile(join(fixture, "right.js"), "const = ;\n");

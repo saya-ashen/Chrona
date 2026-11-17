@@ -1,0 +1,15 @@
+{
+  "name": "@chrona/cli",
+  "version": "0.3.1",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "chrona": "./src/index.ts"
+  },
+  "dependencies": {
+    "@chrona/workspaces": "workspace:*",
+    "@chrona/db": "workspace:*",
+    "@chrona/host": "workspace:*",
+    "commander": "^15.0.0"
+  }
+}

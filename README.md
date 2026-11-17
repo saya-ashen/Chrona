@@ -19,7 +19,7 @@ Schedules can wake the Provider or trigger modules, including fixed reminders wi
 
 ## Quick start
 
-Requires **Bun ≥ 1.4.2**, **git**, and a pinned **Pi CLI** with model access configured in a dedicated service profile. The [Provider adapter](packages/integrations/src/steward/pi-provider.ts) uses Pi RPC; its default version pin is **0.85.0**; an explicit **1.x** pin from **1.3.0** on is also supported. Full backups additionally require GNU-compatible `tar`.
+Requires **Bun ≥ 1.4.2**, **git**, and a pinned **Pi CLI** with model access configured in a dedicated service profile. The [Provider adapter](packages/pi/src/pi-provider.ts) uses Pi RPC; its default version pin is **0.85.0**; an explicit **1.x** pin from **1.3.0** on is also supported. Full backups additionally require GNU-compatible `tar`.
 
 Choose a fresh data directory; do not reuse a pre-rebuild database:
 
@@ -90,7 +90,7 @@ Configure the dedicated official bot variables above and a private secret file, 
 chrona qq bind-code --workspace ws_default
 ```
 
-In a source checkout, replace `chrona` with `bun run packages/cli/src/index.ts`. Send `绑定 <码>` in the bot's private chat. Codes expire after ten minutes by default. QQ delivery restrictions and Chrona notification budgets still apply.
+In a source checkout, replace `chrona` with `bun run apps/cli/src/index.ts`. Send `绑定 <码>` in the bot's private chat. Codes expire after ten minutes by default. QQ delivery restrictions and Chrona notification budgets still apply.
 
 ## Backups and safety
 

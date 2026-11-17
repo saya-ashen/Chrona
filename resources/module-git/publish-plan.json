@@ -6,49 +6,49 @@
       "proposedRepository": "chrona-core/chrona-module-web",
       "localRepository": "../../../chrona-module-web",
       "branch": "main",
-      "commit": "307b72acf4a282e80a7134bb05386544a22638c9"
+      "commit": "bf33943f4b0bd304e45b530d6b42399318a1e632"
     },
     {
       "name": "notify",
       "proposedRepository": "chrona-core/chrona-module-notify",
       "localRepository": "../../../chrona-module-notify",
       "branch": "main",
-      "commit": "2219da0d2bf6ea3cf9b1b7af922639dc19daabed"
+      "commit": "273ffa4ff9e2e945214dfd936fc675e733f3d75c"
     },
     {
       "name": "pi",
       "proposedRepository": "chrona-core/chrona-module-pi",
       "localRepository": "../../../chrona-module-pi",
       "branch": "main",
-      "commit": "8bf7c40377abdd82d7bbfd067a92c5fb4dc5bad1"
+      "commit": "ae46fc3cdd41c523c6e0444940599e24883dffc0"
     },
     {
       "name": "qq",
       "proposedRepository": "chrona-core/chrona-module-qq",
       "localRepository": "../../../chrona-module-qq",
       "branch": "main",
-      "commit": "aa7c242f5a68576d8326da59684cf2ce78e2c1b2"
+      "commit": "de32f903f65ed22c011c153a44b41a1697e5dfb6"
     },
     {
       "name": "author",
       "proposedRepository": "chrona-core/chrona-module-author",
       "localRepository": "../../../chrona-module-author",
       "branch": "main",
-      "commit": "a2b84b1535cfed72371617df9d9dba832af30435"
+      "commit": "ef07b5f0e5703024d3b0c8a305d79155f545d747"
     },
     {
       "name": "mind",
       "proposedRepository": "chrona-core/chrona-module-mind",
       "localRepository": "../../../chrona-module-mind",
       "branch": "main",
-      "commit": "881491f67c0a73096a26d27b2390f2370004f49a"
+      "commit": "02e5d98a1653f495516215e639adf74e6074953a"
     },
     {
       "name": "chat",
       "proposedRepository": "chrona-core/chrona-module-chat",
       "localRepository": "../../../chrona-module-chat",
       "branch": "main",
-      "commit": "0af7436dc27612facede6dccb1a41eac9d3d946f"
+      "commit": "e465c6d9ad8f30a41992af94351e009a579c6dde"
     }
   ]
 }

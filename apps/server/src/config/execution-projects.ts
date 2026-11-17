@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { isAbsolute, join, normalize } from "node:path";
 import { z } from "zod";
-import { CallError } from "@chrona/engine";
+import { CallError } from "@chrona/kernel";
 import { executionIdSchema, executionHostBaselineSchema, localExecutionProjectGrantSchema, type ExecutionPrincipal, type ExecutionProjectGrant, type LocalExecutionProjectGrant, type WorkPlacement } from "@chrona/contracts/steward";
 
 const projectSchema = z.object({

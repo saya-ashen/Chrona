@@ -6,7 +6,7 @@ import { buildProcessHelper } from "../packages/process/scripts/build-helper";
 
 const include = new Bun.Glob("**/*.bun.test.{ts,tsx}");
 const additionalTests = ["state.test.ts", "dom.test.ts", "host-agent.integration.test.ts"]
-	.map(file => `packages/engine/src/modules/steward/applications/chat/${file}`);
+	.map(file => `.generated/applications/chat/${file}`);
 const ignoredSegments = new Set([
 	"node_modules",
 	".direnv",
@@ -36,9 +36,9 @@ function shouldInclude(path: string) {
 	const retained = [
 		"scripts/",
 		"examples/desktop-demo/",
-		"packages/cli/",
-		"packages/engine/src/modules/steward/", "packages/domain/src/steward/",
-		"packages/integrations/src/steward/", "packages/contracts/src/steward/", "packages/pi/", "packages/process/", "packages/workspaces/", "packages/remote-device/", "packages/remote-model/",
+		"apps/cli/", ".generated/applications/", "packages/app-common/", "packages/app-sdk/",
+		"packages/kernel/src/", "packages/domain/src/steward/",
+		"packages/host/src/", "packages/contracts/src/steward/", "packages/pi/", "packages/process/", "packages/workspaces/", "packages/remote-device/", "packages/remote-model/",
 		"packages/db/", "packages/shared/", "packages/logging/", "packages/i18n/",
 	];
 	return retained.some(prefix => path.startsWith(prefix))
@@ -141,7 +141,7 @@ async function runWithFreshDatabase(
 async function discoverTestFiles(): Promise<string[]> {
 	return requestedFiles.length > 0
 			? resolveRequestedFiles(requestedFiles)
-			: [...await Array.fromAsync(include.scan(".")), ...additionalTests]
+			: [...await Array.fromAsync(include.scan(".")), ...(await Array.fromAsync(include.scan(".generated/applications"))).map(path => `.generated/applications/${path}`), ...additionalTests]
 					.filter(shouldInclude)
 					.sort((a, b) => a.localeCompare(b));
 

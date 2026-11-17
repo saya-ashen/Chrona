@@ -6,7 +6,7 @@ import { parseArgs } from "node:util";
 import { backupSqliteDatabase, restoreSqliteDatabase } from "../../../packages/db/src/sqlite-backup";
 import { replaceDataFiles, stageDataFiles } from "../../../packages/db/src/sqlite-backup-files";
 import { checksumSql, ensureSqliteDatabase } from "../../../packages/db/src/sqlite-migrations";
-import { createAgentConversations } from "../../../packages/engine/src/modules/steward/entry-app/conversations";
+import { createAgentConversations } from "../../../packages/app-common/src/conversations";
 
 const SOURCE_CHECKSUM = "6d83f856c64179ca02a18a3865c5eb2b458038a737cf70bcf43e5b01e44ff550";
 const TARGET_CHECKSUM = "b254c9a12912dcf6e53d6588e0edc3b79c25cafa4f15a9755aac00e3276aa458";

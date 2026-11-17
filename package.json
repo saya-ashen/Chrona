@@ -2,7 +2,7 @@
   "name": "@chrona-org/cli",
   "version": "0.3.1",
   "private": true,
-  "description": "Chrona — local AI work executor for governed planning, scheduling, recovery, and results",
+  "description": "Chrona \u2014 local AI work executor for governed planning, scheduling, recovery, and results",
   "license": "MIT",
   "type": "module",
   "repository": {
@@ -12,11 +12,8 @@
   "keywords": [
     "ai",
     "agent",
-    "dashboard",
-    "task-management",
-    "cqrs",
-    "event-sourcing",
-    "vite"
+    "local-first",
+    "applications"
   ],
   "packageManager": "bun@1.4.2",
   "engines": {
@@ -108,8 +105,6 @@
   ],
   "workspaces": [
     "apps/*",
-    "packages/*",
-    "packages/*/*",
-    "packages/*/*/*"
+    "packages/*"
   ]
 }

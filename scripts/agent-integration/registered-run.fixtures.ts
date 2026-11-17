@@ -2,10 +2,10 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema, type ProviderInteraction } from "@chrona/contracts/steward";
 import { agentFixture } from "./agent-application.fixtures";
-import { callSync, kernelOrigin } from "../../packages/engine/src/modules/steward/modules/module-calls";
-import { createRuns, liveRuns } from "../../packages/engine/src/modules/steward/execution/runs";
-import { createProviderChannel } from "../../packages/engine/src/modules/steward/agent/provider-channel";
-import { startLocalProvider } from "../../packages/engine/src/modules/steward/execution/local-runtime";
+import { callSync, kernelOrigin } from "../../packages/kernel/src/modules/module-calls";
+import { createRuns, liveRuns } from "../../packages/kernel/src/execution/runs";
+import { createProviderChannel } from "../../packages/kernel/src/agent/provider-channel";
+import { startLocalProvider } from "../../packages/kernel/src/execution/local-runtime";
 
 /** An approved application uses public Agent tools; Pi itself is registered by its real SDK. */
 export async function registeredRunFixture(prompt = "Offline acceptance prompt", onInteraction?: (request: ProviderInteraction) => Promise<void>) {

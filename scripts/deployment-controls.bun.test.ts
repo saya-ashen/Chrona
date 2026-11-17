@@ -180,10 +180,10 @@ test.each(["unknown", "internal", "forbidden", null])("preflight CLI follows Mod
 
 test("preflight CLI observes the source entry's implicit package fallback without overrides", async () => {
   const f = await fixture(), release = await releaseFixture(f.root);
-  const sourceDir = join(f.root, "packages/cli/src"), resources = join(f.root, "packages/resources");
+  const sourceDir = join(f.root, "apps/cli/src"), resources = join(f.root, "apps/resources");
   await mkdir(sourceDir, { recursive: true });
   await mkdir(join(resources, "prisma/migrations"), { recursive: true });
-  const startup = await readFile(join(import.meta.dir, "../packages/cli/src/start-server.ts"), "utf8");
+  const startup = await readFile(join(import.meta.dir, "../apps/cli/src/start-server.ts"), "utf8");
   // Keep the real launcher's default resolution in the fixture; only relocate its dependency import.
   await writeFile(join(sourceDir, "start-server.ts"), startup.replace('"@chrona/db/sqlite-url"', JSON.stringify(join(import.meta.dir, "../packages/db/src/sqlite-url.ts"))));
   await writeFile(join(sourceDir, "bun-entry.ts"), `import { findResourceDir } from './start-server';

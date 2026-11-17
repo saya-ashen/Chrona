@@ -2,8 +2,8 @@ import { expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { z } from "zod";
-import { publicSystemTools } from "../packages/engine/src/modules/steward/system/tool-contract-declarations";
-import { committedToolContract, moduleCallbackContractHash, moduleToolContract } from "../packages/engine/src/modules/steward/modules/module-tool-contract";
+import { publicSystemTools } from "../packages/kernel/src/system/tool-contract-declarations";
+import { committedToolContract, moduleCallbackContractHash, moduleToolContract } from "../packages/kernel/src/modules/module-tool-contract";
 import { contractSchemasDirectory, generateContractSchemas, serializeContractSchema } from "./generate-contract-schemas";
 
 const schemas = generateContractSchemas();

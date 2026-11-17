@@ -83,7 +83,7 @@ prisma/dev.db-wal.*
 # build output
 /dist/
 dist/
-/packages/cli/dist/
+/apps/cli/dist/
 
 # npm pack
 *.tgz
@@ -167,4 +167,4 @@ prisma/*.sync-conflict-*.db*
 /plans/
 
 # Pinned application sources restored from offline inputs, never authoritative checkouts.
-/packages/engine/src/modules/steward/applications/
+/.generated/applications/

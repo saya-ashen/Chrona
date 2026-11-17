@@ -14,7 +14,7 @@ const eslintConfig = defineConfig([
   },
   {
     // The built-in web module executes in a browser.
-    files: ["packages/engine/src/modules/steward/applications/web/*.js"],
+    files: [".generated/applications/web/*.js"],
     languageOptions: { globals: globals.browser },
   },
   {
@@ -202,8 +202,8 @@ const eslintConfig = defineConfig([
             "@/lib/db",
             "@/generated/prisma/*",
             "@prisma/*",
-            "@chrona/integrations",
-            "@chrona/integrations/*",
+            "@chrona/host",
+            "@chrona/host/*",
           ],
         },
       ],
@@ -220,14 +220,14 @@ const eslintConfig = defineConfig([
     "**/coverage/**",
     "**/*.min.js",
     // Generated browser bundle; lint its src/pages.tsx source instead.
-    "packages/engine/src/modules/steward/applications/web/pages.js",
+    ".generated/applications/web/pages.js",
     // Portable registration helper; lint external/web/registration-test.ts instead.
-    "packages/engine/src/modules/steward/applications/chat/test-support/registration-test.mjs",
+    ".generated/applications/chat/test-support/registration-test.mjs",
     // Generated Pi dependency artifacts; validate their fixed bytes as module material.
-    "packages/engine/src/modules/steward/applications/pi/vendor/**",
+    ".generated/applications/pi/vendor/**",
     // Generated Pi Provider bundles; lint their TypeScript sources instead.
-    "packages/engine/src/modules/steward/applications/pi/runtime.js",
-    "packages/engine/src/modules/steward/applications/pi/test.js",
+    ".generated/applications/pi/runtime.js",
+    ".generated/applications/pi/test.js",
     // Historical plans, frozen candidate snapshots, and throwaway scratch dirs are not live source.
     "plans/**",
     "playwright-report/**",

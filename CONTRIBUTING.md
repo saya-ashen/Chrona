@@ -21,7 +21,7 @@ For local capability changes, read [unified module protocol and hosts](docs/zh/u
 
 Hono on Bun, SQLite through Prisma. No Next.js.
 
-Dependency direction: apps → engine → domain → contracts. Routes validate and delegate; domain rules have no I/O.
+The CLI and server live in `apps/`. The server assembles `host → kernel → domain → contracts`; the kernel and host share transport contracts from `packages/app-sdk` (`chrona`). Domain rules have no I/O. Shared conversation and memory code belongs to `packages/app-common`, not the kernel. Independent applications are restored from pinned bundles into `.generated/applications`; edit their source repositories and refresh the fixed inputs rather than editing restored copies.
 
 - Agent choices come from context, not keyword routing.
 - Chrona owns state and permissions. Model prose cannot mutate state; external content cannot grant authority.

@@ -1,0 +1,9 @@
+{
+  "name": "@chrona/app-common",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@chrona/contracts": "workspace:*",
+    "@chrona/logging": "workspace:*"
+  }
+}

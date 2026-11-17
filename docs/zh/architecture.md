@@ -39,20 +39,26 @@ kernel 不保存业务消息或通用偏好，Workspace 默认设置为 `{}`。�
 
 应用摘要按应用分别执行最近五条版本及执行查询；SQLite 执行 LIMIT，使用确定的 `createdAt/id` 排序。主库连接建立时同步开启外键；共享连接保留事务全程 gate 和同步 `changes()` 处理。暂未新增专用只读连接：先消除已证实的历史全量读取，另开连接需要明确快照一致性及事务内读取路由，当前没有第二个连接的收益测量。
 
-Mind 的组件和三类执行日志共用 `mind.sqlite`，执行预算与恢复按各自表读取；entry-app 会话按会话一行保存到 SQLite，只更新发生变更的行；列表查询只取摘要，详情及附件按会话或身份筛选读取，后台轮询先列摘要再逐会话恢复。留存及旧数据拒绝边界见[运维](operations.md#当前存储与旧数据边界)。这些源码改动未部署或转换真实数据。
+Mind 的组件和三类执行日志共用 `mind.sqlite`，执行预算与恢复按各自表读取；应用共享会话按会话一行保存到 SQLite，只更新发生变更的行；列表查询只取摘要，详情及附件按会话或身份筛选读取，后台轮询先列摘要再逐会话恢复。留存及旧数据拒绝边界见[运维](operations.md#当前存储与旧数据边界)。这些源码改动未部署或转换真实数据。
 
 ## 5. 代码地图
 
 | 位置 | 职责 |
 | --- | --- |
-| `apps/server` | Bun/Hono HTTP、运行时 tick、Provider 桥、鉴权代理及救援入口 |
-| `packages/contracts/src/steward` | zod、工具与 wire 合同 |
-| `packages/domain/src/steward` | 无 I/O 的纯策略 |
-| `packages/engine/src/modules/steward` | `agent/` 管通用 Agent 与 Provider 登记，`execution/` 管 Run 准入与交付，`modules/` 管应用材料、调用与生命周期；13 个应用由独立仓库维护，固定输入恢复到私有 `applications/` staging |
-| `packages/integrations/src/steward`、`packages/pi` | 宿主 `runtime/`、依赖安装 `packages/`、SDK 与类型检查资源，以及 Pi Provider |
-| `packages/db`、`packages/cli` | SQLite/Prisma、迁移与备份恢复、启动和诊断 |
+| `apps/cli` | 命令行启动、停服管理、备份恢复与诊断入口 |
+| `apps/server` | Bun/Hono HTTP、运行时 tick、鉴权代理及救援入口；装配 kernel、宿主和 Provider |
+| `packages/contracts` | zod、工具与 wire 合同 |
+| `packages/domain` | 无 I/O 的纯策略 |
+| `packages/kernel` | `agent/` 管通用 Agent 与 Provider 登记，`execution/` 管 Run 准入与交付，`modules/` 管应用材料、调用与生命周期 |
+| `packages/host` | 本地进程宿主、Provider 桥、依赖安装和发行资源定位 |
+| `packages/app-sdk` | 应用 `chrona` API、wire 传输、测试入口与类型检查资源；不依赖 kernel 或宿主 |
+| `packages/app-common` | 入口应用共享的会话、交付、偏好和记忆源码，由构建复制给应用；不归 kernel |
+| `packages/pi` | Pi Provider 后端适配 |
+| `packages/db` | SQLite/Prisma、迁移与完整备份恢复 |
+| `.generated/applications` | 13 个独立应用的固定输入恢复副本；供测试与构建消费，修改须回到独立仓库并更新 bundle/lock |
+| `resources/application-inputs`、`resources/module-git` | 固定应用提交、源码 bundle、制品与发行锁 |
 
-依赖方向：`apps → engine → domain → contracts`。页面由普通 Web 应用承载，共用 React runtime 与 UI 组件；Web 拥有外壳，业务应用拥有内容及设置。应用直接登记编译后的 React / TSX 页面，可信页面无浏览器沙箱。详见[Web 合同](web-components-and-shell.md)、[应用设置](application-settings.md)、[依赖方向](module-dependency-direction.md)。
+依赖方向：入口装配 `host → kernel → domain → contracts`；kernel 与宿主共用 `app-sdk` 的传输合同，kernel 不依赖宿主、Provider 实现或应用业务。页面由普通 Web 应用承载，共用 React runtime 与 UI 组件；Web 拥有外壳，业务应用拥有内容及设置。应用直接登记编译后的 React / TSX 页面，可信页面无浏览器沙箱。详见[Web 合同](web-components-and-shell.md)、[应用设置](application-settings.md)、[依赖方向](module-dependency-direction.md)。
 
 ## 6. 运行与证据
 
@@ -60,6 +66,6 @@ Mind 的组件和三类执行日志共用 `mind.sqlite`，执行预算与恢复�
 
 内核/Agent 和普通应用的当前阶段证据分别见[内核迁移](kernel-agent-migration.md)、[应用迁移](application-migration.md)。源码、离线测试、隔离验收、部署及真实使用分开判断；文档中的完成不自动覆盖后续代码或既有实例。
 
-当前源码归属、生成副本与发行消费者见[工程清理盘点](../tasks/cleanup-and-reorg/application-boundaries.md)。阶段验证记录见[阶段 1 基线](../tasks/cleanup-and-reorg/stage-1-summary.md)；其中的隔离发行包未部署，不能替代现有实例取证。
+上一阶段的源码归属及发行消费者盘点保留在[工程清理记录](../tasks/cleanup-and-reorg/application-boundaries.md)，其中的旧路径以本文代码地图为准。阶段验证记录见[阶段 1 基线](../tasks/cleanup-and-reorg/stage-1-summary.md)；其中的隔离发行包未部署，不能替代现有实例取证。
 
 旧系统接口、构建和健康自报机制的正文从本文件的 Git 历史查阅，不再作为当前开发规则。

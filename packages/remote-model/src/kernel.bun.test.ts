@@ -14,8 +14,8 @@ async function fixture(unknown = false, applicationRelay = false) {
   // The public Agent fixture owns a real SDK process and isolated database. Its
   // completion executable is a deterministic provider double; the device Pi is
   // the actual installed binary explicitly selected by the test operator.
-  const { createExecutionDelivery, createExecutionEventStore, callSync, deliverExecutionApplication, moduleSupervisor } = await import("@chrona/engine");
-  const { agentFixture, kernelOrigin } = await import("@chrona/engine/test-support");
+  const { createExecutionDelivery, createExecutionEventStore, callSync, deliverExecutionApplication, moduleSupervisor } = await import("@chrona/kernel");
+  const { agentFixture, kernelOrigin } = await import("@chrona/kernel/test-support");
   const f = await agentFixture(), db = f.ports.db;
   f.ports.executionEvents = createExecutionEventStore(f.ports);
   let server: ReturnType<typeof Bun.serve> | null = null;
@@ -44,8 +44,8 @@ async function fixture(unknown = false, applicationRelay = false) {
     };
     const auth = () => ({ version: 1, requestId: randomUUID(), credential, device });
     if (applicationRelay) {
-      const engineRoot = dirname(fileURLToPath(import.meta.resolve("@chrona/engine")));
-      const source = join(engineRoot, "modules/steward/applications/remote-execution");
+      const engineRoot = dirname(fileURLToPath(import.meta.resolve("@chrona/kernel")));
+      const source = join(engineRoot, "../../../.generated/applications/remote-execution");
       const appManifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(source, "module.json"), "utf8")));
       await db.moduleVersion.create({ data: { moduleId: receiver.moduleId, hash: receiver.hash, manifest: appManifest, source: "user", status: "approved", intent: {}, report: {} } });
       const code = join(f.ports.dataDir, "platform/store", receiver.hash);

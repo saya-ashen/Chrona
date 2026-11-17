@@ -4,7 +4,7 @@
 
 `resources/application-inputs/lock.json` 是开发组合的固定入口。七个发行 bundle 继续位于 `resources/module-git`，另六个 bundle 位于 `resources/application-inputs`。每项固定 commit、bundle SHA256、源码摘要；Git 中未包含的页面、Pi runtime/vendor 等 artifact 使用单独的精确输入，固定 SHA256，并由原 `chrona-material.json` 校验每个文件的字节、可执行模式与完整覆盖。没有通过校验的 checkout 不能作为发行资源。
 
-`bun run applications:restore` 只从上述输入恢复 `packages/engine/src/modules/steward/applications/<name>`。该目录被 Git 忽略，是可删除重建的开发 staging；它保留原相对深度供既有组合测试使用。恢复入口不探测相邻应用仓库，也不访问远端。已经恢复的内容发生漂移时会明确失败；修改应进入独立仓库并更新固定输入。
+`bun run applications:restore` 只从上述输入恢复 `.generated/applications/<name>`。该目录被 Git 忽略，是可删除重建的开发 staging；它保留原相对深度供既有组合测试使用。恢复入口不探测相邻应用仓库，也不访问远端。已经恢复的内容发生漂移时会明确失败；修改应进入独立仓库并更新固定输入。
 
 正常 `bun install` 会恢复应用并按各自冻结锁安装开发依赖。已有依赖缓存时，可明确离线执行：
 

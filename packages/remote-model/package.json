@@ -6,5 +6,5 @@
   "exports": { ".": "./src/index.ts" },
   "scripts": { "test": "bun test src", "typecheck": "tsc --noEmit -p tsconfig.json" },
   "dependencies": { "@chrona/pi": "workspace:*", "@chrona/process": "workspace:*", "@chrona/contracts": "workspace:*", "zod": "^4.4.3" },
-  "devDependencies": { "@chrona/engine": "workspace:*" }
+  "devDependencies": { "@chrona/kernel": "workspace:*" }
 }

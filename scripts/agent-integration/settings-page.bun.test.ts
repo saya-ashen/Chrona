@@ -3,11 +3,11 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { agentFixture } from "./agent-application.fixtures";
-import { callSync, kernelOrigin } from "../../packages/engine/src/modules/steward/modules/module-calls";
-import { pageErrors } from "../../packages/engine/src/modules/steward/applications/web/pages";
-import { manifest } from "../../packages/engine/src/modules/steward/applications/pi/build";
-import { SETTINGS_PAGE, settingsRegistration } from "../../packages/engine/src/modules/steward/applications/pi/settings-page";
-import type { ConfigurationView as SettingsView } from "../../packages/engine/src/modules/steward/applications/pi/configuration";
+import { callSync, kernelOrigin } from "../../packages/kernel/src/modules/module-calls";
+import { pageErrors } from "../../.generated/applications/web/pages";
+import { manifest } from "../../.generated/applications/pi/build";
+import { SETTINGS_PAGE, settingsRegistration } from "../../.generated/applications/pi/settings-page";
+import type { ConfigurationView as SettingsView } from "../../.generated/applications/pi/configuration";
 
 const parsed = moduleManifestSchema.parse(manifest());
 test("Pi settings page validates against its actual generated tools", () => {

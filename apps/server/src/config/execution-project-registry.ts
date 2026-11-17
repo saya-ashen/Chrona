@@ -5,7 +5,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { z } from "zod";
-import { CallError, type StewardPorts } from "@chrona/engine";
+import { CallError, type StewardPorts } from "@chrona/kernel";
 import type { ExecutionPrincipal, ExecutionProjectGrant } from "@chrona/contracts/steward";
 
 const exec = promisify(execFile);

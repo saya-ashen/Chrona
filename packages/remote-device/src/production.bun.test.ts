@@ -7,9 +7,9 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { moduleManifestSchema, kernelCleanupReceiptSchema, executionSignedStopSchema, type KernelExecutionStart } from "@chrona/contracts/steward";
-import { createExecutionDelivery, kernelExecutionCleanup } from "@chrona/engine";
-import { testDb } from "@chrona/engine/test-support";
-import { registerLocalModule } from "../../engine/src/modules/steward/modules/module-registry";
+import { createExecutionDelivery, kernelExecutionCleanup } from "@chrona/kernel";
+import { testDb } from "@chrona/kernel/test-support";
+import { registerLocalModule } from "../../kernel/src/modules/module-registry";
 import { createServerApp } from "../../../apps/server/src/app";
 import { createStewardRuntime } from "../../../apps/server/src/steward-runtime";
 import { resetEnvCacheForTests } from "../../../apps/server/src/config/env";
@@ -29,7 +29,7 @@ test.skipIf(!command || process.env.CHRONA_TEST_DEVICE_HTTP !== "1" || process.p
   let runtime: ReturnType<typeof createStewardRuntime> | undefined, server: ReturnType<typeof Bun.serve> | undefined, device: RemoteDevice | undefined;
   try {
     await db.workspace.create({ data: { id: "ws_default", name: "Device acceptance" } });
-    const source = fileURLToPath(new URL("../../engine/src/modules/steward/applications/remote-execution", import.meta.url));
+    const source = fileURLToPath(new URL("../../../.generated/applications/remote-execution", import.meta.url));
     const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(source, "module.json"), "utf8")));
     const appModule = await db.module.create({ data: { workspaceId: "ws_default", name: "remote-execution", activeHash: "c".repeat(40) } });
     await db.moduleVersion.create({ data: { moduleId: appModule.id, hash: appModule.activeHash!, manifest, source: "user", status: "approved", intent: {}, report: {} } });

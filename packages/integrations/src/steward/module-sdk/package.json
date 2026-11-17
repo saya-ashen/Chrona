@@ -1,6 +1,0 @@
-{
-  "name": "chrona",
-  "private": true,
-  "type": "module",
-  "exports": { ".": "./sdk.ts", "./testing": "./testing.ts", "./process": "./process.ts" }
-}

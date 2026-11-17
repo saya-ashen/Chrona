@@ -14,8 +14,8 @@
     "@chrona/i18n": "workspace:*",
     "@chrona/contracts": "workspace:*",
     "@chrona/db": "workspace:*",
-    "@chrona/integrations": "workspace:*",
+    "@chrona/host": "workspace:*",
     "@chrona/logging": "workspace:*",
-    "@chrona/engine": "workspace:*"
+    "@chrona/kernel": "workspace:*"
   }
 }

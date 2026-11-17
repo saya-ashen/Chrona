@@ -252,7 +252,7 @@ export function checkMaterials(root = ROOT): GuardrailFinding[] {
 		...gitPaths(root, ["ls-files", "--others", "--exclude-standard", "-z"]),
 	]);
 	for (const mod of buildArtifacts.moduleGit.modules) {
-		const relDir = posix.join("packages/engine/src/modules/steward/applications", mod.name);
+		const relDir = posix.join(".generated/applications", mod.name);
 		const dir = resolve(root, relDir);
 		const matPath = resolve(dir, "chrona-material.json");
 		if (!existsSync(matPath)) {
@@ -371,8 +371,8 @@ export function checkBoundaries(root = ROOT): GuardrailFinding[] {
 	const proc = Bun.spawnSync(
 		[
 			"bunx", "dependency-cruiser", "--output-type", "json",
-			"apps", "packages/contracts", "packages/db", "packages/domain", "packages/engine",
-			"packages/integrations", "packages/cli", "packages/i18n", "packages/shared",
+			"apps", "packages/contracts", "packages/db", "packages/domain", "packages/kernel",
+			"packages/host", "packages/app-sdk", "packages/app-common", "packages/i18n", "packages/shared",
 			"packages/logging", "packages/pi", "packages/process", "packages/workspaces",
 			"packages/remote-device", "packages/remote-model",
 		],
@@ -402,14 +402,14 @@ export function checkBoundaries(root = ROOT): GuardrailFinding[] {
 		findings.push({
 			check: "boundaries",
 			message: `${errors} architecture boundary error(s): ${sample}`,
-			fix: `Respect apps -> engine -> domain -> contracts direction; run 'bun run check:boundaries' for details.`,
+			fix: `Respect apps -> host/kernel -> domain -> contracts direction; run 'bun run check:boundaries' for details.`,
 		});
 	}
 	if (warns > BOUNDARY_WARNING_BUDGET) {
 		findings.push({
 			check: "boundaries",
 			message: `Boundary warning ratchet exceeded: ${warns} warnings > budget ${BOUNDARY_WARNING_BUDGET}.`,
-			fix: `Avoid importing apps/server or deep engine internals from package tests; use public exports.`,
+			fix: `Avoid importing apps/server or deep kernel internals from package tests; use public exports.`,
 		});
 	}
 	return findings;
@@ -420,7 +420,7 @@ const STAGED_CHECK_RULES: Array<{ check: GuardrailCheckName; match: (p: string) 
 		check: "contracts",
 		match: (p) =>
 			p.startsWith("packages/contracts/") ||
-			p.startsWith("packages/engine/src/modules/steward/system/") ||
+			p.startsWith("packages/kernel/src/system/") ||
 			p.includes("module-tool") ||
 			p.includes("generate-contract-schemas"),
 	},
@@ -435,7 +435,7 @@ const STAGED_CHECK_RULES: Array<{ check: GuardrailCheckName; match: (p: string) 
 	},
 	{
 		check: "materials",
-		match: (p) => p.startsWith("packages/engine/src/modules/steward/applications/") || p.startsWith("resources/application-inputs/") || p.startsWith("resources/module-git/") || p === "build/manifest.ts",
+		match: (p) => p.startsWith(".generated/applications/") || p.startsWith("resources/application-inputs/") || p.startsWith("resources/module-git/") || p === "build/manifest.ts",
 	},
 	{
 		check: "migrations",

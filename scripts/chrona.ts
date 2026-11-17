@@ -11,7 +11,7 @@ const binary = (target?: string) => command("Build steward binary", ["scripts/bu
 const types = [["x", "tsc", "--noEmit", "--pretty", "false"]];
 const boundaries = [
   "x", "dependency-cruiser", "apps", "packages/contracts", "packages/db", "packages/domain",
-  "packages/engine", "packages/integrations", "packages/cli", "packages/i18n", "packages/shared",
+  "packages/kernel", "packages/host", "apps/cli", "packages/i18n", "packages/shared",
   "packages/logging", "packages/pi", "packages/process", "packages/workspaces",
   "packages/remote-device", "packages/remote-model",
 ];
@@ -44,7 +44,7 @@ export const COMMANDS: Record<string, Partial<Record<string, Command>>> = {
     seed: command("Seed steward", ["prisma/seed.ts"]),
     generate: command("Generate Prisma", ["x", "prisma", "generate"]),
   },
-  doctor: { all: command("Local runtime diagnostics", ["packages/cli/src/bun-entry.ts", "doctor"]) },
+  doctor: { all: command("Local runtime diagnostics", ["apps/cli/src/bun-entry.ts", "doctor"]) },
 };
 function printGroupHelp(commands: Partial<Record<string, Command>>) {
   for (const [key, value] of Object.entries(commands)) {

@@ -25,19 +25,7 @@
         "typescript-eslint": "^8.66.0",
       },
     },
-    "apps/server": {
-      "name": "@chrona/server",
-      "dependencies": {
-        "@chrona/contracts": "workspace:*",
-        "@chrona/db": "workspace:*",
-        "@chrona/engine": "workspace:*",
-        "@chrona/i18n": "workspace:*",
-        "@chrona/integrations": "workspace:*",
-        "@chrona/logging": "workspace:*",
-        "@chrona/workspaces": "workspace:*",
-      },
-    },
-    "packages/cli": {
+    "apps/cli": {
       "name": "@chrona/cli",
       "version": "0.3.1",
       "bin": {
@@ -45,10 +33,32 @@
       },
       "dependencies": {
         "@chrona/db": "workspace:*",
-        "@chrona/integrations": "workspace:*",
+        "@chrona/host": "workspace:*",
         "@chrona/workspaces": "workspace:*",
         "commander": "^15.0.0",
       },
+    },
+    "apps/server": {
+      "name": "@chrona/server",
+      "dependencies": {
+        "@chrona/contracts": "workspace:*",
+        "@chrona/db": "workspace:*",
+        "@chrona/host": "workspace:*",
+        "@chrona/i18n": "workspace:*",
+        "@chrona/kernel": "workspace:*",
+        "@chrona/logging": "workspace:*",
+        "@chrona/workspaces": "workspace:*",
+      },
+    },
+    "packages/app-common": {
+      "name": "@chrona/app-common",
+      "dependencies": {
+        "@chrona/contracts": "workspace:*",
+        "@chrona/logging": "workspace:*",
+      },
+    },
+    "packages/app-sdk": {
+      "name": "chrona",
     },
     "packages/contracts": {
       "name": "@chrona/contracts",
@@ -68,31 +78,34 @@
         "@chrona/contracts": "workspace:*",
       },
     },
-    "packages/engine": {
-      "name": "@chrona/engine",
+    "packages/host": {
+      "name": "@chrona/host",
       "version": "0.1.0",
       "dependencies": {
         "@chrona/contracts": "workspace:*",
         "@chrona/db": "workspace:*",
-        "@chrona/domain": "workspace:*",
-        "@chrona/integrations": "workspace:*",
-        "@chrona/logging": "workspace:*",
+        "@chrona/kernel": "workspace:*",
+        "@chrona/pi": "workspace:*",
         "@chrona/process": "workspace:*",
-        "@chrona/shared": "workspace:*",
+        "@chrona/workspaces": "workspace:*",
+        "chrona": "workspace:*",
       },
     },
     "packages/i18n": {
       "name": "@chrona/i18n",
       "version": "0.1.0",
     },
-    "packages/integrations": {
-      "name": "@chrona/integrations",
+    "packages/kernel": {
+      "name": "@chrona/kernel",
       "version": "0.1.0",
       "dependencies": {
         "@chrona/contracts": "workspace:*",
-        "@chrona/pi": "workspace:*",
+        "@chrona/db": "workspace:*",
+        "@chrona/domain": "workspace:*",
+        "@chrona/logging": "workspace:*",
         "@chrona/process": "workspace:*",
-        "@chrona/workspaces": "workspace:*",
+        "@chrona/shared": "workspace:*",
+        "chrona": "workspace:*",
       },
     },
     "packages/logging": {
@@ -141,7 +154,7 @@
         "zod": "^4.4.3",
       },
       "devDependencies": {
-        "@chrona/engine": "workspace:*",
+        "@chrona/kernel": "workspace:*",
       },
     },
     "packages/shared": {
@@ -183,7 +196,9 @@
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
   },
   "packages": {
-    "@chrona/cli": ["@chrona/cli@workspace:packages/cli"],
+    "@chrona/app-common": ["@chrona/app-common@workspace:packages/app-common"],
+
+    "@chrona/cli": ["@chrona/cli@workspace:apps/cli"],
 
     "@chrona/contracts": ["@chrona/contracts@workspace:packages/contracts"],
 
@@ -191,11 +206,11 @@
 
     "@chrona/domain": ["@chrona/domain@workspace:packages/domain"],
 
-    "@chrona/engine": ["@chrona/engine@workspace:packages/engine"],
+    "@chrona/host": ["@chrona/host@workspace:packages/host"],
 
     "@chrona/i18n": ["@chrona/i18n@workspace:packages/i18n"],
 
-    "@chrona/integrations": ["@chrona/integrations@workspace:packages/integrations"],
+    "@chrona/kernel": ["@chrona/kernel@workspace:packages/kernel"],
 
     "@chrona/logging": ["@chrona/logging@workspace:packages/logging"],
 
@@ -494,6 +509,8 @@
     "chokidar": ["chokidar@5.0.0", "", { "dependencies": { "readdirp": "^5.0.0" } }, "sha512-TQMmc3w+5AxjpL8iIiwebF73dRDF4fBIieAqGn9RGCWaEVwQ6Fb2cGe31Yns0RRIzii5goJ1Y7xbMwo1TxMplw=="],
 
     "chromium-bidi": ["chromium-bidi@16.0.1", "", { "dependencies": { "mitt": "^3.0.1", "zod": "^3.24.1" }, "peerDependencies": { "devtools-protocol": "*" } }, "sha512-J63PGu/9PpeCwLIcKYyzWP6yaVL5pxuBc0shlYCYM8BaAkmlwiQboXO1iNbOgSDbVklEyYFfNEcHD8oOAWacUA=="],
+
+    "chrona": ["chrona@workspace:packages/app-sdk"],
 
     "classnames": ["classnames@2.5.1", "", {}, "sha512-saHYOzhIQs6wy2sVxTM6bUDsQO4F50V9RQ22qBpEdCW+I+/Wmke2HOl6lS6dTpdxVhb88/I6+Hs+438c3lfUow=="],
 

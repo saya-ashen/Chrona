@@ -1,13 +1,13 @@
-import { selectContextTools } from "../../../../../packages/engine/src/modules/steward/agent/agent-context-tools";
-import { moduleCallbackContractHash } from "../../../../../packages/engine/src/modules/steward/modules/module-tool-contract";
+import { selectContextTools } from "../../../../../packages/kernel/src/agent/agent-context-tools";
+import { moduleCallbackContractHash } from "../../../../../packages/kernel/src/modules/module-tool-contract";
 import { expect, spyOn, test } from "bun:test";
 import { cp, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
-import { testDb } from "@chrona/engine/test-support";
-import { createStewardService, CallError, moduleSupervisor, type StewardPorts } from "@chrona/engine";
+import { testDb } from "@chrona/kernel/test-support";
+import { createStewardService, CallError, moduleSupervisor, type StewardPorts } from "@chrona/kernel";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
-import { createScriptSandbox } from "../../../../../packages/integrations/src/steward/runtime/script-sandbox";
+import { createScriptSandbox } from "../../../../../packages/host/src/runtime/script-sandbox";
 import { createStewardAgentRoutes } from "../../routes/steward-agent.routes";
 
 const moduleTools = ["list", "describe", "health", "admit", "source", "submit", "receipt", "enable", "disable", "rollback", "remove", "operation"];
@@ -22,7 +22,7 @@ async function fixture() {
   await db.moduleVersion.create({ data: { moduleId: entry.id, hash: "v1", manifest: moduleManifestSchema.parse({ name: entry.name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: ["*"],
       authority: "owner"
 }), source: "user", status: "approved", intent: {}, report: {} } });
-  const authorRoot = join(import.meta.dirname, "../../../../../packages/engine/src/modules/steward/applications/author");
+  const authorRoot = join(import.meta.dirname, "../../../../../.generated/applications/author");
   const authorManifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(authorRoot, "module.json"), "utf8")));
   const author = await db.module.create({ data: { workspaceId, name: "author", activeHash: "c".repeat(64) } });
   await db.moduleVersion.create({ data: { moduleId: author.id, hash: "c".repeat(64), manifest: authorManifest, source: "user", status: "approved", intent: {}, report: {} } });

@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ProviderInteraction } from "@chrona/contracts/steward";
-import { liveRuns } from "../../packages/engine/src/modules/steward/execution/runs";
+import { liveRuns } from "../../packages/kernel/src/execution/runs";
 import { registeredRunFixture, eventually } from "./registered-run.fixtures";
 
 async function fixture() {

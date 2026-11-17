@@ -62,11 +62,11 @@
       "@chrona/shared/*": [
         "./packages/shared/src/*"
       ],
-      "@chrona/engine": [
-        "./packages/engine/src/index.ts"
+      "@chrona/kernel": [
+        "./packages/kernel/src/index.ts"
       ],
-      "@chrona/engine/test-support": [
-        "./packages/engine/src/test-support.ts"
+      "@chrona/kernel/test-support": [
+        "./packages/kernel/src/test-support.ts"
       ],
       "@chrona/workspaces": [
         "./packages/workspaces/src/index.ts"
@@ -74,17 +74,17 @@
       "@chrona/pi": [
         "./packages/pi/src/index.ts"
       ],
-      "@chrona/integrations": [
-        "./packages/integrations/src/index.ts"
-      ],
-      "@chrona/integrations/steward": [
-        "./packages/integrations/src/steward/index.ts"
+      "@chrona/host": [
+        "./packages/host/src/index.ts"
       ],
       "chrona": [
-        "./packages/integrations/src/steward/module-sdk/sdk.ts"
+        "./packages/app-sdk/sdk.ts"
       ],
       "/pages.js": [
-        "./packages/engine/src/modules/steward/applications/web/src/pages.tsx"
+        "./.generated/applications/web/src/pages.tsx"
+      ],
+      "chrona/*": [
+        "./packages/app-sdk/*"
       ]
     }
   },

@@ -1,0 +1,154 @@
+import { afterEach, beforeEach, expect, test } from "bun:test";
+import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createChronaQqDelivery, createQqBotHandler, createQqBotState, createQqPassiveReplies, parseApprovalDecision, type ApprovalDecision, type QqChatPort, type QqReplyItem } from "../../../.generated/applications/qq/bot";
+import { createQqTokenSource } from "../../../.generated/applications/qq/official";
+const APP = "1905797537";
+let dir: string, at: Date;
+beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "qq-bot-")); at = new Date("2026-10-15T08:00:00Z"); });
+afterEach(() => rmSync(dir, { recursive: true, force: true }));
+function harness(options: { send?: QqChatPort["send"]; timers?: Pick<typeof globalThis, "setTimeout" | "clearTimeout"> } = {}) {
+  const state = createQqBotState(join(dir, "state"), APP);
+  const replies: { text: string; sequence: number }[] = [], calls: Parameters<QqChatPort["send"]>[0][] = [], outbox: string[] = [];
+  const decisions: ApprovalDecision[] = [];
+  const handler = createQqBotHandler({ state, now: () => at, timers: options.timers, resolveApproval: async (_binding, decision) => { decisions.push(decision); return "已批准"; },
+    chat: { async send(input) { calls.push(input); return options.send ? options.send(input) : {}; } },
+    reply: async (_openid, _id, text, sequence) => { replies.push({ text, sequence }); },
+    enqueueFinal: async (_binding, _id, text) => { outbox.push(text); },
+  });
+  let n = 0;
+  const say = (openid: string, content: string, id = `M${++n}`, timestamp = at.toISOString()) => handler.onMessage({ id, openid, content, quoted: "", timestamp });
+  const bind = async () => { await say("U1", `绑定 ${(await state.createChallenge({ workspaceId: "ws", now: at })).code}`); replies.length = 0; };
+  // A reply Chrona pushed through qq.reply.
+  const pushed = (text: string, inReplyTo: string | null, messageId = `R${text}`) => handler.deliverReply({ messageId, sessionId: "s", text, workspace: "ws", inReplyTo, attachments: [] } satisfies QqReplyItem);
+  return { state, replies, calls, outbox, say, bind, decisions, pushed };
+}
+test("unbound and non-owner cannot reach concierge; stranger rate limit preserves help", async () => {
+  const h = harness();
+  await h.say("U2", "需求"); await h.say("U2", "进度"); await h.say("U2", "帮助");
+  expect(h.replies).toHaveLength(2); expect(h.replies[0]!.text).toContain("尚未绑定");
+  await h.bind(); await h.say("U3", "需求");
+  expect(h.replies[0]!.text).toContain("没有使用权限"); expect(h.calls).toEqual([]);
+});
+test("owner text goes unchanged to chat.send; pushed replies answer their message; replay and restart dedupe", async () => {
+  const h = harness(); await h.bind();
+  for (const text of ["帮我准备答辩", "/chrona 暂停", "帮助", "进度"]) await h.say("U1", text, text);
+  expect(h.calls.map(c => c.text)).toEqual(["帮我准备答辩", "/chrona 暂停", "帮助", "进度"]);
+  expect(h.calls[0]).toEqual({ workspaceId: "ws", key: "qq:dm", channel: "chrona_qqbot", externalId: "帮我准备答辩", text: "帮我准备答辩" });
+  expect(h.replies).toEqual([]);
+  for (const id of ["帮我准备答辩", "/chrona 暂停", "帮助", "进度"]) expect(await h.pushed("收到", id)).toBe("passive");
+  expect(h.replies).toEqual(Array.from({ length: 4 }, () => ({ text: "收到", sequence: 1 })));
+  await h.say("U1", "duplicate", "帮助"); expect(h.calls).toHaveLength(4);
+  const restart = harness(); await restart.say("U1", "duplicate", "帮助"); expect(restart.calls).toHaveLength(0);
+});
+test("only a slow answer gets a holding line (after 30 s), then the pushed reply with the next sequence", async () => {
+  let fire: (() => void) | undefined;
+  const timers = { setTimeout: ((fn: () => void, ms: number) => { expect(ms).toBe(30_000); fire = fn; return 1; }) as typeof setTimeout, clearTimeout: (() => {}) as typeof clearTimeout };
+  const h = harness({ timers });
+  await h.bind(); await h.say("U1", "需求", "slow");
+  expect(h.replies).toEqual([]); fire!(); await new Promise(resolve => setTimeout(resolve, 1));
+  await h.pushed("最终答复", "slow");
+  expect(h.replies).toEqual([{ text: "我还在处理，稍等，好了马上回你。", sequence: 1 }, { text: "最终答复", sequence: 2 }]);
+});
+test("a quick answer gets no holding line; /new answers at once", async () => {
+  let fire: (() => void) | undefined;
+  const timers = { setTimeout: ((fn: () => void) => { fire = fn; return 1; }) as typeof setTimeout, clearTimeout: (() => {}) as typeof clearTimeout };
+  const h = harness({ timers, send: async input => input.text === "/new" ? { reply: "【Chrona】已开始新会话。" } : {} });
+  await h.bind(); await h.say("U1", "需求", "quick");
+  await h.pushed("答复", "quick"); fire!(); await new Promise(resolve => setTimeout(resolve, 1));
+  expect(h.replies).toEqual([{ text: "答复", sequence: 1 }]);
+  await h.say("U1", "/new", "new");
+  expect(h.replies.at(-1)).toEqual({ text: "【Chrona】已开始新会话。", sequence: 1 });
+});
+test("passive quota reserves four unique sequences and expires after 60 min", async () => {
+  const seq: number[] = []; const send = createQqPassiveReplies(async (_o, _i, _t, n) => { seq.push(n); }, () => at.getTime());
+  const message = { id: "m", openid: "U1", timestamp: at.toISOString(), content: "", quoted: "" };
+  for (let i = 0; i < 4; i++) expect(await send(message, "x")).toBe(true);
+  expect(await send(message, "final")).toBe(false); expect(seq).toEqual([1, 2, 3, 4]);
+  at = new Date(at.getTime() + 3600_000); expect(await send({ ...message, id: "expired" }, "x")).toBe(false);
+});
+test("expired passive window, unknown message (restart) or a background result go through the outbox", async () => {
+  const h = harness(); await h.bind();
+  await h.say("U1", "需求", "expired", new Date(at.getTime() - 3600_000).toISOString());
+  expect(await h.pushed("迟到的答复", "expired")).toBe("outbox");
+  expect(await h.pushed("重启后的答复", "never-seen")).toBe("outbox");
+  expect(await h.pushed("后台结果", null)).toBe("outbox");
+  expect(h.replies).toEqual([]); expect(h.outbox).toEqual(["迟到的答复", "重启后的答复", "后台结果"]);
+});
+test("later replies to the same message (e.g. from a continuation run) take the next sequence, then the outbox after four", async () => {
+  const h = harness(); await h.bind(); await h.say("U1", "看看目录", "m");
+  for (const text of ["一", "二", "三", "四"]) expect(await h.pushed(text, "m")).toBe("passive");
+  expect(await h.pushed("五", "m")).toBe("outbox");
+  expect(h.replies.map(reply => reply.sequence)).toEqual([1, 2, 3, 4]); expect(h.outbox).toEqual(["五"]);
+});
+test("binding code hash, permissions, attempt exhaustion, expiry and replacement", async () => {
+  const h = harness(); const challenge = await h.state.createChallenge({ workspaceId: "ws", now: at });
+  expect(readFileSync(join(dir, "state/challenge.json"), "utf8")).not.toContain(challenge.code);
+  expect(statSync(join(dir, "state/challenge.json")).mode & 0o777).toBe(0o600);
+  for (let i = 0; i < 5; i++) expect((await h.state.redeem("U1", "ZZZZZZZZ", at)).ok).toBe(false);
+  expect(await h.state.redeem("U1", challenge.code, at)).toMatchObject({ reason: "no_challenge" });
+  await h.bind(); const replacement = await h.state.createChallenge({ workspaceId: "ws", replace: true, now: at });
+  expect((await h.state.redeem("U2", replacement.code, at)).ok).toBe(true);
+  expect(await h.state.binding()).toMatchObject({ openid: "U2" });
+  await expect(h.state.createChallenge({ workspaceId: "other", replace: true })).rejects.toThrow("bound workspace");
+  const expired = await h.state.createChallenge({ workspaceId: "ws", replace: true, now: at, ttlMinutes: 1 });
+  expect(await h.state.redeem("U1", expired.code, new Date(at.getTime() + 60000))).toMatchObject({ reason: "expired" });
+});
+test("active delivery allowlist, local rate limit and no passive message id", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const fetch = async (url: string, init?: RequestInit) => {
+    if (url.includes("getAppAccessToken")) return Response.json({ access_token: "fake", expires_in: 7200 });
+    sent.push(JSON.parse(String(init!.body))); return Response.json({ id: "receipt" });
+  };
+  const tokens = createQqTokenSource({ appId: APP, readSecret: async () => "fake", fetch });
+  const delivery = createChronaQqDelivery({ tokens, fetch, allowedRecipients: () => new Set(["chrona_qq:U1"]), perMinute: 1 });
+  const message = { idempotencyKey: "k", title: "title", body: "body", link: null, recipient: "chrona_qq:U1" };
+  expect(await delivery.send(message)).toMatchObject({ outcome: "accepted" }); expect(sent[0]!.msg_id).toBeUndefined();
+  expect(await delivery.send(message)).toMatchObject({ outcome: "rejected", retryable: true });
+  expect(await delivery.send({ ...message, recipient: "chrona_qq:U2" })).toMatchObject({ outcome: "rejected", retryable: false });
+});
+
+test("approval decisions: buttons and owner text commands, never routed to chat", async () => {
+  const id = "5266f07c-2e68-4c6e-8f91-45e39f8d1aec";
+  expect(parseApprovalDecision({ button: `approval:${id}:always` })).toBeNull();
+  expect(parseApprovalDecision({ button: `approval:${id}:once` })).toEqual({ ref: id, decision: "approve" });
+  expect(parseApprovalDecision({ button: `approval:${id}:deny` })).toEqual({ ref: id, decision: "deny" });
+  for (const text of ["批准 5266F07C 始终", "approve 5266f07c always", "拒绝 5266f07c always"]) expect(parseApprovalDecision({ text })).toBeNull();
+  expect(parseApprovalDecision({ text: "批准 5266F07C" })).toEqual({ ref: "5266f07c", decision: "approve" });
+  expect(parseApprovalDecision({ text: "批准一下这个" })).toBeNull();
+  const h = harness(); await h.bind();
+  await h.say("U2", "批准 5266f07c");
+  expect(h.decisions).toEqual([]);
+  for (const text of ["批准 5266f07c 始终", "/approve 5266f07c always", "拒绝 5266f07c always"]) {
+    await h.say("U1", text);
+    expect(h.replies.at(-1)!.text).toContain("不支持始终允许");
+  }
+  expect(h.decisions).toEqual([]); expect(h.calls).toEqual([]);
+  h.replies.length = 0;
+  await h.say("U1", "拒绝 5266f07c");
+  expect(h.decisions).toEqual([{ ref: "5266f07c", decision: "deny" }]);
+  expect(h.replies).toEqual([{ text: "已批准", sequence: 1 }]); expect(h.calls).toEqual([]);
+});
+test("approval delivery carries buttons, and falls back to text when buttons are refused", async () => {
+  const sent: Record<string, any>[] = [];
+  let refuse = false;
+  const fetch = async (url: string, init?: RequestInit) => {
+    if (url.includes("getAppAccessToken")) return Response.json({ access_token: "fake", expires_in: 7200 });
+    const body = JSON.parse(String(init!.body)); sent.push(body);
+    return refuse && body.keyboard ? Response.json({ code: 304003 }, { status: 400 }) : Response.json({ id: "receipt" });
+  };
+  const tokens = createQqTokenSource({ appId: APP, readSecret: async () => "fake", fetch });
+  const delivery = createChronaQqDelivery({ tokens, fetch, allowedRecipients: () => new Set(["chrona_qq:U1"]) });
+  const id = "5266f07c-2e68-4c6e-8f91-45e39f8d1aec";
+  const message = { idempotencyKey: "k", title: "需要你批准", body: "读 career-ops", link: null, recipient: "chrona_qq:U1", approval: { id, scoped: true } };
+  expect(await delivery.send(message)).toMatchObject({ outcome: "accepted" });
+  expect(sent[0]).toMatchObject({ msg_type: 2, markdown: { content: expect.stringContaining("批准 5266f07c") } });
+  expect(sent[0]!.keyboard.content.rows[0].buttons.map((b: any) => b.action.data)).toEqual([`approval:${id}:once`, `approval:${id}:deny`]);
+  expect(JSON.stringify(sent[0])).not.toContain("始终");
+  refuse = true; sent.length = 0;
+  expect(await delivery.send({ ...message, approval: { id, scoped: false } })).toMatchObject({ outcome: "accepted" });
+  expect(sent).toHaveLength(2); expect(sent[0]!.keyboard.content.rows[0].buttons).toHaveLength(2);
+  expect(sent[1]).toMatchObject({ msg_type: 0, content: expect.stringContaining("拒绝 5266f07c") }); expect(sent[1]!.keyboard).toBeUndefined();
+});
+

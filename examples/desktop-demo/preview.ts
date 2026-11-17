@@ -5,12 +5,12 @@ import { createInterface } from "node:readline";
 
 const root = import.meta.dirname, checkout = resolve(root, "../..");
 process.env.CHRONA_MODULE = root;
-process.env.CHRONA_SDK ??= join(checkout, "packages/integrations/src/steward/module-sdk");
+process.env.CHRONA_SDK ??= join(checkout, "packages/app-sdk");
 process.env.CHRONA_PROCESS_HELPER ??= join(checkout, `packages/process/bin/${process.platform}-${process.arch}/chrona-process-guardian`);
 const temp = await mkdtemp(join(tmpdir(), "chrona-desktop-preview-"));
 process.env.CHRONA_DATA = join(temp, "data"); process.env.CHRONA_CONTENT = join(temp, "content");
 await mkdir(process.env.CHRONA_DATA); await mkdir(process.env.CHRONA_CONTENT);
-const { startModule } = await import(join(process.env.CHRONA_SDK, "testing.ts")) as typeof import("../../packages/integrations/src/steward/module-sdk/testing");
+const { startModule } = await import(join(process.env.CHRONA_SDK, "testing.ts")) as typeof import("../../packages/app-sdk/testing");
 const manifest = await Bun.file(join(root, "module.json")).json();
 const runtime = await startModule(manifest.entry);
 const input = createInterface({ input: process.stdin, terminal: false });

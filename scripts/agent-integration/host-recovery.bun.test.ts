@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, rm, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { spawnSupervised } from "@chrona/process";
-import { createPiOperations } from "../../packages/engine/src/modules/steward/applications/pi/operations";
+import { createPiOperations } from "../../.generated/applications/pi/operations";
 
 test.skipIf(process.platform !== "linux")("original host proof recovers uncertain operation without another launch", async () => {
   const root = await mkdtemp("/tmp/chrona-agent-host-test-");
@@ -33,7 +33,7 @@ test.skipIf(process.platform !== "linux")("killed Pi host and its actual Provide
   const root = await mkdtemp("/tmp/chrona-real-host-test-"), generation = randomBytes(32).toString("hex");
   await mkdir(join(root, ".host-stops"), { mode: 0o700 });
   const request = { operationId: "killed", runId: "killed", token: "fixture", lane: "foreground", cwd: root, sessionDir: root, sessionId: null, callbacks: crypto.randomUUID(), prompt: "fixture", systemPrompt: "", resources: "minimal", deadline: null };
-  const source = `import {createPiOperations} from ${JSON.stringify(join(import.meta.dir, "../../packages/engine/src/modules/steward/applications/pi/operations.ts"))};
+  const source = `import {createPiOperations} from ${JSON.stringify(join(import.meta.dir, "../../.generated/applications/pi/operations.ts"))};
 import {spawnSupervised} from ${JSON.stringify(join(import.meta.dir, "../../packages/process/src/index.ts"))};
 const provider={name:"fixture",start(){const task=spawnSupervised(process.execPath,["-e","setInterval(()=>{},1000)"]); return {done:task.exited.then(()=>new Promise(()=>{})),async abort(){task.stop()},async inject(){}}}};
 await createPiOperations(${JSON.stringify(root)},async request=>({provider,input:{...request,deadline:null}})).start(${JSON.stringify(request)});

@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { agent } from "../../packages/engine/src/modules/steward/system/agent";
+import { agent } from "../../packages/kernel/src/system/agent";
 import { registeredRunFixture, eventually } from "./registered-run.fixtures";
 
 test("kernel exposes exactly the seven registered Provider APIs", () => {

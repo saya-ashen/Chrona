@@ -2,17 +2,17 @@ import { mkdtemp, mkdir, writeFile, readFile, rm, cp, symlink } from "node:fs/pr
 import { dirname, join, relative, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { assembleModuleDependencies, stageModuleMaterial } from "../../build/agent-dependencies";
-import { testDb } from "../../packages/engine/src/modules/steward/test-db";
-import { createScriptSandbox } from "../../packages/integrations/src/steward/runtime/script-sandbox";
-import { seedTestModuleRelease } from "../../packages/engine/src/modules/steward/modules/module-release-test-fixture";
-import { moduleSupervisor } from "../../packages/engine/src/modules/steward/modules/module-supervisor";
-import { registerSystemModules } from "../../packages/engine/src/modules/steward/system-modules";
-import { registerLocalRuntime } from "../../packages/engine/src/modules/steward/execution/local-runtime";
-import { resolveExternalRelease } from "../../packages/engine/src/modules/steward/modules/module-release";
-import { buildPiApplication } from "../../packages/engine/src/modules/steward/applications/pi/build";
+import { testDb } from "../../packages/kernel/src/test-db";
+import { createScriptSandbox } from "../../packages/host/src/runtime/script-sandbox";
+import { seedTestModuleRelease } from "../../packages/kernel/src/modules/module-release-test-fixture";
+import { moduleSupervisor } from "../../packages/kernel/src/modules/module-supervisor";
+import { registerSystemModules } from "../../packages/kernel/src/system-modules";
+import { registerLocalRuntime } from "../../packages/kernel/src/execution/local-runtime";
+import { resolveExternalRelease } from "../../packages/kernel/src/modules/module-release";
+import { buildPiApplication } from "../../.generated/applications/pi/build";
 import type { Prisma } from "@chrona/db";
-import type { StewardPorts } from "../../packages/engine/src/modules/steward/ports";
-import "../../packages/engine/src/modules/steward/modules/module-effects";
+import type { StewardPorts } from "../../packages/kernel/src/ports";
+import "../../packages/kernel/src/modules/module-effects";
 
 /** Assemble locally available packages and resolve only this release's declared vendor closure. */
 export async function linkPiFixtureDependencies(moduleDir: string) {
@@ -59,7 +59,7 @@ export async function agentFixture() {
   let cleanup = () => rm(root, { recursive: true, force: true });
   try {
   await mkdir(dataDir); await mkdir(resources);
-  await cp(resolve(import.meta.dir, "../../packages/engine/src/modules/steward/applications/pi"), join(resources, "pi"), { recursive: true });
+  await cp(resolve(import.meta.dir, "../../.generated/applications/pi"), join(resources, "pi"), { recursive: true });
   // Build only the temporary release so the fake and gateway exercise the same current contract.
   await buildPiApplication(join(resources, "pi"));
   await linkPiFixtureDependencies(join(resources, "pi"));
@@ -90,7 +90,7 @@ process.stdin.on('end',()=>process.exit(0));}
   const db = testDb({ injectedAgent: false }), workspace = await db.workspace.create({ data: { name: "agent-app" } });
   const databases = await db.$queryRawUnsafe<{ name: string; file: string }[]>("PRAGMA database_list");
   const database = databases.find(item => item.name === "main")!.file;
-  const sdk = resolve(import.meta.dir, "../../packages/integrations/src/steward/module-sdk");
+  const sdk = resolve(import.meta.dir, "../../packages/app-sdk");
   const sandbox = createScriptSandbox({ executionMode: "trusted-local", dataDir, moduleSdk: sdk });
   const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => new Date(), moduleExternalResources: resources, moduleSdk: sdk,
     sandbox: { ...sandbox.health, ...sandbox }, providerModules: { pi: { startModule: sandbox.startModule, env: { CHRONA_PROVIDER_CONFIGURATION: JSON.stringify({ command, agentDir: profile, expectedVersion: "1.5.0", chronaExtension: extension, agentUrl: "http://127.0.0.1:1/api/steward-agent", workspaceRoot: join(dataDir, "sessions") }) } } } };

@@ -1,4 +1,4 @@
-import { assertExecutionReceiver, deliverExecutionApplication, CallError, type StewardPorts } from "@chrona/engine";
+import { assertExecutionReceiver, deliverExecutionApplication, CallError, type StewardPorts } from "@chrona/kernel";
 import type { ExecutionReceiver } from "@chrona/contracts/steward";
 
 /** The selected owner workspace, never a device supplied workspace/module/header. */

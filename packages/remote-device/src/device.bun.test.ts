@@ -16,9 +16,9 @@ import { appDigest, executionDigest, stopProof, validateDelivery, type Delivery,
 import { DeviceHTTP, DeviceHTTPError, type SnapshotItem, type Transport } from "./transport";
 // Integration-only imports exercise the real application contract/SQLite relay.
 // The standalone CLI/build has no engine, app, server or test dependency.
-import { RemoteExecutionApp } from "../../engine/src/modules/steward/applications/remote-execution/app";
-import { Store } from "../../engine/src/modules/steward/applications/remote-execution/store";
-import { canonical, nativeDigest, type KernelDeliveryPort, type KernelRequest, type Packet } from "../../engine/src/modules/steward/applications/remote-execution/contracts";
+import { RemoteExecutionApp } from "../../../.generated/applications/remote-execution/app";
+import { Store } from "../../../.generated/applications/remote-execution/store";
+import { canonical, nativeDigest, type KernelDeliveryPort, type KernelRequest, type Packet } from "../../../.generated/applications/remote-execution/contracts";
 
 let helperRoot: string, helper: string;
 const cleanup: (() => Promise<void> | void)[] = [];

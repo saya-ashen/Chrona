@@ -121,7 +121,7 @@ bun run deployment:accept -- \
 
 `preflight` 只读核对候选发行组合、真实进程 resource root、指定数据库的迁移 checksum、实际 `Module.activeHash`、未知停止和未结算 Run/调用/交付。它要求指定数据库的运行锁由 `--pid` 持有，因此数据库可以位于 `dataDir` 外；缺少必需状态表、未知停止、未结算工作、待回调、未接受的 outbound receipt、未确认停止或未清理 workspace 均输出 `passed: false` 并以非零退出。active hash 差异只列为受控激活输入。
 
-资源根复用启动器 `findResourceDir` 的优先级，以目标 `/proc` 的 cwd、cmdline、exe 和环境为输入；支持显式 `CHRONA_RESOURCE_DIR`（相对目标 cwd）、启动二进制邻接资源、显式 `CHRONA_PACKAGE_DIR`，以及可确定的 `packages/cli/src/bun-entry.ts` 源码入口。隐藏在其他 wrapper 内的 package fallback 若无法观察，会报告具体原因；启动器原有 fallback 保留。预检不是进程排空或停止证据，结果只描述检查时刻。
+资源根复用启动器 `findResourceDir` 的优先级，以目标 `/proc` 的 cwd、cmdline、exe 和环境为输入；支持显式 `CHRONA_RESOURCE_DIR`（相对目标 cwd）、启动二进制邻接资源、显式 `CHRONA_PACKAGE_DIR`，以及可确定的 `apps/cli/src/bun-entry.ts` 源码入口。隐藏在其他 wrapper 内的 package fallback 若无法观察，会报告具体原因；启动器原有 fallback 保留。预检不是进程排空或停止证据，结果只描述检查时刻。
 
 `deployment:backup` 复用 `chrona backup` 的完整快照，包含 SQLite、`platform`、`sessions`、`secrets` 和 `qq-bot`，并在全新临时目录调用既有 restore 做可读性验证。失败的部分文件不可当作成功备份，重试必须使用新的输出路径。
 
@@ -158,10 +158,10 @@ chrona restore /absolute/private/path/chrona-backup.db
 
 只有明确要替换且已有恢复手段时才使用 `chrona restore /absolute/private/path/chrona-backup.db --force`。恢复后运行 `chrona doctor`，再启动服务并检查页面。建议先在独立目录演练恢复，不要首次在真实数据上试验。
 
-源码环境将上述 `chrona` 替换为 `bun run packages/cli/src/index.ts`，例如：
+源码环境将上述 `chrona` 替换为 `bun run apps/cli/src/index.ts`，例如：
 
 ```bash
-bun run packages/cli/src/index.ts doctor
+bun run apps/cli/src/index.ts doctor
 ```
 
 `doctor` 检查 Git、执行模式配置、数据库存在性、SQLite 完整性、存储权限、运行锁和网络安全配置。旧隔离配置会产生 `executionMode` 错误并使命令非零退出，附移除说明；它不探测 bubblewrap，也不全局要求 Shell、Nix、Python、浏览器或外部 `tar`。模块按自身声明检查所需程序；doctor 不替代模块安装检查，也不验证模型或 QQ 能否真正响应。确认进程已退出后，才考虑 `chrona doctor --repair-stale-lock`；它隔离确认陈旧的锁，不删除数据库。畸形锁需人工检查。
@@ -243,7 +243,7 @@ install -d -m 700 "$CHRONA_STEWARD_PI_AGENT_DIR"
 
 Provider 自带文件、命令与网页工具，Chrona 不再维护脚本草稿/工具版本系统。本地执行只支持 `trusted-local`，模块、构建检查和 Provider 使用服务用户的 OS 权限；已移除 `required-isolation` 和 bubblewrap 包装。旧模式或非空 `CHRONA_STEWARD_SANDBOX_BWRAP` 明确报错，须移除配置后再使用可信本地执行。宿主文件不会默认隐藏，附件只读是 Agent 行为规则而非挂载限制。Manifest 和路由声明不构成对恶意代码的 OS 隔离。Chrona 的路由授权、路径访问审批和对外动作审批仍保留，OS 可访问性不等于用户授权。
 
-模块入口与检查命令由 `packages/integrations/src/steward/runtimes.json` 声明，发行包对应 `resources/runtimes.json`。运行器按扩展名选择宿主解释器和参数，直接启动进程，不再经过 `sh` 包装、`ulimit -v` 或设置 `MALLOC_ARENA_MAX`。当前 `.ts` 使用 Bun 和 TS 运行包的 SDK loader / `check` 命令；`.py` 优先模块内 venv（POSIX 为 `.venv/bin/python`，Windows 声明为 `.venv/Scripts/python.exe`），否则按声明找宿主 Python；只有 `.sh` 入口需要宿主 Shell。未声明 `check` 的运行时跳过类型检查，不跳过其他安装检查。不要在 manifest 中保留 `limits.virtualMemoryMb` 或 `limits`，严格 schema 会拒绝旧字段。
+模块入口与检查命令由 `packages/host/src/runtimes.json` 声明，发行包对应 `resources/runtimes.json`。运行器按扩展名选择宿主解释器和参数，直接启动进程，不再经过 `sh` 包装、`ulimit -v` 或设置 `MALLOC_ARENA_MAX`。当前 `.ts` 使用 Bun 和 TS 运行包的 SDK loader / `check` 命令；`.py` 优先模块内 venv（POSIX 为 `.venv/bin/python`，Windows 声明为 `.venv/Scripts/python.exe`），否则按声明找宿主 Python；只有 `.sh` 入口需要宿主 Shell。未声明 `check` 的运行时跳过类型检查，不跳过其他安装检查。不要在 manifest 中保留 `limits.virtualMemoryMb` 或 `limits`，严格 schema 会拒绝旧字段。
 
 超时、输出上限、并发与模型预算、取消和实际停止证据继续由相应执行路径治理；不再承诺硬虚拟内存限制。模型额度不是 OS 内存上限。运行时声明和路径修复属于 S1，不能据此宣布 Windows/macOS 完整支持：本地 socket/IPC 与进程监管的跨平台工作及三端验收仍待 S4；S2–S6 未由本文宣告完成。阶段范围见[可移植实施方案](kernel-portability-plan.md)。
 

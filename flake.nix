@@ -100,7 +100,7 @@
             name = baseNameOf path;
           in
             !(builtins.elem name [".codegraph" "node_modules" "dist" "result"])
-            && path != "${self}/packages/engine/src/modules/steward/applications";
+            && path != "${self}/.generated/applications";
       };
 
       chronaNodeModules = pkgs.stdenv.mkDerivation {

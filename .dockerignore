@@ -56,4 +56,4 @@ Dockerfile*
 !build/application-ui.ts
 
 # Reconstruct applications from pinned offline inputs inside the image build.
-packages/engine/src/modules/steward/applications/
+.generated/applications/

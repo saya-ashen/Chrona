@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
-import { createScriptSandbox } from "../../../packages/integrations/src/steward/runtime/script-sandbox";
+import { createScriptSandbox } from "../../../packages/host/src/runtime/script-sandbox";
 import { verifyKernelConsumer } from "../../../scripts/acceptance/kernel-api-consumer";
 import { createServerApp } from "./app";
 import { createStewardRuntime } from "./steward-runtime";

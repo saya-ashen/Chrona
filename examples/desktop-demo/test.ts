@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-// @ts-expect-error Chrona provides this module to ordinary author tests.
 import { startModule } from "chrona/testing";
 
 const root = await mkdtemp(join(tmpdir(), "chrona-desktop-demo-"));
@@ -15,6 +14,7 @@ let runtime: Awaited<ReturnType<typeof startModule>> | undefined;
 async function tool(id: string) {
   const reply = await runtime!.send({ trigger: { kind: "tool", id, args: {}, firedAt: now }, now, params: {} });
   assert.equal(reply.error, undefined, reply.error);
+  assert.ok(reply.result);
   return reply.result.result as Output;
 }
 async function waitClosed() {

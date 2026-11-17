@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { Hono } from "hono";
-import { CallError, createExecutionDelivery, kernelExecutionCleanup, resolveExecutionPrincipal, type StewardPorts } from "@chrona/engine";
+import { CallError, createExecutionDelivery, kernelExecutionCleanup, resolveExecutionPrincipal, type StewardPorts } from "@chrona/kernel";
 import { executionAuthorityApprovalSchema, kernelCleanupInputSchema } from "@chrona/contracts/steward";
 import { readEnv } from "./config/env";
 import { callRemoteExecution, remoteExecutionReceiver } from "./remote-execution-binding";

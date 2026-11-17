@@ -5,7 +5,7 @@ import { isEntryModule, moduleManifestSchema } from "@chrona/contracts/steward";
 import { createServerApp } from "./app";
 import { createStewardRuntime } from "./steward-runtime";
 import { resetEnvCacheForTests } from "./config/env";
-import { createScriptSandbox } from "../../../packages/integrations/src/steward/runtime/script-sandbox";
+import { createScriptSandbox } from "../../../packages/host/src/runtime/script-sandbox";
 import { db, resetTestDb, seedWorkspace } from "./__tests__/bun-test-helpers";
 
 let saved: string | undefined, dataDir: string, stop: (() => Promise<void>) | undefined;
@@ -65,7 +65,7 @@ chrona.serve(async request => {
 test("current MCP JSON-RPC requires the API key and routes current tools through the real SDK", async () => {
   const { workspaceId } = await seedWorkspace("MCP listener");
   const selected = createScriptSandbox({ dataDir, executionMode: "trusted-local" });
-  const source = join(import.meta.dirname, "../../../packages/engine/src/modules/steward/applications/mcp");
+  const source = join(import.meta.dirname, "../../../.generated/applications/mcp");
   const code = join(dataDir, "platform/store/mcp-listener");
   await cp(source, code, { recursive: true });
   const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(code, "module.json"), "utf8")));

@@ -1,11 +1,11 @@
-import { selectContextTools } from "../../../../../packages/engine/src/modules/steward/agent/agent-context-tools";
-import { moduleCallbackContractHash } from "../../../../../packages/engine/src/modules/steward/modules/module-tool-contract";
+import { selectContextTools } from "../../../../../packages/kernel/src/agent/agent-context-tools";
+import { moduleCallbackContractHash } from "../../../../../packages/kernel/src/modules/module-tool-contract";
 import { expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema, type ExecutionEvent } from "@chrona/contracts/steward";
 import { agentFixture } from "../../../../../scripts/agent-integration/agent-application.fixtures";
-import { startLocalProvider } from "../../../../../packages/engine/src/modules/steward/execution/local-runtime";
+import { startLocalProvider } from "../../../../../packages/kernel/src/execution/local-runtime";
 import { createServerApp } from "../../app";
 import { createStewardRuntime } from "../../steward-runtime";
 

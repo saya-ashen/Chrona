@@ -121,7 +121,15 @@ const baseRef = resolveBaseRef(stagedOnly);
 if (stagedOnly) checkStagedApplicationInputs(ROOT);
 const applicationBaseline = applicationBaselineSources(ROOT, baseRef);
 const eslint = new ESLint({ cwd: ROOT });
-const applicationPrefix = "packages/engine/src/modules/steward/applications/";
+const applicationPrefix = ".generated/applications/";
+const baselineRenames: Record<string, string> = {};
+for (const [path, previous] of Object.entries(pathRenames)) {
+	let source = previous;
+	while ((pathRenames as Record<string, string>)[source] && git(["cat-file", "-e", `${baseRef}:${source}`]) === null) {
+		source = (pathRenames as Record<string, string>)[source]!;
+	}
+	baselineRenames[path] = source;
+}
 const applicationFiles = (await restoredApplicationSources()).filter(path => isLintablePath(path));
 const candidates =
 	explicitFiles.length > 0
@@ -173,7 +181,7 @@ for (const path of files) {
 	const directSource = path.startsWith(applicationPrefix) && applicationBaseline
 		? applicationBaseline.get(path) ?? null
 		: git(["show", `${baseRef}:${baselinePath}`]);
-	const previousPath = directSource === null ? (pathRenames as Record<string, string>)[path] : undefined;
+	const previousPath = directSource === null ? baselineRenames[path] : undefined;
 	// The old tree keeps its own debt until its deletion is part of the checked tree.
 	const oldPathRemains = previousPath && isLintablePath(previousPath, stagedOnly);
 	const source = directSource ?? (previousPath && !oldPathRemains ? git(["show", `${baseRef}:${previousPath}`]) : null);
@@ -181,7 +189,7 @@ for (const path of files) {
 	if (previousPath) comparedRenames.add(previousPath);
 	// A split shares one original budget; moving code cannot multiply its lint allowance.
 	const relatedPaths = previousPath
-		? Object.entries(pathRenames).filter(([, old]) => old === previousPath).map(([next]) => next)
+		? Object.entries(baselineRenames).filter(([, old]) => old === previousPath).map(([next]) => next)
 		: [path];
 	const current = relatedPaths.reduce((total, next) => {
 		const item = currentByPath.get(resolve(ROOT, next));

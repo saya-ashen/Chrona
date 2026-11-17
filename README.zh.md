@@ -19,7 +19,7 @@ Coding 与 coding-web（含 work-v2）已退役移除；当前 Chat 独立拥有
 
 ## 快速开始
 
-需要 **Bun ≥ 1.4.2**、**git** 和固定版本的 **Pi CLI**，模型访问须配置在服务专用 profile 中。[Provider 适配器](packages/integrations/src/steward/pi-provider.ts) 使用 Pi RPC；默认精确固定 **0.85.0**，也可显式选择 **1.3.0** 及以后的 **1.x**。完整备份还需要 GNU 兼容的 `tar`。
+需要 **Bun ≥ 1.4.2**、**git** 和固定版本的 **Pi CLI**，模型访问须配置在服务专用 profile 中。[Provider 适配器](packages/pi/src/pi-provider.ts) 使用 Pi RPC；默认精确固定 **0.85.0**，也可显式选择 **1.3.0** 及以后的 **1.x**。完整备份还需要 GNU 兼容的 `tar`。
 
 使用新数据目录，不要复用重构前数据库：
 
@@ -90,7 +90,7 @@ Pi 关闭资源自动发现及项目信任。可选的[受控资源清单](docs/
 chrona qq bind-code --workspace ws_default
 ```
 
-源码环境把 `chrona` 替换为 `bun run packages/cli/src/index.ts`。在 Bot 私聊发送 `绑定 <码>`，默认十分钟过期。QQ 平台送达限制和 Chrona 打扰预算仍然有效。
+源码环境把 `chrona` 替换为 `bun run apps/cli/src/index.ts`。在 Bot 私聊发送 `绑定 <码>`，默认十分钟过期。QQ 平台送达限制和 Chrona 打扰预算仍然有效。
 
 ## 备份与安全
 

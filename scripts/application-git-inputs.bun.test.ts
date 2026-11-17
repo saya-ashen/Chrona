@@ -7,7 +7,7 @@ import { buildArtifacts } from "../build/manifest";
 import { applicationBaselineSources, checkStagedApplicationInputs } from "./application-git-inputs";
 
 function fixture() {
-  const root = mkdtempSync(join(process.cwd(), ".tmp/application-lint-test-")), app = "packages/engine/src/modules/steward/applications/web";
+  const root = mkdtempSync(join(process.cwd(), ".tmp/application-lint-test-")), app = ".generated/applications/web";
   const editing = join(root, "editing"), restored = join(root, app);
   for (const directory of [editing, restored, join(root, "scripts"), join(root, "resources/application-inputs")]) mkdirSync(directory, { recursive: true });
   const git = (directory: string, args: string[]) => execFileSync("git", ["-c", "core.hooksPath=/dev/null", "-c", "user.name=Fixture", "-c", "user.email=test@chrona.local", "-C", directory, ...args], { encoding: "utf8", stdio: "pipe" }).trim();

@@ -4,7 +4,7 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
 import { resolveApprovalSchema } from "@chrona/contracts/steward";
-import { StewardError, type StewardService } from "@chrona/engine";
+import { StewardError, type StewardService } from "@chrona/kernel";
 
 /** No main-app middleware, cookies, CORS, or module routing on this origin. */
 export function createRescueApp(service: StewardService, key: string, html: string) {

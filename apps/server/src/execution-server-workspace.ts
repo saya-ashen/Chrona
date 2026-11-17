@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import type { StewardPorts } from "@chrona/engine";
+import type { StewardPorts } from "@chrona/kernel";
 import { prepareLockedLocalWorkspace, workspaceDigest } from "@chrona/workspaces";
 
 /** Trusted host adapter. Only the engine's authorized, fixed preparation request reaches filesystem I/O. */

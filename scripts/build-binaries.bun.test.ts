@@ -134,7 +134,7 @@ test("fixed module seeds package seven applications with exact Pi artifacts and 
       await writeFile(join(dir, "module.json"), JSON.stringify({ name: module.name, entry: "index.ts", keepAlive: true, effects: [], tests: ["test.ts"] }));
       await writeFile(join(dir, "index.ts"), "// entry\n");
     }
-    await cp(join(import.meta.dirname, "../packages/engine/src/modules/steward/applications/pi"), join(resourcesRoot, "external/pi"), { recursive: true, filter: path => !path.split(/[\\/]/).some(part => ["node_modules", "vendor", ".git"].includes(part)) });
+    await cp(join(import.meta.dirname, "../.generated/applications/pi"), join(resourcesRoot, "external/pi"), { recursive: true, filter: path => !path.split(/[\\/]/).some(part => ["node_modules", "vendor", ".git"].includes(part)) });
     const { preparePiApplication } = await import("../build/agent-dependencies");
     await preparePiApplication(resourcesRoot);
     const { buildEntryConversations } = await import("../build/entry-conversations");

@@ -4,11 +4,11 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSyn
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { checksumSql, ensureSqliteDatabase } from "../../../packages/db/src/sqlite-migrations";
-import { createAgentConversations } from "../../../packages/engine/src/modules/steward/entry-app/conversations";
-import { CoreMindStore } from "../../../packages/engine/src/modules/steward/applications/mind/core-store";
-import { CoreMindService } from "../../../packages/engine/src/modules/steward/applications/mind/core-service";
-import { CoreRecovery } from "../../../packages/engine/src/modules/steward/applications/mind/core-recovery";
-import { CoreExecutionJournal } from "../../../packages/engine/src/modules/steward/applications/mind/core-execution";
+import { createAgentConversations } from "../../../packages/app-common/src/conversations";
+import { CoreMindStore } from "../../../.generated/applications/mind/core-store";
+import { CoreMindService } from "../../../.generated/applications/mind/core-service";
+import { CoreRecovery } from "../../../.generated/applications/mind/core-recovery";
+import { CoreExecutionJournal } from "../../../.generated/applications/mind/core-execution";
 import { migrateStorage } from "./migrate";
 
 setDefaultTimeout(20_000);

@@ -6,7 +6,7 @@ import { getApiMessages, getPreferredLocale } from "@chrona/i18n";
 
 import { createApiRouter } from "./routes/api";
 import { createRemoteExecutionRouter, isRemoteExecutionDevicePath, isRemoteExecutionOwnerPath } from "./remote-execution-router";
-import { completeOAuth, OAUTH_CALLBACK_PATH } from "@chrona/engine";
+import { completeOAuth, OAUTH_CALLBACK_PATH } from "@chrona/kernel";
 import { createLogger } from "@chrona/logging";
 import { apiKeyAuth } from "./middleware/auth";
 import { loopbackHostGuard } from "./middleware/host";

@@ -1,15 +1,15 @@
 import { expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { registerAgentProvider } from "../../../../../packages/engine/src/modules/steward/agent/agent-provider";
-import { testProviderManifest } from "../../../../../packages/engine/src/modules/steward/test-provider-process";
+import { registerAgentProvider } from "../../../../../packages/kernel/src/agent/agent-provider";
+import { testProviderManifest } from "../../../../../packages/kernel/src/test-provider-process";
 import { generateKeyPairSync, randomBytes, sign, createHash } from "node:crypto";
 import { cp, mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { moduleManifestSchema, type KernelExecutionStart, type ExecutionDeliveryFinal } from "@chrona/contracts/steward";
-import { createExecutionDelivery, callSync, CallError, moduleSupervisor } from "@chrona/engine";
-import { testDb } from "@chrona/engine/test-support";
+import { createExecutionDelivery, callSync, CallError, moduleSupervisor } from "@chrona/kernel";
+import { testDb } from "@chrona/kernel/test-support";
 import { createServerApp } from "../../app";
 import { createStewardRuntime } from "../../steward-runtime";
 import { resetEnvCacheForTests } from "../../config/env";
@@ -40,7 +40,7 @@ async function fixture(key: string | null = ownerKey, production = false) {
   const tools = toolNames.map(name => ({ name, description: name, visibility: [ownerTools.includes(name) ? "owner" : "kernel"], parameters: { type: "object", properties: { input: { type: "string" } }, required: ["input"] },
       output: {}
 }));
-  const applicationSource = fileURLToPath(new URL("../../../../../packages/engine/src/modules/steward/applications/remote-execution", import.meta.url));
+  const applicationSource = fileURLToPath(new URL("../../../../../.generated/applications/remote-execution", import.meta.url));
   const manifest = moduleManifestSchema.parse(production ? JSON.parse(await readFile(join(applicationSource, "module.json"), "utf8")) : { name: "remote-execution", entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [], tools });
   const receiver = await db.module.create({ data: { workspaceId: "ws_default", name: manifest.name, activeHash: production ? "5".repeat(40) : "s5-http-probe" } });
   await db.moduleVersion.create({ data: { moduleId: receiver.id, hash: receiver.activeHash!, manifest, source: "user", status: "approved", intent: {}, report: {} } });
@@ -275,8 +275,8 @@ on("tool", async event => {
     launch = ownerMessages.find((message: { kind: string }) => message.kind === "launch").envelope;
     target = launch.packet.target;
     await report("started", processIdentity); await deviceRequest("poll", { device });
-    const { moduleContext } = await import("../../../../../packages/engine/src/modules/steward/modules/module-context");
-    const { requestStatus } = await import("../../../../../packages/engine/src/modules/steward/modules/module-status");
+    const { moduleContext } = await import("../../../../../packages/kernel/src/modules/module-context");
+    const { requestStatus } = await import("../../../../../packages/kernel/src/modules/module-status");
     const context = moduleContext(f.runtime.ports, "ws_default");
     await expect(requestStatus(context, receiver.moduleId, "paused", "offline owner execution")).rejects.toMatchObject({ code: "conflict" });
     expect(await f.db.module.findUniqueOrThrow({ where: { id: receiver.moduleId } })).toMatchObject({ status: "active", executionFenceAt: expect.any(Date) });

@@ -6,13 +6,13 @@ import { dirname, join, resolve } from "node:path";
 import ts from "typescript";
 import { assembleModuleDependencies, preparePiApplication, stageModuleMaterial } from "../build/agent-dependencies";
 import { moduleGitReleaseSource } from "./module-git-release";
-import { snapshotModuleMaterial } from "../packages/engine/src/modules/steward/modules/module-artifacts";
-import { seedTestModuleRelease } from "../packages/engine/src/modules/steward/modules/module-release-test-fixture";
+import { snapshotModuleMaterial } from "../packages/kernel/src/modules/module-artifacts";
+import { seedTestModuleRelease } from "../packages/kernel/src/modules/module-release-test-fixture";
 import { MODULE_MATERIAL_FILE, MODULE_SOURCE_MAX_BYTES, MODULE_SOURCE_MAX_FILES, parseModuleMaterial } from "../packages/contracts/src/steward/module-material";
-import { readModuleFiles } from "../packages/engine/src/modules/steward/modules/module-preview";
-import { readModuleMaterial, readModuleSource } from "../packages/engine/src/modules/steward/modules/module-git";
+import { readModuleFiles } from "../packages/kernel/src/modules/module-preview";
+import { readModuleMaterial, readModuleSource } from "../packages/kernel/src/modules/module-git";
 
-const piPath = "packages/engine/src/modules/steward/applications/pi";
+const piPath = ".generated/applications/pi";
 
 test("compact ordinary packages preserve runtime versions, public exports, real types and license texts", async () => {
   const root = await mkdtemp(join(tmpdir(), "chrona-module-closure-"));

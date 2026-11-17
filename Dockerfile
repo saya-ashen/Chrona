@@ -24,7 +24,7 @@ RUN bun install --frozen-lockfile --ignore-scripts \
 COPY scripts/build-binaries.ts scripts/
 COPY .env.example .env.example
 RUN bun scripts/build-binaries.ts --resources-only /app \
-    && rm -rf /app/resources/application-inputs /app/packages/engine/src/modules/steward/applications \
+    && rm -rf /app/resources/application-inputs /app/.generated/applications \
     && apt-get purge -y --auto-remove build-essential
 ENV CHRONA_RESOURCE_DIR=/app/resources
 ENV NODE_ENV=production

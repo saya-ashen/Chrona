@@ -2,12 +2,12 @@ import { afterEach, expect, test } from "bun:test";
 import { readFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createStewardService, type StewardPorts } from "@chrona/engine";
-import { testDb } from "@chrona/engine/test-support";
+import { createStewardService, type StewardPorts } from "@chrona/kernel";
+import { testDb } from "@chrona/kernel/test-support";
 import { createRescueApp, startRescueListener } from "./rescue";
-import { builtinEntry, createRelay, qqEntry } from "@chrona/engine/test-support";
+import { builtinEntry, createRelay, qqEntry } from "@chrona/kernel/test-support";
 import { buildArtifacts } from "../../../build/manifest";
-import webManifest from "../../../packages/engine/src/modules/steward/applications/web/module.json";
+import webManifest from "../../../.generated/applications/web/module.json";
 
 const dbs: ReturnType<typeof testDb>[] = [];
 afterEach(async () => { for (const db of dbs.splice(0)) await db.$disconnect(); });

@@ -1,13 +1,13 @@
 import { startRescueListener } from "./rescue";
-import { createModuleRuntimePorts, resourcePath } from "../../../packages/integrations/src/steward/runtime/module-runtime";
+import { createModuleRuntimePorts, resourcePath } from "@chrona/host";
 import type { PrismaClient } from "@chrona/db";
-import { createRegisteredProviderClient, stopAgentRuns, moduleSupervisor, createStewardService, createExecutions, createExecutionV2Admission, createExecutionWorkspaceCleanup, createExecutionEventStore, createExternalModuleInstaller, CallError, type StewardPorts } from "@chrona/engine";
+import { createRegisteredProviderClient, stopAgentRuns, moduleSupervisor, createStewardService, createExecutions, createExecutionV2Admission, createExecutionWorkspaceCleanup, createExecutionEventStore, createExternalModuleInstaller, CallError, type StewardPorts } from "@chrona/kernel";
 import { loadExecutionProjects, loadExecutionPlacements } from "./config/execution-projects";
 import { createExecutionProjectRegistry } from "./config/execution-project-registry";
 import { createServerWorkspacePreparer } from "./execution-server-workspace";
 import { createExecutionWorkspaceCleanupHost } from "./execution-workspace-cleanup";
 import type { ProviderAdapter } from "@chrona/contracts/steward";
-import { createPiApplicationHost } from "../../../packages/integrations/src/steward/runtime/agent-application-host";
+import { createPiApplicationHost } from "@chrona/host";
 
 let gitAvailable: Promise<boolean> | undefined;
 function probeGit() {

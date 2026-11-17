@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createQqBotHandler, createQqBotState, createQqConversations, createRelay, downloadQqAttachment, qqReplyText, type QqC2cMessage } from "@chrona/engine/test-support";
+import { createQqBotHandler, createQqBotState, createQqConversations, createRelay, downloadQqAttachment, qqReplyText, type QqC2cMessage } from "@chrona/kernel/test-support";
 
 // The entry owns persistence and delivery. Controlled Agent replies avoid any real model or QQ request.
 async function fixture() {

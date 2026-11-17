@@ -57,11 +57,11 @@ Chrona 是随用户需求生长的个人工具。默认中文，代码、命令�
 
 | 范围 | 位置／阅读入口 |
 | --- | --- |
-| 依赖方向 | `apps → packages/engine → packages/domain → packages/contracts`；路由校验并委托，domain 无 I/O |
-| 合同／kernel | `packages/contracts/src/steward`、`packages/engine/src/modules/steward`；[实现现状](docs/zh/kernel-api-implementation.md) |
-| 应用 | 独立 `chrona-module-*` 仓库；固定输入恢复到 `steward/applications/`（含普通 Provider 应用 `pi`）；[普通应用迁移](docs/zh/application-migration.md) |
-| 宿主／SDK／Pi | `packages/integrations/src/steward`、`packages/pi`；[Agent](docs/zh/agent-builtin-application.md) |
-| Web | `applications/web/src/pages.tsx`、`src/system/`、`app.js`；[组合与外壳](docs/zh/web-components-and-shell.md)、[可执行页面](docs/zh/web-executable-components.md) |
+| 依赖方向 | `apps → packages/host → packages/kernel → packages/domain → packages/contracts`；kernel 与 host 共用 `packages/app-sdk`；路由校验并委托，domain 无 I/O |
+| 合同／kernel | `packages/contracts/src/steward`、`packages/kernel/src`；[实现现状](docs/zh/kernel-api-implementation.md) |
+| 应用 | 独立 `chrona-module-*` 仓库；固定输入恢复到 `.generated/applications/`（含普通 Provider 应用 `pi`）；[普通应用迁移](docs/zh/application-migration.md) |
+| 宿主／SDK／Pi | `packages/host`、`packages/app-sdk`、`packages/app-common`、`packages/pi`；[Agent](docs/zh/agent-builtin-application.md) |
+| Web | `.generated/applications/web/src/pages.tsx`、`src/system/`、`app.js`；[组合与外壳](docs/zh/web-components-and-shell.md)、[可执行页面](docs/zh/web-executable-components.md) |
 | 设置／材料 | [应用设置](docs/zh/application-settings.md)、[版本材料](docs/zh/author-version-materials.md)、[当前对话创作](docs/zh/author-current-conversation.md) |
 | 通知／恢复 | [有限事实](docs/zh/kernel-notification-facts.md)、[运维](docs/zh/operations.md) |
 | 可选工具 | 当前会话有 context-mode / CodeGraph 时，按需读[工具手册](docs/agents/tooling.md)；没有则用原生工具，不臆造可用性 |
@@ -73,7 +73,7 @@ Chrona 是随用户需求生长的个人工具。默认中文，代码、命令�
 - 数据库代码在 `packages/db`；停止服务后用 `chrona backup` 备份完整数据、platform、sessions 和 secrets，不能只复制 SQLite。
 - 定向优先：`bun run verify:slice <paths>` 或 `bun test <paths>`；收工前必须运行全量 `bun run verify:slice`（串联 `lint:ratchet`、`typecheck`、`check:guardrails`、分层边界与关联测试），必要时补跑 `bun run test:bun`、`bun run test:api`。
 - 重型检查串行限内存，例如 `systemd-run --user --scope --quiet -p MemoryMax=8G -p MemorySwapMax=1G env NODE_OPTIONS=--max-old-space-size=6144 bunx tsc --noEmit`。
-- 状态推导改动用表驱动测试；涉及队列、配额、显式重试或跨事务等待的状态机改动，必须覆盖 `packages/engine/src/modules/steward/__testing__/state-machine-invariants.ts` 的反例契约（终态释放配额、阻塞头不饿死尾、显式重试推进新尝试、交错结算收敛），不得只测 happy-path。
+- 状态推导改动用表驱动测试；涉及队列、配额、显式重试或跨事务等待的状态机改动，必须覆盖 `packages/kernel/src/__testing__/state-machine-invariants.ts` 的反例契约（终态释放配额、阻塞头不饿死尾、显式重试推进新尝试、交错结算收敛），不得只测 happy-path。
 - 状态机或跨模块改动收工前，派独立只读 `reviewer` 核对三件事：是否靠压单行/空 catch 绕过规则、是否引入无消费者的持久化、配额/游标/幂等 key 在异常与并发下是否死锁。
 - UI 验证可见文字、角色和下一步，覆盖空、加载、错误、等待及完成。自动测试不调用真实模型或 QQ。
 - 只跑验证改动所需的检查；未跑或失败必须说明。不能以测试数量、运行连接或自报健康代替业务就绪。
