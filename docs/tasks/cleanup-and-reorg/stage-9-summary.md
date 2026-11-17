@@ -30,6 +30,8 @@ stage3 retry150ms、stage6 单轮 Bun 失败与其17项补验组合、stage8 PAT
 
 Nix 当前离线 dry-run exit 0，但计划构建745个 derivation（含 bootstrap/toolchain），未启动完整 package 构建或大量下载；已有 Bun version/src override 警告保留。阶段5成功仅为 node_modules FOD，不是整包。Docker daemon 可用，但 `oven/bun:1.4.2-slim` 本地不存在，未拉取或构建镜像。Pi vendor 跨根重新生成的历史绝对路径限制未宣称修复，本轮消费严格固定 artifacts。Standalone Chat SDK lifecycle / Author 实际 admission、macOS/Windows 原生验收、真实账号/模型/QQ消息均不在通过范围。
 
-部署状态 **blocked_by_unknown_receipt**。父协调者只读观察 chino：现服务 active/running、PID1309975、NRestarts0，0001迁移 checksum 与本提交一致；仍有 ModuleInvocation `146941c1-2da2-4864-83c4-4b7a8a3aa44d` 为 unknown、chat/task-view、timeout、reply=false。按既定计划停止部署依赖；不删除、重放或改状态凑通过。该观察不是最终线上验收。本 worker 没有 ssh、停机、真实备份、切换、部署、数据转换、外部写、push 或整机激活。
+本地发行阶段结束时的部署状态曾为 **blocked_by_unknown_receipt**；后续用户已授权唯一历史receipt例外，实际部署进度与恢复入口见 [部署摘要](stage-9-deployment-summary.md)、[部署证据](stage-9-deployment-evidence.json) 及 [部署计划](stage-9-deployment-plan.md)。下述保留为当时观察：父协调者只读观察 chino：现服务 active/running、PID1309975、NRestarts0，0001迁移 checksum 与本提交一致；仍有 ModuleInvocation `146941c1-2da2-4864-83c4-4b7a8a3aa44d` 为 unknown、chat/task-view、timeout、reply=false。按既定计划停止部署依赖；不删除、重放或改状态凑通过。该观察不是最终线上验收。本 worker 没有 ssh、停机、真实备份、切换、部署、数据转换、外部写、push 或整机激活。
 
-全部验证进程已结束，无运行中任务。主要 unit / PID：chrona-cleanup-stage9-final / 1748804（通过），delivery / 1893494（r1 portable 断言失败），portable-r2 / 1905258（通过）。均按8G/1G、Node6144、并发2串行执行；成功 transient unit 已卸载，systemctl show 的默认 infinity 不代表运行时配置，实际 argv 见 launch JSON、终止证据见 units-journal.log。开始/结束/argv/exit 在 results、release/report 与 directed results 中；父独立审阅后再处理本地提交，部署阻塞保留。
+全部验证进程已结束，无运行中任务。主要 unit / PID：chrona-cleanup-stage9-final / 1748804（通过），delivery / 1893494（r1 portable 断言失败），portable-r2 / 1905258（通过）。均按8G/1G、Node6144、并发2串行执行；成功 transient unit 已卸载，systemctl show 的默认 infinity 不代表运行时配置，实际 argv 见 launch JSON、终止证据见 units-journal.log。开始/结束/argv/exit 在 results、release/report 与 directed results 中；父独立审阅后再处理本地提交；此处为当时部署阻塞记录，当前状态以上述后续部署摘要为准。
+
+后续实际部署截至2026-11-17 03:06:36 UTC：新byte-preserving包与7应用已上线，service active/PID2753388/NRestarts0；HTTP与数据保留检查通过，但Pi host要求精确发行commit、旧Apps调用退役Web API的真实功能阻塞尚未解决，阶段9未完成。已恢复正常unit策略且保持运行，不回滚数据库；详见[部署摘要](stage-9-deployment-summary.md)实际交接章节。

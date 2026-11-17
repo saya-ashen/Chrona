@@ -1,0 +1,703 @@
+{
+  "baseline": {
+    "head": "a8d4488a0cbc215fb40bdc1adda981c28c2a3ab9",
+    "lintBase": "a8d4488a",
+    "initialUserChanges": [
+      "docs/tasks/cleanup-and-reorg/stage-9-summary.md",
+      "docs/tasks/cleanup-and-reorg/stage-9-deployment-plan.md",
+      "docs/tasks/cleanup-and-reorg/stage-9-deployment-summary.md",
+      "docs/tasks/cleanup-and-reorg/stage-9-deployment-evidence.json"
+    ]
+  },
+  "scope": {
+    "remoteWrites": false,
+    "deployment": false,
+    "realDatabaseChanges": false,
+    "modelsOrQqMessages": false,
+    "stagedFiles": false,
+    "commitsOrPush": false,
+    "contractsIndexChanged": false,
+    "providerHostTrustChanged": false,
+    "resolveExternalReleaseChanged": false,
+    "schemaChanged": false
+  },
+  "implementation": {
+    "entry": "chrona admin install <package> --update --exact-release --request-key <key>",
+    "authorization": "Stopped-service local filesystem owner plus existing SQLite runtime lock; internal function rejects module/provider callers; no routed option or sourceCommit API",
+    "releaseSelection": {
+      "name": "pi",
+      "repository": null,
+      "branch": "main",
+      "commit": "8bf7c40377abdd82d7bbfd067a92c5fb4dc5bad1",
+      "bundle": "pi.bundle",
+      "bundleSha256": "c634a92458e9a5e76ae7edd539af2561d23a4a3a4a5774a83480ef056171ca44"
+    },
+    "baseline": "Captured in installation claim transaction before async resolution: approved active hash + versionId + activationId. Actual Git tree must equal verified release tree. An unselected different tree rejects. Rechecked before source adoption, in queue transaction, before review and in activation transaction. Old approved release cannot authorize a fresh selection after rollback. The baseline also shares the existing drain write transaction, before fencing executions; loaded module identity is reused.",
+    "persistence": "No new schema/table/queue. Internal exact-release mode uses existing installation receipt. Baseline retained in ModuleVersion.report until its normal version-history retention; propose/build/recovery/approval activation read it. Git objects and candidate/release refs remain.",
+    "ordinaryUpdate": "Existing submitMergedCommit/mergeModuleUpstream unchanged."
+  },
+  "changedLines": [
+    {
+      "path": "docs/zh/operations.md",
+      "added": 2,
+      "removed": 0
+    },
+    {
+      "path": "packages/cli/src/admin.bun.test.ts",
+      "added": 31,
+      "removed": 0
+    },
+    {
+      "path": "packages/cli/src/admin.ts",
+      "added": 7,
+      "removed": 2
+    },
+    {
+      "path": "packages/cli/src/program.ts",
+      "added": 5,
+      "removed": 1
+    },
+    {
+      "path": "packages/engine/src/index.ts",
+      "added": 1,
+      "removed": 1
+    },
+    {
+      "path": "packages/engine/src/modules/steward/execution/execution-delivery-controls.ts",
+      "added": 6,
+      "removed": 2
+    },
+    {
+      "path": "packages/engine/src/modules/steward/modules/module-activation.ts",
+      "added": 10,
+      "removed": 1
+    },
+    {
+      "path": "packages/engine/src/modules/steward/modules/module-build-review.ts",
+      "added": 7,
+      "removed": 2
+    },
+    {
+      "path": "packages/engine/src/modules/steward/modules/module-build.ts",
+      "added": 8,
+      "removed": 3
+    },
+    {
+      "path": "packages/engine/src/modules/steward/modules/module-context.ts",
+      "added": 1,
+      "removed": 1
+    },
+    {
+      "path": "packages/engine/src/modules/steward/modules/module-install-types.ts",
+      "added": 5,
+      "removed": 1
+    },
+    {
+      "path": "packages/engine/src/modules/steward/modules/module-install.ts",
+      "added": 35,
+      "removed": 11
+    },
+    {
+      "path": "packages/engine/src/modules/steward/modules/module-proposal.ts",
+      "added": 7,
+      "removed": 3
+    },
+    {
+      "path": "packages/engine/src/modules/steward/modules/module-exact-release.ts",
+      "added": 57,
+      "removed": 0
+    },
+    {
+      "path": "packages/engine/src/modules/steward/modules/module-exact-release.bun.test.ts",
+      "added": 207,
+      "removed": 0
+    }
+  ],
+  "appsChangedLines": [
+    {
+      "path": "index.ts",
+      "added": 1,
+      "removed": 2
+    },
+    {
+      "path": "module.json",
+      "added": 1,
+      "removed": 1
+    },
+    {
+      "path": "entry_test.ts",
+      "added": 1,
+      "removed": 0
+    },
+    {
+      "path": "sdk_test.ts",
+      "added": 2,
+      "removed": 2
+    }
+  ],
+  "tests": {
+    "exactFinal": {
+      "command": [
+        "bun",
+        "test",
+        "packages/engine/src/modules/steward/modules/module-exact-release.bun.test.ts"
+      ],
+      "exitCode": 0,
+      "passed": 14,
+      "failed": 0,
+      "expectCalls": 69,
+      "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/logs/exact-final.log"
+    },
+    "targetedEarlier": [
+      {
+        "command": [
+          "bun",
+          "test",
+          "packages/engine/src/modules/steward/modules/module-exact-release.bun.test.ts"
+        ],
+        "exitCode": 0,
+        "durationMs": 47152,
+        "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/logs/exact-r3.log"
+      },
+      {
+        "command": [
+          "bun",
+          "test",
+          "packages/engine/src/modules/steward/modules/module-install.bun.test.ts"
+        ],
+        "exitCode": 0,
+        "durationMs": 57419,
+        "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/logs/install.log"
+      },
+      {
+        "command": [
+          "bun",
+          "test",
+          "packages/cli/src/admin.bun.test.ts"
+        ],
+        "exitCode": 0,
+        "durationMs": 8329,
+        "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/logs/admin.log"
+      },
+      {
+        "command": [
+          "bun",
+          "run",
+          "verify:slice",
+          "packages/engine/src/modules/steward/modules/module-exact-release.ts",
+          "packages/engine/src/modules/steward/modules/module-proposal.ts",
+          "packages/engine/src/modules/steward/modules/module-build.ts",
+          "packages/engine/src/modules/steward/modules/module-build-review.ts",
+          "packages/engine/src/modules/steward/modules/module-activation.ts",
+          "packages/cli/src/admin.ts",
+          "packages/cli/src/program.ts"
+        ],
+        "exitCode": 1,
+        "durationMs": 76609,
+        "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/logs/slice.log"
+      }
+    ],
+    "lintFinal": {
+      "command": "LINT_RATCHET_BASE=a8d4488a bun run lint:ratchet <all changed code>",
+      "exitCode": 0,
+      "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/logs/lint-final.log",
+      "summary": "14 changed code files; no increased lint debt; 31 existing warnings"
+    },
+    "invariants": {
+      "poisonedHead": "4 stale real candidates ahead of healthy candidate; actual buildPending window3 progresses",
+      "explicitRetry": "Failed candidate old key remains failed; fresh key runs tests and selects exact commit",
+      "interleaving": "Build settlement before or after receipt refresh converges; concurrent same key creates one version",
+      "quota": "not applicable: no new capacity limit or quota mechanism"
+    }
+  },
+  "apps": {
+    "provenance": {
+      "remoteReadOnlyCommand": "ssh -o BatchMode=yes chino tar -C /home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/apps-current-source --exclude=node_modules --exclude=data --exclude=secrets --exclude=.env --exclude=.env.local --exclude=credentials -cf - .",
+      "installedCommitFromHandoff": "477b950e8aed71b78ed8480ed73e000d0b0a1e9c",
+      "upstream": "none; no Git history created or changed",
+      "originalSource": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/apps-original"
+    },
+    "materialDirectory": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/apps-source",
+    "diff": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/apps-source.diff",
+    "archives": {
+      "apps-current-source.tar": {
+        "path": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/apps-current-source.tar",
+        "sha256": "612ac353fd94815e217002ece3fed0fda69f9e290cce9fe83170b4e892d4c41b",
+        "bytes": 706560
+      },
+      "apps-candidate.tar": {
+        "path": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/apps-candidate.tar",
+        "sha256": "22694c91323cda5990aec9363ec2daf0a38245f871de3f415c204458a05fec50",
+        "bytes": 706560
+      }
+    },
+    "materialProof": {
+      "materialDigest": "734750fb46b514df71a0b8115d18d1e20da0a7be245cc98b0ec2a098eb7db080",
+      "files": [
+        {
+          "path": ".gitignore",
+          "sha256": "c0060925153ac467897a9f9fc6c05da8dab65c6ee2cc86b68f66de1acb51ae70",
+          "executable": false
+        },
+        {
+          "path": "build.ts",
+          "sha256": "d5a101dfed7884447b03bcfcbf81ddc36a60a266c97ba8138940789c5e01f237",
+          "executable": false
+        },
+        {
+          "path": "bun.lock",
+          "sha256": "845e2488545f07908b8ed888b77087af1885ce5c7411ea49f848c884528697a8",
+          "executable": false
+        },
+        {
+          "path": "chrona-material.json",
+          "sha256": "aeea7cc69774dc70e9f117306555cfa24b384d41a1e9ccb07aaba97e44053805",
+          "executable": false
+        },
+        {
+          "path": "core.ts",
+          "sha256": "26a95db314b8d212e3db3c58199caaeb44d8e8a0971a5fa5d14a9b6c032e3dfc",
+          "executable": false
+        },
+        {
+          "path": "dist/ui.js",
+          "sha256": "106d02dc1ae200204ec56e992759d71767d161575854b7da2534449caed3b0ad",
+          "executable": false
+        },
+        {
+          "path": "entry_test.ts",
+          "sha256": "26f57f1b6ab65579ee40a0b1dd5ee29b6e17798868b489cd40115229ab420293",
+          "executable": false
+        },
+        {
+          "path": "evidence/clarity-1024.png",
+          "sha256": "ce7b052c981dd58caf1ad102c56b784583b43e62e8ddfb89242904747758d7e5",
+          "executable": false
+        },
+        {
+          "path": "evidence/clarity-1440.png",
+          "sha256": "7fb143c81bdd63087d6dc4704e3739f500ab8162725ed6a57672f11118521819",
+          "executable": false
+        },
+        {
+          "path": "evidence/clarity-390.png",
+          "sha256": "dea38d74a8e3d351c984ffc41bfc99334111d993f4388aa7d9e8a7ded6ea2203",
+          "executable": false
+        },
+        {
+          "path": "evidence/clarity-tests.log",
+          "sha256": "721e8fcf9ac60ab1f926e6da97b22af4b89957dd13bc0fb1cf0c2fe8ab98ac31",
+          "executable": false
+        },
+        {
+          "path": "evidence/v2-1024x768.png",
+          "sha256": "3ce7d57b981fa39f9c4e10cdc692dfb4d9d0981f032e61a4d1c2817336a20c69",
+          "executable": false
+        },
+        {
+          "path": "evidence/v2-1440x900.png",
+          "sha256": "9dd7dbcceed4636f4cb8e705ad90af79c08e2f008532fa995dfa24460f8480bc",
+          "executable": false
+        },
+        {
+          "path": "evidence/v2-390x844.png",
+          "sha256": "9e0f43646c87d631164960e7b74ea56a83516a58f4f2e16c19d435466466411f",
+          "executable": false
+        },
+        {
+          "path": "evidence/v2-4-script-tests.log",
+          "sha256": "251345c82a16e6e7682e816c6793f1cd359919c1b5f4748c0d10cba15413c168",
+          "executable": false
+        },
+        {
+          "path": "evidence/v2-5-before.log",
+          "sha256": "9fa045ed949790ba29d9d76d477bd84e7ab49842fda4698fd17a429c4c216dea",
+          "executable": false
+        },
+        {
+          "path": "evidence/v2-5-boundary-before.log",
+          "sha256": "b4742779fce289809ed3dbd80bdf1662506e3f60e85b756cd370cad77a052873",
+          "executable": false
+        },
+        {
+          "path": "evidence/v2-5-script-tests.log",
+          "sha256": "479a976ac18f9d69645924c10a5a5edc40e500457ce410e7853d6a3923065076",
+          "executable": false
+        },
+        {
+          "path": "evidence/v2-6-before-materials_test.log",
+          "sha256": "2e93f55431e45913c5d1232dbc50212a908932a71c613d7d1bc7b95b2340ad2f",
+          "executable": false
+        },
+        {
+          "path": "evidence/v2-6-before-sdk_test.log",
+          "sha256": "8e218679d58a442f79779cec8f4b2e6bcb9bde6609393ffd1e81b6ece6297b24",
+          "executable": false
+        },
+        {
+          "path": "evidence/v2-6-before-ui_test.log",
+          "sha256": "d032347fb834c57af716995ce3c1473e927db9d3ee24cc6134f53c300d2b6e15",
+          "executable": false
+        },
+        {
+          "path": "evidence/v2-6-script-tests.log",
+          "sha256": "9a5f60bca3b33b3cf9f7f8f4b53b3b5d53eec7bfdfd5e0dc552d2205f8b29323",
+          "executable": false
+        },
+        {
+          "path": "evidence/v2-unit.log",
+          "sha256": "5cdf1299b83408614cb504f13d44127020d08accc8e8c39773ecf9769efe3d1f",
+          "executable": false
+        },
+        {
+          "path": "index.ts",
+          "sha256": "2a7aa99e79220663ef2bb0014edf2ba4c1a49eafeed284a897a72239db88773d",
+          "executable": false
+        },
+        {
+          "path": "INSTALL-UPDATE.md",
+          "sha256": "9eb69648aa4dd435133efb6a4e8aa91c06db1927810186b06504f7ac836e249c",
+          "executable": false
+        },
+        {
+          "path": "INTERFACE-GAPS.md",
+          "sha256": "c39855cdcd494e5d52598820739ccb1a1191f4d102447fbfd26074b022c4766b",
+          "executable": false
+        },
+        {
+          "path": "materials_test.ts",
+          "sha256": "9caed7e6884686b554ba836bfebf38f2e2945e5ab07e741e7d8e4326be19c8a4",
+          "executable": false
+        },
+        {
+          "path": "materials.ts",
+          "sha256": "da349e6c3db85141017b8910f0af1fe709e6c69fb30a2d3650ffcb0e213c81d6",
+          "executable": false
+        },
+        {
+          "path": "module.json",
+          "sha256": "855cae7afc3dda112a34908725e00ee05f76cb928e0e7db27bd21b7b537e9581",
+          "executable": false
+        },
+        {
+          "path": "official.json",
+          "sha256": "0c3aeef01ce0e5652179078a82890f034f9b8434fbe5ae9d236d20ea77179830",
+          "executable": false
+        },
+        {
+          "path": "package.json",
+          "sha256": "4dab56ccd949e89c073b3df1533e0f9ebf8cecd514f7dcee6e2259e1e1f93eef",
+          "executable": false
+        },
+        {
+          "path": "preview.ts",
+          "sha256": "1abdd73a0db9315186ea212f55c5c7656959fc25e01782cbbd632cb00f43cbf6",
+          "executable": false
+        },
+        {
+          "path": "README.md",
+          "sha256": "f3109b140c6fe4ce0f2b1ebf9449b8bc6a261a5b147d7e36260025d8feb241d5",
+          "executable": false
+        },
+        {
+          "path": "script-test.ts",
+          "sha256": "968afeecf886061ebda9da5a9f5f1fc4ce168681902e2d6a65e94ae396d3a0ef",
+          "executable": false
+        },
+        {
+          "path": "sdk_test.ts",
+          "sha256": "406ef5a3d73cb1a7071862fd5a4b46f541ec6cdff85e602e386e8acccea740b1",
+          "executable": false
+        },
+        {
+          "path": "sdk-contract.d.ts",
+          "sha256": "12cf1caf01fa1453a0176eb43057e422ff4a6d3f9d7ee821f5e1571668e86e52",
+          "executable": false
+        },
+        {
+          "path": "service.ts",
+          "sha256": "083cd36d7a4d33ff9bd5792e36fb6ba5971ac887903f21c0a02073bb7e1ee4e2",
+          "executable": false
+        },
+        {
+          "path": "test.ts",
+          "sha256": "8d9ca62f5aac818302b2eaaeae85f65757d4537b5a77a9747d20be27b25cc95d",
+          "executable": false
+        },
+        {
+          "path": "tsconfig.json",
+          "sha256": "c8e0633a9366be24dd82cc2cb06c8aea3ee0f8a4f563742ab1783f5a091bf493",
+          "executable": false
+        },
+        {
+          "path": "ui_test.ts",
+          "sha256": "7c49042c84a4f553d8c10b4ba9a12f6ee8e6b299f57b2cff1956aa0a31540c2c",
+          "executable": false
+        },
+        {
+          "path": "ui.css",
+          "sha256": "b6305a3fea7b4a2854f24938b1ac9a94d5678b25cab544aa26eb29c97244be76",
+          "executable": false
+        },
+        {
+          "path": "ui.ts",
+          "sha256": "72904bbf614277cd85e4e05be15a917b309b480d7ef4a063e07e9cc2e955ab85",
+          "executable": false
+        },
+        {
+          "path": "VALIDATION.md",
+          "sha256": "8fc28ac53574e5b3d89ba2634c2f9531c329e56ad008a595d662cd905c70d532",
+          "executable": false
+        }
+      ],
+      "sourceFiles": [
+        ".gitignore",
+        "build.ts",
+        "bun.lock",
+        "chrona-material.json",
+        "core.ts",
+        "entry_test.ts",
+        "evidence/clarity-tests.log",
+        "evidence/v2-4-script-tests.log",
+        "evidence/v2-5-before.log",
+        "evidence/v2-5-boundary-before.log",
+        "evidence/v2-5-script-tests.log",
+        "evidence/v2-6-before-materials_test.log",
+        "evidence/v2-6-before-sdk_test.log",
+        "evidence/v2-6-before-ui_test.log",
+        "evidence/v2-6-script-tests.log",
+        "evidence/v2-unit.log",
+        "index.ts",
+        "INSTALL-UPDATE.md",
+        "INTERFACE-GAPS.md",
+        "materials_test.ts",
+        "materials.ts",
+        "module.json",
+        "official.json",
+        "package.json",
+        "preview.ts",
+        "README.md",
+        "script-test.ts",
+        "sdk_test.ts",
+        "sdk-contract.d.ts",
+        "service.ts",
+        "test.ts",
+        "tsconfig.json",
+        "ui_test.ts",
+        "ui.css",
+        "ui.ts",
+        "VALIDATION.md"
+      ]
+    },
+    "checks": {
+      "typecheck": {
+        "exitCode": 0,
+        "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/logs/apps-0.log"
+      },
+      "build": {
+        "exitCode": 0,
+        "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/logs/apps-1.log",
+        "originalArtifactHashesAllPreserved": true
+      },
+      "originalFullTests": {
+        "exitCode": 0,
+        "cases": 27,
+        "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/logs/apps-tests-final.log"
+      },
+      "actualPageSetRegistration": {
+        "exitCode": 0,
+        "passed": 1,
+        "expectCalls": 5,
+        "fixture": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/apps-registration.bun.test.ts",
+        "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/logs/apps-registration.log"
+      },
+      "sdkIpcDescendantStop": {
+        "command": [
+          "bun",
+          "--no-install",
+          "--preload",
+          "/home/saya/workspace/Chrona-cleanup-and-reorg/packages/integrations/src/steward/module-typecheck/chrona-sdk-loader.ts",
+          "sdk_test.ts"
+        ],
+        "exitCode": 0,
+        "durationMs": 84,
+        "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/logs/apps-sdk-r4.log"
+      }
+    },
+    "businessFilesUnchanged": [
+      "core.ts",
+      "service.ts",
+      "materials.ts",
+      "ui.ts",
+      "ui.css",
+      "dist/ui.js",
+      "chrona-material.json"
+    ]
+  },
+  "failedAttempts": [
+    {
+      "name": "initial direct combined tests",
+      "result": "Tool timeout at 60 seconds; no child exit captured; process no longer running; formal per-file runner later passed",
+      "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/logs/initial-tests.log"
+    },
+    {
+      "name": "exact-tests initial",
+      "exitCode": 1,
+      "reason": "Fixture sandbox shape and slow multi-fixture test timeout; fixed test harness",
+      "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/logs/exact-tests.log"
+    },
+    {
+      "name": "exact-tests-r2",
+      "exitCode": 1,
+      "reason": "Assertion missed actual IPC result envelope; corrected assertion",
+      "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/logs/exact-tests-r2.log"
+    },
+    {
+      "name": "apps tests initial",
+      "exitCode": 1,
+      "reason": "Missing CHRONA_SDK environment",
+      "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/logs/apps-2.log"
+    },
+    {
+      "name": "apps tests r2",
+      "exitCode": 1,
+      "reason": "SDK test needed explicit guardian path; first26 script cases passed",
+      "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/logs/apps-tests-r2.log"
+    },
+    {
+      "name": "apps-sdk-r3",
+      "exitCode": 1,
+      "reason": "Direct SDK command omitted preload; final command supplies real loader/SDK/guardian",
+      "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/logs/apps-sdk-r3.log"
+    },
+    {
+      "name": "targeted slice",
+      "exitCode": 1,
+      "reason": "New lint warnings in admin optional indexing, exact helper signature and proposal guard; fixed with correct optional type, readable signature and cohesive baseline binding check",
+      "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/logs/slice.log"
+    },
+    {
+      "name": "lint-r2",
+      "exitCode": 1,
+      "reason": "Installer new complexity and long invocation; removed redundant branch and formatted invocation; final lint passes",
+      "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/logs/lint-r2.log"
+    }
+  ],
+  "fullValidationRunner": {
+    "launch": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/full-launch.json",
+    "latestReport": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/full-checks.json",
+    "releaseReport": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/release/report.json",
+    "unit": "chrona-compat-full-r2-065ea59e.service",
+    "pid": 2563443,
+    "memoryMax": "8G",
+    "swapMax": "1G",
+    "nodeMaxOldSpaceMiB": 6144,
+    "concurrency": 2,
+    "timeoutPerStepSeconds": 1800,
+    "environment": "Whitelisted inherited PATH, Prisma schema engine, LD_LIBRARY_PATH, browser cache; no credentials forwarded",
+    "observed": {
+      "pid": 2563443,
+      "unit": "chrona-compat-full-r2-065ea59e.service",
+      "started": "2026-11-17T03:34:44.478109+00:00",
+      "head": "a8d4488a0cbc215fb40bdc1adda981c28c2a3ab9",
+      "steps": [
+        {
+          "name": "exact-final",
+          "command": [
+            "bun",
+            "test",
+            "packages/engine/src/modules/steward/modules/module-exact-release.bun.test.ts"
+          ],
+          "exitCode": 0,
+          "durationMs": 52209,
+          "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/logs/exact-final.log"
+        }
+      ],
+      "state": "running",
+      "currentStep": "full-slice",
+      "currentCommand": [
+        "bun",
+        "run",
+        "verify:slice"
+      ],
+      "childPid": 2570520
+    },
+    "previousRunnerStopped": {
+      "pid": 2505380,
+      "unit": "chrona-compat-full-065ea59e.service",
+      "started": "2026-11-17T03:26:33.844051+00:00",
+      "head": "a8d4488a0cbc215fb40bdc1adda981c28c2a3ab9",
+      "steps": [
+        {
+          "name": "exact-final",
+          "command": [
+            "bun",
+            "test",
+            "packages/engine/src/modules/steward/modules/module-exact-release.bun.test.ts"
+          ],
+          "exitCode": 0,
+          "durationMs": 47598,
+          "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/logs/exact-final.log"
+        },
+        {
+          "name": "full-slice",
+          "command": [
+            "bun",
+            "run",
+            "verify:slice"
+          ],
+          "exitCode": 1,
+          "durationMs": 352604,
+          "log": "/home/saya/workspace/Chrona-cleanup-and-reorg/.tmp/cleanup-and-reorg/deployment-compatibility/logs/full-slice.log"
+        }
+      ],
+      "state": "stopped-for-code-change",
+      "currentStep": "full-slice",
+      "currentCommand": [
+        "bun",
+        "run",
+        "verify:slice"
+      ],
+      "childPid": 2512194,
+      "finished": "2026-11-17T03:33:14.048401+00:00",
+      "stopReason": "Move exact baseline precondition into the existing drain write transaction to prevent fencing a concurrently changed active version",
+      "stoppedAt": "2026-11-17T03:33:17.491216+00:00",
+      "unitStatusAfterStop": "ActiveState=failed\nMainPID=0\nResult=exit-code\nExecMainCode=1\nExecMainStatus=1\n",
+      "note": "Intentional stop while slice tests active; final source fix revalidated by new persistent runner; incomplete check is not a passing gate."
+    },
+    "observedAt": "2026-11-17T03:36:47.867904+00:00",
+    "systemdObservation": "ActiveState=active\nSubState=running\nMainPID=2563443\nResult=success\nExecMainStatus=0\n"
+  },
+  "residualRisks": [
+    "Parent independent reviewer gate outstanding; no worker delegation allowed.",
+    "Formal verify:release and its build/runtimeSmoke pending runner. Dirty worktree build cannot serve as final clean release; parent must commit/rebuild/reverify identity after review.",
+    "No production mutation or functional acceptance; no new real browser size/interaction proof. Registration contract only, UI assets byte-identical.",
+    "Fake provider health regression uses a synthetic verified Pi release in a real supervised process to prove post-update host env injection; no real model/QQ calls.",
+    "Apps normal Author candidate build/approval/activation is deferred to deployment worker."
+  ],
+  "productionPreserved": {
+    "lastObservationFromPriorHandoff": "2026-11-17T03:06:36Z, PID2753388, package bc16..., unit cbakr...; not reobserved by this worker",
+    "unknownRows": [
+      {
+        "id": "146941c1-2da2-4864-83c4-4b7a8a3aa44d",
+        "sha256": "b040fb97f9fb039bdf13f643446f0b43b26dbe06c1b8e7bf343f525ef9d0dac8"
+      },
+      {
+        "id": "840dfcfd-8ee9-46d5-b142-6ce7babc2810",
+        "sha256": "643100947a47b12b059f3f4c487e5482980c5b7c015b0fbb3966d2f9270abac3"
+      }
+    ],
+    "actions": "No changes, deletion, replay or key replacement"
+  },
+  "tools": {
+    "ponytail": "/home/saya/.pi/agent/skills/ponytail-bundle/ponytail/SKILL.md full",
+    "unavailable": [
+      "Hindsight extension",
+      "Serena extension",
+      "antislop skill"
+    ],
+    "fallback": "Native source and consumer references; no visual redesign so modernwebguide not used."
+  },
+  "generatedAt": "2026-11-17T03:36:27.378791+00:00",
+  "reviewGate": "Required parent independent reviewer pending; worker did not delegate."
+}

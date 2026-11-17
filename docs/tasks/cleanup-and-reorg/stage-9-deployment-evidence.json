@@ -1,0 +1,2750 @@
+{
+  "status": "deployed_http_and_data_checks_passed_functional_completion_blocked_pi_exact_commit_and_apps_retired_api",
+  "observedAt": "2026-11-17T03:06:36.842974+00:00",
+  "remoteDirectory": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa",
+  "sourceCommit": "caf46efabdf3735bb71ea43302a0566b96f43bdc",
+  "archiveSha256": "adf5a82ff5998a7b642ea6de5e04d482414bddaa019f0e2054591a75830ebdd1",
+  "archiveBytes": 47774266,
+  "production": {
+    "pid": 2753388,
+    "activeState": "active",
+    "subState": "running",
+    "restarts": 0,
+    "stopTimeoutSeconds": 45,
+    "packageSwitched": true,
+    "applicationsUpdated": true,
+    "functionalCompletion": false,
+    "functionalBlockers": [
+      {
+        "component": "pi",
+        "cause": "Author exact-source commit differs from release commit; strict providerHost correctly withheld host configuration",
+        "activeCommit": "51e29501f757fd4285cf233b86d1350562f92fdc",
+        "requiredReleaseCommit": "8bf7c40377abdd82d7bbfd067a92c5fb4dc5bad1",
+        "sameSourceTree": "74a742c480e543129d7edea45c0314eed8254ae9",
+        "fixRequiresNewRelease": true
+      },
+      {
+        "component": "apps",
+        "cause": "Retained old application activation calls retired web.component-set",
+        "activeCommit": "477b950e8aed71b78ed8480ed73e000d0b0a1e9c",
+        "fix": "Normal app update: direct page-set javascript/css/props/tools; remove component-set use"
+      }
+    ]
+  },
+  "paths": {
+    "package": "/nix/store/bc16dh9fhsnqwja504lxj3xjgdn76hg7-chrona-0.3.1-cleanup-caf46efa",
+    "unit": "/nix/store/cbakrsg9jnc29hy6srf8p6wvinwgc8iy-unit-chrona.service",
+    "oldPackage": "/nix/store/4m6rqksjbsqh5jnq44d2jhd5y423d1mp-chrona-0.9.40-storage-20261116",
+    "oldUnit": "/nix/store/fzblrb58qwxkfg2l05njva5n243xd72a-unit-chrona.service/chrona.service"
+  },
+  "backup": {
+    "freshStoppedProduction": true,
+    "files": [
+      {
+        "path": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T0243Z-8ce927b2-r2/backup/before.db",
+        "bytes": 394350592,
+        "sha256": "c494c6c271ae6e66a772c7c38d48dd2706a3abf21784163811c5f791ca1eebf3"
+      },
+      {
+        "path": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T0243Z-8ce927b2-r2/backup/before.db.tar",
+        "bytes": 166516224,
+        "sha256": "f81a44b70aa24395e8ea04f43028ea5ef98640c0f211f19c5fb3b19743f78424"
+      },
+      {
+        "path": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T0243Z-8ce927b2-r2/backup/external-roots.tar",
+        "bytes": 74598400,
+        "sha256": "24c78f381be20fa79b65cdc80d6a56b392b7a357ccfa069f667877a3106acc50"
+      }
+    ],
+    "restoreContinuity": {
+      "tables": {
+        "Workspace": 1,
+        "Session": 51,
+        "AgentContext": 51,
+        "Run": 63,
+        "AgentCommand": 63,
+        "AgentProvider": 1,
+        "AgentRunProvider": 63,
+        "AgentRunAdmission": 63,
+        "ProviderLaunch": 63,
+        "ExecutionAttempt": 0,
+        "ExecutionCommand": 0,
+        "ExecutionDelivery": 0,
+        "ExecutionReceipt": 0,
+        "ExecutionAuthority": 0,
+        "ExecutionDetail": 0,
+        "ExecutionSnapshot": 0,
+        "ExecutionControl": 0,
+        "_chrona_migrations": 1
+      },
+      "files": {
+        "applicationData": 123,
+        "previousContent": 4709,
+        "previousSource": 440
+      },
+      "restoreGenerationMarkers": 9,
+      "unknownRowSha256": "b040fb97f9fb039bdf13f643446f0b43b26dbe06c1b8e7bf343f525ef9d0dac8"
+    },
+    "externalRootsRestore": {
+      "files": 1003,
+      "restoredDirectory": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T0243Z-8ce927b2-r2/restore-check/external-roots"
+    }
+  },
+  "rehearsal": {
+    "directory": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/material-rehearsal-r4",
+    "unit": "chrona-cleanup-reorg-material-lifecycle-20261117-r4.service",
+    "exitCode": 0,
+    "finishedAt": "2026-11-17T01:56:00.047Z",
+    "candidateResults": [
+      {
+        "moduleId": "d3dddc1e-368c-4556-9461-c9407aa6b903",
+        "hash": "65cfc54a4a77a436663657a4fe0092d4b6bfd800",
+        "status": "approved",
+        "tree": "74a742c480e543129d7edea45c0314eed8254ae9",
+        "typecheck": {
+          "status": "passed"
+        },
+        "testExitCodes": [
+          0
+        ],
+        "continuity": {
+          "status": "passed",
+          "fromSchema": 1,
+          "toSchema": 1,
+          "migrated": false,
+          "tests": [
+            {
+              "exitCode": 0,
+              "stdout": "",
+              "stderr": ""
+            }
+          ]
+        },
+        "dependentChecks": []
+      },
+      {
+        "moduleId": "ab95c762-2218-4cec-94fc-a13fb11957d5",
+        "hash": "d464d7a6116d6734e99b573ed6580509250c5249",
+        "status": "approved",
+        "tree": "dbf5ec219eda5298f85933468a275908bd92b51c",
+        "typecheck": {
+          "status": "passed"
+        },
+        "testExitCodes": [
+          0
+        ],
+        "continuity": {
+          "status": "passed",
+          "fromSchema": 1,
+          "toSchema": 1,
+          "migrated": false,
+          "tests": [
+            {
+              "exitCode": 0,
+              "stdout": "",
+              "stderr": ""
+            }
+          ]
+        },
+        "dependentChecks": [
+          {
+            "caller": "web",
+            "status": "passed"
+          },
+          {
+            "caller": "mind",
+            "status": "passed"
+          },
+          {
+            "caller": "chat",
+            "status": "passed"
+          },
+          {
+            "caller": "qq",
+            "status": "passed"
+          }
+        ]
+      },
+      {
+        "moduleId": "db7f3b02-b4ca-4704-b8cb-3d683030646b",
+        "hash": "856126abbe96a42249061a2a9ea3460affd96dd3",
+        "status": "approved",
+        "tree": "003876287f33fae9cc6445de36521c437f5b6d32",
+        "typecheck": {
+          "status": "passed"
+        },
+        "testExitCodes": [
+          0
+        ],
+        "continuity": {
+          "status": "passed",
+          "fromSchema": 2,
+          "toSchema": 2,
+          "migrated": false,
+          "tests": [
+            {
+              "exitCode": 0,
+              "stdout": "",
+              "stderr": ""
+            }
+          ]
+        },
+        "dependentChecks": []
+      },
+      {
+        "moduleId": "708e9ce6-e8fc-4feb-b787-4ef6d7806100",
+        "hash": "dd43f85d483ed9a69047b37c5c35db802d044d40",
+        "status": "approved",
+        "tree": "fea0c6a8f54336db46c566938ea1684dc3b3ff04",
+        "typecheck": {
+          "status": "passed"
+        },
+        "testExitCodes": [
+          0
+        ],
+        "continuity": {
+          "status": "passed",
+          "fromSchema": 2,
+          "toSchema": 2,
+          "migrated": false,
+          "tests": [
+            {
+              "exitCode": 0,
+              "stdout": "",
+              "stderr": ""
+            }
+          ]
+        },
+        "dependentChecks": []
+      },
+      {
+        "moduleId": "474390d3-9d74-4eee-a192-0536c2c01f06",
+        "hash": "93ff27ac13a611cbf2baf5c6f942d968aafb5de5",
+        "status": "approved",
+        "tree": "80d36c3c17065a8ded82e2ae95d67eae5b9c267d",
+        "typecheck": {
+          "status": "passed"
+        },
+        "testExitCodes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "continuity": {
+          "status": "passed",
+          "fromSchema": 2,
+          "toSchema": 2,
+          "migrated": false,
+          "tests": [
+            {
+              "exitCode": 0,
+              "stdout": "",
+              "stderr": ""
+            },
+            {
+              "exitCode": 0,
+              "stdout": "",
+              "stderr": ""
+            },
+            {
+              "exitCode": 0,
+              "stdout": "",
+              "stderr": ""
+            },
+            {
+              "exitCode": 0,
+              "stdout": "",
+              "stderr": ""
+            }
+          ]
+        },
+        "dependentChecks": []
+      },
+      {
+        "moduleId": "bfc7b577-d20f-47d8-8774-b97b4362b1d3",
+        "hash": "e7fdfb48201c4dfbed934c0efe6617704020804f",
+        "status": "approved",
+        "tree": "85a45511ba2282a4e67b88da4e4abe5278bc878f",
+        "typecheck": {
+          "status": "passed"
+        },
+        "testExitCodes": [
+          0,
+          0
+        ],
+        "continuity": {
+          "status": "passed",
+          "fromSchema": 2,
+          "toSchema": 2,
+          "migrated": false,
+          "tests": [
+            {
+              "exitCode": 0,
+              "stdout": "",
+              "stderr": ""
+            },
+            {
+              "exitCode": 0,
+              "stdout": "",
+              "stderr": ""
+            }
+          ]
+        },
+        "dependentChecks": []
+      },
+      {
+        "moduleId": "8bca1433-7185-42e4-9eef-08a832244e1a",
+        "hash": "599b86ce0cd6f036bf7243bbdfb733211e49152e",
+        "status": "approved",
+        "tree": "31ccf4e0bc0bea45b187c998a66fb45cdebc4239",
+        "typecheck": {
+          "status": "passed"
+        },
+        "testExitCodes": [
+          0
+        ],
+        "continuity": {
+          "status": "passed",
+          "fromSchema": 1,
+          "toSchema": 1,
+          "migrated": false,
+          "tests": [
+            {
+              "exitCode": 0,
+              "stdout": "",
+              "stderr": ""
+            }
+          ]
+        },
+        "dependentChecks": []
+      }
+    ],
+    "active": [
+      {
+        "id": "5d25045f-72e9-40bc-b678-0f865a699650",
+        "name": "apps",
+        "activeHash": "477b950e8aed71b78ed8480ed73e000d0b0a1e9c",
+        "status": "active",
+        "dataSchema": 1
+      },
+      {
+        "id": "ab95c762-2218-4cec-94fc-a13fb11957d5",
+        "name": "author",
+        "activeHash": "d464d7a6116d6734e99b573ed6580509250c5249",
+        "status": "active",
+        "dataSchema": 1
+      },
+      {
+        "id": "8bca1433-7185-42e4-9eef-08a832244e1a",
+        "name": "chat",
+        "activeHash": "599b86ce0cd6f036bf7243bbdfb733211e49152e",
+        "status": "active",
+        "dataSchema": 1
+      },
+      {
+        "id": "1b2f2ef3-efbb-4f2c-ae77-6fb4ec5adb58",
+        "name": "mcp",
+        "activeHash": "0815de57954b58f199125c5196bd99d8dc4a6a69",
+        "status": "active",
+        "dataSchema": 1
+      },
+      {
+        "id": "708e9ce6-e8fc-4feb-b787-4ef6d7806100",
+        "name": "mind",
+        "activeHash": "dd43f85d483ed9a69047b37c5c35db802d044d40",
+        "status": "active",
+        "dataSchema": 2
+      },
+      {
+        "id": "bfc7b577-d20f-47d8-8774-b97b4362b1d3",
+        "name": "notify",
+        "activeHash": "e7fdfb48201c4dfbed934c0efe6617704020804f",
+        "status": "active",
+        "dataSchema": 2
+      },
+      {
+        "id": "d3dddc1e-368c-4556-9461-c9407aa6b903",
+        "name": "pi",
+        "activeHash": "65cfc54a4a77a436663657a4fe0092d4b6bfd800",
+        "status": "active",
+        "dataSchema": 1
+      },
+      {
+        "id": "474390d3-9d74-4eee-a192-0536c2c01f06",
+        "name": "qq",
+        "activeHash": "93ff27ac13a611cbf2baf5c6f942d968aafb5de5",
+        "status": "active",
+        "dataSchema": 2
+      },
+      {
+        "id": "db7f3b02-b4ca-4704-b8cb-3d683030646b",
+        "name": "web",
+        "activeHash": "856126abbe96a42249061a2a9ea3460affd96dd3",
+        "status": "active",
+        "dataSchema": 2
+      }
+    ],
+    "normalAutomaticApproval": true,
+    "continuity": {
+      "at": "2026-11-17T01:57:08.992168+00:00",
+      "quickCheck": "ok",
+      "historicalUnknownRowSha256": "b040fb97f9fb039bdf13f643446f0b43b26dbe06c1b8e7bf343f525ef9d0dac8",
+      "unchangedTableCounts": {
+        "Run": 63,
+        "AgentCommand": 63,
+        "ExecutionAttempt": 0,
+        "ExecutionCommand": 0,
+        "ExecutionDelivery": 0,
+        "ExecutionReceipt": 0,
+        "_chrona_migrations": 1
+      },
+      "unchangedFiles": {
+        "applicationData": 122,
+        "previousContent": 4709,
+        "previousSource": 440
+      },
+      "expectedRestoreGenerationMarkers": 9,
+      "allNinePreviousCommitsRetained": true,
+      "productionChanged": false,
+      "schemaConverted": false
+    }
+  },
+  "productionKeys": [
+    {
+      "group": 1,
+      "admit": "cleanup-material-production-20261117T0131Z:g1:admit",
+      "authorSubmit": "cleanup-material-production-20261117T0131Z:g1:author-submit",
+      "submit": "cleanup-material-production-20261117T0131Z:g1:submit",
+      "used": false
+    },
+    {
+      "group": 2,
+      "admit": "cleanup-material-production-20261117T0131Z:g2:admit",
+      "authorSubmit": "cleanup-material-production-20261117T0131Z:g2:author-submit",
+      "submit": "cleanup-material-production-20261117T0131Z:g2:submit",
+      "used": false
+    },
+    {
+      "group": 3,
+      "admit": "cleanup-material-production-20261117T0131Z:g3:admit",
+      "authorSubmit": "cleanup-material-production-20261117T0131Z:g3:author-submit",
+      "submit": "cleanup-material-production-20261117T0131Z:g3:submit",
+      "used": false
+    }
+  ],
+  "noStagedFiles": true,
+  "limitations": [
+    "Production application updates, unit switch and final deployment acceptance not yet performed",
+    "No real model invocation or QQ test message",
+    "r3 restore wrapper timeout lost original exit; remote completion log was observed without replay",
+    "Production runner and split DB guard implemented, dry-tested and uploaded; awaiting parent script review, not launched"
+  ],
+  "rawEvidenceDirectory": ".tmp/cleanup-and-reorg/stage-9-deployment",
+  "actionsLog": ".tmp/cleanup-and-reorg/stage-9-deployment/actions.jsonl",
+  "productionRunnerPreparation": {
+    "reviewAddressed": "df7c2c1e original two P1 closed by 978aa3b8; new final-cleanup failure-stop P1 patched, awaiting narrow parent review",
+    "paths": {
+      "directory": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa",
+      "runDirectory": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T020346Z-8ce927b2",
+      "backupDirectory": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T020346Z-8ce927b2/backup",
+      "restoreDirectory": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T020346Z-8ce927b2/restore-check",
+      "unit": "chrona-cleanup-reorg-production-8ce927b2.service"
+    },
+    "launchArgv": [
+      "sudo",
+      "-n",
+      "systemd-run",
+      "--unit=chrona-cleanup-reorg-production-8ce927b2",
+      "--uid=saya",
+      "--gid=users",
+      "-p",
+      "WorkingDirectory=/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa",
+      "-p",
+      "UMask=0077",
+      "-p",
+      "MemoryMax=8G",
+      "-p",
+      "MemorySwapMax=1G",
+      "-p",
+      "Type=exec",
+      "-p",
+      "Restart=no",
+      "-p",
+      "TimeoutStopSec=infinity",
+      "-p",
+      "SendSIGKILL=no",
+      "-p",
+      "IPAddressDeny=any",
+      "-p",
+      "IPAddressAllow=localhost",
+      "--setenv=PATH=/home/saya/.nix-profile/bin:/run/wrappers/bin:/run/current-system/sw/bin",
+      "--setenv=HOME=/home/saya",
+      "--setenv=NODE_OPTIONS=--max-old-space-size=6144",
+      "--setenv=CHRONA_STEWARD_EXECUTION_MODE=trusted-local",
+      "/home/saya/.nix-profile/bin/python3",
+      "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-runner.py"
+    ],
+    "launchFromSsh": [
+      "ssh",
+      "-o",
+      "BatchMode=yes",
+      "chino",
+      "sh /home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/launch-production.sh"
+    ],
+    "environmentWhitelist": {
+      "PATH": "/home/saya/.nix-profile/bin:/run/wrappers/bin:/run/current-system/sw/bin",
+      "HOME": "/home/saya",
+      "NODE_OPTIONS": "--max-old-space-size=6144",
+      "CHRONA_STEWARD_EXECUTION_MODE": "trusted-local",
+      "CHRONA_DATA_DIR": "/var/lib/chrona-pi/data",
+      "DATABASE_URL": "file:/var/lib/chrona-pi/data/chrona.db",
+      "CHRONA_RESOURCE_DIR": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/chrona-linux-x64/resources"
+    },
+    "restoreEnvironmentOverrides": {
+      "CHRONA_DATA_DIR": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T020346Z-8ce927b2/restore-check",
+      "DATABASE_URL": "file:/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T020346Z-8ce927b2/restore-check/chrona.db"
+    },
+    "credentialHandling": "No credentials in argv or logs; existing API_KEY extracted only in remote memory for read-only authenticated acceptance",
+    "checkpointPath": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T020346Z-8ce927b2/checkpoint.json",
+    "actionsPath": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T020346Z-8ce927b2/actions.jsonl",
+    "baselinePath": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T020346Z-8ce927b2/production-before.json",
+    "executionPolicy": [
+      "Create previously nonexistent exact production run, backup and restore directories",
+      "Full DB guard after old PID and service cgroup exit, on original real DB, before first app write",
+      "Fresh stopped baseline plus chrona backup pair and external-root tar; temporary restore and hash checks",
+      "Repeat complete DB guard immediately before real Author submission",
+      "Keep service stopped through seven candidate reports/receipt/tree/schema/data checks",
+      "Only candidate unit/package/resource combination verified from release identity and pre-start source may start",
+      "After start, read-only health/ready/401/authenticated today, actual exe/resources/apps/retained data/unknown receipt/restarts",
+      "On any failure after stop request, normal stop with infinite timeout and no forced kill; retain latest data and current unit, never snapshot/code rollback",
+      "No automatic replay: existing run directory refuses full runner re-entry; inspect original fixed receipts/checkpoint instead"
+    ],
+    "validation": {
+      "testCommand": "python .tmp/cleanup-and-reorg/stage-9-deployment/production-runner.test.py",
+      "testMethods": 8,
+      "guardCounterexamples": 13,
+      "testsPassed": true,
+      "queryEquivalence": "all 12 original full guard query texts equal extracted DB guard",
+      "syntax": "Python py_compile, sh -n, Bun.Transpiler.scan of existing helper TS/JS",
+      "releaseOrRehearsalRebuiltOrRerun": false,
+      "liveDeploymentExecuted": false,
+      "safeFailureStopRegression": "after normal policy restoration: properties/assert failure and checkpoint failure reinstall/reload/verify protection before stop; install, reload or property failure never sends stop",
+      "testLog": "production-runner-safe-stop-regression.log"
+    },
+    "remoteNotExecutedProof": {
+      "at": "2026-11-17T02:19:41.945211+00:00",
+      "files": [
+        {
+          "path": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-runner.py",
+          "bytes": 24284,
+          "sha256": "504ff2a291d8bea517e75b99e260aad9715c607d15f3d6c3b6d085d3fbf0bfbd"
+        },
+        {
+          "path": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/state_guard.py",
+          "bytes": 4051,
+          "sha256": "11fe71187a29dd76706c27ced83c4b7b7334de78824025e364c2217d4594659e"
+        },
+        {
+          "path": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/preflight.py",
+          "bytes": 1828,
+          "sha256": "dc85122cf422354382e22e81afc347087f65bda681629bce20ea8bbffc085db5"
+        },
+        {
+          "path": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/material-production.ts",
+          "bytes": 9544,
+          "sha256": "d24c913ec788d374773dfd873c17675911f0b2b4a90c0fe20486ae824937f790"
+        },
+        {
+          "path": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/material-production.js",
+          "bytes": 6612210,
+          "sha256": "9c598764839e12ed33ebc650674a895b9f7362c7b0ccd46189ac732079d580d5"
+        },
+        {
+          "path": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-paths.json",
+          "bytes": 605,
+          "sha256": "e1f89c486d66b0f8e3bd01c948c8ad2074cd983ebb307cf790899b8f29828e73"
+        },
+        {
+          "path": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/launch-production.sh",
+          "bytes": 711,
+          "sha256": "750abc84d38bf2382413368a6ff343bb2cd5156296064bd4532154dea47fa876"
+        }
+      ],
+      "productionRunDirectoryExists": false,
+      "productionTransientUnitObservation": {
+        "exitCode": 0,
+        "properties": [
+          "LoadState=not-found",
+          "ActiveState=inactive",
+          "MainPID=0"
+        ]
+      },
+      "service": {
+        "ActiveState": "active",
+        "SubState": "running",
+        "MainPID": "2576846",
+        "NRestarts": "0"
+      },
+      "exe": "/nix/store/4m6rqksjbsqh5jnq44d2jhd5y423d1mp-chrona-0.9.40-storage-20261116/libexec/chrona/chrona",
+      "runnerLaunched": false
+    },
+    "failureStopProtection": {
+      "sequence": [
+        "install existing safety drop-in",
+        "daemon-reload",
+        "query TimeoutStopUSec/SendSIGKILL/Restart",
+        "require infinity/no/no",
+        "only then systemctl stop"
+      ],
+      "protectionFailure": "record error and observed service, never send a potentially forced stop"
+    }
+  },
+  "productionAttempt1": {
+    "launchAuthorizedByParent": true,
+    "unit": "chrona-cleanup-reorg-production-8ce927b2.service",
+    "runnerPid": 2670855,
+    "exitCode": 1,
+    "checkpoint": "production-runner-started",
+    "stopRequested": false,
+    "candidateStartRequested": false,
+    "applicationWrites": false,
+    "failure": "autoPatchelfHook changed chrona and guardian bytes in first Nix package",
+    "productionServiceUnchanged": true,
+    "retainedCheckpoint": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T020346Z-8ce927b2/checkpoint.json",
+    "nextDirection": "separate byte-preserving Nix declaration with dontFixup=true, then exact payload and isolated runtime/fake-provider proof before parent review/new unique attempt"
+  },
+  "bytePreservingPackageAttempt": {
+    "declaration": "D/declaration-byte-preserving/_chrona/package.nix",
+    "changes": [
+      "remove autoPatchelfHook",
+      "dontFixup=true",
+      "retain dontStrip=true and exact original archive"
+    ],
+    "buildArgv": [
+      "nix-build",
+      "D/build-service-byte-preserving.nix",
+      "--out-link",
+      "D/unit-byte-preserving-root"
+    ],
+    "buildPid": 2673644,
+    "daemonPid": 2673676,
+    "buildComplete": true,
+    "buildLog": "D/logs/nix-byte-preserving-build.log",
+    "blockingStack": [
+      "handle_reserve_ticket",
+      "reserve_bytes",
+      "btrfs_reserve_metadata_bytes",
+      "start_transaction",
+      "btrfs_create_common"
+    ],
+    "filesystem": {
+      "deviceBytes": 511555141632,
+      "unallocatedBytes": 1048576,
+      "metadataSizeBytes": 20401094656,
+      "metadataUsedBytes": 19844694016,
+      "metadataUsedPercent": 97.27,
+      "estimatedFreeBytes": 82605871104
+    },
+    "production": {
+      "pid": 2576846,
+      "active": true,
+      "restarts": 0,
+      "stopped": false,
+      "applicationWrites": false
+    },
+    "maintenanceActionsPerformed": [],
+    "smokePreparedNotRun": [
+      "byte-preserving-smoke.py",
+      "byte-preserving-portable-probe.ts"
+    ],
+    "decision": "Parent contacted for infrastructure maintenance or pause; no unapproved balance/GC/deletion",
+    "infrastructureWaitResolvedWithoutMaintenance": true
+  },
+  "bytePreservingR2Review": {
+    "at": "2026-11-17T02:47:25.692384+00:00",
+    "files": [
+      {
+        "path": "production-runner-r2.py",
+        "bytes": 24660,
+        "sha256": "d77439328a8d4d2a2f24a96442ad85f32d894ad46828957c874eaa89b5b4b18d"
+      },
+      {
+        "path": "material-production-r2.ts",
+        "bytes": 9545,
+        "sha256": "40e13a7d0eb5d2cacaeb79f8514b17ff5fe279521bc59317e068aad2acdfe8c8"
+      },
+      {
+        "path": "material-production-r2.js",
+        "bytes": 6612211,
+        "sha256": "ed4a26096411c064e83e3767591305081317c817c8305962bc7ec1efdc546dcb"
+      },
+      {
+        "path": "launch-production-r2.sh",
+        "bytes": 717,
+        "sha256": "596d208916ddb847fa461ba01a8657f6c36f3f3a67eb454946df849a51a4204d"
+      },
+      {
+        "path": "production-paths-r2.json",
+        "bytes": 611,
+        "sha256": "93aa4cb6413f16f7760ff706b3f68fa81831c34699b11a3737e7f0b1a50e3065"
+      },
+      {
+        "path": "state_guard.py",
+        "bytes": 4051,
+        "sha256": "11fe71187a29dd76706c27ced83c4b7b7334de78824025e364c2217d4594659e"
+      },
+      {
+        "path": "preflight.py",
+        "bytes": 1828,
+        "sha256": "dc85122cf422354382e22e81afc347087f65bda681629bce20ea8bbffc085db5"
+      },
+      {
+        "path": "paths-byte-preserving.json",
+        "bytes": 359,
+        "sha256": "c03974527d10baeab32456a8f5ae548ffa50255306885fad2709d2ecccbca3a4"
+      },
+      {
+        "path": "declaration-byte-preserving/_chrona/package.nix",
+        "bytes": 1592,
+        "sha256": "7dc5e0199b8bdd6edfe12b458183e836f28fde5c5f7d0b8f3964fc90d4c01906"
+      },
+      {
+        "path": "build-service-byte-preserving.nix",
+        "bytes": 1196,
+        "sha256": "00b5383dd76fc22399710e06f658f24b5ec70ebeff7cd57f2c9222c4347062a3"
+      }
+    ],
+    "newAttemptNotLaunched": true,
+    "freshRunDirectoryAbsent": true,
+    "unitObservation": "LoadState=not-found\nMainPID=0\n",
+    "previousAttempt": {
+      "at": "2026-11-17T02:21:29.362491+00:00",
+      "step": "production-deployment-failed",
+      "runnerPid": 2670855,
+      "failedStep": "production-runner-started",
+      "error": "RuntimeError: Release byte mismatch: /nix/store/mwsx1p3r7glc3q4mivfx39v35ckn2qz8-chrona-0.3.1-cleanup-caf46efa/libexec/chrona/chrona",
+      "stopRequested": false,
+      "candidateStartRequested": false,
+      "failureStopError": null,
+      "service": {
+        "ActiveState": "active",
+        "SubState": "running",
+        "MainPID": "2576846",
+        "NRestarts": "0",
+        "ControlGroup": "/system.slice/chrona.service"
+      },
+      "databaseRestored": false,
+      "automaticCodeRollback": false
+    },
+    "packageProof": {
+      "passed": true,
+      "payloadCount": 999,
+      "allPayloadBytesAndExecutableReadableModesExact": true,
+      "nixWriteBitsRemovedByStorePolicy": true,
+      "identityByteExact": true,
+      "inventoryExact": true,
+      "paths": {
+        "package": "/nix/store/bc16dh9fhsnqwja504lxj3xjgdn76hg7-chrona-0.3.1-cleanup-caf46efa",
+        "unit": "/nix/store/cbakrsg9jnc29hy6srf8p6wvinwgc8iy-unit-chrona.service",
+        "oldPackage": "/nix/store/4m6rqksjbsqh5jnq44d2jhd5y423d1mp-chrona-0.9.40-storage-20261116",
+        "oldUnit": "/nix/store/fzblrb58qwxkfg2l05njva5n243xd72a-unit-chrona.service/chrona.service"
+      },
+      "originalArchiveUnchanged": true
+    },
+    "smoke": {
+      "package": "/nix/store/bc16dh9fhsnqwja504lxj3xjgdn76hg7-chrona-0.3.1-cleanup-caf46efa",
+      "http": [
+        {
+          "path": "/health",
+          "status": 200,
+          "responseSha256": "bf57a31dc5bae443f7b658b902d33117c478d2a0d64cc59f7ac9b91e10c5f5fd"
+        },
+        {
+          "path": "/ready",
+          "status": 200,
+          "responseSha256": "31bf75f4c0a97cc1f7b60df824fa390b3be9ba014f29b63c87c698ba63d9a9fd"
+        },
+        {
+          "path": "/api/modules",
+          "status": 401,
+          "responseSha256": "3be5b8e53fdc8b0a2996590589456db33504977f3d1ce9bb75016c8a707e1a71"
+        },
+        {
+          "path": "/api/web/today",
+          "status": 200,
+          "responseSha256": "1d3c77b8070eb35b743c8c91172d957dce8d5fa50d2c99f1c2895f689efa6d58"
+        }
+      ],
+      "results": [
+        {
+          "name": "cli-help",
+          "argv": [
+            "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/byte-preserving-runtime-smoke-r2/chrona-linux-x64/chrona",
+            "--help"
+          ],
+          "started": "2026-11-17T02:46:10.447227+00:00",
+          "finished": "2026-11-17T02:46:10.675584+00:00",
+          "exitCode": 0
+        },
+        {
+          "name": "pi-offline-pinned-dependencies",
+          "argv": [
+            "bun",
+            "install",
+            "--offline",
+            "--frozen-lockfile",
+            "--ignore-scripts"
+          ],
+          "started": "2026-11-17T02:46:43.428438+00:00",
+          "finished": "2026-11-17T02:46:43.555325+00:00",
+          "exitCode": 0
+        },
+        {
+          "name": "packaged-helper-and-fake-provider",
+          "argv": [
+            "bun",
+            "--no-install",
+            "--preload",
+            "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/byte-preserving-runtime-smoke-r2/chrona-linux-x64/resources/module-sdk/chrona-sdk-loader.ts",
+            "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/byte-preserving-portable-probe.ts"
+          ],
+          "started": "2026-11-17T02:46:43.556165+00:00",
+          "finished": "2026-11-17T02:46:44.568224+00:00",
+          "exitCode": 0
+        }
+      ],
+      "realAccountsOrModelsUsed": false,
+      "freshDataDirectory": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/byte-preserving-runtime-smoke-r2/data",
+      "productionUnchanged": true
+    },
+    "service": "ActiveState=active\nMainPID=2576846\nNRestarts=0\n"
+  },
+  "historicalProductionBeforeActualDeployment": {
+    "pid": 2576846,
+    "activeState": "active",
+    "subState": "running",
+    "restarts": 0,
+    "stopTimeoutSeconds": 45,
+    "packageSwitched": false,
+    "applicationsUpdated": false,
+    "fullGuardsPassedWithSingleAuthorizedWaiver": true
+  },
+  "historicalBackupBeforeActualDeployment": {
+    "files": [
+      {
+        "path": "before.db",
+        "bytes": 393715712,
+        "sha256": "3683668cb432b932b8e5de9c0863f7fd571ba614f8f0f5eab1ade43e9c6be188"
+      },
+      {
+        "path": "before.db.tar",
+        "bytes": 166515200,
+        "sha256": "46719d8fa93deca6c2038c60545655bb48dba8288eba32474f21b2e1316a5619"
+      },
+      {
+        "path": "chrona-env",
+        "bytes": 73,
+        "sha256": "3b0c41677bf043e80cc0edd01cc9b3e92144e1c859f72279bc5a05bc440dd303"
+      },
+      {
+        "path": "chrona.service",
+        "bytes": 4550,
+        "sha256": "cf31e0bf2ad6b8f986e49032134c58db353ee79108450091fcd0b3a38c68bf16"
+      },
+      {
+        "path": "declaration-before/_chrona/package.nix",
+        "bytes": 1532,
+        "sha256": "10481795ce2f1441cf9fb18351a5986b106a6e69fa94de0b3148fe5f23112b3b"
+      },
+      {
+        "path": "declaration-before/_chrona/snapshot.json",
+        "bytes": 247,
+        "sha256": "c834fb9418bbee74fdbd03baea0b457e244034290fe202a99a367e8a810d7b68"
+      },
+      {
+        "path": "declaration-before/chrona.nix",
+        "bytes": 5647,
+        "sha256": "0efea78706b14cab252f8d72e8213c72a31d8614fddb13381c6d190bd90d2ea4"
+      },
+      {
+        "path": "external-roots.tar",
+        "bytes": 74598400,
+        "sha256": "797dd0d86b8e6f0064865b0006857e090351e471c648921e2fa771285610e503"
+      }
+    ],
+    "restoreVerified": true,
+    "realDataConverted": false,
+    "originalDatasetSelected": true
+  },
+  "historicalPathsBeforeBytePreservingPackage": {
+    "package": "/nix/store/bc16dh9fhsnqwja504lxj3xjgdn76hg7-chrona-0.3.1-cleanup-caf46efa",
+    "unit": "/nix/store/cbakrsg9jnc29hy6srf8p6wvinwgc8iy-unit-chrona.service",
+    "oldPackage": "/nix/store/4m6rqksjbsqh5jnq44d2jhd5y423d1mp-chrona-0.9.40-storage-20261116",
+    "oldUnit": "/nix/store/fzblrb58qwxkfg2l05njva5n243xd72a-unit-chrona.service/chrona.service"
+  },
+  "actualProductionDeployment": {
+    "observedAt": "2026-11-17T03:06:36.842974+00:00",
+    "acceptance": {
+      "at": "2026-11-17T02:58:43.473771+00:00",
+      "service": {
+        "ActiveState": "active",
+        "SubState": "running",
+        "MainPID": "2753388",
+        "NRestarts": "0",
+        "ControlGroup": "/system.slice/chrona.service"
+      },
+      "exe": "/nix/store/bc16dh9fhsnqwja504lxj3xjgdn76hg7-chrona-0.3.1-cleanup-caf46efa/libexec/chrona/chrona",
+      "resourceRoot": "/var/lib/chrona-pi/runtime-resources",
+      "commit": "caf46efabdf3735bb71ea43302a0566b96f43bdc",
+      "http": [
+        {
+          "path": "/health",
+          "authenticated": false,
+          "status": 200,
+          "responseBytes": 140,
+          "responseSha256": "bf57a31dc5bae443f7b658b902d33117c478d2a0d64cc59f7ac9b91e10c5f5fd"
+        },
+        {
+          "path": "/ready",
+          "authenticated": false,
+          "status": 200,
+          "responseBytes": 18,
+          "responseSha256": "31bf75f4c0a97cc1f7b60df824fa390b3be9ba014f29b63c87c698ba63d9a9fd"
+        },
+        {
+          "path": "/api/modules",
+          "authenticated": false,
+          "status": 401,
+          "responseBytes": 24,
+          "responseSha256": "3be5b8e53fdc8b0a2996590589456db33504977f3d1ce9bb75016c8a707e1a71"
+        },
+        {
+          "path": "/api/web/today",
+          "authenticated": true,
+          "status": 200,
+          "responseBytes": 16474,
+          "responseSha256": "99c70d78bbb7d6360da165214b18316f6313d1d9bca9d975118fe9497b7df021"
+        }
+      ],
+      "retainedBusinessRows": {
+        "Session": 51,
+        "Run": 63,
+        "AgentCommand": 63
+      },
+      "unknownRowSha256": "b040fb97f9fb039bdf13f643446f0b43b26dbe06c1b8e7bf343f525ef9d0dac8",
+      "active": [
+        {
+          "id": "5d25045f-72e9-40bc-b678-0f865a699650",
+          "name": "apps",
+          "activeHash": "477b950e8aed71b78ed8480ed73e000d0b0a1e9c",
+          "status": "active",
+          "dataSchema": 1
+        },
+        {
+          "id": "ab95c762-2218-4cec-94fc-a13fb11957d5",
+          "name": "author",
+          "activeHash": "07673002acf9247aa2a93e3dde48aecf06b78bb9",
+          "status": "active",
+          "dataSchema": 1
+        },
+        {
+          "id": "8bca1433-7185-42e4-9eef-08a832244e1a",
+          "name": "chat",
+          "activeHash": "f8f8fe9d4b9ad5aa3de32dedc734865c2af760de",
+          "status": "active",
+          "dataSchema": 1
+        },
+        {
+          "id": "1b2f2ef3-efbb-4f2c-ae77-6fb4ec5adb58",
+          "name": "mcp",
+          "activeHash": "0815de57954b58f199125c5196bd99d8dc4a6a69",
+          "status": "active",
+          "dataSchema": 1
+        },
+        {
+          "id": "708e9ce6-e8fc-4feb-b787-4ef6d7806100",
+          "name": "mind",
+          "activeHash": "da0788a920cd2eda897a9751cc6314d3d4223f42",
+          "status": "active",
+          "dataSchema": 2
+        },
+        {
+          "id": "bfc7b577-d20f-47d8-8774-b97b4362b1d3",
+          "name": "notify",
+          "activeHash": "d731484920eeed3e68d99dd4851d83bba8a9a5e7",
+          "status": "active",
+          "dataSchema": 2
+        },
+        {
+          "id": "d3dddc1e-368c-4556-9461-c9407aa6b903",
+          "name": "pi",
+          "activeHash": "51e29501f757fd4285cf233b86d1350562f92fdc",
+          "status": "active",
+          "dataSchema": 1
+        },
+        {
+          "id": "474390d3-9d74-4eee-a192-0536c2c01f06",
+          "name": "qq",
+          "activeHash": "9e453467130082b62d306ca6c7f01c29f8af2258",
+          "status": "active",
+          "dataSchema": 2
+        },
+        {
+          "id": "db7f3b02-b4ca-4704-b8cb-3d683030646b",
+          "name": "web",
+          "activeHash": "34dd657af9abe5172479f734b487aaa814ac654b",
+          "status": "active",
+          "dataSchema": 2
+        }
+      ],
+      "pageRegistration": {
+        "mindPageIds": [
+          "main",
+          "settings"
+        ],
+        "callerHash": "da0788a920cd2eda897a9751cc6314d3d4223f42",
+        "revisionPresent": true,
+        "retainedUnknownRows": {
+          "146941c1-2da2-4864-83c4-4b7a8a3aa44d": "b040fb97f9fb039bdf13f643446f0b43b26dbe06c1b8e7bf343f525ef9d0dac8",
+          "840dfcfd-8ee9-46d5-b142-6ce7babc2810": "643100947a47b12b059f3f4c487e5482980c5b7c015b0fbb3966d2f9270abac3"
+        },
+        "originalInvocationReplayed": false
+      },
+      "normalUnitPolicy": [
+        "Restart=on-failure",
+        "TimeoutStopUSec=45s",
+        "SendSIGKILL=yes"
+      ]
+    },
+    "backupFiles": [
+      {
+        "path": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T0243Z-8ce927b2-r2/backup/before.db",
+        "bytes": 394350592,
+        "sha256": "c494c6c271ae6e66a772c7c38d48dd2706a3abf21784163811c5f791ca1eebf3"
+      },
+      {
+        "path": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T0243Z-8ce927b2-r2/backup/before.db.tar",
+        "bytes": 166516224,
+        "sha256": "f81a44b70aa24395e8ea04f43028ea5ef98640c0f211f19c5fb3b19743f78424"
+      },
+      {
+        "path": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T0243Z-8ce927b2-r2/backup/external-roots.tar",
+        "bytes": 74598400,
+        "sha256": "24c78f381be20fa79b65cdc80d6a56b392b7a357ccfa069f667877a3106acc50"
+      }
+    ],
+    "unitLink": "/nix/store/cbakrsg9jnc29hy6srf8p6wvinwgc8iy-unit-chrona.service/chrona.service",
+    "deploymentActions": [
+      {
+        "at": "2026-11-17T02:49:22.460485+00:00",
+        "step": "production-runner-started",
+        "runnerPid": 2731732
+      },
+      {
+        "at": "2026-11-17T02:49:23.043647+00:00",
+        "step": "live-preflight",
+        "runnerPid": 2731732,
+        "argv": [
+          "python3",
+          "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/preflight.py",
+          "2576846"
+        ],
+        "started": "2026-11-17T02:49:23.043635+00:00"
+      },
+      {
+        "at": "2026-11-17T02:49:24.174462+00:00",
+        "step": "live-preflight.finished",
+        "runnerPid": 2731732,
+        "argv": [
+          "python3",
+          "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/preflight.py",
+          "2576846"
+        ],
+        "exitCode": 0
+      },
+      {
+        "at": "2026-11-17T02:49:24.174776+00:00",
+        "step": "create-stop-drop-directory",
+        "runnerPid": 2731732,
+        "argv": [
+          "sudo",
+          "-n",
+          "mkdir",
+          "-p",
+          "/run/systemd/system/chrona.service.d"
+        ],
+        "started": "2026-11-17T02:49:24.174770+00:00"
+      },
+      {
+        "at": "2026-11-17T02:49:24.187793+00:00",
+        "step": "create-stop-drop-directory.finished",
+        "runnerPid": 2731732,
+        "argv": [
+          "sudo",
+          "-n",
+          "mkdir",
+          "-p",
+          "/run/systemd/system/chrona.service.d"
+        ],
+        "exitCode": 0
+      },
+      {
+        "at": "2026-11-17T02:49:24.188201+00:00",
+        "step": "install-stop-override",
+        "runnerPid": 2731732,
+        "argv": [
+          "sudo",
+          "-n",
+          "install",
+          "-m",
+          "0644",
+          "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T0243Z-8ce927b2-r2/stop.conf",
+          "/run/systemd/system/chrona.service.d/94-cleanup-reorg-production.conf"
+        ],
+        "started": "2026-11-17T02:49:24.188191+00:00"
+      },
+      {
+        "at": "2026-11-17T02:49:24.205445+00:00",
+        "step": "install-stop-override.finished",
+        "runnerPid": 2731732,
+        "argv": [
+          "sudo",
+          "-n",
+          "install",
+          "-m",
+          "0644",
+          "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T0243Z-8ce927b2-r2/stop.conf",
+          "/run/systemd/system/chrona.service.d/94-cleanup-reorg-production.conf"
+        ],
+        "exitCode": 0
+      },
+      {
+        "at": "2026-11-17T02:49:24.205896+00:00",
+        "step": "reload-before-stop",
+        "runnerPid": 2731732,
+        "argv": [
+          "sudo",
+          "-n",
+          "systemctl",
+          "daemon-reload"
+        ],
+        "started": "2026-11-17T02:49:24.205884+00:00"
+      },
+      {
+        "at": "2026-11-17T02:49:24.610839+00:00",
+        "step": "reload-before-stop.finished",
+        "runnerPid": 2731732,
+        "argv": [
+          "sudo",
+          "-n",
+          "systemctl",
+          "daemon-reload"
+        ],
+        "exitCode": 0
+      },
+      {
+        "at": "2026-11-17T02:49:24.611236+00:00",
+        "step": "stop-original-service",
+        "runnerPid": 2731732,
+        "argv": [
+          "sudo",
+          "-n",
+          "systemctl",
+          "stop",
+          "chrona.service"
+        ],
+        "started": "2026-11-17T02:49:24.611228+00:00"
+      },
+      {
+        "at": "2026-11-17T02:49:24.760823+00:00",
+        "step": "stop-original-service.finished",
+        "runnerPid": 2731732,
+        "argv": [
+          "sudo",
+          "-n",
+          "systemctl",
+          "stop",
+          "chrona.service"
+        ],
+        "exitCode": 0
+      },
+      {
+        "at": "2026-11-17T02:49:24.766250+00:00",
+        "step": "original-process-and-cgroup-exited",
+        "runnerPid": 2731732,
+        "service": {
+          "ActiveState": "inactive",
+          "SubState": "dead",
+          "MainPID": "0",
+          "NRestarts": "0",
+          "ControlGroup": ""
+        }
+      },
+      {
+        "at": "2026-11-17T02:49:24.766526+00:00",
+        "step": "stopped-db-guard",
+        "runnerPid": 2731732
+      },
+      {
+        "at": "2026-11-17T02:49:24.858209+00:00",
+        "step": "backup-database-and-private-roots",
+        "runnerPid": 2731732,
+        "argv": [
+          "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/chrona-linux-x64/chrona",
+          "backup",
+          "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T0243Z-8ce927b2-r2/backup/before.db"
+        ],
+        "started": "2026-11-17T02:49:24.858191+00:00"
+      },
+      {
+        "at": "2026-11-17T02:49:44.686539+00:00",
+        "step": "backup-database-and-private-roots.finished",
+        "runnerPid": 2731732,
+        "argv": [
+          "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/chrona-linux-x64/chrona",
+          "backup",
+          "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T0243Z-8ce927b2-r2/backup/before.db"
+        ],
+        "exitCode": 0
+      },
+      {
+        "at": "2026-11-17T02:49:44.686982+00:00",
+        "step": "backup-external-roots",
+        "runnerPid": 2731732
+      },
+      {
+        "at": "2026-11-17T02:49:47.147613+00:00",
+        "step": "backup-external-roots.finished",
+        "runnerPid": 2731732,
+        "exitCode": 0
+      },
+      {
+        "at": "2026-11-17T02:49:47.147988+00:00",
+        "step": "backup-environment-file",
+        "runnerPid": 2731732,
+        "argv": [
+          "sudo",
+          "-n",
+          "install",
+          "-o",
+          "saya",
+          "-g",
+          "users",
+          "-m",
+          "0600",
+          "/run/secrets/rendered/chrona-env",
+          "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T0243Z-8ce927b2-r2/backup/chrona-env"
+        ],
+        "started": "2026-11-17T02:49:47.147978+00:00"
+      },
+      {
+        "at": "2026-11-17T02:49:47.170488+00:00",
+        "step": "backup-environment-file.finished",
+        "runnerPid": 2731732,
+        "argv": [
+          "sudo",
+          "-n",
+          "install",
+          "-o",
+          "saya",
+          "-g",
+          "users",
+          "-m",
+          "0600",
+          "/run/secrets/rendered/chrona-env",
+          "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T0243Z-8ce927b2-r2/backup/chrona-env"
+        ],
+        "exitCode": 0
+      },
+      {
+        "at": "2026-11-17T02:49:47.170911+00:00",
+        "step": "backup-unit-and-declaration",
+        "runnerPid": 2731732,
+        "sources": [
+          "/etc/systemd/system/chrona.service",
+          "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/declaration-before"
+        ]
+      },
+      {
+        "at": "2026-11-17T02:49:47.171660+00:00",
+        "step": "backup-unit-and-declaration.finished",
+        "runnerPid": 2731732,
+        "exitCode": 0
+      },
+      {
+        "at": "2026-11-17T02:49:47.746734+00:00",
+        "step": "verify-fresh-backup-restore",
+        "runnerPid": 2731732,
+        "argv": [
+          "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/chrona-linux-x64/chrona",
+          "restore",
+          "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T0243Z-8ce927b2-r2/backup/before.db"
+        ],
+        "started": "2026-11-17T02:49:47.746717+00:00"
+      },
+      {
+        "at": "2026-11-17T02:50:47.790421+00:00",
+        "step": "verify-fresh-backup-restore.finished",
+        "runnerPid": 2731732,
+        "argv": [
+          "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/chrona-linux-x64/chrona",
+          "restore",
+          "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T0243Z-8ce927b2-r2/backup/before.db"
+        ],
+        "exitCode": 0
+      },
+      {
+        "at": "2026-11-17T02:50:47.791078+00:00",
+        "step": "continuity-restore",
+        "runnerPid": 2731732
+      },
+      {
+        "at": "2026-11-17T02:50:50.169360+00:00",
+        "step": "verify-external-roots-restore",
+        "runnerPid": 2731732
+      },
+      {
+        "at": "2026-11-17T02:50:53.083192+00:00",
+        "step": "verify-external-roots-restore.finished",
+        "runnerPid": 2731732,
+        "exitCode": 0,
+        "files": 1003
+      },
+      {
+        "at": "2026-11-17T02:50:53.096641+00:00",
+        "step": "immediately-before-application-write-db-guard",
+        "runnerPid": 2731732
+      },
+      {
+        "at": "2026-11-17T02:50:53.636601+00:00",
+        "step": "exact-author-seven-application-lifecycle",
+        "runnerPid": 2731732,
+        "argv": [
+          "bun",
+          "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/material-production-r2.js"
+        ],
+        "started": "2026-11-17T02:50:53.636574+00:00"
+      },
+      {
+        "at": "2026-11-17T02:52:00.289253+00:00",
+        "step": "exact-author-seven-application-lifecycle.finished",
+        "runnerPid": 2731732,
+        "argv": [
+          "bun",
+          "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/material-production-r2.js"
+        ],
+        "exitCode": 0
+      },
+      {
+        "at": "2026-11-17T02:52:01.389404+00:00",
+        "step": "continuity-production",
+        "runnerPid": 2731732
+      },
+      {
+        "at": "2026-11-17T02:52:07.766482+00:00",
+        "step": "failure-install-safe-stop-override",
+        "runnerPid": 2731732,
+        "argv": [
+          "sudo",
+          "-n",
+          "install",
+          "-m",
+          "0644",
+          "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T0243Z-8ce927b2-r2/stop.conf",
+          "/run/systemd/system/chrona.service.d/94-cleanup-reorg-production.conf"
+        ],
+        "started": "2026-11-17T02:52:07.766464+00:00"
+      },
+      {
+        "at": "2026-11-17T02:52:07.779775+00:00",
+        "step": "failure-install-safe-stop-override.finished",
+        "runnerPid": 2731732,
+        "argv": [
+          "sudo",
+          "-n",
+          "install",
+          "-m",
+          "0644",
+          "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T0243Z-8ce927b2-r2/stop.conf",
+          "/run/systemd/system/chrona.service.d/94-cleanup-reorg-production.conf"
+        ],
+        "exitCode": 0
+      },
+      {
+        "at": "2026-11-17T02:52:07.780324+00:00",
+        "step": "failure-reload-safe-stop-policy",
+        "runnerPid": 2731732,
+        "argv": [
+          "sudo",
+          "-n",
+          "systemctl",
+          "daemon-reload"
+        ],
+        "started": "2026-11-17T02:52:07.780308+00:00"
+      },
+      {
+        "at": "2026-11-17T02:52:08.260735+00:00",
+        "step": "failure-reload-safe-stop-policy.finished",
+        "runnerPid": 2731732,
+        "argv": [
+          "sudo",
+          "-n",
+          "systemctl",
+          "daemon-reload"
+        ],
+        "exitCode": 0
+      },
+      {
+        "at": "2026-11-17T02:52:08.278262+00:00",
+        "step": "failure-safe-stop-policy-verified",
+        "runnerPid": 2731732,
+        "policy": {
+          "Restart": "no",
+          "TimeoutStopUSec": "infinity",
+          "SendSIGKILL": "no"
+        }
+      },
+      {
+        "at": "2026-11-17T02:52:08.278601+00:00",
+        "step": "failure-stop-preserve-latest-data",
+        "runnerPid": 2731732,
+        "argv": [
+          "sudo",
+          "-n",
+          "systemctl",
+          "stop",
+          "chrona.service"
+        ],
+        "started": "2026-11-17T02:52:08.278594+00:00"
+      },
+      {
+        "at": "2026-11-17T02:52:08.292906+00:00",
+        "step": "failure-stop-preserve-latest-data.finished",
+        "runnerPid": 2731732,
+        "argv": [
+          "sudo",
+          "-n",
+          "systemctl",
+          "stop",
+          "chrona.service"
+        ],
+        "exitCode": 0
+      },
+      {
+        "at": "2026-11-17T02:52:08.301760+00:00",
+        "step": "production-deployment-failed",
+        "runnerPid": 2731732,
+        "failedStep": "continuity-production",
+        "error": "RuntimeError: Preserved file changed: platform/data/bfc7b577-d20f-47d8-8774-b97b4362b1d3/notify.db",
+        "stopRequested": true,
+        "candidateStartRequested": false,
+        "failureStopError": null,
+        "service": {
+          "ActiveState": "inactive",
+          "SubState": "dead",
+          "MainPID": "0",
+          "NRestarts": "0",
+          "ControlGroup": ""
+        },
+        "databaseRestored": false,
+        "automaticCodeRollback": false
+      },
+      {
+        "at": "2026-11-17T02:55:10.992432+00:00",
+        "step": "resume-after-seven-apps-started",
+        "runnerPid": 2746175,
+        "previousFailedStep": "continuity-production"
+      },
+      {
+        "at": "2026-11-17T02:55:11.000654+00:00",
+        "step": "resume-full-stopped-db-guard",
+        "runnerPid": 2746175
+      },
+      {
+        "at": "2026-11-17T02:55:12.922596+00:00",
+        "step": "continuity-production",
+        "runnerPid": 2746175
+      },
+      {
+        "at": "2026-11-17T02:55:14.895389+00:00",
+        "step": "resume-immediately-before-switch-db-guard",
+        "runnerPid": 2746175
+      },
+      {
+        "at": "2026-11-17T02:55:15.084766+00:00",
+        "step": "switch-only-chrona-unit",
+        "runnerPid": 2746175,
+        "argv": [
+          "sudo",
+          "-n",
+          "ln",
+          "-sfn",
+          "/nix/store/cbakrsg9jnc29hy6srf8p6wvinwgc8iy-unit-chrona.service/chrona.service",
+          "/etc/systemd/system/chrona.service"
+        ],
+        "started": "2026-11-17T02:55:15.084736+00:00"
+      },
+      {
+        "at": "2026-11-17T02:55:15.122621+00:00",
+        "step": "switch-only-chrona-unit.finished",
+        "runnerPid": 2746175,
+        "argv": [
+          "sudo",
+          "-n",
+          "ln",
+          "-sfn",
+          "/nix/store/cbakrsg9jnc29hy6srf8p6wvinwgc8iy-unit-chrona.service/chrona.service",
+          "/etc/systemd/system/chrona.service"
+        ],
+        "exitCode": 0
+      },
+      {
+        "at": "2026-11-17T02:55:15.123352+00:00",
+        "step": "reload-candidate-unit",
+        "runnerPid": 2746175,
+        "argv": [
+          "sudo",
+          "-n",
+          "systemctl",
+          "daemon-reload"
+        ],
+        "started": "2026-11-17T02:55:15.123327+00:00"
+      },
+      {
+        "at": "2026-11-17T02:55:15.599558+00:00",
+        "step": "reload-candidate-unit.finished",
+        "runnerPid": 2746175,
+        "argv": [
+          "sudo",
+          "-n",
+          "systemctl",
+          "daemon-reload"
+        ],
+        "exitCode": 0
+      },
+      {
+        "at": "2026-11-17T02:55:15.600658+00:00",
+        "step": "start-candidate-service",
+        "runnerPid": 2746175,
+        "argv": [
+          "sudo",
+          "-n",
+          "systemctl",
+          "start",
+          "chrona.service"
+        ],
+        "started": "2026-11-17T02:55:15.600637+00:00"
+      },
+      {
+        "at": "2026-11-17T02:55:17.528663+00:00",
+        "step": "start-candidate-service.finished",
+        "runnerPid": 2746175,
+        "argv": [
+          "sudo",
+          "-n",
+          "systemctl",
+          "start",
+          "chrona.service"
+        ],
+        "exitCode": 0
+      },
+      {
+        "at": "2026-11-17T02:55:17.529164+00:00",
+        "step": "live-read-only-acceptance",
+        "runnerPid": 2746175
+      },
+      {
+        "at": "2026-11-17T02:55:17.580604+00:00",
+        "step": "waiting-for-readiness",
+        "runnerPid": 2746175,
+        "attempt": 0,
+        "error": "URLError: <urlopen error [Errno 111] Connection refused>"
+      },
+      {
+        "at": "2026-11-17T02:55:21.545400+00:00",
+        "step": "post-start-db-guard",
+        "runnerPid": 2746175
+      },
+      {
+        "at": "2026-11-17T02:55:21.600533+00:00",
+        "step": "failure-install-safe-stop-override",
+        "runnerPid": 2746175,
+        "argv": [
+          "sudo",
+          "-n",
+          "install",
+          "-m",
+          "0644",
+          "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T0243Z-8ce927b2-r2/stop.conf",
+          "/run/systemd/system/chrona.service.d/94-cleanup-reorg-production.conf"
+        ],
+        "started": "2026-11-17T02:55:21.600515+00:00"
+      },
+      {
+        "at": "2026-11-17T02:55:21.613624+00:00",
+        "step": "failure-install-safe-stop-override.finished",
+        "runnerPid": 2746175,
+        "argv": [
+          "sudo",
+          "-n",
+          "install",
+          "-m",
+          "0644",
+          "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T0243Z-8ce927b2-r2/stop.conf",
+          "/run/systemd/system/chrona.service.d/94-cleanup-reorg-production.conf"
+        ],
+        "exitCode": 0
+      },
+      {
+        "at": "2026-11-17T02:55:21.614321+00:00",
+        "step": "failure-reload-safe-stop-policy",
+        "runnerPid": 2746175,
+        "argv": [
+          "sudo",
+          "-n",
+          "systemctl",
+          "daemon-reload"
+        ],
+        "started": "2026-11-17T02:55:21.614307+00:00"
+      },
+      {
+        "at": "2026-11-17T02:55:21.898950+00:00",
+        "step": "failure-reload-safe-stop-policy.finished",
+        "runnerPid": 2746175,
+        "argv": [
+          "sudo",
+          "-n",
+          "systemctl",
+          "daemon-reload"
+        ],
+        "exitCode": 0
+      },
+      {
+        "at": "2026-11-17T02:55:21.913093+00:00",
+        "step": "failure-safe-stop-policy-verified",
+        "runnerPid": 2746175,
+        "policy": {
+          "Restart": "no",
+          "TimeoutStopUSec": "infinity",
+          "SendSIGKILL": "no"
+        }
+      },
+      {
+        "at": "2026-11-17T02:55:21.913338+00:00",
+        "step": "failure-stop-preserve-latest-data",
+        "runnerPid": 2746175,
+        "argv": [
+          "sudo",
+          "-n",
+          "systemctl",
+          "stop",
+          "chrona.service"
+        ],
+        "started": "2026-11-17T02:55:21.913333+00:00"
+      },
+      {
+        "at": "2026-11-17T02:55:22.208239+00:00",
+        "step": "failure-stop-preserve-latest-data.finished",
+        "runnerPid": 2746175,
+        "argv": [
+          "sudo",
+          "-n",
+          "systemctl",
+          "stop",
+          "chrona.service"
+        ],
+        "exitCode": 0
+      },
+      {
+        "at": "2026-11-17T02:55:22.242047+00:00",
+        "step": "production-resume-failed",
+        "runnerPid": 2746175,
+        "failedStep": "post-start-db-guard",
+        "error": "RuntimeError: Other unknown/unsettled invocations: [{\"id\": \"146941c1-2da2-4864-83c4-4b7a8a3aa44d\", \"status\": \"unknown\", \"targetIdentity\": \"8bca1433-7185-42e4-9eef-08a832244e1a\", \"tool\": \"task-view\", \"key\": \"38d2979a-48c6-45b8-b10c-3e4795b09352\", \"error\": \"unknown: Module event timeout\", \"reply\": 0, \"repliedAt\": null}, {\"id\": \"62840fc8-656c-46e4-b37f-7fd0f5677023\", \"status\": \"running\", \"targetIdentity\": \"db7f3b02-b4ca-4704-b8cb-3d683030646b\", \"tool\": \"page-set\", \"key\": \"de169a42-eabe-4151-8e29-ce9e9c2b29f5\", \"error\": null, \"reply\": 0, \"repliedAt\": null}]",
+        "candidateStartRequested": true,
+        "failureStopError": null,
+        "service": {
+          "ActiveState": "inactive",
+          "SubState": "dead",
+          "MainPID": "0",
+          "NRestarts": "0",
+          "ControlGroup": ""
+        },
+        "databaseRestored": false,
+        "automaticCodeRollback": false
+      },
+      {
+        "at": "2026-11-17T02:58:33.446185+00:00",
+        "step": "failure-install-safe-stop-override",
+        "runnerPid": 2753249,
+        "argv": [
+          "sudo",
+          "-n",
+          "install",
+          "-m",
+          "0644",
+          "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T0243Z-8ce927b2-r2/stop.conf",
+          "/run/systemd/system/chrona.service.d/94-cleanup-reorg-production.conf"
+        ],
+        "started": "2026-11-17T02:58:33.446173+00:00"
+      },
+      {
+        "at": "2026-11-17T02:58:33.461380+00:00",
+        "step": "failure-install-safe-stop-override.finished",
+        "runnerPid": 2753249,
+        "argv": [
+          "sudo",
+          "-n",
+          "install",
+          "-m",
+          "0644",
+          "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T0243Z-8ce927b2-r2/stop.conf",
+          "/run/systemd/system/chrona.service.d/94-cleanup-reorg-production.conf"
+        ],
+        "exitCode": 0
+      },
+      {
+        "at": "2026-11-17T02:58:33.461621+00:00",
+        "step": "failure-reload-safe-stop-policy",
+        "runnerPid": 2753249,
+        "argv": [
+          "sudo",
+          "-n",
+          "systemctl",
+          "daemon-reload"
+        ],
+        "started": "2026-11-17T02:58:33.461616+00:00"
+      },
+      {
+        "at": "2026-11-17T02:58:33.693542+00:00",
+        "step": "failure-reload-safe-stop-policy.finished",
+        "runnerPid": 2753249,
+        "argv": [
+          "sudo",
+          "-n",
+          "systemctl",
+          "daemon-reload"
+        ],
+        "exitCode": 0
+      },
+      {
+        "at": "2026-11-17T02:58:33.698806+00:00",
+        "step": "failure-safe-stop-policy-verified",
+        "runnerPid": 2753249,
+        "policy": {
+          "Restart": "no",
+          "TimeoutStopUSec": "infinity",
+          "SendSIGKILL": "no"
+        }
+      },
+      {
+        "at": "2026-11-17T02:58:33.747128+00:00",
+        "step": "recover-start-current-candidate",
+        "runnerPid": 2753249,
+        "argv": [
+          "sudo",
+          "-n",
+          "systemctl",
+          "start",
+          "chrona.service"
+        ],
+        "started": "2026-11-17T02:58:33.747115+00:00"
+      },
+      {
+        "at": "2026-11-17T02:58:34.179481+00:00",
+        "step": "recover-start-current-candidate.finished",
+        "runnerPid": 2753249,
+        "argv": [
+          "sudo",
+          "-n",
+          "systemctl",
+          "start",
+          "chrona.service"
+        ],
+        "exitCode": 0
+      },
+      {
+        "at": "2026-11-17T02:58:40.703815+00:00",
+        "step": "live-read-only-acceptance",
+        "runnerPid": 2753249
+      },
+      {
+        "at": "2026-11-17T02:58:43.512040+00:00",
+        "step": "remove-stop-override",
+        "runnerPid": 2753249,
+        "argv": [
+          "sudo",
+          "-n",
+          "rm",
+          "/run/systemd/system/chrona.service.d/94-cleanup-reorg-production.conf"
+        ],
+        "started": "2026-11-17T02:58:43.512016+00:00"
+      },
+      {
+        "at": "2026-11-17T02:58:43.524351+00:00",
+        "step": "remove-stop-override.finished",
+        "runnerPid": 2753249,
+        "argv": [
+          "sudo",
+          "-n",
+          "rm",
+          "/run/systemd/system/chrona.service.d/94-cleanup-reorg-production.conf"
+        ],
+        "exitCode": 0
+      },
+      {
+        "at": "2026-11-17T02:58:43.524794+00:00",
+        "step": "restore-normal-unit-policy",
+        "runnerPid": 2753249,
+        "argv": [
+          "sudo",
+          "-n",
+          "systemctl",
+          "daemon-reload"
+        ],
+        "started": "2026-11-17T02:58:43.524783+00:00"
+      },
+      {
+        "at": "2026-11-17T02:58:43.906463+00:00",
+        "step": "restore-normal-unit-policy.finished",
+        "runnerPid": 2753249,
+        "argv": [
+          "sudo",
+          "-n",
+          "systemctl",
+          "daemon-reload"
+        ],
+        "exitCode": 0
+      },
+      {
+        "at": "2026-11-17T02:58:43.928384+00:00",
+        "step": "production-deployment-accepted",
+        "runnerPid": 2753249,
+        "acceptance": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T0243Z-8ce927b2-r2/acceptance.json",
+        "recoveryWithoutReplay": true,
+        "retainedTwoPreciselyApprovedUnknownRows": true
+      }
+    ],
+    "logs": [
+      "live-preflight.log",
+      "create-stop-drop-directory.log",
+      "install-stop-override.log",
+      "reload-before-stop.log",
+      "stop-original-service.log",
+      "backup-database-and-private-roots.log",
+      "backup-environment-file.log",
+      "verify-fresh-backup-restore.log",
+      "exact-author-seven-application-lifecycle.log",
+      "failure-install-safe-stop-override.log",
+      "failure-reload-safe-stop-policy.log",
+      "failure-stop-preserve-latest-data.log",
+      "switch-only-chrona-unit.log",
+      "reload-candidate-unit.log",
+      "start-candidate-service.log",
+      "recover-start-current-candidate.log",
+      "remove-stop-override.log",
+      "restore-normal-unit-policy.log"
+    ],
+    "restore-continuity": {
+      "tables": {
+        "Workspace": 1,
+        "Session": 51,
+        "AgentContext": 51,
+        "Run": 63,
+        "AgentCommand": 63,
+        "AgentProvider": 1,
+        "AgentRunProvider": 63,
+        "AgentRunAdmission": 63,
+        "ProviderLaunch": 63,
+        "ExecutionAttempt": 0,
+        "ExecutionCommand": 0,
+        "ExecutionDelivery": 0,
+        "ExecutionReceipt": 0,
+        "ExecutionAuthority": 0,
+        "ExecutionDetail": 0,
+        "ExecutionSnapshot": 0,
+        "ExecutionControl": 0,
+        "_chrona_migrations": 1
+      },
+      "files": {
+        "applicationData": 123,
+        "previousContent": 4709,
+        "previousSource": 440
+      },
+      "restoreGenerationMarkers": 9,
+      "unknownRowSha256": "b040fb97f9fb039bdf13f643446f0b43b26dbe06c1b8e7bf343f525ef9d0dac8"
+    },
+    "production-continuity-resume": {
+      "tables": {
+        "Workspace": 1,
+        "Session": 51,
+        "AgentContext": 51,
+        "Run": 63,
+        "AgentCommand": 63,
+        "AgentProvider": 1,
+        "AgentRunProvider": 63,
+        "AgentRunAdmission": 63,
+        "ProviderLaunch": 63,
+        "ExecutionAttempt": 0,
+        "ExecutionCommand": 0,
+        "ExecutionDelivery": 0,
+        "ExecutionReceipt": 0,
+        "ExecutionAuthority": 0,
+        "ExecutionDetail": 0,
+        "ExecutionSnapshot": 0,
+        "ExecutionControl": 0,
+        "_chrona_migrations": 1
+      },
+      "files": {
+        "applicationData": 132,
+        "previousContent": 4709,
+        "previousSource": 440
+      },
+      "restoreGenerationMarkers": 0,
+      "unknownRowSha256": "b040fb97f9fb039bdf13f643446f0b43b26dbe06c1b8e7bf343f525ef9d0dac8",
+      "vacuumSnapshotLogicalComparisons": [
+        {
+          "path": "platform/data/bfc7b577-d20f-47d8-8774-b97b4362b1d3/notify.db",
+          "logicalSchemaEqual": true,
+          "userVersion": 0,
+          "allTableRowsEqual": true,
+          "quickCheck": "ok",
+          "foreignKeyCheck": "ok",
+          "tables": [
+            {
+              "name": "kv",
+              "rows": 92,
+              "fullRowsSha256": "cef10626a8b7fad60d8278f5f43f158ba06f4cadb3a3f0dc18fd4b7cd8dfc2ee"
+            },
+            {
+              "name": "notifications",
+              "rows": 82,
+              "fullRowsSha256": "69410298fef0216e1fca6d940abfb2d2e5ed3a4d51a0ea2fcbdc6b4a7fd5e049"
+            }
+          ],
+          "physicalDifferenceReason": "Existing backupDataFiles VACUUM INTO snapshot; journal/schema_version/rootpage/file layout are physical"
+        },
+        {
+          "path": "platform/data/8bca1433-7185-42e4-9eef-08a832244e1a/chat.sqlite",
+          "logicalSchemaEqual": true,
+          "userVersion": 0,
+          "allTableRowsEqual": true,
+          "quickCheck": "ok",
+          "foreignKeyCheck": "ok",
+          "tables": [
+            {
+              "name": "conversations",
+              "rows": 7,
+              "fullRowsSha256": "e56adf36d82048beaf5e25c19418c275a7d6e75c591f2084ab1fcd9bb5e5f775"
+            },
+            {
+              "name": "create_requests",
+              "rows": 7,
+              "fullRowsSha256": "d05b3c4fa9ecefb23983d35f1cb23b200c0f8de5232f6b3387f50a834a6d34d6"
+            },
+            {
+              "name": "observation_events",
+              "rows": 100,
+              "fullRowsSha256": "3e80f4b543596751e7af45562f56a98b817b9c8aca8e1f21ad0d336d4aeb0aff"
+            },
+            {
+              "name": "observation_meta",
+              "rows": 1,
+              "fullRowsSha256": "9b2569034130a281316020be69212c8a4e16f1dab3cb53f24b0bf33aee630fdd"
+            },
+            {
+              "name": "observation_objects",
+              "rows": 57,
+              "fullRowsSha256": "0ca4d0db3050e882f90f2b23693405660c9fe07c6e447ab8b5e4f68f07fee29d"
+            },
+            {
+              "name": "observation_scopes",
+              "rows": 6,
+              "fullRowsSha256": "658f9c95047a519f926c7ee06c756f7e9c389eecc14be56f94d0acf5b9157fd8"
+            },
+            {
+              "name": "observation_withdrawals",
+              "rows": 0,
+              "fullRowsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            },
+            {
+              "name": "sqlite_sequence",
+              "rows": 1,
+              "fullRowsSha256": "fee7fcbc69c79d2fb3197b1fecbf7e6fe0f686c516b34a1aa4a516dc6ac67923"
+            }
+          ],
+          "physicalDifferenceReason": "Existing backupDataFiles VACUUM INTO snapshot; journal/schema_version/rootpage/file layout are physical"
+        },
+        {
+          "path": "platform/data/708e9ce6-e8fc-4feb-b787-4ef6d7806100/mind.sqlite",
+          "logicalSchemaEqual": true,
+          "userVersion": 0,
+          "allTableRowsEqual": true,
+          "quickCheck": "ok",
+          "foreignKeyCheck": "ok",
+          "tables": [
+            {
+              "name": "adapters",
+              "rows": 0,
+              "fullRowsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            },
+            {
+              "name": "admission_executions",
+              "rows": 6,
+              "fullRowsSha256": "6422156b567c7be9090a9badf2e44089e23e0b879f9dda35ded46a3f17158093"
+            },
+            {
+              "name": "admission_requests",
+              "rows": 6,
+              "fullRowsSha256": "cb4888be0c9003227e4ca8546fde4a111b5d40f14902cd59f337a730aa3d9547"
+            },
+            {
+              "name": "admission_verdicts",
+              "rows": 0,
+              "fullRowsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            },
+            {
+              "name": "application_reads",
+              "rows": 5,
+              "fullRowsSha256": "1241572b0b9bfbbae10fea6d717f94a68afebf0bdd4ff9cdacf249169f4597cd"
+            },
+            {
+              "name": "delivery",
+              "rows": 2,
+              "fullRowsSha256": "9ea339c846828295e8dd8f832067914e60d65860690166642f6c8348138edd83"
+            },
+            {
+              "name": "documents",
+              "rows": 8,
+              "fullRowsSha256": "55df7032e9aa1f1368a18f1fe23f558400440b3e524132d3b598886ed62fb024"
+            },
+            {
+              "name": "executions",
+              "rows": 36,
+              "fullRowsSha256": "45915fdd133888748f719d0f42f161cdcb5cde2a6e31d0ae6b38eb23881fb35a"
+            },
+            {
+              "name": "invocations",
+              "rows": 9,
+              "fullRowsSha256": "516232c50a46136fdeea5640c2c3aaedbc67305c82f44bdf55608b39c85c1a88"
+            },
+            {
+              "name": "mind_meta",
+              "rows": 3,
+              "fullRowsSha256": "d4b24e91ac7e9c2a5f5eadb95b263047eaa4621a13bd0cc8739fe5c32d373ed9"
+            },
+            {
+              "name": "mind_receipts",
+              "rows": 149,
+              "fullRowsSha256": "57634770124353739393480fb84570be06eb323249e988b600b427e536e431ef"
+            },
+            {
+              "name": "mind_records",
+              "rows": 145,
+              "fullRowsSha256": "9120f76ff2537ccf93f52f27663c26193f3f7cce9befa8226d4dfb74ee1b8ef1"
+            },
+            {
+              "name": "notification_budget",
+              "rows": 6,
+              "fullRowsSha256": "accfb5e5e564d910013425d147d7a664c095cf6b7d783a419eb7b822aaefd369"
+            },
+            {
+              "name": "notification_events",
+              "rows": 18,
+              "fullRowsSha256": "72d75f0a23ab92d8ce90ed7dba9943bfa4fdd0ea3f23e10d9c8caea81262ec2e"
+            },
+            {
+              "name": "notification_intents",
+              "rows": 6,
+              "fullRowsSha256": "b6f005f516730d61bf6cc35676977b68b7d7576a505ffeeb5462d9a787a493cc"
+            },
+            {
+              "name": "proofs",
+              "rows": 2,
+              "fullRowsSha256": "e3843efa767445a21f734670bb8217bc444f0a1ef267a43c74ec8f9feeb18fbd"
+            },
+            {
+              "name": "runtime_identity",
+              "rows": 1,
+              "fullRowsSha256": "fa6f3dec58db2a96f63ff159e409f2bcd44b0018b6db9da896e2d2bff941f76e"
+            },
+            {
+              "name": "runtime_observation_budget",
+              "rows": 1,
+              "fullRowsSha256": "c68fd76a77b0e1c28ce70b4da52b495cf85cc3e492f22cc8c6a40a23693a1b86"
+            },
+            {
+              "name": "runtime_observations",
+              "rows": 4,
+              "fullRowsSha256": "20dc14ea1a07895b94558b2ac848c5c17fbfcfd134c6ee83d50deac8844e3da3"
+            },
+            {
+              "name": "runtime_organized",
+              "rows": 0,
+              "fullRowsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            },
+            {
+              "name": "runtime_releases",
+              "rows": 0,
+              "fullRowsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            },
+            {
+              "name": "runtime_resumes",
+              "rows": 0,
+              "fullRowsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            },
+            {
+              "name": "runtime_schedule",
+              "rows": 22,
+              "fullRowsSha256": "0dfbc536eb3e1dae6d0ab7d06c4adc313fd07352a25e7f44080434151662acd0"
+            },
+            {
+              "name": "runtime_understood",
+              "rows": 51,
+              "fullRowsSha256": "845b6e211ce110747168ae95a391af92341676bacd0143e9afe6e396488e544c"
+            },
+            {
+              "name": "verification_executions",
+              "rows": 0,
+              "fullRowsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            },
+            {
+              "name": "verification_pending",
+              "rows": 0,
+              "fullRowsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            },
+            {
+              "name": "verification_requests",
+              "rows": 0,
+              "fullRowsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            },
+            {
+              "name": "verification_verdicts",
+              "rows": 0,
+              "fullRowsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            }
+          ],
+          "physicalDifferenceReason": "Existing backupDataFiles VACUUM INTO snapshot; journal/schema_version/rootpage/file layout are physical"
+        },
+        {
+          "path": "platform/data/474390d3-9d74-4eee-a192-0536c2c01f06/conversations/sessions.sqlite",
+          "logicalSchemaEqual": true,
+          "userVersion": 0,
+          "allTableRowsEqual": true,
+          "quickCheck": "ok",
+          "foreignKeyCheck": "ok",
+          "tables": [
+            {
+              "name": "conversations",
+              "rows": 1,
+              "fullRowsSha256": "e6622f8c64b6d0741e1120983dd5ecdb64e2a4a6904cbc5a55e369218d6bb6e8"
+            }
+          ],
+          "physicalDifferenceReason": "Existing backupDataFiles VACUUM INTO snapshot; journal/schema_version/rootpage/file layout are physical"
+        }
+      ]
+    },
+    "verified-applications-resume": {
+      "active": [
+        {
+          "id": "5d25045f-72e9-40bc-b678-0f865a699650",
+          "name": "apps",
+          "activeHash": "477b950e8aed71b78ed8480ed73e000d0b0a1e9c",
+          "status": "active",
+          "dataSchema": 1
+        },
+        {
+          "id": "ab95c762-2218-4cec-94fc-a13fb11957d5",
+          "name": "author",
+          "activeHash": "07673002acf9247aa2a93e3dde48aecf06b78bb9",
+          "status": "active",
+          "dataSchema": 1
+        },
+        {
+          "id": "8bca1433-7185-42e4-9eef-08a832244e1a",
+          "name": "chat",
+          "activeHash": "f8f8fe9d4b9ad5aa3de32dedc734865c2af760de",
+          "status": "active",
+          "dataSchema": 1
+        },
+        {
+          "id": "1b2f2ef3-efbb-4f2c-ae77-6fb4ec5adb58",
+          "name": "mcp",
+          "activeHash": "0815de57954b58f199125c5196bd99d8dc4a6a69",
+          "status": "active",
+          "dataSchema": 1
+        },
+        {
+          "id": "708e9ce6-e8fc-4feb-b787-4ef6d7806100",
+          "name": "mind",
+          "activeHash": "da0788a920cd2eda897a9751cc6314d3d4223f42",
+          "status": "active",
+          "dataSchema": 2
+        },
+        {
+          "id": "bfc7b577-d20f-47d8-8774-b97b4362b1d3",
+          "name": "notify",
+          "activeHash": "d731484920eeed3e68d99dd4851d83bba8a9a5e7",
+          "status": "active",
+          "dataSchema": 2
+        },
+        {
+          "id": "d3dddc1e-368c-4556-9461-c9407aa6b903",
+          "name": "pi",
+          "activeHash": "51e29501f757fd4285cf233b86d1350562f92fdc",
+          "status": "active",
+          "dataSchema": 1
+        },
+        {
+          "id": "474390d3-9d74-4eee-a192-0536c2c01f06",
+          "name": "qq",
+          "activeHash": "9e453467130082b62d306ca6c7f01c29f8af2258",
+          "status": "active",
+          "dataSchema": 2
+        },
+        {
+          "id": "db7f3b02-b4ca-4704-b8cb-3d683030646b",
+          "name": "web",
+          "activeHash": "34dd657af9abe5172479f734b487aaa814ac654b",
+          "status": "active",
+          "dataSchema": 2
+        }
+      ],
+      "receipts": [
+        {
+          "id": "candidate-submission:576ca0c6622af2827cfdb0b0531be2026d1385c625e1f7532e4497d14dd7b205",
+          "requestKey": "cleanup-material-production-20261117T0131Z:g1:submit"
+        },
+        {
+          "id": "candidate-submission:af694636ce5cec3bf35e919a43f35fd2bfb21d634b1d4b1c0247440397400325",
+          "requestKey": "cleanup-material-production-20261117T0131Z:g2:submit"
+        },
+        {
+          "id": "candidate-submission:06bdea2c556f171a0699a7ad907af7d7a5effa491dba92b51a876802889049f4",
+          "requestKey": "cleanup-material-production-20261117T0131Z:g3:submit"
+        }
+      ]
+    },
+    "external-roots-restore": {
+      "files": 1003,
+      "restoredDirectory": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T0243Z-8ce927b2-r2/restore-check/external-roots"
+    },
+    "file-difference-inventory": {
+      "checkedFiles": 5281,
+      "differences": [
+        {
+          "path": "platform/data/bfc7b577-d20f-47d8-8774-b97b4362b1d3/notify.db",
+          "beforeSha256": "b1ee4147b8cf97266fa0534381c57b8dfc25d74e60f3bd27a3f9cac57ce195bf",
+          "nowSha256": "3f8b921fe27848af953651b1d6b1443dc149fe519bf4c78da6658464de5824d1",
+          "backupSqlite": true,
+          "realSqlite": true,
+          "restoredMatchesBackup": true
+        },
+        {
+          "path": "platform/data/8bca1433-7185-42e4-9eef-08a832244e1a/chat.sqlite",
+          "beforeSha256": "7a5ec6fcf80c2f6574562b7c94da8df0c7a057d722c4f8962d483f03b82da821",
+          "nowSha256": "4050f6d87e8b446f84ba1bcc571d501d2ffa73560ad3e3d4bf7cf22d0cb43a4b",
+          "backupSqlite": true,
+          "realSqlite": true,
+          "restoredMatchesBackup": true
+        },
+        {
+          "path": "platform/data/708e9ce6-e8fc-4feb-b787-4ef6d7806100/mind.sqlite",
+          "beforeSha256": "51a77ddab3b73efde5d01505c3e927c5589685d76cab498e520ef73f7c485788",
+          "nowSha256": "85a23bb546b85bf86fd2e4b3a0888ae169970f000690a86b294ac368174eed4a",
+          "backupSqlite": true,
+          "realSqlite": true,
+          "restoredMatchesBackup": true
+        },
+        {
+          "path": "platform/data/474390d3-9d74-4eee-a192-0536c2c01f06/conversations/sessions.sqlite",
+          "beforeSha256": "7e9d0b318f4644ff9b10e08fd4d603346200d4adcfbd82d5d9a4be002f87f86f",
+          "nowSha256": "73448d54e26c3dfba83709a1babdc63a4581d920e07cce6664b497cb9a871849",
+          "backupSqlite": true,
+          "realSqlite": true,
+          "restoredMatchesBackup": true
+        }
+      ]
+    },
+    "checkpoint": {
+      "at": "2026-11-17T02:58:43.928384+00:00",
+      "step": "production-deployment-accepted",
+      "runnerPid": 2753249,
+      "acceptance": "/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa/production-20261117T0243Z-8ce927b2-r2/acceptance.json",
+      "recoveryWithoutReplay": true,
+      "retainedTwoPreciselyApprovedUnknownRows": true
+    },
+    "currentService": [
+      "ActiveState=active",
+      "SubState=running",
+      "Restart=on-failure",
+      "TimeoutStopUSec=45s",
+      "MainPID=2753388",
+      "NRestarts=0",
+      "ExecMainStartTimestamp=Tue 2026-11-17 10:58:34 CST",
+      "SendSIGKILL=yes"
+    ],
+    "recentJournal": [
+      "{\"component\":\"module-supervisor\",\"event\":\"provider_host_withheld\",\"module\":\"pi\",\"reason\":\"Release commit differs from the registered version\"}",
+      "{\"component\":\"module-supervisor\",\"event\":\"activation.failed\",\"moduleId\":\"5d25045f-72e9-40bc-b678-0f865a699650\",\"hash\":\"477b950e8aed71b78ed8480ed73e000d0b0a1e9c\",\"delivery\":\"handler\",\"error\":\"Error: Tool web.component-set not found\"}",
+      "{\"component\":\"module\",\"moduleId\":\"474390d3-9d74-4eee-a192-0536c2c01f06\",\"hash\":\"9e453467130082b62d306ca6c7f01c29f8af2258\",\"pid\":2754075,\"stderr\":\"{\\\"component\\\":\\\"qq-bot\\\",\\\"event\\\":\\\"qq.token_refreshed\\\",\\\"expiresInSeconds\\\":3989}\\n\"}",
+      "{\"component\":\"module\",\"moduleId\":\"474390d3-9d74-4eee-a192-0536c2c01f06\",\"hash\":\"9e453467130082b62d306ca6c7f01c29f8af2258\",\"pid\":2754075,\"stderr\":\"{\\\"component\\\":\\\"qq-bot\\\",\\\"event\\\":\\\"qq.ready\\\",\\\"appId\\\":\\\"1905797537\\\"}\\n\"}",
+      "{\"component\":\"module\",\"moduleId\":\"d3dddc1e-368c-4556-9461-c9407aa6b903\",\"hash\":\"51e29501f757fd4285cf233b86d1350562f92fdc\",\"pid\":2753755,\"stderr\":\"{\\\"component\\\":\\\"pi\\\",\\\"event\\\":\\\"health_unavailable\\\",\\\"error\\\":\\\"Chrona agent URL must be loopback\\\"}\\n\"}",
+      "{\"component\":\"agent-provider\",\"event\":\"provider_unavailable\",\"provider\":\"pi\",\"error\":\"Pi configuration or host bridge is unavailable\"}",
+      "{\"component\":\"module\",\"moduleId\":\"d3dddc1e-368c-4556-9461-c9407aa6b903\",\"hash\":\"51e29501f757fd4285cf233b86d1350562f92fdc\",\"pid\":2753755,\"stderr\":\"{\\\"component\\\":\\\"pi\\\",\\\"event\\\":\\\"health_unavailable\\\",\\\"error\\\":\\\"Chrona agent URL must be loopback\\\"}\\n\"}",
+      "{\"component\":\"module\",\"moduleId\":\"d3dddc1e-368c-4556-9461-c9407aa6b903\",\"hash\":\"51e29501f757fd4285cf233b86d1350562f92fdc\",\"pid\":2753755,\"stderr\":\"{\\\"component\\\":\\\"pi\\\",\\\"event\\\":\\\"health_unavailable\\\",\\\"error\\\":\\\"Chrona agent URL must be loopback\\\"}\\n\"}"
+    ],
+    "onlineSafetyAtHandoff": {
+      "modules": [
+        {
+          "id": "5d25045f-72e9-40bc-b678-0f865a699650",
+          "name": "apps",
+          "status": "active",
+          "activeHash": "477b950e8aed71b78ed8480ed73e000d0b0a1e9c",
+          "dataSchema": 1,
+          "activationId": "2147c877-d07c-416c-9d0b-731572192b99"
+        },
+        {
+          "id": "ab95c762-2218-4cec-94fc-a13fb11957d5",
+          "name": "author",
+          "status": "active",
+          "activeHash": "07673002acf9247aa2a93e3dde48aecf06b78bb9",
+          "dataSchema": 1,
+          "activationId": "68cb3892-ec1d-4bb0-b145-00cb600546dc"
+        },
+        {
+          "id": "8bca1433-7185-42e4-9eef-08a832244e1a",
+          "name": "chat",
+          "status": "active",
+          "activeHash": "f8f8fe9d4b9ad5aa3de32dedc734865c2af760de",
+          "dataSchema": 1,
+          "activationId": "8bb21c16-748e-4d88-a2ba-611b8982da5c"
+        },
+        {
+          "id": "1b2f2ef3-efbb-4f2c-ae77-6fb4ec5adb58",
+          "name": "mcp",
+          "status": "active",
+          "activeHash": "0815de57954b58f199125c5196bd99d8dc4a6a69",
+          "dataSchema": 1,
+          "activationId": "6ee5d73a-edb9-4ebf-8c92-60fd10e83655"
+        },
+        {
+          "id": "708e9ce6-e8fc-4feb-b787-4ef6d7806100",
+          "name": "mind",
+          "status": "active",
+          "activeHash": "da0788a920cd2eda897a9751cc6314d3d4223f42",
+          "dataSchema": 2,
+          "activationId": "a69d0b15-c50d-46bb-a51e-e9f71d3e0e63"
+        },
+        {
+          "id": "bfc7b577-d20f-47d8-8774-b97b4362b1d3",
+          "name": "notify",
+          "status": "active",
+          "activeHash": "d731484920eeed3e68d99dd4851d83bba8a9a5e7",
+          "dataSchema": 2,
+          "activationId": "d9861584-c111-4c0c-9c53-f2e180b88b61"
+        },
+        {
+          "id": "d3dddc1e-368c-4556-9461-c9407aa6b903",
+          "name": "pi",
+          "status": "active",
+          "activeHash": "51e29501f757fd4285cf233b86d1350562f92fdc",
+          "dataSchema": 1,
+          "activationId": "23210934-74f2-4c96-a844-b34728b95df6"
+        },
+        {
+          "id": "474390d3-9d74-4eee-a192-0536c2c01f06",
+          "name": "qq",
+          "status": "active",
+          "activeHash": "9e453467130082b62d306ca6c7f01c29f8af2258",
+          "dataSchema": 2,
+          "activationId": "d47fffcf-4a45-4cc5-96f7-67f8d8b55c1d"
+        },
+        {
+          "id": "db7f3b02-b4ca-4704-b8cb-3d683030646b",
+          "name": "web",
+          "status": "active",
+          "activeHash": "34dd657af9abe5172479f734b487aaa814ac654b",
+          "dataSchema": 2,
+          "activationId": "12feeb48-afe2-4c0f-a229-de6e0dd88c63"
+        }
+      ],
+      "waiver": {
+        "fullRowSha256": "b040fb97f9fb039bdf13f643446f0b43b26dbe06c1b8e7bf343f525ef9d0dac8"
+      },
+      "retainedUnknownRows": {
+        "146941c1-2da2-4864-83c4-4b7a8a3aa44d": "b040fb97f9fb039bdf13f643446f0b43b26dbe06c1b8e7bf343f525ef9d0dac8",
+        "840dfcfd-8ee9-46d5-b142-6ce7babc2810": "643100947a47b12b059f3f4c487e5482980c5b7c015b0fbb3966d2f9270abac3"
+      },
+      "normalInflightObservations": []
+    },
+    "backup-manifest": {
+      "files": [
+        {
+          "path": "before.db",
+          "bytes": 394350592,
+          "sha256": "c494c6c271ae6e66a772c7c38d48dd2706a3abf21784163811c5f791ca1eebf3"
+        },
+        {
+          "path": "before.db.tar",
+          "bytes": 166516224,
+          "sha256": "f81a44b70aa24395e8ea04f43028ea5ef98640c0f211f19c5fb3b19743f78424"
+        },
+        {
+          "path": "chrona-env",
+          "bytes": 73,
+          "sha256": "3b0c41677bf043e80cc0edd01cc9b3e92144e1c859f72279bc5a05bc440dd303"
+        },
+        {
+          "path": "chrona.service",
+          "bytes": 4550,
+          "sha256": "cf31e0bf2ad6b8f986e49032134c58db353ee79108450091fcd0b3a38c68bf16"
+        },
+        {
+          "path": "declaration-before/_chrona/package.nix",
+          "bytes": 1532,
+          "sha256": "10481795ce2f1441cf9fb18351a5986b106a6e69fa94de0b3148fe5f23112b3b"
+        },
+        {
+          "path": "declaration-before/_chrona/snapshot.json",
+          "bytes": 247,
+          "sha256": "c834fb9418bbee74fdbd03baea0b457e244034290fe202a99a367e8a810d7b68"
+        },
+        {
+          "path": "declaration-before/chrona.nix",
+          "bytes": 5647,
+          "sha256": "0efea78706b14cab252f8d72e8213c72a31d8614fddb13381c6d190bd90d2ea4"
+        },
+        {
+          "path": "external-roots.tar",
+          "bytes": 74598400,
+          "sha256": "24c78f381be20fa79b65cdc80d6a56b392b7a357ccfa069f667877a3106acc50"
+        }
+      ]
+    },
+    "material-production-submissions": [
+      {
+        "receiptId": "candidate-submission:576ca0c6622af2827cfdb0b0531be2026d1385c625e1f7532e4497d14dd7b205",
+        "admissionId": "candidate-admission:c0a4f9bccdcfa3778baab1de70d0e66e71f72ac5dc5b6e6c51839b0b8ed72bbd",
+        "requestKey": "cleanup-material-production-20261117T0131Z:g1:submit",
+        "submitter": {
+          "moduleId": "ab95c762-2218-4cec-94fc-a13fb11957d5",
+          "hash": "691d1622e741bbb726e80af59a3e0a3f3657d5bf"
+        },
+        "members": [
+          {
+            "name": "notify",
+            "moduleId": "bfc7b577-d20f-47d8-8774-b97b4362b1d3",
+            "hash": "d731484920eeed3e68d99dd4851d83bba8a9a5e7",
+            "versionId": "8f3d8526-a37f-40a7-a058-0cee54756b29",
+            "materialDigest": "7d5b9664001ef694c21f3e9be716c0b24493c7f8fe206acac38c53af66728d31",
+            "expectedActiveHash": "5731bd75f1ba525d2283f1066b79dd9d7e82f47b",
+            "status": "building",
+            "selected": false
+          },
+          {
+            "name": "pi",
+            "moduleId": "d3dddc1e-368c-4556-9461-c9407aa6b903",
+            "hash": "51e29501f757fd4285cf233b86d1350562f92fdc",
+            "versionId": "117ffe54-2f30-42ff-bfb5-71a0cecb8ad2",
+            "materialDigest": "a495619734295470d5308d1ac7488a03921736986ba2e3d37f3e6894e443caf6",
+            "expectedActiveHash": "6f4718a4278074d2c9b2acf1eead47b34e661d50",
+            "status": "building",
+            "selected": false
+          },
+          {
+            "name": "qq",
+            "moduleId": "474390d3-9d74-4eee-a192-0536c2c01f06",
+            "hash": "9e453467130082b62d306ca6c7f01c29f8af2258",
+            "versionId": "36e29c3c-59a0-4ef4-9048-28549c1a9240",
+            "materialDigest": "72b98c13de7d8e9c41285597b57017a89ab4f2fb82d54039879e5a0791bd749d",
+            "expectedActiveHash": "40e7748bb059c84e9f3c42af2d83f9579a1e6e03",
+            "status": "building",
+            "selected": false
+          },
+          {
+            "name": "web",
+            "moduleId": "db7f3b02-b4ca-4704-b8cb-3d683030646b",
+            "hash": "34dd657af9abe5172479f734b487aaa814ac654b",
+            "versionId": "7e850192-5f08-4bd1-ac42-523596321306",
+            "materialDigest": "5b85784d8fba2f7c900040944390497bd4597ad211b4fdb3d6914f0a8c0c9175",
+            "expectedActiveHash": "6f357eeeff58e75d6141a26286b8c59862f553ee",
+            "status": "building",
+            "selected": false
+          }
+        ],
+        "state": "submitted",
+        "approvalId": null
+      },
+      {
+        "receiptId": "candidate-submission:af694636ce5cec3bf35e919a43f35fd2bfb21d634b1d4b1c0247440397400325",
+        "admissionId": "candidate-admission:f5ecfc6ff9d5321730bf3e7f5ba526f5ffc98d735a24cd1685d15b11d30a8574",
+        "requestKey": "cleanup-material-production-20261117T0131Z:g2:submit",
+        "submitter": {
+          "moduleId": "ab95c762-2218-4cec-94fc-a13fb11957d5",
+          "hash": "691d1622e741bbb726e80af59a3e0a3f3657d5bf"
+        },
+        "members": [
+          {
+            "name": "chat",
+            "moduleId": "8bca1433-7185-42e4-9eef-08a832244e1a",
+            "hash": "f8f8fe9d4b9ad5aa3de32dedc734865c2af760de",
+            "versionId": "ba1bb7dc-0dbc-4195-a572-b45099779d91",
+            "materialDigest": "88da984d1483cec7372116200f0c6fcbd7e248450a91cc4507661d3d1a076836",
+            "expectedActiveHash": "1e0befc925ba086e492b9b115b65fb5dfc8a5998",
+            "status": "building",
+            "selected": false
+          }
+        ],
+        "state": "submitted",
+        "approvalId": null
+      },
+      {
+        "receiptId": "candidate-submission:06bdea2c556f171a0699a7ad907af7d7a5effa491dba92b51a876802889049f4",
+        "admissionId": "candidate-admission:7215f80e4304a28c162d1aaf3d60f8cb67e97f9c9426080a1152df38a205d81e",
+        "requestKey": "cleanup-material-production-20261117T0131Z:g3:submit",
+        "submitter": {
+          "moduleId": "ab95c762-2218-4cec-94fc-a13fb11957d5",
+          "hash": "691d1622e741bbb726e80af59a3e0a3f3657d5bf"
+        },
+        "members": [
+          {
+            "name": "author",
+            "moduleId": "ab95c762-2218-4cec-94fc-a13fb11957d5",
+            "hash": "07673002acf9247aa2a93e3dde48aecf06b78bb9",
+            "versionId": "308c65b5-374d-4b6f-8142-29caca613df8",
+            "materialDigest": "c046199fffc1bdc2d6a87066a9b47adad30f5f72784666fa5a25bd5b0c05525c",
+            "expectedActiveHash": "691d1622e741bbb726e80af59a3e0a3f3657d5bf",
+            "status": "building",
+            "selected": false
+          },
+          {
+            "name": "mind",
+            "moduleId": "708e9ce6-e8fc-4feb-b787-4ef6d7806100",
+            "hash": "da0788a920cd2eda897a9751cc6314d3d4223f42",
+            "versionId": "2180f510-118b-42ab-8005-82d0b9f65cf5",
+            "materialDigest": "d94964ff8c0d00d7364d9bc243db033c9eb6dfb813f4684f1ea5e44a4a5ead3f",
+            "expectedActiveHash": "a6422c26beb6edff9f476ba2bc11ef3e649c8599",
+            "status": "building",
+            "selected": false
+          }
+        ],
+        "state": "submitted",
+        "approvalId": null
+      }
+    ],
+    "material-production-activated": {
+      "receipts": [
+        {
+          "receiptId": "candidate-submission:576ca0c6622af2827cfdb0b0531be2026d1385c625e1f7532e4497d14dd7b205",
+          "admissionId": "candidate-admission:c0a4f9bccdcfa3778baab1de70d0e66e71f72ac5dc5b6e6c51839b0b8ed72bbd",
+          "requestKey": "cleanup-material-production-20261117T0131Z:g1:submit",
+          "submitter": {
+            "moduleId": "ab95c762-2218-4cec-94fc-a13fb11957d5",
+            "hash": "691d1622e741bbb726e80af59a3e0a3f3657d5bf"
+          },
+          "members": [
+            {
+              "name": "notify",
+              "moduleId": "bfc7b577-d20f-47d8-8774-b97b4362b1d3",
+              "hash": "d731484920eeed3e68d99dd4851d83bba8a9a5e7",
+              "versionId": "8f3d8526-a37f-40a7-a058-0cee54756b29",
+              "materialDigest": "7d5b9664001ef694c21f3e9be716c0b24493c7f8fe206acac38c53af66728d31",
+              "expectedActiveHash": "5731bd75f1ba525d2283f1066b79dd9d7e82f47b",
+              "status": "building",
+              "selected": false
+            },
+            {
+              "name": "pi",
+              "moduleId": "d3dddc1e-368c-4556-9461-c9407aa6b903",
+              "hash": "51e29501f757fd4285cf233b86d1350562f92fdc",
+              "versionId": "117ffe54-2f30-42ff-bfb5-71a0cecb8ad2",
+              "materialDigest": "a495619734295470d5308d1ac7488a03921736986ba2e3d37f3e6894e443caf6",
+              "expectedActiveHash": "6f4718a4278074d2c9b2acf1eead47b34e661d50",
+              "status": "building",
+              "selected": false
+            },
+            {
+              "name": "qq",
+              "moduleId": "474390d3-9d74-4eee-a192-0536c2c01f06",
+              "hash": "9e453467130082b62d306ca6c7f01c29f8af2258",
+              "versionId": "36e29c3c-59a0-4ef4-9048-28549c1a9240",
+              "materialDigest": "72b98c13de7d8e9c41285597b57017a89ab4f2fb82d54039879e5a0791bd749d",
+              "expectedActiveHash": "40e7748bb059c84e9f3c42af2d83f9579a1e6e03",
+              "status": "building",
+              "selected": false
+            },
+            {
+              "name": "web",
+              "moduleId": "db7f3b02-b4ca-4704-b8cb-3d683030646b",
+              "hash": "34dd657af9abe5172479f734b487aaa814ac654b",
+              "versionId": "7e850192-5f08-4bd1-ac42-523596321306",
+              "materialDigest": "5b85784d8fba2f7c900040944390497bd4597ad211b4fdb3d6914f0a8c0c9175",
+              "expectedActiveHash": "6f357eeeff58e75d6141a26286b8c59862f553ee",
+              "status": "building",
+              "selected": false
+            }
+          ],
+          "state": "submitted",
+          "approvalId": null
+        },
+        {
+          "receiptId": "candidate-submission:af694636ce5cec3bf35e919a43f35fd2bfb21d634b1d4b1c0247440397400325",
+          "admissionId": "candidate-admission:f5ecfc6ff9d5321730bf3e7f5ba526f5ffc98d735a24cd1685d15b11d30a8574",
+          "requestKey": "cleanup-material-production-20261117T0131Z:g2:submit",
+          "submitter": {
+            "moduleId": "ab95c762-2218-4cec-94fc-a13fb11957d5",
+            "hash": "691d1622e741bbb726e80af59a3e0a3f3657d5bf"
+          },
+          "members": [
+            {
+              "name": "chat",
+              "moduleId": "8bca1433-7185-42e4-9eef-08a832244e1a",
+              "hash": "f8f8fe9d4b9ad5aa3de32dedc734865c2af760de",
+              "versionId": "ba1bb7dc-0dbc-4195-a572-b45099779d91",
+              "materialDigest": "88da984d1483cec7372116200f0c6fcbd7e248450a91cc4507661d3d1a076836",
+              "expectedActiveHash": "1e0befc925ba086e492b9b115b65fb5dfc8a5998",
+              "status": "building",
+              "selected": false
+            }
+          ],
+          "state": "submitted",
+          "approvalId": null
+        },
+        {
+          "receiptId": "candidate-submission:06bdea2c556f171a0699a7ad907af7d7a5effa491dba92b51a876802889049f4",
+          "admissionId": "candidate-admission:7215f80e4304a28c162d1aaf3d60f8cb67e97f9c9426080a1152df38a205d81e",
+          "requestKey": "cleanup-material-production-20261117T0131Z:g3:submit",
+          "submitter": {
+            "moduleId": "ab95c762-2218-4cec-94fc-a13fb11957d5",
+            "hash": "691d1622e741bbb726e80af59a3e0a3f3657d5bf"
+          },
+          "members": [
+            {
+              "name": "author",
+              "moduleId": "ab95c762-2218-4cec-94fc-a13fb11957d5",
+              "hash": "07673002acf9247aa2a93e3dde48aecf06b78bb9",
+              "versionId": "308c65b5-374d-4b6f-8142-29caca613df8",
+              "materialDigest": "c046199fffc1bdc2d6a87066a9b47adad30f5f72784666fa5a25bd5b0c05525c",
+              "expectedActiveHash": "691d1622e741bbb726e80af59a3e0a3f3657d5bf",
+              "status": "building",
+              "selected": false
+            },
+            {
+              "name": "mind",
+              "moduleId": "708e9ce6-e8fc-4feb-b787-4ef6d7806100",
+              "hash": "da0788a920cd2eda897a9751cc6314d3d4223f42",
+              "versionId": "2180f510-118b-42ab-8005-82d0b9f65cf5",
+              "materialDigest": "d94964ff8c0d00d7364d9bc243db033c9eb6dfb813f4684f1ea5e44a4a5ead3f",
+              "expectedActiveHash": "a6422c26beb6edff9f476ba2bc11ef3e649c8599",
+              "status": "building",
+              "selected": false
+            }
+          ],
+          "state": "submitted",
+          "approvalId": null
+        }
+      ],
+      "active": [
+        {
+          "id": "5d25045f-72e9-40bc-b678-0f865a699650",
+          "name": "apps",
+          "activeHash": "477b950e8aed71b78ed8480ed73e000d0b0a1e9c",
+          "status": "active",
+          "dataSchema": 1
+        },
+        {
+          "id": "ab95c762-2218-4cec-94fc-a13fb11957d5",
+          "name": "author",
+          "activeHash": "07673002acf9247aa2a93e3dde48aecf06b78bb9",
+          "status": "active",
+          "dataSchema": 1
+        },
+        {
+          "id": "8bca1433-7185-42e4-9eef-08a832244e1a",
+          "name": "chat",
+          "activeHash": "f8f8fe9d4b9ad5aa3de32dedc734865c2af760de",
+          "status": "active",
+          "dataSchema": 1
+        },
+        {
+          "id": "1b2f2ef3-efbb-4f2c-ae77-6fb4ec5adb58",
+          "name": "mcp",
+          "activeHash": "0815de57954b58f199125c5196bd99d8dc4a6a69",
+          "status": "active",
+          "dataSchema": 1
+        },
+        {
+          "id": "708e9ce6-e8fc-4feb-b787-4ef6d7806100",
+          "name": "mind",
+          "activeHash": "da0788a920cd2eda897a9751cc6314d3d4223f42",
+          "status": "active",
+          "dataSchema": 2
+        },
+        {
+          "id": "bfc7b577-d20f-47d8-8774-b97b4362b1d3",
+          "name": "notify",
+          "activeHash": "d731484920eeed3e68d99dd4851d83bba8a9a5e7",
+          "status": "active",
+          "dataSchema": 2
+        },
+        {
+          "id": "d3dddc1e-368c-4556-9461-c9407aa6b903",
+          "name": "pi",
+          "activeHash": "51e29501f757fd4285cf233b86d1350562f92fdc",
+          "status": "active",
+          "dataSchema": 1
+        },
+        {
+          "id": "474390d3-9d74-4eee-a192-0536c2c01f06",
+          "name": "qq",
+          "activeHash": "9e453467130082b62d306ca6c7f01c29f8af2258",
+          "status": "active",
+          "dataSchema": 2
+        },
+        {
+          "id": "db7f3b02-b4ca-4704-b8cb-3d683030646b",
+          "name": "web",
+          "activeHash": "34dd657af9abe5172479f734b487aaa814ac654b",
+          "status": "active",
+          "dataSchema": 2
+        }
+      ],
+      "noProductionWrites": false,
+      "noModelOrQQMessages": true
+    },
+    "serviceAtHandoff": [
+      "ActiveState=active",
+      "SubState=running",
+      "Restart=on-failure",
+      "TimeoutStopUSec=45s",
+      "MainPID=2753388",
+      "NRestarts=0",
+      "SendSIGKILL=yes"
+    ],
+    "activeChronaUnits": [
+      "  chrona.service loaded active running Chrona steward (dedicated Pi provider)"
+    ],
+    "completionStatus": "deployed_http_and_data_checks_passed_functional_completion_blocked_pi_exact_commit_and_apps_retired_api",
+    "noDatabaseRestoreOrCodeRollback": true,
+    "noModelOrQQTestDispatch": true,
+    "functionalBlockers": [
+      {
+        "component": "pi",
+        "cause": "Author exact-source commit differs from release commit; strict providerHost correctly withheld host configuration",
+        "activeCommit": "51e29501f757fd4285cf233b86d1350562f92fdc",
+        "requiredReleaseCommit": "8bf7c40377abdd82d7bbfd067a92c5fb4dc5bad1",
+        "sameSourceTree": "74a742c480e543129d7edea45c0314eed8254ae9",
+        "fixRequiresNewRelease": true
+      },
+      {
+        "component": "apps",
+        "cause": "Retained old application activation calls retired web.component-set",
+        "activeCommit": "477b950e8aed71b78ed8480ed73e000d0b0a1e9c",
+        "fix": "Normal app update: direct page-set javascript/css/props/tools; remove component-set use"
+      }
+    ]
+  },
+  "acceptanceInterpretation": "Runner production-deployment-accepted covers HTTP/resources/material/data checks only. Final functional review found Pi host identity unavailable and Apps retired component API; overall stage remains incomplete."
+}
