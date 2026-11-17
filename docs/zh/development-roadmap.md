@@ -18,8 +18,8 @@
 | --- | --- |
 | API 合同收口 | 独立消费者与冻结门槛（已从工作树删除，见 git 历史 docs/zh/kernel-api-acceptance.md）已加入；继续补齐 35 个工具的外部故障路径，不以单实现测试宣称可替换内核已验证 |
 | 产品闭环验收 | 用目标 §12 的真实新需求和连续补充验证完成、修订、暂停、恢复及主动反馈；记录失败场景，不以测试数量证明省心 |
-| Chat 使用反馈 | 验证独立 Chat 的会话、附件、执行记录和恢复体验；旧 Coding/coding-web 已[退役](coding-retirement.md)，不再推进旧 work 执行合同冻结 |
-| 应用自动化 | [持续关注与恢复](continuous-steward-journey.md)包含 Mind 持久 timer、Files 读取和记忆纠正；尚需真实连续使用验收。memory-local 周期整理和 Remind 仍暂停 |
+| Chat 使用反馈 | 验证独立 Chat 的会话、附件、执行记录和恢复体验；旧 Coding/coding-web 已[退役](../../../chrona-module-author/docs/coding-retirement.md)，不再推进旧 work 执行合同冻结 |
+| 应用自动化 | [持续关注与恢复](continuous-steward-journey.md)包含 Mind 持久 timer、Files 读取和记忆纠正；尚需真实连续使用验收。Remind 仍暂停；memory-local 已移出主仓组合，旧自动会话记忆链已删除 |
 | 发行与部署 | 选定精确 revision，核对生成合同、种子和制品，隔离构建及 fresh-data 验证；真实模型、账号和部署分别授权 |
 | 既有数据接管 | 另行盘点真实实例、设计备份及转换，在副本演练；不把旧接口兼容加回正常架构，不自行操作真实库 |
 | 远端与替代内核 | 通用远端宿主继续延后；跨语言替代内核是设计目标，当前不要求实现第二内核或迁移格式 |

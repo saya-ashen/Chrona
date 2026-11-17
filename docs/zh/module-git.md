@@ -31,7 +31,7 @@
 3. Author 以实际应用身份提交整个固定集合，用原 request key 和 receipt 查询检查、审批与激活。丢失回复不换 key 重投。
 4. 激活后核对实际版本、页面及业务行为；检查通过和审批通过分别只有其自身证明范围。
 
-当前参数见[对话创作](author-current-conversation.md)、[版本材料](author-version-materials.md)及 [API 规范](kernel-api-design.md)。旧 `modules.checkout/propose/check/build` 不再是公开入口。
+当前参数见[对话创作](../../../chrona-module-author/docs/author-current-conversation.md)、[版本材料](../../../chrona-module-author/docs/author-version-materials.md)及 [API 规范](kernel-api-design.md)。旧 `modules.checkout/propose/check/build` 不再是公开入口。
 
 同名卸载后重装的外部应用拥有新 `moduleId`，不会继承旧仓库、提交回执或安装身份。
 

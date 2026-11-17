@@ -14,6 +14,8 @@ Mind 用应用自己的 `mind-review` 持久 timer。启用、修改间隔、暂
 
 ## 记忆纠正与删除
 
+以下是独立 memory-local 模块的历史实现记录。该模块已移出 Chrona 主仓组合，Web／MCP／QQ 不再发送会话快照、自动注入上下文或按水位留存。Mind 的关注与恢复机制继续独立维护。
+
 memory-local 的 owner 工具 `correct-preference(id, expected-text, text)` 保留偏好 ID 和创建时间，以预期旧值防止覆盖并发修改。同进程写入串行化。
 
 `correct-memory(id, expected-content, content)` 纠正原始记忆。SQLite 私有日志先持久化目标，再更新本地索引；每次读取、留存前修复未完成修改。无法修复时拒绝返回旧事实。删除同样保留目标墓碑。日志容量为 4096 条目标、8192 个被取代内容摘要；满额明确失败，不静默遗忘防重放事实。

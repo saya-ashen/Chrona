@@ -1,6 +1,6 @@
 # 内核 API 实施记录
 
-> 当前状态：Coding 与 coding-web 已退役，包含旧 work-v2；当前 Chat 独立拥有会话与执行记录。本文的 Coding/Editor 接口、源码路径、验收和部署描述仅作历史记录，不是现行接入指引。详见[Coding 退役说明](coding-retirement.md)。
+> 当前状态：Coding 与 coding-web 已退役，包含旧 work-v2；当前 Chat 独立拥有会话与执行记录。本文的 Coding/Editor 接口、源码路径、验收和部署描述仅作历史记录，不是现行接入指引。详见[Coding 退役说明](../../../chrona-module-author/docs/coding-retirement.md)。
 
 状态：2026-11-11 实现、SDK 和维护中的调用方已提交为 `1aef6824`，完成下述验证，并按用户授权部署独立本地预览实例；**API 未冻结**。依据：[公开 API 规范](kernel-api-design.md)。旧服务及其数据保留，新实例仅使用全新数据。
 
@@ -100,7 +100,7 @@
 
 ## 2026-11-11：Provider 注册制与七工具 Agent
 
-本节记录新增改造，前文的六命名空间及 `work-*` 状态属于历史阶段。当前源码公开 `agent.register/providers/run/read/write/stop/native`；旧 Agent 公开别名及不可替换内置应用已移除。具体 Provider 通过普通应用登记，默认预装 Pi 可停用、移除，内核不导入 Pi。已部署实例尚未更新。
+本节记录新增改造，前文的六命名空间及 `work-*` 状态属于历史阶段。当前源码公开 `agent.register/providers/run/read/write/stop/native`；旧 Agent 公开别名及不可替换内置应用已移除。具体 Provider 通过普通应用登记，Pi 由独立应用提供，可停用、移除，内核不导入 Pi。已部署实例尚未更新。
 
 登记固定获准应用身份、版本、端点合同和配置 revision；上下文及 Run 保存选定绑定。Pi 使用所选用户配置目录的技能、扩展、模板及上下文，模型和思考强度由 Pi 配置页面管理。原生命令交给原有进程，原始事件保留结构，超出保留边界明确报告缺口。有限 completion 使用显式无工具执行，与通用会话分开。
 

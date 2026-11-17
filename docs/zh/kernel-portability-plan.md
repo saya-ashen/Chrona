@@ -1,6 +1,8 @@
 # 内核可移植、可信本地运行与远程执行应用化实施方案
 
-> 当前状态：Coding 与 coding-web 已退役，包含旧 work-v2；当前 Chat 独立拥有会话与执行记录。本文的 Coding/Editor 接口、源码路径、验收和部署描述仅作历史记录，不是现行接入指引。详见[Coding 退役说明](coding-retirement.md)。
+当前远程设备功能已退役：`remote-device`、`remote-model` 及专属 HTTP 入口已删除。下文远程设备实现、命令和验收仅保留历史背景，不是当前启用指引；未来需要时另行设计。通用 execution 与 process 能力保留。
+
+> 当前状态：Coding 与 coding-web 已退役，包含旧 work-v2；当前 Chat 独立拥有会话与执行记录。本文的 Coding/Editor 接口、源码路径、验收和部署描述仅作历史记录，不是现行接入指引。详见[Coding 退役说明](../../../chrona-module-author/docs/coding-retirement.md)。
 
 日期：2026-11-09。状态：**S0–S3 已实施；S4 部分实现，原生平台矩阵未验收；S5 本机实际设备全链路与可靠性修复定向通过，仍为部分完成；S6 未验收**。
 
@@ -108,7 +110,7 @@
 
 ## 5. 远程执行目标架构
 
-普通应用已使用 `remote-execution` 名称，源码位于 [`external/remote-execution`](../../packages/engine/src/modules/steward/applications/remote-execution/)。它已登记为普通可选安装包，实际固定 seed 安装通过（`builtin: false`、0 execution authority），未默认安装或增加权限；完整发行 runtime 尚未接受。Agent 仍是唯一不可变的内置应用。
+普通应用已使用 `remote-execution` 名称，源码位于 `external/remote-execution`（历史路径 `../../packages/engine/src/modules/steward/applications/remote-execution/`）。它已登记为普通可选安装包，实际固定 seed 安装通过（`builtin: false`、0 execution authority），未默认安装或增加权限；完整发行 runtime 尚未接受。Agent 仍是唯一不可变的内置应用。
 
 ```mermaid
 flowchart LR
@@ -122,7 +124,7 @@ flowchart LR
     A --> C
 ```
 
-图中的连线表示职责和控制路径。S5 已有通用 Run 交付、私有 receiver carrier、普通应用和设备认证入口；实际设备程序经生产 HTTP/真实应用/内核/实际 Pi 到签名停止和 cleanup 已通过确定性测试。模型网关和窄治理已接通，配额、公平性与 cancel-before-journal 修复后的定向回归已通过；有限物理存储已完成定向验证，安全归档、完整生命周期故障矩阵与跨平台发行仍待收口。当前接口以 [`kernel-execution.ts`](../../packages/contracts/src/steward/kernel-execution.ts) 和 [`execution-delivery-carrier.ts`](../../packages/engine/src/modules/steward/execution-delivery-carrier.ts) 为准。继续复用现有 Agent 和应用路由，不引入公共 Provider 注册框架，也不开放"任意应用都能写 Run 状态"的接口。
+图中的连线表示职责和控制路径。S5 已有通用 Run 交付、私有 receiver carrier、普通应用和设备认证入口；实际设备程序经生产 HTTP/真实应用/内核/实际 Pi 到签名停止和 cleanup 已通过确定性测试。模型网关和窄治理已接通，配额、公平性与 cancel-before-journal 修复后的定向回归已通过；有限物理存储已完成定向验证，安全归档、完整生命周期故障矩阵与跨平台发行仍待收口。当前接口以 [`kernel-execution.ts`](../../packages/contracts/src/steward/kernel-execution.ts) 和 `execution-delivery-carrier.ts`（历史路径 `../../packages/engine/src/modules/steward/execution-delivery-carrier.ts`） 为准。继续复用现有 Agent 和应用路由，不引入公共 Provider 注册框架，也不开放"任意应用都能写 Run 状态"的接口。
 
 ### 5.1 职责归属
 
@@ -187,7 +189,7 @@ flowchart LR
 
 ### 7.2 本地 IPC 与 HTTP
 
-已选择并实现仅监听 `127.0.0.1` 的认证 loopback TCP，内核通道与 SDK 共享 [`transport.ts`](../../packages/integrations/src/steward/module-sdk/transport.ts)，不再以 Bun unix serve/fetch 作为新协议前提。三端实际运行仍待验收，连接信息通过环境变量合同告诉模块进程，并满足 §1.4 第 2 条。
+已选择并实现仅监听 `127.0.0.1` 的认证 loopback TCP，内核通道与 SDK 共享 `transport.ts`（历史路径 `../../packages/integrations/src/steward/module-sdk/transport.ts`），不再以 Bun unix serve/fetch 作为新协议前提。三端实际运行仍待验收，连接信息通过环境变量合同告诉模块进程，并满足 §1.4 第 2 条。
 
 该实现必须持续满足：每个实例一个不可猜测的凭据、绑定到目标实例、启动时的就绪握手、限制监听地址、限制消息大小、处理断连。不能仅凭"来自本机"就授予 caller 身份；内部凭据不能注入到应用自报的 caller 中，也不能写进日志。新增的握手消息纳入 wire schema。
 
@@ -248,7 +250,7 @@ flowchart LR
 - 修复路径、解释器和环境变量的构造；完成进程内备份。
 - 同步 Agent 生成产物、资源、配置、doctor/health、`AGENTS.md` 和运维说明。
 - 交付：本地功能的行为验证；增加一个 `.py` 入口模块完成安装和启动的测试。除显式登记的 S1 `modules.diagnostics` 变更外，hash 基线保持。此阶段不据此宣布三端完整支持。
-- **当前状态：已实施，本机 Linux 发行 runtime 已通过。** 运行时表、直接解释器启动、`calls.json` 与运行包内声明生成、可选工具检测及进程内备份已有实现。历史定向 110/130 项及 Python/合同 11 项分别通过，不累加。17:43–17:44 新修复显式可信宿主 `StewardPorts.processHelper`，贯通 checker、bun/uv installer 与父 build declaration helper；[实际编译回归](../../packages/integrations/src/steward/module-packaged-helper.bun.test.ts)从无关 cwd 验证 1 pass / 8 断言，既有 checker 16 pass / 94 断言、installer 9 pass / 33 断言（2 个实际安装用例 filtered）。受限子进程环境未放宽；normalized guardian 的 Nix RUNPATH 缺陷已在构建时修复，受限环境停止证据及 17:55 默认 Linux CLI 离线 runtime smoke 已通过。其他原生平台仍须单独验收。
+- **当前状态：已实施，本机 Linux 发行 runtime 已通过。** 运行时表、直接解释器启动、`calls.json` 与运行包内声明生成、可选工具检测及进程内备份已有实现。历史定向 110/130 项及 Python/合同 11 项分别通过，不累加。17:43–17:44 新修复显式可信宿主 `StewardPorts.processHelper`，贯通 checker、bun/uv installer 与父 build declaration helper；实际编译回归（历史路径 `../../packages/integrations/src/steward/module-packaged-helper.bun.test.ts`）从无关 cwd 验证 1 pass / 8 断言，既有 checker 16 pass / 94 断言、installer 9 pass / 33 断言（2 个实际安装用例 filtered）。受限子进程环境未放宽；normalized guardian 的 Nix RUNPATH 缺陷已在构建时修复，受限环境停止证据及 17:55 默认 Linux CLI 离线 runtime smoke 已通过。其他原生平台仍须单独验收。
 
 ### S2：Agent 自包含
 
@@ -257,9 +259,9 @@ flowchart LR
 - `browser.ts` 移入 Agent 目录；`transcriptRedactor` 移入 `@chrona/logging/redaction`，同时修改 `transcript.ts`、`module-build-session.ts` 的 import。
 - 删除 `builtinCallerMaterial` 和 `module-typecheck-material.macro.ts`；Agent 作为依赖方，按 §4 的方式检查。
 - 在 `.dependency-cruiser.cjs` 中加入 §4 的两条禁止规则，测试和 fixture 也遵守。
-- 发布打包（`build/manifest.ts`、`build/portable-elf.ts`）纳入 `@chrona/pi`。
+- 发布打包（`scripts/build/manifest.ts`、`scripts/build/portable-elf.ts`）纳入 `@chrona/pi`。
 - 交付：hash fixture 不变，Agent tools 快照一致；depcruise 不新增例外；在内核目录中 `grep builtin/agent` 没有生产代码命中；`release-smoke` 通过。
-- **当前状态：已实施，本机 Linux 发行 runtime 已通过。** 合同迁入 [`agent.ts`](../../packages/contracts/src/steward/agent.ts)，Pi 实现与资源迁入 [`packages/pi`](../../packages/pi/)，依赖规则和 Agent 自包含产物已改造。Pi 定向日志 139 通过、复核日志 51 通过；16:38–16:39 Agent 安装/设置页及脱离源码树的检查失败保留为 HISTORY。17:11:25 第二轮 full Bun 中设置页 3 通过、Agent 安装文件隔离重试 5 通过但有 callback 超时历史，最终失败清单已无 detached 文件；Agent module-calls/release 当轮仍失败。17:27 修复 manifest union 和 admission wake 后，原 module-call 4 项/release 1 项定向通过；完整 API 已确认通过；17:42 第三轮 full Bun 已完成 229 文件，最终无失败文件清单但包含 notify 首次失败后的隔离重试，17:55 在修复 helper 路径和 ELF 搜索路径后，本机默认 Linux CLI 通过离线 runtime smoke，详见[验证记录](kernel-portability-verification.md)。
+- **当前状态：已实施，本机 Linux 发行 runtime 已通过。** 合同迁入 [`agent.ts`](../../packages/contracts/src/steward/agent.ts)，Pi 实现与资源迁入 `packages/pi`（历史路径 `../../packages/pi/`），依赖规则和 Agent 自包含产物已改造。Pi 定向日志 139 通过、复核日志 51 通过；16:38–16:39 Agent 安装/设置页及脱离源码树的检查失败保留为 HISTORY。17:11:25 第二轮 full Bun 中设置页 3 通过、Agent 安装文件隔离重试 5 通过但有 callback 超时历史，最终失败清单已无 detached 文件；Agent module-calls/release 当轮仍失败。17:27 修复 manifest union 和 admission wake 后，原 module-call 4 项/release 1 项定向通过；完整 API 已确认通过；17:42 第三轮 full Bun 已完成 229 文件，最终无失败文件清单但包含 notify 首次失败后的隔离重试，17:55 在修复 helper 路径和 ELF 搜索路径后，本机默认 Linux CLI 通过离线 runtime smoke，详见[验证记录](kernel-portability-verification.md)。
 
 ### S3：冻结系统工具合同
 
@@ -281,7 +283,7 @@ flowchart LR
 - 改造内核中直接认识 Executor 的认领、路由、恢复和完成路径，只保留最小的可信执行支撑。按 §6 调整 Agent 原语，hash 变化逐项列出。
 - 设备端程序依赖 `@chrona/pi`，独立打包；Linux 监管后端与核心解耦。
 - 交付：四种组合的验证证据——无远程应用的核心、本地 Coding、已安装远程应用、实际设备端。
-- **当前状态：部分完成，本机实际独立设备全链路与可靠性修复定向通过，S5 尚未整体接受。** [生产设备测试](../../packages/remote-device/src/production.bun.test.ts)实际执行 RemoteDevice→生产 HTTP→真实应用 SDK/native carrier→SQLite 内核模型预留→实际 Pi 1.5.0 原生文件工具→内核验证设备签名停止并释放占用→cleanup preview/confirm，仅 completion I/O 为假实现，无外部模型。17:36 设备最终 **39 pass / 325 断言、无 skip**；17:35 native cold-claim 修复后生产用例重跑 **1 pass / 36 断言**，包级 tsc、重建与复制二进制 smoke 通过。app 最终 **2 pass / 15 断言**、原生 **21 pass / 179 断言**、公平性 **1 pass / 17 断言**，最终完整 wire bytes 预留后再验证。历史 server 53 pass / 317 断言、actual Pi 1 pass / 91 断言、model 18 pass / 115 断言覆盖重叠，不累加。治理、模型网关、cleanup、source/终止证据独立逻辑配额与持久公平轮询已接通；认证 ready/reconcile 后 drain-only identity 先入 journal，再产生 never_started 签名及 cancel ACK，禁止 spawn，丢失回复后可安全重放。此前已授权但缺 journal、spawn_possible/running/unknown 仍保留未知停止与占用。有限 SQLite/回滚日志与实际证据预留已实现并通过 50 项回归；安全 GC/retention、>100 delivery 恢复、完整故障矩阵与跨平台发行验收仍未完成，见[验证记录 §4](kernel-portability-verification.md#4-s5-已贯通路径与尚未闭环的部分)。
+- **当前状态：部分完成，本机实际独立设备全链路与可靠性修复定向通过，S5 尚未整体接受。** 生产设备测试（历史路径 `../../packages/remote-device/src/production.bun.test.ts`）实际执行 RemoteDevice→生产 HTTP→真实应用 SDK/native carrier→SQLite 内核模型预留→实际 Pi 1.5.0 原生文件工具→内核验证设备签名停止并释放占用→cleanup preview/confirm，仅 completion I/O 为假实现，无外部模型。17:36 设备最终 **39 pass / 325 断言、无 skip**；17:35 native cold-claim 修复后生产用例重跑 **1 pass / 36 断言**，包级 tsc、重建与复制二进制 smoke 通过。app 最终 **2 pass / 15 断言**、原生 **21 pass / 179 断言**、公平性 **1 pass / 17 断言**，最终完整 wire bytes 预留后再验证。历史 server 53 pass / 317 断言、actual Pi 1 pass / 91 断言、model 18 pass / 115 断言覆盖重叠，不累加。治理、模型网关、cleanup、source/终止证据独立逻辑配额与持久公平轮询已接通；认证 ready/reconcile 后 drain-only identity 先入 journal，再产生 never_started 签名及 cancel ACK，禁止 spawn，丢失回复后可安全重放。此前已授权但缺 journal、spawn_possible/running/unknown 仍保留未知停止与占用。有限 SQLite/回滚日志与实际证据预留已实现并通过 50 项回归；安全 GC/retention、>100 delivery 恢复、完整故障矩阵与跨平台发行验收仍未完成，见[验证记录 §4](kernel-portability-verification.md#4-s5-已贯通路径与尚未闭环的部分)。
 
 ### S6：三端远程验收与旧链路清理
 
@@ -344,6 +346,6 @@ flowchart LR
 - [可移植性验证记录](kernel-portability-verification.md)：本轮实际证据、平台矩阵、复现命令与未完成验收。
 - [当前 API 规范](kernel-api-design.md)及[实施记录](kernel-api-implementation.md)：当前职责与生命周期。旧永久边界合同及实施记录从 Git 历史查阅。
 - [当前架构](architecture.md)、[模块依赖方向](module-dependency-direction.md)：依赖与所有权规则。
-- [Coding 退役说明](coding-retirement.md)：业务调用面；不借远程拆分重建 Coding 协议。
+- [Coding 退役说明](../../../chrona-module-author/docs/coding-retirement.md)：业务调用面；不借远程拆分重建 Coding 协议。
 - 统一模块协议与本地／远端宿主方案从 Git 历史 `docs/zh/unified-module-runtime-plan.md` 查阅；本文不重启已推迟的通用远程宿主工作。
 - 合并前的《可信本地跨平台运行与远程执行应用化方案》：`git show fbc4464a:docs/zh/history/cross-platform-runtime-and-remote-execution-plan.md`。

@@ -2,103 +2,49 @@ English | [中文](README.zh.md)
 
 # Chrona
 
-A local-first personal steward: talk in the web composer or QQ private chat, and work together in persistent sessions and apps.
+Chrona provides a general kernel, host runtime, CLI and SDK for independently maintained applications.
 
-Coding and coding-web, including work-v2, are retired. The current Chat application owns its conversations and execution records independently; see the [retirement note](docs/zh/coding-retirement.md).
+The kernel owns application lifecycle, tool routing, caller identity, approvals, credentials, a single Run queue, budgets, cancellation and durable timers. The host supplies local process execution and transport. The CLI starts the runtime, exposes the loopback HTTP kernel agent bridge and provides administration, diagnostics and backup commands. The SDK defines application transport and build contracts.
 
-## How it works
+Application source, pages, Provider adapters, dependency bundles and release artifacts belong to their own repositories. Applications manage their own builds, releases and installation instructions. This repository and its distributions contain no default applications; starting a fresh kernel creates its database and default workspace without installing an application or calling a model.
 
-**Sessions** have directories under `<dataDir>/sessions/<id>/`. Apps (modules) keep their own files under `<dataDir>/platform/data` (code under `<dataDir>/platform/store`) and offer tools; conversation attachments are kept under `<dataDir>/platform/data/chat`. The Provider (currently Pi) works through app tools, researches and uses its own tools. Chrona supplies persistent schedules, foreground/background queues, credentials, approvals and delivery. Model prose alone does not schedule work or send messages: those actions use Chrona tools.
+## Run from source
 
-- **Today**: approvals, schedules and recent activity.
-- **Sessions**: conversations and saved work.
-- **Documents and apps**: the files app's documents, each app's runs, versions and tools.
-- **Settings**: notifications, permissions, preferences and Provider/runtime health.
+Requires **Bun ≥ 1.4.2**, **git**, and a native C compiler for the process guardian. Full backups also require GNU-compatible `tar`.
 
-Schedules can wake the Provider or trigger modules, including fixed reminders without a model call and recurring executable checks. Proactive notifications pass through the built-in `notify` module's budget, including quiet hours and digests. External content cannot grant permission.
-
-## Quick start
-
-Requires **Bun ≥ 1.4.2**, **git**, and a pinned **Pi CLI** with model access configured in a dedicated service profile. The [Provider adapter](packages/pi/src/pi-provider.ts) uses Pi RPC; its default version pin is **0.85.0**; an explicit **1.x** pin from **1.3.0** on is also supported. Full backups additionally require GNU-compatible `tar`.
-
-Choose a fresh data directory; do not reuse a pre-rebuild database:
+Use a fresh data directory:
 
 ```bash
 bun install
-export CHRONA_DATA_DIR="$PWD/.data/steward-fresh"
+export CHRONA_DATA_DIR="$PWD/.data/kernel-fresh"
 export DATABASE_URL="file:$CHRONA_DATA_DIR/chrona.db"
-export CHRONA_STEWARD_AGENT=pi
-# Replace this example with a reviewed, service-only executable; no shell arguments.
-export CHRONA_STEWARD_PI_COMMAND=/opt/chrona/pi/bin/pi
-export CHRONA_STEWARD_PI_VERSION=0.85.0
-export CHRONA_STEWARD_PI_AGENT_DIR="$CHRONA_DATA_DIR/providers/pi"
-install -d -m 700 "$CHRONA_STEWARD_PI_AGENT_DIR"
-# Configure model access using this executable and PI_CODING_AGENT_DIR first.
+bun scripts/chrona.ts build helper
 bun run dev
 ```
 
-The Pi path above is a placeholder, not an installation command. Prepare model access separately with `PI_CODING_AGENT_DIR="$CHRONA_STEWARD_PI_AGENT_DIR"` and the selected executable. Chrona does not copy personal authentication or create the profile. Use an absolute canonical profile path that does not overlap the session tree, private to the service user (Unix mode `0700`); the default `<dataDir>/providers/pi` is valid. Missing configuration or a version mismatch leaves the Provider unavailable; there is no PATH/profile fallback. See [operations](docs/zh/operations.md#确认-agent-真正可用) before upgrading an existing installation.
+`bun run dev` starts the kernel runtime in watch mode. Use `bun run server:start` without watch mode, or `chrona start --no-open` in a packaged release. The HTTP bridge listens on `127.0.0.1:3101` by default; `/health` reports runtime health. Application pages are supplied by applications installed separately.
 
-Open `http://127.0.0.1:3101`; `bun run dev` starts Hono in watch mode and serves both the built-in web module and API there, with no separate Vite server. Startup applies migrations and creates `ws_default`. Set both storage variables explicitly: the source server's database default is `file:./prisma/dev.db`, independent of `CHRONA_DATA_DIR`. The server binds loopback by default; configure authentication before exposing it to a network.
+The default SQLite database is `<dataDir>/chrona.db`; `DATABASE_URL` overrides it. Set `CHRONA_DATA_DIR` explicitly when developing or running multiple instances. `CHRONA_CONFIG_FILE` selects a configuration file; see [chrona.config.example.json](chrona.config.example.json).
 
-The packaged application uses `chrona start --no-open`. For source startup without watch mode use `bun run server:start`.
+Application processes use the service user's OS permissions. Kernel authorization, approvals and budgets govern routed actions; they do not isolate trusted local code from the host OS.
 
-Set a browser login password on first opening the web app, then sign in with that password and change it in Settings. An existing instance with `API_KEY` requires its original access authorization for initial password setup. See [browser login passwords](docs/zh/operations.md#网页登录密码).
-
-## Configuration
-
-Set these in the server environment, then restart:
-
-| Variable | Meaning |
-| --- | --- |
-| `DATABASE_URL` | SQLite URL; source default `file:./prisma/dev.db` |
-| `CHRONA_DATA_DIR` | Platform, sessions and secrets root; set explicitly for server and CLI |
-| `HOST`, `PORT` | API bind; defaults `127.0.0.1`, `3101` |
-| `API_KEY` | API authentication; required before non-loopback exposure |
-| `ALLOWED_ORIGINS` | Additional permitted browser origins, comma-separated |
-| `CHRONA_STEWARD_AGENT` | `pi` enables the Provider; otherwise disabled |
-| `CHRONA_STEWARD_PI_COMMAND` | Required absolute, reviewed service executable; no PATH fallback or shell arguments |
-| `CHRONA_STEWARD_PI_VERSION` | Exact version pin; default `0.85.0`, also supports explicit `1.x` from `1.3.0` |
-| `CHRONA_STEWARD_PI_AGENT_DIR` | Existing private canonical profile; default `<dataDir>/providers/pi`; never copied automatically |
-| `CHRONA_STEWARD_PI_RESOURCES_FILE` | Optional private, canonical JSON manifest of reviewed explicit skill/extension entry files and extra tool names; no installation or ambient discovery |
-| `CHRONA_STEWARD_PI_MODEL` | Optional Pi model selection |
-| `CHRONA_STEWARD_PI_WEB_EXTENSION` | Optional explicit web extension path |
-| `CHRONA_STEWARD_EXECUTION_MODE` | Trusted local execution; unset, empty or `trusted-local` are accepted; retired isolation settings fail explicitly |
-| `CHRONA_STEWARD_TICK_SECONDS` | Background tick interval; default `30` seconds |
-| `CHRONA_PUBLIC_URL` | Public HTTP(S) origin for notification links |
-| `CHRONA_QQ_APP_ID` | Dedicated QQ bot application ID |
-| `CHRONA_QQ_SECRET_FILE` | Private app-secret file owned by the server user |
-| `CHRONA_QQ_STATE_DIR` | Legacy QQ state source for the first migration; fallback `<dataDir>/qq-bot/<appId>`; current state lives in the `qq` module's data |
-
-The default `trusted-local` mode runs Pi's bash, file tools and modules as local processes with the service user's OS permissions, even when bubblewrap is installed. Host files are not hidden by an OS sandbox; `content/chat` uses symlinks, so treating attachments as read-only is an agent rule rather than an enforced mount. Chrona's routed authorization, approvals and budgets still apply; local access does not grant permission to bypass them.
-
-Applications and Providers use host-installed interpreters and programs directly. Python, Shell and browsers are checked when needed; browsers are never downloaded automatically. Manifest declarations do not restrict host OS permissions. The retired `required-isolation` mode and nonempty `CHRONA_STEWARD_SANDBOX_BWRAP` settings fail explicitly and must be removed. Portable IPC, process-tree supervision and three-platform acceptance remain in progress.
-
-Pi resource auto-discovery and project trust are disabled. An optional reviewed [resource manifest](docs/zh/provider-runtime.md) adds explicit skills/extensions using Pi's own loading mechanism; native MCP requires an explicit `1.x` pin of `1.3.0` or later. Startup checks command resources before prompting. This is not a full tool manifest or proof that wrappers/extensions are safe: review the executable, extension code and service profile independently. Health checks validate launch configuration/version, not authentication or model success.
-
-### Work progress and Provider questions
-
-Safe progress summaries and usage estimates appear on session/app pages. Blocking Pi `select/confirm/input/editor` requests appear in the shared shell, including when you are viewing a different session, app or Settings. You must answer explicitly; requests are bound to one attempt, expire within its deadline and cannot be reused after interruption/restart. Editor originals are available only from the live controller; originals and free-text answers are not stored in request history or copied into the chat composer. Overlong/sensitive request context fails closed instead of offering approval of hidden details. Chrona's own approvals remain separate.
-
-Stopping an attempt preserves saved work/messages, blocks new Chrona actions and does not automatically retry that attempt. It does not undo external effects or cancel future schedules. Usage is a Provider estimate: the UI distinguishes this attempt from session totals and never invents zero for missing data. See [runtime behavior and limitations](docs/zh/provider-runtime.md).
-
-### QQ
-
-Configure the dedicated official bot variables above and a private secret file, then create an owner binding code:
+## Build and check
 
 ```bash
-chrona qq bind-code --workspace ws_default
+bun run verify:slice
+bun run build
+bun run build:smoke
 ```
 
-In a source checkout, replace `chrona` with `bun run apps/cli/src/index.ts`. Send `绑定 <码>` in the bot's private chat. Codes expire after ten minutes by default. QQ delivery restrictions and Chrona notification budgets still apply.
+Builds package the CLI/kernel, database migrations, SDK, runtime declarations and native process guardian under `dist/releases/`. Release smoke checks the packaged CLI and starts an empty kernel against temporary data. It requires no application, browser or model.
 
-## Backups and safety
+Applications must be built and released in their own repositories. Root install, lint, typecheck and verification commands operate on this source tree and do not restore application copies.
 
-**Back up the data directory, not only SQLite.** Stop the server before `chrona backup /absolute/private/path/backup.db`: it creates a consistent DB copy plus `backup.db.tar` containing `platform` (module store and data, conversation attachments), `sessions`, `secrets` and `qq-bot`. Keep the pair together and private; neither file is encrypted. `chrona restore /absolute/private/path/backup.db` restores both while stopped and refuses existing data without `--force`. Current QQ state is included under `platform`, and legacy state under `<dataDir>/qq-bot` is also included. Archive the Provider profile (including `<dataDir>/providers/pi`) and any custom state directories outside the backup roots separately; they are not in that tar. See [operations](docs/zh/operations.md) for recovery caveats.
+## Data
 
-Local-first is not offline-only: model requests, web tools and QQ can contact external services. Protect backups, review approvals and verify model claims. The Provider environment filters Chrona credentials but retains its own model access. No compatibility with pre-rebuild databases; only Pi is currently implemented, not every future Provider described in design notes.
+Stop the runtime before `chrona backup /absolute/private/path/backup.db` or `chrona restore /absolute/private/path/backup.db`. Keep the database backup and companion archive together and private. See [operations](docs/zh/operations.md) for backup contents and recovery constraints. Development checks use fresh temporary databases; there is no compatibility migration for pre-rebuild databases.
 
-[Documentation](docs/README.md) · [Goals](docs/zh/steward-goals.md) · [Architecture](docs/zh/architecture.md) · [Contributing](CONTRIBUTING.md)
+[Documentation](docs/README.md) · [Kernel API](docs/zh/kernel-api-design.md) · [Architecture](docs/zh/architecture.md) · [Contributing](CONTRIBUTING.md)
 
 ## License
 

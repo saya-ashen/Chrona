@@ -81,7 +81,7 @@ The new `.github/workflows/process-native-acceptance.yml` runs these checks on L
 
 For **SDK `chrona.exec`**, preserve credential lifetime, bounded collection, redaction, and secret cleanup, but replace `spawn` with `spawnSupervised(command,args,{env,cwd,helperPath})`; use `task.process` streams, change timeout/disconnect cancellation to `task.stop()`, and replace the child `close` handler with `task.exited.then(requireDescendantStop)`. Do not remove secret files or release reservations on direct-child closure. Secret-file cleanup after *unknown* stop must be an explicit policy decision because descendants may still need/access them. The installed SDK is copied outside the monorepo, so it needs a shipped/vendored copy of this wrapper **including `windows-transport.ts` (or its bundled equivalent)** and access to the native binary; importing a workspace-relative path from the copied SDK is insufficient. This change edits no SDK package; the main owner will perform byte-copy synchronization after review. Do not assume the module's outer guardian makes an independently completed `exec` safe: descendants of a completed exec can remain while the module continues running.
 
-For **Pi `PiProcess`** (currently `packages/pi/src/pi-process.ts`), the exact adapter is:
+For **Pi `PiProcess`** (the independent Pi module’s `adapter/src/pi-process.ts`), the exact adapter is:
 
 ```ts
 const task = spawnSupervised(input.file, input.args, {

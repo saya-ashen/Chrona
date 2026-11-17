@@ -48,7 +48,7 @@ fi
 
 这会修改用户管理器的环境，影响之后启动的用户服务；只在用户选定的桌面会话中操作。随后由用户按自己的服务配置决定何时启动或重启 Chrona。服务若通过 `Environment=`、`EnvironmentFile=` 或包装脚本覆盖或清除这些变量，还需同步检查那些配置。不要无参数执行 `systemctl --user import-environment`，也不要整体导入 shell 环境或写入凭据。多桌面会话时，单个用户管理器不能为同一个服务自动选择每个显示器；最后导入的值应对应用户选择的会话。退出登录、重新登录或启用 linger 后，仍需重新确认会话是否有效。
 
-2026 年 11 月 10 日 12:53（UTC+8），用户授权将实现部署到本地 3112。部署没有修改用户管理器全局环境，而是为 `chrona-kernel-preview.service` 写入专属 `50-desktop-session.conf` drop-in，配置当前会话实际存在的四项变量并清除缺失的 `XAUTHORITY`。冷备份后重启服务，已验证服务和受监督应用进程实际继承对应值。配置记录的是本次桌面会话，重新登录或更换桌面后仍需重新确认。详见[部署验收记录](desktop-applications.md)。
+2026 年 11 月 10 日 12:53（UTC+8），用户授权将实现部署到本地 3112。部署没有修改用户管理器全局环境，而是为 `chrona-kernel-preview.service` 写入专属 `50-desktop-session.conf` drop-in，配置当前会话实际存在的四项变量并清除缺失的 `XAUTHORITY`。冷备份后重启服务，已验证服务和受监督应用进程实际继承对应值。配置记录的是本次桌面会话，重新登录或更换桌面后仍需重新确认。详见[部署验收记录](../../../chrona-module-web/docs/desktop-applications.md)。
 
 ## 停止与验证边界
 

@@ -11,6 +11,6 @@ The kernel owns routed calls, caller identity, exact authorization, application 
 
 The server assembles the kernel with `packages/host` and Provider adapters. Kernel production code depends on contracts, domain policy, database access and SDK transport contracts; it does not import the host, Pi implementation, application business code or HTTP entry points. Tests may compose those components to exercise their behavior together.
 
-Shared conversation, memory and delivery sources live in `packages/app-common`. Independent application inputs are restored to `.generated/applications`; they are not kernel source.
+Application conversation, memory, delivery, configuration, pages and Provider implementations live in independent application repositories. This repository carries no application source copies, fixed application releases or preinstall list; an empty kernel can start without a Provider.
 
 See [current architecture](../../docs/zh/architecture.md) and [kernel API implementation](../../docs/zh/kernel-api-implementation.md).

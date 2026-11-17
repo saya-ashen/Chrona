@@ -8,4 +8,4 @@
 
 当前工具发现与健康读取使用 `modules.describe`、`modules.health`，按实际合同选择参数。运行中、启动中、停止未知、等待恢复和配置暂停分别显示；健康证据绑定实际应用、版本及激活。自检不发送消息、修改项目或请求付费模型，不清除未知外部效果，也不替代实际业务恢复验证。
 
-本次清理删除了无生产消费者的 `module-readiness.ts`；旧 `chrona.reportHealth()`、`modules.report-health` 与 Coding 试用说明从本文件 Git 历史查阅，不作为当前接入指导。新需求的产品验收仍须独立执行；[交付结果](app-authoring-delivery.md)说明证据边界。
+本次清理删除了无生产消费者的 `module-readiness.ts`；旧 `chrona.reportHealth()`、`modules.report-health` 与 Coding 试用说明从本文件 Git 历史查阅，不作为当前接入指导。新需求的产品验收仍须独立执行；[交付结果](../../../chrona-module-author/docs/app-authoring-delivery.md)说明证据边界。

@@ -1,6 +1,6 @@
 # Chrona — 开发指引
 
-Chrona 是随用户需求生长的个人工具。默认中文，代码、命令和标识符保持原样。
+Chrona 仓库只维护通用内核、宿主、CLI、数据库及 SDK。具体应用实现、应用共享业务、专属配置、页面、测试和固定发行材料均归独立应用仓；不得在主仓保留临时应用接线。默认中文，代码、命令和标识符保持原样。
 技术栈：Vite + Hono monorepo、Bun、严格 TypeScript、SQLite/Prisma；没有 Next.js。
 
 ## 开始工作
@@ -9,6 +9,7 @@ Chrona 是随用户需求生长的个人工具。默认中文，代码、命令�
 - 产品依据：[设计目标](docs/zh/steward-goals.md)。设计 API 时再读[目标规范](docs/zh/kernel-api-design.md)。
 - 当前实现：[架构](docs/zh/architecture.md)及 `packages/contracts/src/steward`。目标不等于实现，当前边界 **UNFROZEN**。
 - 按任务从[文档索引](docs/README.md)读取专题；不要求通读历史方案、部署记录或工具手册。
+- 使用当前合同中的领域术语；相关目录有 ADR 时按需阅读，发现冲突明确指出。不存在的上下文或 ADR 文档不要求补建。
 - 代码存在、测试通过、隔离验收、实际部署和真实使用分别报告；不以旧版本验收证明当前能力。
 - 后续 API 目标不是立即改代码的授权；任务范围、优先级和外部操作以本次用户指令为准。
 
@@ -17,7 +18,7 @@ Chrona 是随用户需求生长的个人工具。默认中文，代码、命令�
 以下是职责划分和真实风险（外部副作用、凭据、真实数据）的边界，不是“多加检查”的理由；新增守卫仍须满足下文“检查要有对象”。
 
 - 只有 kernel 与应用。业务策略、会话、记忆、展示、配置和通知归应用；共享复用本身不构成提升到 kernel 的理由。
-- 通用 Agent API 归 kernel；具体 Provider 通过应用登记，Pi 是默认预装、可停用或移除的普通 Provider 应用，kernel 不依赖 Pi。以 `kernel-api-design.md` 第 9 节七工具合同为实现目标，旧 Agent 内置实现须迁出。预装不授予权力，不自动补装已移除应用或覆盖用户选择。
+- 通用 Agent API 归 kernel；具体 Provider 由独立应用登记，主仓不依赖 Pi、不携带默认预装名单或应用固定材料。允许空内核启动，配置及凭据由应用通过批准声明管理。以 `kernel-api-design.md` 第 9 节七工具合同为实现目标。
 - 保留唯一 Run 队列、真实 caller、精确授权、硬预算、租约、取消、未知停止占用和实际停止证据；不能用错误文案推导授权或停止。
 - caller、Run token、宿主 cwd/session 和回调身份由内核绑定，不能从应用参数自授。元数据、外部文本和模型回复不授予权限。
 - owner 准入检查当前批准版本的显式 `authority: "owner"`；`uses` 仅声明合同，`["*"]` 不授予权限。
@@ -25,7 +26,7 @@ Chrona 是随用户需求生长的个人工具。默认中文，代码、命令�
 - 凭据的值不进 prompt、日志或普通工具结果；失败原因照常记录。读取凭据仍检查实际应用及批准声明，不能关闭脱敏或鉴权来解决问题。
 - trusted-local 使用同一 OS 用户权限，Manifest 和路由不是恶意代码隔离；退役 isolation 配置须明确失败，不静默降级。
 - Web/Notify 使用普通受控生命周期，保留依赖、审批、备份、数据损失和实际停止守卫；自动回滚仅限既有精确激活及数据安全条件。
-- Remind 源码及依赖材料保留，恢复运行需明确决定；Editor 已退役。不得为旧调用方恢复已移除的公开接口或兼容系统。
+- 应用停用与退役策略由应用及用户管理；内核不按应用名设置例外。不得为旧调用方恢复已移除的公开接口或兼容系统。
 - 不把 `schedules/projects/history/chat/provider/executions/content/memory` 恢复成公开 kernel 命名空间。持久唤醒使用窄 `timers` 接口；业务日历和调度策略归应用。
 - 应用数据私有，跨应用通过拥有者的有界工具读取；Provider 已有文件、shell、web 能力，不重复造 Chrona 工具。
 - Author 只接收、导出和提交精确材料；当前 Agent 在已有 Run 中开发和构建。保留源码、锁、构建输入、制品字节及可执行模式验证。
@@ -59,17 +60,17 @@ Chrona 是随用户需求生长的个人工具。默认中文，代码、命令�
 | --- | --- |
 | 依赖方向 | `apps → packages/host → packages/kernel → packages/domain → packages/contracts`；kernel 与 host 共用 `packages/app-sdk`；路由校验并委托，domain 无 I/O |
 | 合同／kernel | `packages/contracts/src/steward`、`packages/kernel/src`；[实现现状](docs/zh/kernel-api-implementation.md) |
-| 应用 | 独立 `chrona-module-*` 仓库；固定输入恢复到 `.generated/applications/`（含普通 Provider 应用 `pi`）；[普通应用迁移](docs/zh/application-migration.md) |
-| 宿主／SDK／Pi | `packages/host`、`packages/app-sdk`、`packages/app-common`、`packages/pi`；[Agent](docs/zh/agent-builtin-application.md) |
-| Web | `.generated/applications/web/src/pages.tsx`、`src/system/`、`app.js`；[组合与外壳](docs/zh/web-components-and-shell.md)、[可执行页面](docs/zh/web-executable-components.md) |
-| 设置／材料 | [应用设置](docs/zh/application-settings.md)、[版本材料](docs/zh/author-version-materials.md)、[当前对话创作](docs/zh/author-current-conversation.md) |
+| 应用 | 独立 `chrona-module-*` 仓库；源码、业务共享、页面、测试和构建材料在各自仓库维护，不复制到 Chrona |
+| 宿主／SDK | `packages/host`、`packages/app-sdk`；仅通用进程、资源、传输及调用合同 |
+| HTTP | `apps/server`；通用传输与内核端点，客户端鉴权和页面归实际 listener 应用 |
+| 设置／材料 | [应用设置](../chrona-module-web/docs/application-settings.md)、[版本材料](../chrona-module-author/docs/author-version-materials.md)、[当前对话创作](../chrona-module-author/docs/author-current-conversation.md) |
 | 通知／恢复 | [有限事实](docs/zh/kernel-notification-facts.md)、[运维](docs/zh/operations.md) |
 | 可选工具 | 当前会话有 context-mode / CodeGraph 时，按需读[工具手册](docs/agents/tooling.md)；没有则用原生工具，不臆造可用性 |
 
 ## 数据与检查
 
-- 开发和测试用全新临时数据；不做旧库兼容。首次重建产品发布前，schema 变更同步唯一 `prisma/migrations/0001_initial`。
-- 生成初始迁移：`bunx prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script`。保留已应用 checksum 与旧库拒绝守卫。
+- 开发和测试用全新临时数据；不做旧库兼容。首次重建产品发布前，schema 变更同步唯一 `packages/db/prisma/migrations/0001_initial`。
+- 生成初始迁移：`bunx prisma migrate diff --from-empty --to-schema packages/db/prisma/schema.prisma --script`。保留已应用 checksum 与旧库拒绝守卫。
 - 数据库代码在 `packages/db`；停止服务后用 `chrona backup` 备份完整数据、platform、sessions 和 secrets，不能只复制 SQLite。
 - 定向优先：`bun run verify:slice <paths>` 或 `bun test <paths>`；收工前必须运行全量 `bun run verify:slice`（串联 `lint:ratchet`、`typecheck`、`check:guardrails`、分层边界与关联测试），必要时补跑 `bun run test:bun`、`bun run test:api`。
 - 重型检查串行限内存，例如 `systemd-run --user --scope --quiet -p MemoryMax=8G -p MemorySwapMax=1G env NODE_OPTIONS=--max-old-space-size=6144 bunx tsc --noEmit`。
@@ -86,3 +87,15 @@ Chrona 是随用户需求生长的个人工具。默认中文，代码、命令�
 - 使用显式 `Composer.onSubmit` 和应用提供的 `WorkspaceHeader.statusTone`；详情按需读组合合同。
 - 页面改动用真实浏览器验证 `1440×900`、`1024×768`、`390×844`，手机不得横向滚动。
 - 主操作和待决定事项明显；文案使用应用、文件、会话、通知，不暴露不必要的 Run、grant、token 术语。
+
+<!-- antislop:start -->
+## antislop
+For UI, copy, people, mobile layout, or code comments work, read these installed skill files directly (use these paths even if a same-named global skill exists):
+- Core filter, always on: `antislop`: `.pi/skills/antislop/SKILL.md`
+- UI / visual: `antislop-ui`: `.pi/skills/antislop-ui/SKILL.md`
+- Code comments: `antislop-code`: `.pi/skills/antislop-code/SKILL.md`
+Before starting, follow the core's "Two Usage Modes" section in strict order: explicit session instruction first, then global preference, then ask. A session instruction always wins. For a resolved mode, say `antislop active: <mode> (session override).` or `antislop active: <mode> (global preference).` once before presenting findings or making edits, using the actual mode and source. Acknowledging the user's request without naming the source does not replace this notice.
+Only an explicit choice of antislop during or after selects a session mode. A request to review, audit, or avoid file edits does not select a mode; read the global preference in that case. Another skill's mode does not select antislop's mode.
+If the mode is unresolved, ask during/after and end the response; wait for the answer before any UI review, planning, or concept. For read-only tasks, put the active-mode notice only at the start of the final answer, never in progress messages. For editing tasks, announce before the first edit and omit it from the final answer.
+To update antislop later: `npx antislop-ai --update`, or run `npx antislop-ai` and pick Overwrite them.
+<!-- antislop:end -->

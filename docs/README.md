@@ -1,42 +1,20 @@
 # 文档入口
 
-按任务阅读，不要求通读全部专题或历史。目标、当前代码、验收及部署分别记录；旧记录中的“当前”“已完成”和优先级不自动适用于本次开发。
+本源码仓维护通用 kernel、宿主、CLI、数据库和 SDK。具体应用源码、页面、私有配置、构建和发行在各自仓库维护；kernel 不预装应用，也不恢复固定应用副本。
 
-## 核心文档
+按任务阅读。目标、当前实现、静态核对、测试及部署分别记录；旧文档中的“当前”“已完成”和优先级不自动适用于本次开发。
 
-| 文档 | 解决的问题 |
+| 任务 | 入口 |
 | --- | --- |
-| [产品目标](zh/steward-goals.md) | 为什么做、用户价值与真实使用验收；最高产品依据 |
-| [内核 API 目标规范](zh/kernel-api-design.md) | 公开合同与待实现的七工具 Agent／Provider 注册制；未冻结 |
-| [内核 API 实施记录](zh/kernel-api-implementation.md) | 当前实现、自动检查及未覆盖范围 |
-| [持续关注与恢复](zh/continuous-steward-journey.md) | timer、来源、记忆纠正、恢复与用量的实施证据及未完成项 |
-| [当前架构](zh/architecture.md) | 当前源码边界、所有权和代码地图 |
-| [开发路线](zh/development-roadmap.md) | 待推进工作及证据入口，不重复阶段流水账 |
-| [开发指引](../AGENTS.md) | 必守规则、最小实现和检查方式 |
+| 产品目标与公开合同 | [设计目标](zh/steward-goals.md)、[API 规范](zh/kernel-api-design.md) |
+| 当前代码与开发规则 | [架构](zh/architecture.md)、[开发指引](../AGENTS.md)、[贡献说明](../CONTRIBUTING.md) |
+| 安装与运维 | [中文 README](../README.zh.md)、[English README](../README.md)、[运维](zh/operations.md) |
+| 通用 Agent 与 Provider | [Agent 边界](zh/agent-builtin-application.md)、[Provider 运行](zh/provider-runtime.md)、[任务时限](zh/task-timeout.md) |
+| 应用接入与材料 | [独立应用边界](zh/independent-applications.md)、[依赖方向](zh/module-dependency-direction.md)、[Git 材料](zh/module-git.md)、[安装就绪](zh/module-installation-readiness.md)、[恢复](zh/module-recovery.md) |
+| 内核事实与唤醒 | [有限事实](zh/kernel-notification-facts.md)、[API 规范](zh/kernel-api-design.md) |
+| 实施证据与后续工作 | [API 实施记录](zh/kernel-api-implementation.md)、[路线](zh/development-roadmap.md)、[可移植方案](zh/kernel-portability-plan.md)、[历史验证](zh/kernel-portability-verification.md) |
+| 按需代理工具 | [context-mode / CodeGraph](agents/tooling.md)，仅在当前会话提供时读取 |
 
-## 使用与运维
+Web、聊天、通知、应用创作、记忆和桌面示例的实现文档随源码归各应用仓库；不在主仓维护应用页面合同或视觉系统。相关入口见[独立应用边界](zh/independent-applications.md)。
 
-- [中文 README](../README.zh.md) / [English README](../README.md)：安装与运行范围。
-- [运维](zh/operations.md)：启动、数据目录、完整备份、恢复与诊断。
-- [Coding 退役说明](zh/coding-retirement.md)：旧 Coding/coding-web 已移除，当前 Chat 独立运行。
-- [本地桌面应用](zh/desktop-applications.md) / [桌面会话](zh/desktop-session.md)：窗口与宿主环境。
-
-## 按任务阅读
-
-| 任务 | 专题入口 |
-| --- | --- |
-| 运行与恢复 | [Agent](zh/agent-builtin-application.md)、[Provider](zh/provider-runtime.md)、[应用恢复](zh/module-recovery.md)、[任务时限](zh/task-timeout.md) |
-| 独立应用与离线输入 | [源码、固定输入与开发检查](zh/independent-applications.md) |
-| 应用开发与材料 | [依赖方向](zh/module-dependency-direction.md)、[版本材料](zh/author-version-materials.md)、[当前对话创作](zh/author-current-conversation.md)、[Git 发行](zh/module-git-release.md) |
-| Web 与设置 | [外壳与组合](zh/web-components-and-shell.md)、[可执行页面](zh/web-executable-components.md)、[应用设置](zh/application-settings.md) |
-| 通知与自动化 | [有限内核事实](zh/kernel-notification-facts.md)、[Mind](zh/mind-implementation.md)、[应用迁移](zh/application-migration.md) |
-| 源码验收证据 | [API 实施记录](zh/kernel-api-implementation.md)、[普通应用迁移](zh/application-migration.md) |
-| 退役与历史证据 | [Coding 退役](zh/coding-retirement.md)、[Editor 退役](zh/editor-retirement.md)；旧 Coding 协议、实施与工作台验证从 Git 历史查阅 |
-| 可选代理工具 | [context-mode / CodeGraph](agents/tooling.md)：仅在当前会话提供对应工具时按需读取 |
-| 历史背景 | 已归档的早期方案从 Git 历史查阅，不作为当前开发规则 |
-
-安全简化的历史依据见[安全机制简化](zh/security-simplification.md)，跨平台范围及证据见[可移植方案](zh/kernel-portability-plan.md)和[验证记录](zh/kernel-portability-verification.md)；两者都按各自版本和验收范围阅读。贡献说明见[Contributing](../CONTRIBUTING.md)。
-
-工程清理阶段材料 `docs/tasks/cleanup-and-reorg/`、旧 Workbench 合同、统一宿主及早期内核边界方案已从工作树删除。当前约束归入架构、API 规范、独立应用及运维专题；旧测试计数、部署时间线和逐文件映射用 Git 历史查阅。
-
-早期归档已从工作树删除，可用 `git log --all -- docs/zh/history/` 定位，再用 `git show <revision>:<path>` 查阅。清理前的架构及路线正文分别查其原文件历史。阶段验收与验证记录（M1–M3、kernel-minimization 各阶段、portability S0 等）同样从工作树删除，从 git 历史查阅。
+历史部署、应用组合、旧 Workbench、统一宿主方案和阶段验收通过 Git 历史查阅。历史测试计数只证明记录中的版本；2026-11-17 本轮清理受用户限制仅编辑文件和静态核对，没有构建、测试或部署结论。

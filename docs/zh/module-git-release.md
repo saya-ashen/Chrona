@@ -1,80 +1,9 @@
-# 模块 Git 种子与官方发布
+# 通用发行与应用 Git 材料
 
-当前发行集合固定为 Pi、Web、Notify、Author、Mind、Chat、QQ 七个普通应用，默认预装前六个，QQ 按需安装。通用 Agent API 归 kernel，Pi 是可停用或移除的普通 Provider 应用。其他应用的源码、依赖材料和开发 bundle 由独立应用仓库与固定开发输入保留，但不进入七应用发行或默认初始化；Remind 仍暂停，Editor 已退役，见[退役记录](editor-retirement.md)。集合以 `build/manifest.ts` 为准；对应种子的来源与发行 commit 由同步后的 `resources/module-git/lock.json` 和 `publish-plan.json` 记录，不能用旧种子快照证明当前发行已完成验证。
+Chrona 发行仅包含通用内核、宿主、CLI、数据库、SDK、解释器声明及进程监督资源。没有固定应用集合、默认初始化、应用 Git 种子或恢复/pin 步骤。具体应用自行构建和发布完整材料，用户通过普通安装与审批接入。
 
-2026-11-08 的历史盘点仅 files/events/remind 的 repository 非空，其余为 null；这是当时的锁定元数据，不能承诺当前提交均有公开 upstream。官方仓库命名约定为 `chrona-core/chrona-module-<name>`；离线种子、历史公开仓库与当前提交发布核验分别记录。后续收口见[统一开发路线](development-roadmap.md)。
+应用材料需保留源码、依赖锁、构建输入、制品字节和可执行模式。通用 kernel Git 生命周期仍核对真实 commit、tree、bundle 完整性、来源关联及当前批准身份；缺失材料不能用临时最新构建或手填 hash 替代。参见[Git 工作流](module-git.md)及[API 规范](kernel-api-design.md)。
 
-初次提取从当前构建输入源码创建 `Extract initial module release from Chrona <base commit>` 初始提交，说明中明确源码来自工作树，不声称继承主仓库子目录历史。作者固定为 Chrona Release，时间来自宿主 commit；不读取个人 Git identity。每模块随包 MIT License 原样复制自主仓库，保留 `Copyright (c) 2025 AgentDashboard Contributors`；不将引用的第三方依赖重新许可。SDK 仍由 Chrona 发行资源提供，独立源码仓库不是自带完整 SDK 的 npm 包。历史初始提取 commit 后追加 License 提交，保留原始 ancestry；当时 web/coding/editor 再追加第三方通知提交。该历史不要求继续分发已退役 Editor 的 bundle；仍分发的完整 bundle 包含其全部提交。相同源码树复用现有种子的 commit；之后修改在该独立仓库历史上追加提交，不自动提交主仓库。
+主仓 `scripts/build/` 维护通用打包和 release identity，identity 记录源码提交、工作树状态、依赖锁及实际文件字节和模式。发行冒烟使用隔离配置、临时数据库及空应用内核，不隐式安装应用或批准 owner 权限。
 
-## 准备和审阅
-
-默认构建复制资源后，生成当前入口会话材料和 Pi 依赖，给当前种子集合的 staging 模块复制 `resources/module-git/LICENSE`，并给含第三方 bundle 的模块复制 `THIRD-PARTY-NOTICES.txt`，再验证并复制固定种子。验证后按发行清单裁剪 staging 的 external 模块树，只保留上述七个应用；独立仓库与开发固定输入不受影响。构建不会生成初始提交，也不依赖主仓库 `.git` 或宿主 commit 环境变量。
-
-受版本控制的发行输入是 `resources/module-git/`：`lock.json`、当前集合的完整 `.bundle`、MIT `LICENSE`、`THIRD-PARTY-NOTICES.txt` 和不含本机路径的 `publish-plan.json`。默认构建、Docker、Nix 消费同一历史；`CHRONA_MODULE_GIT_SEEDS` 可显式覆盖种子目录，仍严格验证 checksum、commit 和源码 tree。
-
-`dist/module-git/` 仅为显式维护种子的缓存，不作为默认构建输入：
-
-- `repos/<name>.git`：当前集合的独立 bare repo，可供最终发布审阅。
-- `<name>.bundle`：含完整 main 历史、无外部 prerequisite 的离线种子。
-- `lock.json`：`{ version: 1, modules: [{ name, repository, branch, commit, bundle, bundleSha256 }] }`。
-- `publish-plan.json`：拟议公开仓库名、本地 repo、branch、commit；与可信 lock 分开。
-
-初次准备时 `repository: null`，表示源码尚未发布。离线种子可用不等于存在公开 upstream，不能承诺上游更新。
-
-安装当前随发行交付的七个官方应用时，宿主默认关联 `https://github.com/chrona-core/chrona-module-<name>` 的 `main`，无需用户再手工关联。发行 lock 的 `repository: null` 仍只表示该精确提交未完成公开发布核验；默认更新地址不把离线 commit 宣称为远端已发布版本。其他保留应用不会按名称猜测远端。
-
-默认关联不联网、不自动更新或激活，也不覆盖所有者已有的远端选择；源码合并、检查、审批及停止守卫沿用既有流程。已有实例不会因启动而批量改写来源记录，线上应用代码也不会因主仓库迁移而被替换。
-
-开发启动前显式准备发行资源（不编译二进制、不接触用户数据）；随后让源码进程使用该资源根。启动本身不会自动生成或联网：
-
-```sh
-bun scripts/build-binaries.ts --resources-only dist/module-resources
-CHRONA_RESOURCE_DIR="$PWD/dist/module-resources/resources" bun run dev
-```
-
-13 个应用现由独立仓库维护，开发组合见[独立应用与固定输入](independent-applications.md)。修改先进入应用本地 `main`，再从明确指定的干净 checkout 更新固定输入；七个发行应用必须继承当前发行 commit：
-
-```sh
-bun scripts/pin-application.ts web /absolute/path/to/chrona-module-web
-```
-
-该入口核对已提交源码与完整材料，生成完整 main bundle、精确 artifact 输入，更新开发 lock 与适用的发行 lock。Git bundle 不包含声明的 artifacts；不得把 bundle checkout 当完整发行资源。新输入审阅后再提交主仓库，不推送、不猜测远端。
-
-旧 `module-git-release.ts prepare` 继续供独立的合成/历史提取目录使用，拒绝直接更新主仓库的正式种子目录；正式应用历史由独立仓库提交。旧 bare 缓存不作为当前应用 main 的事实来源，正常构建只读固定 lock/bundle 并使用临时仓库核验。
-
-## 真实公开发布 gate
-
-1. 审阅每份源码、license、生成契约、初始提交、publish-plan；确认没有凭据或个人数据，并确认全部模块可独立交付。
-2. 获得具体发布授权后，由发布者创建真实公开仓库，将本地对应 main 历史推送到计划中的仓库。准备脚本不执行创建或推送。
-3. 使用只读核验命令检查 GitHub visibility 和真实 main 指向，全部精确匹配 lock commit 后才写入真实 repository：
-
-```sh
-bun scripts/module-git-release.ts verify-published /absolute/path/to/seeds
-```
-
-核验需要发布者的 `gh` 和系统 Git；不读取或打印 token。任一未公开、未建立或 commit 不匹配则不更新 lock。该命令只接受当前官方计划中的模块名称，不允许任意来源替换官方身份。
-
-4. 将已核验的 `lock.json` 与对应 bundle 同步进 `resources/module-git/`，保留主仓库 MIT License；不要版本控制 bare repos 或含本机路径的缓存 plan。正式构建默认消费它们，保留远端和离线 bundle 的同一提交历史；独立维护种子可显式覆盖：
-
-```sh
-CHRONA_MODULE_GIT_SEEDS=/absolute/path/to/seeds bun run build
-```
-
-构建逐项核对 bundle SHA256、完整性、main commit 和源码 tree；源码或生成契约不符时失败，不能静默创建另一条初始历史。以后官方更新先在真实独立仓库提交、更新固定种子，再交付主发行。修改生成 bundle 时，用相同 Bun 版本与参数的 metafile 核对实际依赖，更新第三方通知；第三方原始许可证和版权通知应完整保留。仍分发模块的第三方通知需覆盖其实际依赖，包括 Web 的 React/React DOM/scheduler；各依赖保留原许可证。退役 Editor 的历史通知不构成继续打包该应用的理由。
-
-二进制发行目录附带 `release-identity.json`，由既有 builder 在资源准备完毕后生成，记录宿主 commit/工作树是否修改、Bun/平台/锁摘要、应用组合及包内文件的 SHA256、模式或符号链接目标；既有 smoke 先核对实际目录。无主仓库 Git 的 Docker/Nix 输入保留 commit:null 与 unavailable，并在构建日志记录 Git 失败原因。该记录用于对照实际制品，不构成来源签名、可复现构建或部署验收；身份文件自身不进入摘要集合。归档 SHA256 在发行验证证据中另记。
-
-归档包含 `resources/module-git/{name}.bundle` 与 `lock.json`，bundle 在源码根之外，不混入 `.git`、依赖或数据。运行构建产物、安装依赖与数据备份仍按现有机制保留；Git 只替代重复源码副本。
-
-## 系统 Git 依赖
-
-所有安装均需 Chrona 进程 PATH 中存在系统 Git；`chrona doctor` 报告 Git 缺失，不自动安装、不要求个人 GitHub 账号。Git 缺失时源码操作明确失败，没有旧快照 fallback。
-
-- Linux 裸二进制：通过发行版包管理器安装 `git` 与 HTTPS CA（例如 Debian/Ubuntu 的 `git ca-certificates`）。
-- macOS 裸二进制：安装 Apple Command Line Tools 或包管理器的 Git，确认服务运行环境的 `git --version` 可用。
-- Windows 裸二进制：安装 Git for Windows 并加入运行 Chrona 的 PATH；安装后重启服务进程。
-- Docker runner 显式安装 Git 与 CA；源码构建直接复制受版本控制的固定种子，不需要宿主 Git 元数据 build args。
-
-- Nix 包使用 wrapper 注入 Git PATH，NixOS、Home Manager 和直接 CLI 共用该运行依赖。Nix 构建也显式带 Git。
-
-Git/种子校验成功不表示网络上的 upstream 此刻可达。离线安装使用 bundle；联网更新失败或发生冲突时，保留本地修改与当前运行版本，不自动覆盖、stash 或推送。
+2026-11-17 本轮未运行构建或冒烟。独立应用源码、锁和实际制品须在后续明确允许的构建中验证；Nix 依赖输出 hash 同样等待真实计算。旧七应用发行、种子同步和固定开发输入记录通过 Git 历史查阅。
