@@ -59,6 +59,16 @@ chrona restore /absolute/private/path/before.db
 
 实际发布、服务切换、恢复、Nix 激活和真实业务验收均需要具体任务授权。release identity、源码字节、模式和哈希各自保留，不把本地复制称为部署，不把健康接口当作业务验收。
 
+## chino：2026-11-18 内核减重发行
+
+运行源码版本为 `bf63e7511145997669ade271e1fd2f732315d56a`。按用户选择，新实例使用 `/var/lib/chrona/kernel/{data,config,work,runtime-resources}`；没有转换或清空 `/var/lib/chrona/data` 的旧库，也没有自动迁入旧应用。新实例为空内核，Provider、Web 和 Chat 尚未安装。
+
+本次只构建并激活 Nix 配置生成的 `chrona.service` 及其包，没有切换整个 NixOS generation。服务使用 `/nix/store/yg5v4pwnrg9x29ibnv0axh0n3cp5n245-chrona-0.3.1-kernel-bf63e751/bin/chrona`；系统默认 PATH 中的 `chrona` 仍可能是旧包，管理本实例须使用此路径并显式指定新数据目录。旧 `90-state-directory.conf` 已退出当前服务，避免覆盖新路径。
+
+恢复材料位于 `/var/lib/chrona/deployments/kernel-bf63e751/`：`before.db` 与 `before.db.tar` 保存停服后的旧数据库和 platform/sessions/secrets，`extra-state.tar` 保存旧 config/pi-profile/work；原 unit、drop-in 及新旧包的 GC roots 同目录保留。数据库 quick_check 和两份 tar 目录读取通过。原目录仍保留，回退前先停止新实例并核对其新增数据，不自动覆盖。
+
+Linux 发行空实例运行冒烟、现场 `/health`、`/ready`、内网直连 TLS 及无 capability 的工具请求拒绝均通过；这不等于应用业务验收。主仓全量 verify、Bun/API 和独立 Author/Pi 测试已通过，macOS/Windows 原生行为未验收。
+
 ## 历史恢复材料
 
 工程清理的历史部署根为 `/home/saya/.local/share/chrona-deploy/cleanup-and-reorg-20261117T0131Z-caf46efa`，生产动作目录为 `production-20261117T0243Z-8ce927b2-r2`。其完整备份 `backup/before.db`、`before.db.tar`、`external-roots.tar` 及新旧 package/unit/archive GC roots 继续保留。恢复前核对实际服务、最新数据和兼容性，不直接回放旧动作。
