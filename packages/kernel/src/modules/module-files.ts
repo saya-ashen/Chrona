@@ -8,7 +8,9 @@ import { StewardError } from "../errors";
 
 export type ModuleFile = { path: string; bytes: Uint8Array; executable?: boolean };
 function validatePath(path: string) {
-  if (!path || path.startsWith("/") || path.includes("\\") || Array.from(path).some(char => char.charCodeAt(0) <= 31 || char.charCodeAt(0) === 127) || path.split("/").some(part => !part || part === "." || part === ".." || part === ".git" || part.includes(":"))) throw new StewardError("invalid", "Invalid module path");
+  if (!path || path.startsWith("/") || path.includes("\\") || Array.from(path).some(char => char.charCodeAt(0) <= 31 ||
+    char.charCodeAt(0) === 127) || path.split("/").some(part => !part || part === "." || part === ".." || part === ".git" ||
+    part.includes(":"))) throw new StewardError("invalid", "Invalid module path");
   return path.split("/");
 }
 const unsafe = () => new StewardError("forbidden", "Unsafe module file");
@@ -40,7 +42,8 @@ const regularFile = (stat: BigIntStats) => stat.isFile() && stat.nlink === 1n;
 const sameFile = (a: BigIntStats, b: BigIntStats) => a.ino === b.ino && a.dev === b.dev;
 const fingerprint = (stat: BigIntStats) => [stat.dev, stat.ino, stat.mode, stat.nlink, stat.size, stat.mtimeNs, stat.ctimeNs].join(":");
 function assertStableRead(start: BigIntStats, end: BigIntStats, current: BigIntStats, length: number) {
-  if (BigInt(length) !== start.size || !regularFile(end) || !regularFile(current) || fingerprint(start) !== fingerprint(end) || fingerprint(start) !== fingerprint(current)) throw new StewardError("conflict", "Module file changed during snapshot");
+  if (BigInt(length) !== start.size || !regularFile(end) || !regularFile(current) || fingerprint(start) !== fingerprint(end) ||
+    fingerprint(start) !== fingerprint(current)) throw new StewardError("conflict", "Module file changed during snapshot");
 }
 /** Keep every selected file and its ancestors anchored until the complete read is verified. */
 export class ModuleSnapshot {
@@ -63,7 +66,7 @@ export class ModuleSnapshot {
   }
   async verify() {
     for (const check of this.checks.values()) {
-      let unchanged = false;
+      let unchanged: boolean;
       try { unchanged = await check(); }
       catch (error) { throw Object.assign(new StewardError("conflict", "Module material changed during snapshot"), { cause: error }); }
       if (!unchanged) throw new StewardError("conflict", "Module material changed during snapshot");
@@ -176,7 +179,8 @@ export class ModuleDirectory {
     const parts = validatePath(file.path), name = parts.pop()!;
     const directory = parts.length ? await this.directory(parts.join("/"), true) : this;
     try {
-      const handle = await open(join(descriptor(directory.handle), name), constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, mode);
+      const handle = await open(join(descriptor(directory.handle), name), constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL |
+        constants.O_NOFOLLOW, mode);
       try { await handle.writeFile(file.bytes); await handle.chmod(mode); await handle.sync(); } finally { await handle.close(); }
     } finally { if (directory !== this) await directory.close(); }
   }

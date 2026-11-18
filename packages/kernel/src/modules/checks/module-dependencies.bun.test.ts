@@ -1,3 +1,4 @@
+import { seedTestModuleRelease } from "../../__testing__/module-release-test-fixture";
 import { afterEach, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -31,6 +32,8 @@ test("lockfile libraries install at build time, never come from the submission, 
   await writeFile(join(dir, "index.ts"), `import { on } from "chrona"; import dep from "dep"; on("tool", ev => ({ result: dep.shout(String(ev.args.text)) }));`);
   await writeFile(join(dir, "test.ts"), `import dep from "dep"; if (dep.shout("a") !== "A") process.exit(1);`);
   const propose = async () => {
+    await rm(join(dir, "chrona-material.json"), { force: true });
+    await seedTestModuleRelease(root, "fmt");
     const result = await service.modules.propose({ root, dir: "fmt", intent }, "provider");
     await service.modules.buildPending();
     return db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: result.moduleId!, hash: result.hash } } });

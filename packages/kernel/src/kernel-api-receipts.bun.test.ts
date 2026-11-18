@@ -1,3 +1,4 @@
+import { installTestModuleVersion } from "./__testing__/module-release-test-fixture";
 import { afterEach, expect, spyOn, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -33,7 +34,7 @@ async function fixture() {
   async function app(name: string, authority?: "owner") {
     const row = await ports.db.module.create({ data: { workspaceId: workspace.id, name, activeHash: `${name}-v1` } });
     const manifest = moduleManifestSchema.parse({ name, authority, uses: ["*"], entry: "index.ts", tests: ["test.ts"], effects: [], tools: [{ name: "observe", description: "Observe", parameters: { type: "object", properties: {} }, output: { type: "object", properties: {} } }] });
-    await ports.db.moduleVersion.create({ data: { moduleId: row.id, hash: row.activeHash!, manifest, source: "user", status: "approved", intent: {}, report: {} } });
+    row.activeHash = await installTestModuleVersion(ports, row, manifest);
     const origin = { ...kernelOrigin(workspace.id), caller: { kind: "module" as const, module: name, moduleId: row.id, hash: row.activeHash! } };
     return { row, manifest, origin, scope: { workspaceId: workspace.id, moduleId: row.id, hash: row.activeHash!, manifest } };
   }

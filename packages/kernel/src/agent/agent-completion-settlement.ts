@@ -31,7 +31,8 @@ function retainedCompletion(observation: Observation, maxOutputTokens: number, s
 }
 
 /** One writer transaction owns both the retained result and its original caller's accounting. */
-export async function settleRunCompletion(ports: StewardPorts, workspaceId: string, runId: string, observation: Observation, secrets: string[] = []): Promise<Outcome> {
+export async function settleRunCompletion(ports: StewardPorts, workspaceId: string, runId: string, observation: Observation,
+  secrets: string[] = []): Promise<Outcome> {
   return ports.db.$transaction(async tx => {
     await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${workspaceId}`;
     const binding = await tx.agentRunProvider.findFirst({ where: { runId, run: { workspaceId } } });
@@ -40,14 +41,17 @@ export async function settleRunCompletion(ports: StewardPorts, workspaceId: stri
     const owner = await tx.agentRunAdmission.findUnique({ where: { runId } });
     if (!owner) throw new CallError("conflict", "Completion admission is missing");
     const expectedOwner = { moduleId: owner.moduleId, hash: owner.hash };
-    const reservation = await tx.moduleCall.findFirst({ where: { id: budget.reservationId, method: "model", workspaceId, module: { workspaceId }, ...expectedOwner } });
-    if (!reservation || !["pending", "executed", "failed"].includes(reservation.status)) throw new CallError("conflict", "Completion reservation does not match its admission");
+    const reservation = await tx.moduleCall.findFirst({ where: { id: budget.reservationId, method: "model", workspaceId, module: {
+      workspaceId }, ...expectedOwner } });
+    if (!reservation || !["pending", "executed", "failed"].includes(reservation.status)) throw new CallError("conflict",
+      "Completion reservation does not match its admission");
     if (reservation.status === "executed") {
       const event = await tx.runEvent.findFirst({ where: { runId, kind: "completion" } });
       if (!event) throw new CallError("conflict", "Settled completion result is missing");
       return { outcome: "finished", sessionId: null, error: null };
     }
-    if (reservation.status === "failed") return { outcome: reservation.error === "timeout" ? "timed_out" : "failed", sessionId: null, error: "Provider completion failed" };
+    if (reservation.status === "failed") return { outcome: reservation.error === "timeout" ? "timed_out" : "failed", sessionId: null,
+      error: "Provider completion failed" };
     const settled = retainedCompletion(observation, Math.min(budget.maxOutputTokens, budget.limits.maxOutputTokens), secrets);
     if (settled.result) await appendRunEventIn(tx, runId, "completion", settled.result as Prisma.InputJsonValue, ports.now());
     await finishCompletionIn(tx, workspaceId, { id: budget.reservationId, result: settled.result, error: settled.error }, expectedOwner);

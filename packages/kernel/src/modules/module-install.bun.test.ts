@@ -70,7 +70,8 @@ test.each(["qq", "files", "events"] as const)("optional %s installs, stays remov
     const session = await f.db.agentContext.create({ data: { workspaceId: f.workspaceId, ownerId: "owner", moduleId: first.moduleId!, hash: first.hash! } });
 
     const run = await f.db.run.create({ data: { workspaceId: f.workspaceId, sessionId: session.id, lane: "foreground", trigger: "module", provider: "fixture", tokenHash: `files-${session.id}`, prompt: "fixture", cwd: f.ports.dataDir } });
-    await expect(requestRemove(context, first.moduleId!, "queued context")).rejects.toMatchObject({ code: "conflict" });
+    await expect(requestRemove(context, first.moduleId!, "queued context")).resolves.toMatchObject({ status: "pending_approval" });
+    await f.db.providerLaunch.create({ data: { runId: run.id, digest: "launched-fixture" } });
     await f.db.run.update({ where: { id: run.id }, data: { status: "failed", stopStatus: "unknown", error: "Execution stop is unconfirmed" } });
     await expect(requestRemove(context, first.moduleId!, "unknown context stop")).rejects.toMatchObject({ code: "conflict" });
     await f.db.run.update({ where: { id: run.id }, data: { status: "succeeded", stopStatus: "confirmed", error: null, endedAt: f.ports.now() } });
@@ -210,7 +211,7 @@ test("receipts reflect actual approval, paused selection, inactive approval and 
   expect(await f.db.module.findUniqueOrThrow({ where: { id: result.moduleId! } })).toMatchObject({ status: "paused" });
   const update = { ...request, mode: "update" as const, requestKey: "inactive" };
   await f.db.module.update({ where: { id: result.moduleId! }, data: { activeHash: "a".repeat(64) } });
-  expect(await installExternal(f.ports, f.workspaceId, update)).toMatchObject({ status: "failed", error: { code: "conflict" } });
+  await expect(installExternal(f.ports, f.workspaceId, update)).rejects.toMatchObject({ code: "conflict" });
 
 });
 
@@ -281,12 +282,11 @@ test.each(["pi", "qq"] as const)("%s checks and credential approval refresh the 
   expect(await installExternal(f.ports, f.workspaceId, request)).toMatchObject({ status: "installed", approvalId: null });
 });
 
-test("ordinary local source uses its own real Git commit rather than impersonating a release", async () => {
+test("identical local source and an external release share the same material hash", async () => {
   const f = await fixture(), release = await resolveExternalRelease(f.ports, "files");
   const result = await propose(moduleContext(f.ports, f.workspaceId), { root: f.ports.moduleExternalResources!, dir: "files", intent: { changes: ["Owner local source"] } }, "user");
   expect(result.hash).toMatch(/^[a-f0-9]{64}$/);
-  expect(result.hash).toMatch(/^[a-f0-9]{64}$/);
-  expect(result.hash).not.toBe(release.hash);
+  expect(result.hash).toBe(release.hash);
 });
 
 test("offline update refuses local changes and preserves the selected application", async () => {
@@ -296,9 +296,12 @@ test("offline update refuses local changes and preserves the selected applicatio
   await buildPending(context); await refreshInstallationReceipts(f.ports, f.workspaceId);
   const dir = join(f.ports.moduleExternalResources!, "files");
   await writeFile(join(dir, "local.txt"), "owner customization");
+  await rm(join(dir, "chrona-material.json"));
+  await seedTestModuleRelease(f.ports.moduleExternalResources!, "files");
   const custom = await propose(context, { root: f.ports.moduleExternalResources!, dir: "files", intent: { changes: ["Owner customization"] } }, "user");
   await buildPending(context);
   await rm(join(dir, "local.txt"));
+  await rm(join(dir, "chrona-material.json"));
   await f.resource("files", { description: "New release" });
   const request = { package: "files", mode: "update" as const, requestKey: "conflicting-update" };
   expect(await installExternal(f.ports, f.workspaceId, request)).toMatchObject({ status: "failed", error: { message: expect.stringContaining("Local application changes conflict") } });

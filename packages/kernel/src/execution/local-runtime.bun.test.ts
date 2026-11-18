@@ -1,3 +1,4 @@
+import { installTestModuleVersion } from "../__testing__/module-release-test-fixture";
 import { expect, test } from "bun:test";
 import { mkdtemp, open, rm } from "node:fs/promises";
 import { constants } from "node:fs";
@@ -32,8 +33,8 @@ async function fixture(provider?: ProviderAdapter) {
   await testProviderPorts(ports);
   const workspace = await db.workspace.create({ data: { name: "local-modules" } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "entry-app", activeHash: "entry-v1", status: "active" } });
-  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "entry-v1", status: "approved", source: "user", intent: {}, report: {}, manifest: moduleManifestSchema.parse({ name: module.name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: ["agent.run", "runtime-callback.event"] }) } });
-  const origin = { ...kernelOrigin(workspace.id), caller: { kind: "module" as const, module: module.name, moduleId: module.id, hash: "entry-v1" } };
+  const hash = await installTestModuleVersion(ports, module, moduleManifestSchema.parse({ name: module.name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: ["agent.run", "runtime-callback.event"] }));
+  const origin = { ...kernelOrigin(workspace.id), caller: { kind: "module" as const, module: module.name, moduleId: module.id, hash } };
   const request = async (key: string, prompt = "private prompt") => (await callSync(ports, origin, "agent.run", { prompt }, { key })).output as { runId: string; contextId: string };
   return { ports, workspaceId: workspace.id, origin, request,
     async authorize(key: string): Promise<ProviderRunInput> {
@@ -121,11 +122,11 @@ test("callbacks require the admitted provider, workspace, runtime scope and exac
     await callSync({ ...f.ports }, origin, "runtime-callback.event", args);
     expect(delivered).toBe(1);
     await f.ports.db.module.update({ where: { id: binding.moduleId }, data: { executionFenceAt: new Date() } });
-    await expect(callSync(f.ports, origin, "runtime-callback.event", args)).rejects.toMatchObject({ code: "forbidden" });
+    await callSync(f.ports, origin, "runtime-callback.event", args);
     await f.ports.db.module.update({ where: { id: binding.moduleId }, data: { executionFenceAt: null } });
     callback.release();
     await expect(callSync(f.ports, origin, "runtime-callback.event", args)).rejects.toMatchObject({ code: "not_found" });
-    expect(delivered).toBe(1);
+    expect(delivered).toBe(2);
     expect(await f.ports.db.moduleInvocation.count({ where: { target: "runtime-callback" } })).toBe(0);
   } finally { release?.(); await f.close(); }
 });

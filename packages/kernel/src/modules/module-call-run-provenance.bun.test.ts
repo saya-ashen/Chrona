@@ -1,3 +1,4 @@
+import { installTestModuleVersion } from "../__testing__/module-release-test-fixture";
 import { afterEach, expect, test } from "bun:test";
 import { z } from "zod";
 import "./module-effects";
@@ -38,7 +39,7 @@ async function fixture() {
   const peer = testModuleProcess(async (event, call, input) => {
     if (event.trigger.kind !== "tool") return {};
     const trigger = event.trigger;
-    if (input.codeDir.endsWith("provider-v1")) {
+    if (input.dataDir.endsWith(provider.moduleId)) {
       providerCalls.push(trigger.id);
       if (trigger.id !== "health") throw new Error(`Unexpected provider execution: ${trigger.id}`);
       return { result: { name: "offline", supportsRunModel: true, complete: false, available: true, sandboxed: false, error: null } };
@@ -54,7 +55,7 @@ async function fixture() {
   });
   async function install(name: string, hash: string, manifest: unknown) {
     const module = await db.module.create({ data: { workspaceId, name, status: "active", activeHash: hash } });
-    await db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest: moduleManifestSchema.parse(manifest), source: "user", status: "approved", intent: {}, report: {} } });
+    hash = await installTestModuleVersion(ports, module, moduleManifestSchema.parse(manifest));
     return { kind: "module" as const, module: name, moduleId: module.id, hash };
   }
   const provider = await install("test-provider", "provider-v1", testProviderManifest);

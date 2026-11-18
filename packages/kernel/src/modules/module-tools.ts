@@ -8,16 +8,19 @@ import { CallError, callSync, listSystemModules, type SystemTool } from "./modul
 
 /** Tools belong to the workspace; `audience` determines visibility. */
 type Scope = { workspaceId: string; audience?: "provider" | "owner" | "modules" };
-type Entry = { name: string; module: { id: string; name: string; activeHash: string | null }; manifest: { description?: string; tools: (SystemTool | ModuleTool)[] }; tool: SystemTool | ModuleTool; direct: boolean; system?: true };
+type Entry = { name: string; module: { id: string; name: string; activeHash: string | null }; manifest: { description?: string;
+  tools: (SystemTool | ModuleTool)[] }; tool: SystemTool | ModuleTool; direct: boolean; system?: true };
 /** Chrona's own interfaces visible to the audience (v2-13): always direct, few, and part of how the Provider works. */
 function systemEntries(audience: "provider" | "owner" | "modules"): Entry[] {
   return listSystemModules().flatMap(system => {
     const visible = system.tools.filter(tool => tool.visibility.includes(audience));
-    return visible.map(tool => ({ name: `m_${system.name}_${tool.name.replaceAll("-", "_")}`, module: { id: `system:${system.name}`, name: system.name, activeHash: "system" },
+    return visible.map(tool => ({ name: `m_${system.name}_${tool.name.replaceAll("-", "_")}`, module: { id: `system:${system.name}`,
+      name: system.name, activeHash: "system" },
       manifest: { tools: visible }, tool, direct: true, system: true as const }));
   });
 }
-async function addModuleTools(ports: StewardPorts, modules: Awaited<ReturnType<StewardPorts["db"]["module"]["findMany"]>>, audience: "provider" | "owner" | "modules", catalog: { tools: Entry[]; names: Set<string>; toolsets: Set<string> }) {
+async function addModuleTools(ports: StewardPorts, modules: Awaited<ReturnType<StewardPorts["db"]["module"]["findMany"]>>,
+  audience: "provider" | "owner" | "modules", catalog: { tools: Entry[]; names: Set<string>; toolsets: Set<string> }) {
   const { db } = ports, { tools, names, toolsets } = catalog;
   for (const module of modules) {
     // One toolset per module name, like one MCP server per name.
@@ -46,11 +49,13 @@ export async function moduleTools(ports: StewardPorts, scope: Scope): Promise<En
 }
 type Resolved = Awaited<ReturnType<typeof moduleTools>>[number];
 function toolset({ module, manifest }: Resolved) {
-  return { name: `module_${module.name.replaceAll("-", "_")}`, description: (manifest.description ?? manifest.tools.map(tool => tool.description).join("; ")).slice(0, 500) };
+  return { name: `module_${module.name.replaceAll("-", "_")}`,
+    description: (manifest.description ?? manifest.tools.map(tool => tool.description).join("; ")).slice(0, 500) };
 }
 export function catalogEntry(resolved: Resolved) {
   const { tool } = resolved;
-  const inputSchema: Record<string, unknown> = { ...moduleToolContract(tool).input, description: `[${resolved.system ? "Chrona" : "module"} ${resolved.module.name}] ${tool.description}` };
+  const inputSchema: Record<string, unknown> = { ...moduleToolContract(tool).input,
+    description: `[${resolved.system ? "Chrona" : "module"} ${resolved.module.name}] ${tool.description}` };
   return { name: resolved.name, exposure: resolved.direct ? "direct" as const : "deferred" as const, namespace: toolset(resolved),
     description: tool.description,
     inputSchema,
@@ -73,22 +78,29 @@ export function moduleToolsets(catalog: CatalogEntry[]) {
   return [...sets.values()];
 }
 /** A routed call to a system tool (v2-13): the system module's own admission and validation apply, and the real caller is recorded. */
-async function callSystemTool(ports: StewardPorts, caller: { workspaceId: string; runId: string | null; via?: string | null; deadline?: number; key?: string }, resolved: Entry, raw: unknown) {
-  const origin = { workspaceId: caller.workspaceId, caller: caller.runId ? { kind: "provider" as const, runId: caller.runId } : { kind: "owner" as const, via: caller.via ?? null }, chain: [], path: [], deadline: caller.deadline };
+async function callSystemTool(ports: StewardPorts, caller: { workspaceId: string; runId: string | null; via?: string | null;
+  deadline?: number; key?: string }, resolved: Entry, raw: unknown) {
+  const origin = { workspaceId: caller.workspaceId, caller: caller.runId ? { kind: "provider" as const, runId: caller.runId } : {
+    kind: "owner" as const, via: caller.via ?? null }, chain: [], path: [], deadline: caller.deadline };
   try {
-    const { output } = await callSync(ports, origin, `${resolved.module.name}.${resolved.tool.name}`, raw, { key: caller.key, ...(caller.deadline ? { timeoutMs: Math.max(1000, caller.deadline - ports.now().getTime()) } : {}) });
+    const { output } = await callSync(ports, origin, `${resolved.module.name}.${resolved.tool.name}`, raw, { key: caller.key,
+      ...(caller.deadline ? { timeoutMs: Math.max(1000, caller.deadline - ports.now().getTime()) } : {}) });
     return { result: output };
   } catch (error) {
     // Restore system business refusals at the HTTP/tool boundary, not an opaque 500.
-    if (error instanceof CallError && (error.code === "conflict" || error.code === "invalid" || error.code === "forbidden" || error.code === "not_found")) throw Object.assign(new StewardError(error.code, error.message), { reason: error.reason });
+    if (error instanceof CallError && (error.code === "conflict" || error.code === "invalid" || error.code === "forbidden" ||
+      error.code === "not_found")) throw Object.assign(new StewardError(error.code, error.message), { reason: error.reason });
     throw error;
   }
 }
 /** Runs a workspace-owned module tool for a Provider run or the owner (`via`: the entry module that relayed an owner request). */
-export async function callModuleTool(ports: StewardPorts, caller: Omit<Scope, "audience"> & { sessionId?: string | null; runId: string | null; via?: string | null; deadline?: number; key?: string }, name: string, raw: unknown) {
+export async function callModuleTool(ports: StewardPorts, caller: Omit<Scope, "audience"> & { sessionId?: string | null; runId: string |
+  null; via?: string | null; deadline?: number; key?: string }, name: string, raw: unknown) {
   const audience = caller.runId ? "provider" as const : "owner" as const;
   const resolved = (await moduleTools(ports, { ...caller, audience })).find(tool => tool.name === name);
   if (!resolved) throw new StewardError("not_found", "Module tool not found");
-  if (!resolved.system) await audit(ports.db, { workspaceId: caller.workspaceId, actor: caller.runId ? "chrona" : "user", kind: "module_tool_call", subjectId: resolved.module.id, details: { tool: name, callerRunId: caller.runId, callerSessionId: caller.sessionId ?? null, via: caller.via ?? null } });
+  if (!resolved.system) await audit(ports.db, { workspaceId: caller.workspaceId, actor: caller.runId ? "chrona" : "user",
+    kind: "module_tool_call", subjectId: resolved.module.id, details: { tool: name, callerRunId: caller.runId,
+    callerSessionId: caller.sessionId ?? null, via: caller.via ?? null } });
   return callSystemTool(ports, caller, resolved, raw);
 }

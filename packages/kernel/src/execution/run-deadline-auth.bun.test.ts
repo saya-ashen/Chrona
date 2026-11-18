@@ -1,3 +1,4 @@
+import { installTestModuleVersion } from "../__testing__/module-release-test-fixture";
 import { expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -38,10 +39,10 @@ test.each([
     const properties = { ...Object.fromEntries(["operationId", "runId", "token", "lane", "cwd", "sessionDir", "prompt", "systemPrompt", "resources", "callbacks"].map(key => [key, string])), sessionId: { type: ["string", "null"] }, deadline: { type: ["string", "null"] }, providerOptions: object };
     const module = await db.module.create({ data: { workspaceId, name: "deadline-backend", status: "active", activeHash: "v1" } });
     const manifest = moduleManifestSchema.parse({ name: module.name, entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["runtime-callback.event"], tools: Object.values(declaration.endpoints).map(name => ({ name, description: name, visibility: ["kernel"], parameters: { type: "object", properties: name === "health" ? {} : properties }, output: {} })) });
-    await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest, source: "user", status: "approved", intent: {}, report: {} } });
-    const caller = { kind: "module" as const, module: module.name, moduleId: module.id, hash: "v1" };
+    module.activeHash = await installTestModuleVersion(ports, module, manifest);
+    const caller = { kind: "module" as const, module: module.name, moduleId: module.id, hash: module.activeHash! };
     await registerAgentProvider(ports, workspaceId, caller, declaration);
-    const sessionId = (await db.agentContext.create({ data: { workspaceId, ownerId: "owner", moduleId: module.id, hash: "v1" } })).id;
+    const sessionId = (await db.agentContext.create({ data: { workspaceId, ownerId: "owner", moduleId: module.id, hash: module.activeHash! } })).id;
     const runs = createRuns(ports, workspaceId);
     await runs.enqueue({ sessionId, lane: "foreground", trigger: "message", prompt: "Work" });
     const run = (await runs.claimNext("foreground"))!;

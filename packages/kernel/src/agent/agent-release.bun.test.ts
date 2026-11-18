@@ -11,7 +11,7 @@ test("empty bootstrap creates no builtin Agent and needs no builtin resources", 
   const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => new Date() };
   const supervisor = createModuleSupervisor(ports);
   try {
-    const workspace = await db.workspace.create({ data: { name: "empty" } });
+    await db.workspace.create({ data: { name: "empty" } });
     await supervisor.start();
     expect(await db.module.count()).toBe(0);
     expect(await db.moduleVersion.count()).toBe(0);
@@ -26,7 +26,8 @@ test("supervisor startup preserves a paused Pi and never upgrades it from host r
   try {
     const workspace = await db.workspace.create({ data: { name: "paused Pi" } });
     const pi = await db.module.create({ data: { workspaceId: workspace.id, name: "pi", status: "paused", activeHash: "a".repeat(40) } });
-    await db.moduleVersion.create({ data: { moduleId: pi.id, hash: pi.activeHash!, manifest: moduleManifestSchema.parse({ name: "pi", entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true }), status: "approved", source: "user", intent: {}, report: {} } });
+    await db.moduleVersion.create({ data: { moduleId: pi.id, hash: pi.activeHash!, manifest: moduleManifestSchema.parse({ name: "pi",
+      entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true }), status: "approved", source: "user", intent: {}, report: {} } });
     await supervisor.start();
     expect(await db.module.findUniqueOrThrow({ where: { id: pi.id } })).toEqual(pi);
     expect(await db.moduleVersion.count()).toBe(1);

@@ -16,7 +16,8 @@ type Manifest = z.output<typeof moduleManifestSchema>;
 type ProposalInput = { dir: string; intent: z.input<typeof intentSchema>; root: string; allowed?: string[];
   /** Internal official installation/update path; never part of routed tool input. */
   exactReleaseUpdate?: ExactReleaseBaseline; expectedHash?: string; expectedModuleId?: string | null };
-type Submission = { moduleId: string; hash: string; versionId: string; manifest: Manifest; intent: z.output<typeof intentSchema>; source: ModuleSource; report: BuildReport };
+type Submission = { moduleId: string; hash: string; versionId: string; manifest: Manifest; intent: z.output<typeof intentSchema>;
+  source: ModuleSource; report: BuildReport };
 async function queueVersion(context: ModuleContext, submission: Submission) {
   const { db, ports } = context, { moduleId, hash, versionId, manifest, intent, source, report } = submission;
   return db.$transaction(async tx => {
@@ -25,10 +26,12 @@ async function queueVersion(context: ModuleContext, submission: Submission) {
     // Preserve submission order for failure streaks even within one millisecond.
     const latest = await tx.moduleVersion.findFirst({ where: { moduleId }, orderBy: { createdAt: "desc" } });
     const createdAt = new Date(Math.max(ports.now().getTime(), (latest?.createdAt.getTime() ?? 0) + 1));
-    const row = await tx.moduleVersion.upsert({ where: { moduleId_hash: { moduleId, hash } }, create: { id: versionId, moduleId, hash, manifest: json(manifest), intent: json(intent), source, report: json(report), status: "building", createdAt }, update: {} });
+    const row = await tx.moduleVersion.upsert({ where: { moduleId_hash: { moduleId, hash } }, create: { id: versionId, moduleId, hash,
+      manifest: json(manifest), intent: json(intent), source, report: json(report), status: "building", createdAt }, update: {} });
     // A concurrent same-hash proposal owns its staging; never overwrite it.
     if (row.id !== versionId && row.status === "rejected") {
-      const changed = await tx.moduleVersion.updateMany({ where: { id: row.id, status: "rejected" }, data: { id: versionId, status: "building", intent: json(intent), source, report: json(report), createdAt } });
+      const changed = await tx.moduleVersion.updateMany({ where: { id: row.id, status: "rejected" }, data: { id: versionId,
+        status: "building", intent: json(intent), source, report: json(report), createdAt } });
       if (changed.count) {
         return { ...row, id: versionId, status: "building" };
       }
@@ -54,12 +57,14 @@ async function readManifest(staging: string): Promise<{ manifest: Manifest } | {
   // Invalid manifests have no validated identity; never expose JSON parser/host diagnostics.
   try { raw = JSON.parse(await readFile(join(staging, "module.json"), "utf8")); }
   catch (error) {
-    console.error(JSON.stringify({ component: "module-proposal", event: "manifest.invalid", error: error instanceof SyntaxError ? "invalid JSON" : String(error) }));
+    console.error(JSON.stringify({ component: "module-proposal", event: "manifest.invalid",
+      error: error instanceof SyntaxError ? "invalid JSON" : String(error) }));
     return { errors: ["module.json: missing or not valid JSON"] };
   }
   const parsed = moduleManifestSchema.safeParse(raw);
   // Schema issue paths and messages come from the contract, so the Provider can fix its manifest.
-  return parsed.success ? { manifest: parsed.data } : { errors: manifestIssues(parsed.error.issues).slice(0, 10).map(issue => `${issue.path.join(".") || "module.json"}: ${issue.message}`.slice(0, 300)) };
+  return parsed.success ? { manifest: parsed.data } : { errors: manifestIssues(parsed.error.issues).slice(0,
+    10).map(issue => `${issue.path.join(".") || "module.json"}: ${issue.message}`.slice(0, 300)) };
 }
 function submissionErrors(manifest: Manifest, hasEntry: boolean, hasMigrate: boolean) {
   return [...(hasEntry ? [] : [`entry: ${manifest.entry} not found`]), ...(hasMigrate ? [] : [`data.migrate: ${manifest.data.migrate} not found`])];
@@ -68,7 +73,8 @@ function proposedModule(context: ModuleContext, manifest: Manifest, expectedModu
   const { db, workspaceId, ports } = context;
   return db.$transaction(async tx => {
     const existing = await assertExternalName(tx, workspaceId, manifest.name, "propose");
-    if (expectedModuleId !== undefined && (existing?.id ?? null) !== expectedModuleId) throw new StewardError("conflict", "Module identity changed before proposal");
+    if (expectedModuleId !== undefined && (existing?.id ?? null) !== expectedModuleId) throw new StewardError("conflict",
+      "Module identity changed before proposal");
     return existing ?? tx.module.create({ data: { workspaceId, name: manifest.name, createdAt: ports.now() } });
   });
 }
@@ -82,7 +88,8 @@ async function writeStaging(staging: string, files: ModuleFile[]) {
 function assertDeclared(name: string, allowed?: string[]) {
   if (allowed && !allowed.includes(name)) throw new StewardError("forbidden", `This build may submit only ${allowed.join(", ")}`);
 }
-async function submitStaging(context: ModuleContext, submission: Omit<Submission, "moduleId" | "manifest">, staging: string, files: ModuleFile[], input: ProposalInput): Promise<Proposal & { retained?: boolean }> {
+async function submitStaging(context: ModuleContext, submission: Omit<Submission, "moduleId" | "manifest">, staging: string,
+  files: ModuleFile[], input: ProposalInput): Promise<Proposal & { retained?: boolean }> {
   const { db } = context, { report, versionId } = submission;
   const { hash } = submission;
   await writeStaging(staging, files);
@@ -98,8 +105,10 @@ async function submitStaging(context: ModuleContext, submission: Omit<Submission
   const hasEntry = files.some(file => file.path === moduleMaterialEntryPath(manifest.entry));
   const hasMigrate = hasMigration(manifest, files);
   if (existing?.status === "approved") return { moduleId: module.id, hash, status: "approved", report: existing.report as BuildReport };
-  if (!hasEntry || !hasMigrate) return { moduleId: module.id, hash, status: "rejected", report: { ...report, errors: submissionErrors(manifest, hasEntry, hasMigrate) } };
-  if (existing && ["building", "testing", "pending_review"].includes(existing.status)) return { moduleId: module.id, hash, status: existing.status as Proposal["status"], report: existing.report as BuildReport };
+  if (!hasEntry || !hasMigrate) return { moduleId: module.id, hash, status: "rejected", report: { ...report,
+    errors: submissionErrors(manifest, hasEntry, hasMigrate) } };
+  if (existing && ["building", "testing", "pending_review"].includes(existing.status)) return { moduleId: module.id, hash,
+    status: existing.status as Proposal["status"], report: existing.report as BuildReport };
   const queued = await queueVersion(context, { ...submission, hash, moduleId: module.id, manifest });
   if (queued.id !== versionId) return { moduleId: module.id, hash, status: queued.status as Proposal["status"], report: queued.report as BuildReport };
   return { moduleId: module.id, hash, status: "building", report, retained: true };
@@ -115,7 +124,8 @@ async function submitProposal(context: ModuleContext, input: ProposalInput, sour
   const intent = parseInput(intentSchema, input.intent);
   const files = await snapshotModuleMaterial(input.root, input.dir);
   const hash = moduleMaterialDigest(files);
-  if (input.expectedHash !== undefined && input.expectedHash !== hash) throw new StewardError("conflict", "Submitted material differs from the selected release");
+  if (input.expectedHash !== undefined && input.expectedHash !== hash) throw new StewardError("conflict",
+    "Submitted material differs from the selected release");
   const report: BuildReport = { tests: [], ...(input.exactReleaseUpdate ? { exactReleaseUpdate: input.exactReleaseUpdate } : {}) };
   const versionId = randomUUID(), staging = join(platform, "staging", versionId);
   let retained = false;

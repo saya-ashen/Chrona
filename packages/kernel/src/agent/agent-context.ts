@@ -33,24 +33,29 @@ async function selectContextProvider(ports: StewardPorts, principal: ModulePrinc
     if (!context.providerId || !context.providerRevision) throw new CallError("conflict", "Context has no registered provider binding");
     if (providerId && context.providerId !== providerId) throw new CallError("conflict", "Context provider cannot change");
     providerId = context.providerId;
-    const previous = await ports.db.agentRunProvider.findFirst({ where: { run: { workspaceId: principal.workspaceId, sessionId: context.id }, providerId, revision: context.providerRevision }, orderBy: { run: { createdAt: "desc" } } });
-    if (!previous || !(await providerView(ports, principal.workspaceId, previous)).available) throw new CallError("unavailable", "Context provider revision is unavailable");
+    const previous = await ports.db.agentRunProvider.findFirst({ where: { run: { workspaceId: principal.workspaceId,
+      sessionId: context.id }, providerId, revision: context.providerRevision }, orderBy: { run: { createdAt: "desc" } } });
+    if (!previous || !(await providerView(ports, principal.workspaceId, previous)).available) throw new CallError("unavailable",
+      "Context provider revision is unavailable");
     return previous;
   }
   return selectAgentProvider(ports, principal.workspaceId, providerId);
 }
 
 async function registeredRunReceipt(ports: StewardPorts, principal: ModulePrincipal, args: Record<string, unknown>) {
-  const prior = await ports.db.agentCommand.findUnique({ where: { id: `agent-command:${contextDigest([principal.workspaceId, principal.caller.moduleId, "run", args.requestKey])}` } });
+  const prior = await ports.db.agentCommand.findUnique({ where: { id: `agent-command:${contextDigest([principal.workspaceId,
+    principal.caller.moduleId, "run", args.requestKey])}` } });
   if (!prior) return;
   await assertApprovedAgentPrincipal(ports.db, principal);
-  if (prior.hash !== principal.caller.hash || prior.requestDigest !== contextRequestDigest(args)) throw new CallError("conflict", "Agent request identity changed");
+  if (prior.hash !== principal.caller.hash || prior.requestDigest !== contextRequestDigest(args)) throw new CallError("conflict",
+    "Agent request identity changed");
   return prior;
 }
 
 async function selectRunTools(ports: StewardPorts, principal: ModulePrincipal, args: Record<string, unknown>) {
   const selection = await selectContextTools(ports, principal, args.tools as import("@chrona/contracts/steward").RoutedTarget[]);
-  if ((args.content as string[]).some(ref => !ref.startsWith(`${selection.caller.module}/`))) throw new CallError("forbidden", "Agent input content must belong to the originating module");
+  if ((args.content as string[]).some(ref => !ref.startsWith(`${selection.caller.module}/`))) throw new CallError("forbidden",
+    "Agent input content must belong to the originating module");
   return selection;
 }
 
@@ -81,7 +86,8 @@ async function applyEffects(ports: StewardPorts, command: ContextCommand, output
 }
 
 /** Kernel retains only scoped context identity, admission receipts and durable Run evidence. */
-export async function admitContextPrimitive(ports: StewardPorts, rawPrincipal: AgentPrincipal, name: string, args: Record<string, unknown>, ...[settle = false, settledOutput]: [settle?: boolean, settledOutput?: Prisma.InputJsonValue]) {
+export async function admitContextPrimitive(ports: StewardPorts, rawPrincipal: AgentPrincipal, name: string, args: Record<string, unknown>,
+  ...[settle = false, settledOutput]: [settle?: boolean, settledOutput?: Prisma.InputJsonValue]) {
   const principal = modulePrincipal(rawPrincipal);
   let binding: ProviderBinding | undefined;
   if (name === "run" && args.providerRegistration === true) {

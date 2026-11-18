@@ -16,7 +16,7 @@ export async function fenceAgentModuleIn(ports: StewardPorts, tx: Prisma.Transac
   }, include: { providerLaunch: true } });
   for (const run of runs) {
     await tx.run.update({ where: { id: run.id }, data: { cancelRequestedAt: run.cancelRequestedAt ?? now } });
-    await finishRunIn(ports, workspaceId, tx, run.id, { outcome: "failed", sessionId: null, error: "Application lifecycle drain" }, now, run.providerLaunch ? undefined : "never_started");
+    await finishRunIn(tx, workspaceId, run.id, { outcome: "failed", sessionId: null, error: "Application lifecycle drain" }, { now, evidence: run.providerLaunch ? undefined : "never_started" });
   }
   return { runs: runs.length, runIds: runs.map(run => run.id) };
 }
@@ -27,7 +27,7 @@ export async function abortDrainedAgentRuns(ports: StewardPorts, workspaceId: st
       const handle = liveRuns.get(runId);
       if (handle) await handle.abort();
       else if (await ports.db.providerLaunch.findUnique({ where: { runId } })) {
-        await callProviderEndpoint(ports, workspaceId, await runProviderBinding(ports, workspaceId, runId), "abort", { operationId: runId }, `agent-drain:${runId}`);
+        await callProviderEndpoint(ports, workspaceId, { ...await runProviderBinding(ports, workspaceId, runId), requestKey: `agent-drain:${runId}` }, "abort", { operationId: runId });
       }
     } catch (error) {
       console.error(JSON.stringify({ component: "agent-drain", event: "abort.failed", runId, error: String(error) }));

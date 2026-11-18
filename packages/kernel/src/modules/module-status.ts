@@ -12,7 +12,8 @@ export type ModuleStatus = "paused" | "active";
 type PauseCause = { source: string; reason?: string; incidentId?: string };
 
 /** Status transitions never create or resume calendar work. */
-export function setStatusIn(context: ModuleContext, tx: Prisma.TransactionClient, moduleId: string, status: ModuleStatus, cause: string | PauseCause): Promise<{ moduleId: string; status: ModuleStatus }> {
+export function setStatusIn(context: ModuleContext, tx: Prisma.TransactionClient, moduleId: string, status: ModuleStatus, cause: string |
+  PauseCause): Promise<{ moduleId: string; status: ModuleStatus }> {
   const input = typeof cause === "string" ? { source: cause } : cause;
   return status === "paused" ? pauseIn(context, tx, moduleId, input) : resumeIn(context, tx, moduleId, input.source);
 }
@@ -20,11 +21,13 @@ const statusKinds = ["module_disabled", "module_enabled"];
 function latestStatus(tx: Prisma.TransactionClient, workspaceId: string, moduleId: string) {
   return tx.audit.findFirst({ where: { workspaceId, subjectId: moduleId, kind: { in: statusKinds } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] });
 }
-async function recordStatus(context: ModuleContext, tx: Prisma.TransactionClient, moduleId: string, kind: string, details: Prisma.InputJsonObject & { source: string }) {
+async function recordStatus(context: ModuleContext, tx: Prisma.TransactionClient, moduleId: string, kind: string,
+  details: Prisma.InputJsonObject & { source: string }) {
   const previous = await latestStatus(tx, context.workspaceId, moduleId);
   // Preserve pause/resume order even when transitions share a millisecond or the clock moves back.
   const createdAt = new Date(Math.max(context.now().getTime(), (previous?.createdAt.getTime() ?? -Infinity) + 1));
-  await tx.audit.create({ data: { workspaceId: context.workspaceId, subjectId: moduleId, actorKey: details.source === "automatic" || details.source === "chrona" ? "chrona" : "user", kind, details, createdAt } });
+  await tx.audit.create({ data: { workspaceId: context.workspaceId, subjectId: moduleId, actorKey: details.source === "automatic" ||
+    details.source === "chrona" ? "chrona" : "user", kind, details, createdAt } });
 }
 export async function pauseIn(context: ModuleContext, tx: Prisma.TransactionClient, moduleId: string, { source, reason = source, incidentId }: PauseCause) {
   const module = await requireModule(context, tx, moduleId), result = { moduleId, status: "paused" as const };
@@ -43,9 +46,11 @@ async function resumeIn(context: ModuleContext, tx: Prisma.TransactionClient, mo
   if (module.executionFenceAt) {
     // A failed pause can leave an active module fenced. Only confirmed drain permits reopening it.
     await assertExecutionModuleIdle(tx, moduleId);
-    if (!await tx.moduleVersion.findFirst({ where: { moduleId, hash: module.activeHash, status: "approved" } })) throw new StewardError("conflict", "Module version is not approved");
+    if (!await tx.moduleVersion.findFirst({ where: { moduleId, hash: module.activeHash,
+      status: "approved" } })) throw new StewardError("conflict", "Module version is not approved");
   }
-  await tx.module.update({ where: { id: moduleId }, data: { status: "active", ...(module.status === "paused" ? { activationId: randomUUID() } : {}), executionFenceAt: null } });
+  await tx.module.update({ where: { id: moduleId }, data: { status: "active", ...(module.status === "paused" ? {
+    activationId: randomUUID() } : {}), executionFenceAt: null } });
   await recordStatus(context, tx, moduleId, "module_enabled", { source });
   return result;
 }

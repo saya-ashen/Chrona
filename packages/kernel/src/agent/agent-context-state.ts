@@ -12,7 +12,8 @@ export type ModulePrincipal = AgentPrincipal & { caller: { kind: "module"; modul
 
 export async function assertApprovedAgentPrincipal(tx: Prisma.TransactionClient, principal: ModulePrincipal, allowFenced = true) {
   const { workspaceId, caller } = principal;
-  const module = await tx.module.findFirst({ where: { workspaceId, id: caller.moduleId, activeHash: caller.hash, status: "active", ...(allowFenced ? {} : { executionFenceAt: null }), versions: { some: { hash: caller.hash, status: "approved" } } }, select: { id: true } });
+  const module = await tx.module.findFirst({ where: { workspaceId, id: caller.moduleId, activeHash: caller.hash, status: "active",
+    ...(allowFenced ? {} : { executionFenceAt: null }), versions: { some: { hash: caller.hash, status: "approved" } } }, select: { id: true } });
   if (!module) throw new CallError("forbidden", "Agent caller is no longer its approved active module");
 }
 
@@ -27,7 +28,8 @@ export function modulePrincipal(principal: AgentPrincipal): ModulePrincipal {
   return principal as ModulePrincipal;
 }
 export async function ownedContext(tx: Prisma.TransactionClient, principal: ModulePrincipal, contextId: string) {
-  const context = await tx.agentContext.findFirst({ where: { id: contextId, workspaceId: principal.workspaceId, ownerId: principal.ownerId, moduleId: principal.caller.moduleId, hash: principal.caller.hash } });
+  const context = await tx.agentContext.findFirst({ where: { id: contextId, workspaceId: principal.workspaceId, ownerId: principal.ownerId,
+    moduleId: principal.caller.moduleId, hash: principal.caller.hash } });
   if (!context) throw new CallError("not_found", "Agent context not found");
   return context;
 }
@@ -39,5 +41,6 @@ export async function ownedRun(tx: Prisma.TransactionClient, principal: ModulePr
 }
 export function view(run: { id: string; sessionId: string | null; status: string; stopStatus: string }) {
   const uncertain = run.stopStatus === "unknown";
-  return { runId: run.id, contextId: run.sessionId!, status: uncertain ? "unknown" : run.status, active: uncertain || run.status === "queued" || run.status === "running" };
+  return { runId: run.id, contextId: run.sessionId!, status: uncertain ? "unknown" : run.status, active: uncertain ||
+    run.status === "queued" || run.status === "running" };
 }

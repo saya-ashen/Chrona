@@ -13,18 +13,22 @@ export async function contextRunImages(ports: StewardPorts, run: { id: string; w
   for (const ref of content) {
     const file = await readRunContent(ports, run.workspaceId, receipt.moduleId, ref); bytes += file.bytes.byteLength;
     if (bytes > 20 * 1024 * 1024) throw new Error("Agent content exceeds 20 MiB");
-    if (["image/png", "image/jpeg", "image/gif", "image/webp"].includes(file.mime)) images.push({ mime: file.mime, base64: Buffer.from(file.bytes).toString("base64") });
+    if (["image/png", "image/jpeg", "image/gif", "image/webp"].includes(file.mime)) images.push({ mime: file.mime,
+      base64: Buffer.from(file.bytes).toString("base64") });
   }
   return images;
 }
 
 /** Caller has already proved ownership of this exact Run. No workspace-wide discovery. */
-export async function contextInteractions(ports: StewardPorts, run: { id: string; workspaceId: string; status: string; deadlineAt: Date | null; leaseUntil: Date | null; cancelRequestedAt: Date | null }) {
+export async function contextInteractions(ports: StewardPorts, run: { id: string; workspaceId: string; status: string; deadlineAt: Date |
+  null; leaseUntil: Date | null; cancelRequestedAt: Date | null }) {
   const { workspaceId } = run;
   const requested = await ports.db.runInteraction.findMany({ where: { runId: run.id }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: 12 });
   const alive = providerRunActive(run, liveRuns.has(run.id) && !run.cancelRequestedAt, ports.now());
   return requested.map(row => {
     const question = providerInteractionSchema.parse(row.request);
-    return { ...question, status: providerRequestStatus(question, row.status === "pending" ? undefined : row.status as typeof question.status, alive, hasLiveProviderInteraction(ports, workspaceId, run.id, question.id), ports.now()) };
+    return { ...question, status: providerRequestStatus(question,
+      row.status === "pending" ? undefined : row.status as typeof question.status, alive, hasLiveProviderInteraction(ports, workspaceId,
+      run.id, question.id), ports.now()) };
   });
 }

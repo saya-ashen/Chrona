@@ -1,3 +1,5 @@
+import { installTestModuleVersion } from "../__testing__/module-release-test-fixture";
+import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { admitContextPrimitive } from "./agent-context";
@@ -30,7 +32,7 @@ test.each([false, true])("restart reconciles only a persisted stop receipt (conf
   const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => new Date(), sandbox: { available: true, isolated: false, startModule: peer.startModule } };
   cleanups.push(() => moduleSupervisor(ports).stop());
   const backend = await db.module.create({ data: { workspaceId: workspace.id, name: "test-provider", activeHash: "backend-version", status: "active" } });
-  await db.moduleVersion.create({ data: { moduleId: backend.id, hash: "backend-version", status: "approved", source: "user", manifest: testProviderManifest, intent: {}, report: {} } });
+  backend.activeHash = await installTestModuleVersion(ports, backend, moduleManifestSchema.parse(testProviderManifest));
   const binding = await registerAgentProvider(ports, workspace.id, { kind: "module", module: backend.name, moduleId: backend.id, hash: backend.activeHash! }, {
     id: "receipt-provider", name: "Receipt Provider", protocolVersion: 1,
     capabilities: { conversation: true, completion: false, native: false, images: false, interactions: false, resume: true },

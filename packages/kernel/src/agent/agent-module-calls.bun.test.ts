@@ -1,6 +1,5 @@
+import { installTestModuleVersion } from "../__testing__/module-release-test-fixture";
 import { expect, test } from "bun:test";
-import { join } from "node:path";
-import { mkdir, writeFile } from "node:fs/promises";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { agentContextFixture as fixture } from "../__testing__/agent-context.fixture";
 import { assertExecutionModuleIdle } from "../execution/execution-module-guard";
@@ -15,12 +14,11 @@ type Fixture = Awaited<ReturnType<typeof fixture>>;
 type Read = { run: { runId: string; status: string; active: boolean }; items: { sequence: number; kind: string; payload: unknown }[]; nextCursor: string; ended: boolean; interactions: { id: string; status: string }[]; transcript: unknown[] };
 const owner = (f: Fixture) => ({ ...kernelOrigin(f.workspaceId), caller: { kind: "owner" as const, via: null } });
 async function install(f: Fixture, name: string, source: string, tools = ["relay"], uses = ["agent.run", "agent.read", "agent.write", "agent.stop", "agent.native"], readOnly = false) {
-  const hash = name + "-v1", directory = join(f.ports.dataDir, "platform/store", hash);
-  await mkdir(directory); await writeFile(join(directory, "index.ts"), source);
   const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", effects: [], uses, model: { tier: "any", maxCalls: 1, maxOutputTokens: 100 }, tests: ["test.ts"],
     tools: tools.map(name => ({ name, ...(readOnly ? { readOnly: true } : {}), description: "Offline SDK fixture", visibility: ["owner"], parameters: { type: "object", properties: name === "relay" ? { tool: { type: "string" }, args: { type: "string" }, key: { type: "string" } } : {} }, output: {} })) });
-  const module = await f.ports.db.module.create({ data: { workspaceId: f.workspaceId, name, status: "active", activeHash: hash } });
-  await f.ports.db.moduleVersion.create({ data: { moduleId: module.id, hash, source: "user", manifest, status: "approved", intent: {}, report: {} } });
+  const module = await f.ports.db.module.create({ data: { workspaceId: f.workspaceId, name, status: "active", activeHash: null } });
+  const hash = await installTestModuleVersion(f.ports, module, manifest, name, source);
+  module.activeHash = hash;
   return { module, hash, manifest, origin: { ...kernelOrigin(f.workspaceId), caller: { kind: "module" as const, module: name, moduleId: module.id, hash } } };
 }
 const relaySource = `import {chrona,on} from 'chrona';on('tool',async t=>{try{return {result:await chrona.call('agent.'+t.args.tool,JSON.parse(t.args.args),t.args.tool==='read'?{}:{key:t.args.key})}}catch(e){return {result:{error:e.code,message:e.message}}}});`;
@@ -55,11 +53,9 @@ test("SDK Agent contexts preserve ownership, selected tools, scoped reads, inter
     expect(await relay("read", target)).toMatchObject({ ended: true });
     expect(await createRuns(f.ports, f.workspaceId).claimNext("background")).toBeNull();
 
-    const sinkHash = "context-sink-v1", sinkSource = join(f.ports.dataDir, "platform/store", sinkHash);
-    await mkdir(sinkSource); await writeFile(join(sinkSource, "index.ts"), `import {on} from 'chrona';on('tool',async t=>({result:{caller:t.caller}}));`);
     const sinkManifest = moduleManifestSchema.parse({ name: "context-sink", entry: "index.ts", effects: [], tests: ["test.ts"], tools: [{ name: "observe", description: "Caller fixture", visibility: ["modules"], parameters: { type: "object", properties: {} }, output: {} }] });
-    const sink = await f.ports.db.module.create({ data: { workspaceId: f.workspaceId, name: "context-sink", status: "active", activeHash: sinkHash } });
-    await f.ports.db.moduleVersion.create({ data: { moduleId: sink.id, hash: sinkHash, source: "user", manifest: sinkManifest, status: "approved", intent: {}, report: {} } });
+    const sink = await f.ports.db.module.create({ data: { workspaceId: f.workspaceId, name: "context-sink", status: "active", activeHash: null } });
+    await installTestModuleVersion(f.ports, sink, sinkManifest, "sink", `import {on} from "chrona";on("tool",async t=>({result:{caller:t.caller}}));`);
     expect(await relay("run", { ...input, tools: [{ moduleId: consumer.module.id, tool: "relay" }] }, "owner-escalation")).toMatchObject({ error: "forbidden" });
     const buildRequest = { name: "context-built", goal: "Verify original context admission", examples: [], intent: { changes: ["Add a deterministic fixture"], preserves: [] } };
     await expect(callSync(f.ports, consumer.origin, "modules.build", buildRequest)).rejects.toMatchObject({ code: "not_found" });

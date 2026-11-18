@@ -8,7 +8,7 @@ import { moduleSupervisor } from "./module-supervisor";
 import { createModules } from "./modules";
 import { testModuleProcess } from "../__testing__/module-test-process";
 import { testDb } from "../__testing__/test-db";
-import { seedTestModuleRelease } from "../__testing__/module-release-test-fixture";
+import { installTestModuleVersion, seedTestModuleRelease } from "../__testing__/module-release-test-fixture";
 import { moduleContext } from "./module-context";
 import { propose } from "./module-proposal";
 import type { StewardPorts } from "../ports";
@@ -40,7 +40,7 @@ async function fixture() {
       await cp(code, join(dataDir, "platform/store", activeHash), { recursive: true });
     } else {
       module = await db.module.create({ data: { workspaceId: workspace.id, name, activeHash: name } });
-      await db.moduleVersion.create({ data: { moduleId: module.id, hash: name, manifest, source: "user", status: "approved", intent: {}, report: {} } });
+      module.activeHash = await installTestModuleVersion(ports, module, manifest);
     }
     const caller: Caller = { kind: "module", module: name, moduleId: module.id, hash: module.activeHash! };
     return { ...module, caller };
@@ -54,7 +54,7 @@ test("ordinary web owner controls pause and resume, audits the user and keeps re
   const f = await fixture();
   const timer = await f.db.timer.create({ data: { workspaceId: f.workspace.id, moduleId: f.target.id, timerId: "mail", rule: { kind: "every", minutes: 60 }, status: "active", nextAt: f.ports.now() } });
   await moduleSupervisor(f.ports).reconcile();
-  const running = () => f.processes.filter(process => process.input.codeDir.endsWith("/gmail") && !process.socket.destroyed);
+  const running = () => f.processes.filter(process => process.input.codeDir.endsWith("/" + f.target.activeHash) && !process.socket.destroyed);
   expect(running()).toHaveLength(1);
   for (const [operation, status, kind] of [["disable", "paused", "module_disabled"], ["enable", "active", "module_enabled"]]) {
     expect(await f.call(`modules.${operation}`, { moduleId: f.target.id, reason: "用户在网页操作" })).toMatchObject({ status: "done", result: { status } });

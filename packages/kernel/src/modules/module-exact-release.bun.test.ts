@@ -36,7 +36,7 @@ async function fixture(name = "pi") {
   const code = join(ports.moduleExternalResources!, name); await mkdir(code, { recursive: true });
   const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [], tools: [{ name: "health", description: "Offline provider health", visibility: ["owner"], parameters: { type: "object", properties: {} }, output: { type: "object", properties: { available: { type: "boolean" } }, required: ["available"], additionalProperties: false } }] });
   await writeFile(join(code, "module.json"), JSON.stringify(manifest));
-  await writeFile(join(code, "index.ts"), '\non("tool", async () => ({ result: { available: true } }));\n');
+  await writeFile(join(code, "index.ts"), 'import { on } from "chrona";\non("tool", async () => ({ result: { available: true } }));\n');
   await writeFile(join(code, "test.ts"), "export {};\n");
   await seedTestModuleRelease(ports.moduleExternalResources!, name);
   const context = moduleContext(ports, workspace.id);
@@ -45,7 +45,7 @@ async function fixture(name = "pi") {
   expect(await db.module.findUniqueOrThrow({ where: { id: local.moduleId! } })).toMatchObject({ activeHash: local.hash });
   const active = await db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: local.moduleId!, hash: local.hash } } });
   await installExternal(ports, workspace.id, { package: name, mode: "update", requestKey: "initial-receipt" });
-  await writeFile(join(code, "index.ts"), '// next release\n\non("tool", async () => ({ result: { available: true } }));\n');
+  await writeFile(join(code, "index.ts"), 'import { on } from "chrona";\n// next release\non("tool", async () => ({ result: { available: true } }));\n');
   const release = await resolveExternalRelease(ports, name);
   const request = (key: string) => ({ package: name as "pi", mode: "update" as const, requestKey: key });
   return { db, ports, context, release, code, local, active, request, tests: () => tests, failTests: (value: boolean) => { fail = value; }, select: (key: string) => installExternal(ports, workspace.id, request(key)) };

@@ -1,3 +1,4 @@
+import { installTestModuleVersion } from "../__testing__/module-release-test-fixture";
 import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -38,7 +39,7 @@ async function fixture() {
   async function install(name: string, visibility: "kernel" | "modules" = "kernel") {
     const module = await db.module.create({ data: { workspaceId, name, status: "active", activeHash: `${name}-v1` } });
     const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: ["agent.run"], tools: Object.values(declaration().endpoints).map(endpoint => ({ name: endpoint, description: endpoint, visibility: [visibility], parameters: { type: "object", properties: endpoint === "start" ? { token: { type: "string" }, prompt: { type: "string" } } : {} }, output: {} })) });
-    await db.moduleVersion.create({ data: { moduleId: module.id, hash: module.activeHash!, manifest, source: "user", status: "approved", intent: {}, report: {} } });
+    module.activeHash = await installTestModuleVersion(ports, module, manifest);
     return { module, manifest, caller: { kind: "module" as const, module: module.name, moduleId: module.id, hash: module.activeHash! } };
   }
   return { db, ports, workspaceId, install, requests, reply(value: Record<string, unknown>) { privateReply = value; }, reject(value: string) { privateError = value; } };

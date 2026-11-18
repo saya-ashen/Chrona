@@ -4,7 +4,8 @@ import type { ProviderDeclaration } from "./agent-provider";
 import { CallError } from "../modules/module-call-error";
 
 type Endpoint = <T>(name: keyof ProviderDeclaration["endpoints"], args: Record<string, unknown>, key?: string) => Promise<T>;
-const statusSchema = runtimeOperationSchema.extend({ outcome: runtimeOutcomeSchema.nullable(), failure: z.boolean(), completion: runtimeCompletionSchema.optional() });
+const statusSchema = runtimeOperationSchema.extend({ outcome: runtimeOutcomeSchema.nullable(), failure: z.boolean(),
+  completion: runtimeCompletionSchema.optional() });
 const unknown = () => new CallError("unknown", "Provider completion requires reconciliation");
 
 /** Observe a single submission. An abort acknowledgement never proves closure. */

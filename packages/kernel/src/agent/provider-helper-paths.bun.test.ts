@@ -1,3 +1,4 @@
+import { installTestModuleVersion } from "../__testing__/module-release-test-fixture";
 import { createTestAgentContext } from "../__testing__/test-provider";
 import { afterEach, expect, test } from "bun:test";
 import type { Prisma } from "@chrona/db";
@@ -38,7 +39,7 @@ async function fixture() {
       endpoints: { health: `${id}-health`, start: `${id}-start`, status: `${id}-status`, inject: `${id}-inject`, abort: `${id}-abort`, release: `${id}-release`, ...(options.transcript === false ? {} : { transcript: `${id}-transcript` }), ...(options.conversation === false ? { complete: `${id}-complete` } : {}) },
     };
     const manifest = moduleManifestSchema.parse({ name: module.name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: [], tools: Object.values(declaration.endpoints).map(name => ({ name, description: name, visibility: ["kernel"], parameters: name.endsWith("transcript") ? { type: "object", properties: { sessionDir: { type: "string" }, limit: { type: "number" } }, required: ["sessionDir", "limit"] } : { type: "object", properties: {} }, output: {} })) });
-    await db.moduleVersion.create({ data: { moduleId: module.id, hash: module.activeHash!, manifest, source: "user", status: "approved", intent: {}, report: {} } });
+    module.activeHash = await installTestModuleVersion(ports, module, manifest);
     await registerAgentProvider(ports, workspaceId, { kind: "module", module: module.name, moduleId: module.id, hash: module.activeHash! }, declaration);
     return { module, registration: await db.agentProvider.findUniqueOrThrow({ where: { workspaceId_id: { workspaceId, id } } }) };
   }

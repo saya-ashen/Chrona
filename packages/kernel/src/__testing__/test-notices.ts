@@ -1,7 +1,8 @@
 import type { StewardPorts } from "../ports";
 import { kernelFactSchema, type LifecycleFact } from "../notification-facts";
 
-type Notice = { title: string; body: string; level: string; kind: string | null; fact: LifecycleFact | null; idempotencyKey: string; moduleId: string | null; sessionId: string | null; approvalId: string | null; recipient: string | null; caller: string; status: string };
+type Notice = { title: string; body: string; level: string; kind: string | null; fact: LifecycleFact | null; idempotencyKey: string;
+  moduleId: string | null; sessionId: string | null; approvalId: string | null; recipient: string | null; caller: string; status: string };
 export async function notices(db: StewardPorts["db"], filter: Partial<Notice> = {}) {
   const calls = await db.moduleInvocation.findMany({ where: { target: "notify", tool: "send" }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
   const facts = await db.kernelFact.findMany({ orderBy: [{ createdAt: "asc" }, { id: "asc" }] });

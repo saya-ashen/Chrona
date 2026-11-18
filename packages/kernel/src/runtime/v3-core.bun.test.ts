@@ -108,7 +108,7 @@ test.each(["inactive", "cancelled"] as const)("claim rechecks a queued run's %s 
   if (reason === "inactive") await db.agentContext.update({ where: { id: sessionId }, data: { status: "ended" } });
   else await cancel(stale.id);
   expect((await api.runs.claimNext("foreground"))?.id).toBe(eligible.id);
-  expect(await db.run.findUniqueOrThrow({ where: { id: stale.id } })).toMatchObject({ status: "cancelled", startedAt: null, endedAt: now });
+  expect(await db.run.findUniqueOrThrow({ where: { id: stale.id } })).toMatchObject({ status: reason === "inactive" ? "failed" : "cancelled", startedAt: null, endedAt: now });
 });
 
 for (const scope of ["session", "workspace"] as const) test(`${scope} budget admits its last slot, defers excess and resets at local midnight`, async () => {

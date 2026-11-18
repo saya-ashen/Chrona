@@ -5,11 +5,12 @@ import type { ModuleCall, moduleCallReplySchema, ModuleEvent, ModuleManifest, mo
 import type { StewardPorts } from "../ports";
 import type { createModuleChannel } from "./module-channel";
 import type { moduleHttpReady } from "./module-http-ready";
-import { diagnosticText, type ModuleFailureEvidence } from "./module-diagnostics";
+import { diagnosticText, recordModuleRecovery, type ModuleFailureEvidence } from "./module-diagnostics";
 
 export type Reply = ReturnType<typeof moduleEventReplySchema.parse>;
 /** `chain`/`path`: the routed call path of the event being handled (see module-calls). */
-export type CallScope = { workspaceId: string; moduleId: string; hash: string; receiverActivationId?: string; manifest: ModuleManifest; moduleRunId?: string; eventKey?: string; chain?: string[]; path?: string[] };
+export type CallScope = { workspaceId: string; moduleId: string; hash: string; receiverActivationId?: string; manifest: ModuleManifest;
+  moduleRunId?: string; eventKey?: string; chain?: string[]; path?: string[] };
 /** Where a failed delivery stopped: never reached the module, the module answered with an error, or lost after sending. */
 export type DeliveryStage = "unavailable" | "handler" | "lost";
 export function staged(error: unknown, stage: DeliveryStage) {
@@ -24,7 +25,10 @@ export function isHandlerRejection(error: unknown) {
 export type Process = ReturnType<NonNullable<NonNullable<StewardPorts["sandbox"]>["startModule"]>>;
 export type Timers = Pick<typeof globalThis, "setTimeout" | "clearTimeout">;
 export type Options = { timers?: Timers; idleMs?: number; backoffMs?: number };
-export type DeliveryOptions = { private?: boolean; /** Observations keep only in-memory delivery identity. */ retainHistory?: boolean; /** false: record the run, not its result. */ retainOutput?: boolean; chain?: string[]; path?: string[]; timeoutMs?: number; activationId?: string | null; beforeDelivery?: () => Promise<void>; dispatch?: (send: () => void) => Promise<void>; validateResult?: (result: unknown) => string | null; callerRunId?: string };
+export type DeliveryOptions = { private?: boolean; /** Observations keep only in-memory delivery identity. */ retainHistory?: boolean;
+  /** false: record the run, not its result. */ retainOutput?: boolean; chain?: string[]; path?: string[]; timeoutMs?: number;
+  activationId?: string | null; beforeDelivery?: () => Promise<void>; dispatch?: (send: () => void) => Promise<void>;
+  validateResult?: (result: unknown) => string | null; callerRunId?: string };
 export type Delivery = { promise: Promise<Reply>; waits: Set<Delivery>; runId?: string };
 export type Instance = {
   moduleId: string; hash: string; activationId: string | null; manifest: ModuleManifest; scope: CallScope;
@@ -82,7 +86,8 @@ function processEvidence(instance: Partial<Pick<Instance, "process" | "exit" | "
   return { pid: process?.pid ?? null, exitCode: exit?.code ?? null, signal: exit?.signal ?? null,
     stderr: instance.privateTransport ? "[private process output omitted]" : diagnosticText(process?.stderr() ?? "", 4000, true) };
 }
-export function evidence(instance: Partial<Pick<Instance, "connected" | "process" | "exit" | "privateTransport">>, error: string, runId?: string, event?: ModuleEvent): ModuleFailureEvidence {
+export function evidence(instance: Partial<Pick<Instance, "connected" | "process" | "exit" | "privateTransport">>, error: string,
+  runId?: string, event?: ModuleEvent): ModuleFailureEvidence {
   return { phase: failurePhase(event, instance.connected), reason: instance.privateTransport ? "Private operation failed" : diagnosticText(error, 1000),
     runId: runId ?? null, triggerId: event ? triggerKey(event) : "process", delivery: null, ...processEvidence(instance) };
 }
@@ -90,7 +95,8 @@ export function evidence(instance: Partial<Pick<Instance, "connected" | "process
 export function failureDetail(instance: Instance, input: { error: string; runId?: string; event?: ModuleEvent; delivery?: DeliveryStage; triggerId: string }) {
   const { error, runId, event, delivery, triggerId } = input;
   const observed = instance.privateTransport ? evidence(instance, error, runId, event) : instance.failureEvidence ?? evidence(instance, error, runId, event);
-  return { ...observed, reason: instance.privateTransport ? "Private operation failed" : diagnosticText(error, 1000), runId: runId ?? null, triggerId, delivery: delivery ?? null };
+  return { ...observed, reason: instance.privateTransport ? "Private operation failed" : diagnosticText(error, 1000), runId: runId ?? null,
+    triggerId, delivery: delivery ?? null };
 }
 export function deliveryFailure(error: unknown, privateTransport?: boolean) {
   if (!privateTransport) return error;
@@ -100,7 +106,8 @@ export function deliveryFailure(error: unknown, privateTransport?: boolean) {
 export function handlerFailureData(error: unknown, privateTransport?: boolean) {
   const failure = error as { deliveryRejected?: boolean };
   const reason = error instanceof Error ? error.message : String(error);
-  return { exitCode: 1, error: privateTransport ? "Private operation failed" : diagnosticText(reason, 1000), ...(failure.deliveryRejected ? { output: { delivery: "not_sent" } } : {}) };
+  return { exitCode: 1, error: privateTransport ? "Private operation failed" : diagnosticText(reason, 1000),
+    ...(failure.deliveryRejected ? { output: { delivery: "not_sent" } } : {}) };
 }
 
 /** A retired or closing owner cannot serve a new delivery. */
@@ -118,13 +125,17 @@ export function restartDelay(backoffMs: number, persistedFailures: number, local
 
 /** Observed process state after the supervisor's ownership/backoff checks. */
 export function instanceStatus(instance: Instance | undefined, hash: string | null, keepAlive: boolean) {
-  if (instance && instance.hash === hash && !instance.closing) return { state: instance.connected ? "running" as const : "starting" as const, pid: instance.process?.pid ?? null };
+  if (instance && instance.hash === hash && !instance.closing) return {
+    state: instance.connected ? "running" as const : "starting" as const, pid: instance.process?.pid ?? null };
   return { state: keepAlive ? "unavailable" as const : "idle" as const, pid: null };
 }
 
 type ModuleEffects = {
+  rollbackFailedStart(context: import("./module-context").ModuleContext, moduleId: string, hash: string, activationId: string): Promise<{
+    rolledBack: boolean }>;
   handleModuleCall(ports: StewardPorts, scope: CallScope, call: ModuleCall): Promise<ReturnType<typeof moduleCallReplySchema.parse>>;
-  pauseFailedModule(ports: StewardPorts, execution: { workspaceId: string; moduleId: string; hash: string; activationId: string | null; triggerId: string; firedAt: Date }, runId: string): Promise<void>;
+  pauseFailedModule(ports: StewardPorts, execution: { workspaceId: string; moduleId: string; hash: string; activationId: string | null;
+    triggerId: string; firedAt: Date }, runId: string): Promise<void>;
 };
 // module-effects routes a module's calls through module-calls, which delivers through this supervisor: it registers here instead of being imported.
 let effects: ModuleEffects | undefined;
@@ -140,3 +151,43 @@ export async function eventLimits(ports: StewardPorts, manifest: ModuleManifest,
   const ceiling = workspace && manifest.model ? moduleModelSettings(workspace.settings)?.eventTimeoutMs ?? RUN_LIMITS.jobTimeoutMs : RUN_LIMITS.jobTimeoutMs;
   return { timeoutMs: Math.min(requested ?? ceiling, ceiling), params: moduleRuntimeParams(manifest) };
 }
+
+export async function validateTrigger(ports: StewardPorts, instance: Instance, event: ModuleEvent) {
+  const { trigger } = event, { manifest, moduleId } = instance;
+  switch (trigger.kind) {
+    case "timer":
+      if (!await ports.db.moduleInvocation.findFirst({ where: { id: trigger.eventId, workspaceId: instance.scope.workspaceId,
+        targetModuleId: moduleId, targetHash: instance.hash, mode: "timer",
+        status: "running" } })) throw staged(new Error("Timer event lacks its exact delivery claim"), "unavailable");
+      return;
+    case "tool":
+      if (!manifest.tools.some(tool => tool.name === trigger.id)) throw staged(new Error("Module trigger missing"), "unavailable");
+      return;
+    case "activated":
+      if (!manifest.activated) throw staged(new Error("Module has no activated handler"), "unavailable");
+      return;
+    case "call_result": return;
+    default: throw staged(new Error("Unsupported module event kind"), "unavailable");
+  }
+}
+
+export async function recordEventResult(ports: StewardPorts, input: { instance: Instance; event: ModuleEvent; workspaceId: string; runId: string; reply: Reply;
+  private?: boolean; retainHistory?: boolean; retainOutput?: boolean; validateResult?: DeliveryOptions["validateResult"] }) {
+  const { instance, event, workspaceId, runId, reply, validateResult } = input;
+  if ("error" in reply) throw staged(Object.assign(new Error(reply.error), { code: reply.errorCode, reason: reply.errorReason }), "handler");
+  const outputError = validateResult?.(reply.result.result ?? null) ?? null;
+  if (outputError) {
+    if (input.retainHistory !== false) await ports.db.moduleRun.update({ where: { id: runId }, data: { exitCode: 1,
+      error: input.private ? "Private operation returned an invalid result" : outputError.slice(0, 1000) } });
+    return false;
+  }
+  if (input.retainHistory !== false) await ports.db.moduleRun.update({ where: { id: runId }, data: { exitCode: 0,
+    ...(input.retainOutput === false ? {} : { output: input.private ? {} : reply.result }) } });
+  await recordModuleRecovery(ports, { workspaceId, moduleId: instance.moduleId, hash: instance.hash,
+    activationId: instance.activationId, triggerId: triggerKey(event), runId }).catch(error => console.error(JSON.stringify({
+    component: "module-supervisor", event: "recovery_diagnostic.persist_failed", moduleId: instance.moduleId, hash: instance.hash,
+    error: diagnosticText(String(error), 300) })));
+  return true;
+}
+
+export const isClosing = (instance: Instance) => instance.closing;

@@ -14,16 +14,20 @@ import { fenceAgentModuleIn, abortDrainedAgentRuns } from "../agent/module-drain
 import { assertExecutionModuleIdle } from "../execution/execution-module-guard";
 import { ensureVersionMaterial } from "./module-source";
 
-export async function activateIn(context: ModuleContext, tx: Prisma.TransactionClient, { moduleId, hash, reason, dataHandling }: { moduleId: string; hash: string; reason: "activate" | "rollback"; dataHandling?: string }) {
+export async function activateIn(context: ModuleContext, tx: Prisma.TransactionClient, { moduleId, hash, reason, dataHandling }: {
+  moduleId: string; hash: string; reason: "activate" | "rollback"; dataHandling?: string }) {
   const { activeHash: previousHash } = await switchActiveIn(context, tx, moduleId, hash, { preservePause: reason === "activate", operation: reason });
   const previousOutcome = reason === "rollback" && previousHash ? await latestModuleEvolution(tx, context.workspaceId, moduleId, previousHash) : null;
-  if (previousOutcome && previousHash) await updateModuleEvolution(tx, { workspaceId: context.workspaceId, moduleId, activationId: previousOutcome.activationId, hash: previousHash, status: "rolled-back", expectedCurrentHash: hash, ...(dataHandling ? { dataHandling } : {}), nextAction: `代码已切回 ${hash.slice(0, 12)}；${dataHandling ?? "本次恢复未恢复旧数据快照。"}`, now: context.ports.now() });
+  if (previousOutcome && previousHash) await updateModuleEvolution(tx, { workspaceId: context.workspaceId, moduleId,
+    activationId: previousOutcome.activationId, hash: previousHash, status: "rolled-back", expectedCurrentHash: hash, ...(dataHandling ? {
+    dataHandling } : {}), nextAction: `代码已切回 ${hash.slice(0, 12)}；${dataHandling ?? "本次恢复未恢复旧数据快照。"}`, now: context.ports.now() });
   const activation = await recordModuleActivation(context, tx, {
     moduleId, previousHash, hash,
     dataHandling: dataHandling ?? (reason === "rollback" ? `恢复到已批准版本 ${hash.slice(0, 12)}；本次未恢复旧数据快照。` : undefined),
     ...(reason === "rollback" ? { rollback: { attempted: false, result: "blocked", reason: "恢复目标不会自动继续回滚，避免版本来回切换。" } } as const : {}),
   });
-  await audit(tx, { workspaceId: context.workspaceId, actor: "chrona", kind: `module_${reason}`, subjectId: moduleId, details: { hash, previousHash, activationId: activation.activationId } });
+  await audit(tx, { workspaceId: context.workspaceId, actor: "chrona", kind: `module_${reason}`, subjectId: moduleId, details: { hash,
+    previousHash, activationId: activation.activationId } });
   return activation;
 }
 async function assertListenAvailable(tx: Prisma.TransactionClient, moduleId: string, manifest: ReturnType<typeof moduleManifestSchema.parse>) {
@@ -35,7 +39,8 @@ async function assertListenAvailable(tx: Prisma.TransactionClient, moduleId: str
   }
 }
 /** Switches an approved version and returns the pre-switch row for activation history. */
-export async function switchActiveIn(context: ModuleContext, tx: Prisma.TransactionClient, moduleId: string, hash: string, { preservePause = true, operation = "activate" }: { preservePause?: boolean; operation?: "activate" | "rollback" } = {}) {
+export async function switchActiveIn(context: ModuleContext, tx: Prisma.TransactionClient, moduleId: string, hash: string, {
+  preservePause = true, operation = "activate" }: { preservePause?: boolean; operation?: "activate" | "rollback" } = {}) {
   const { workspaceId } = context;
   const module = await assertExternalModule(tx, workspaceId, moduleId, operation);
   if (module.activeHash !== hash) await assertExecutionModuleIdle(tx, moduleId);
@@ -44,14 +49,19 @@ export async function switchActiveIn(context: ModuleContext, tx: Prisma.Transact
   const manifest = moduleManifestSchema.parse(version.manifest);
   await assertListenAvailable(tx, moduleId, manifest);
   await ensureVersionMaterial(context, version);
-  await tx.module.update({ where: { id: moduleId }, data: { activeHash: hash, status: "active", ...(module.activeHash !== hash ? { activationId: randomUUID(), executionFenceAt: null } : {}) } });
+  await tx.module.update({ where: { id: moduleId }, data: { activeHash: hash, status: "active", ...(module.activeHash !== hash ? {
+    activationId: randomUUID(), executionFenceAt: null } : {}) } });
   if (preservePause && module.status === "paused") await pauseIn(context, tx, moduleId, { source: "chrona", reason: "版本切换保留原停用状态" });
   return module;
 }
-type AutomaticRollbackInput = { tx: Prisma.TransactionClient; workspaceId: string; moduleId: string; hash: string; previousHash: string; moduleSchema: number; current: NonNullable<Awaited<ReturnType<typeof latestModuleEvolution>>> };
-function automaticRollbackDataError(candidate: ReturnType<typeof moduleManifestSchema.parse>, previous: ReturnType<typeof moduleManifestSchema.parse>, moduleSchema: number, current: AutomaticRollbackInput["current"]) {
-  const migrated = current.checks.continuity && typeof current.checks.continuity === "object" && "migrated" in current.checks.continuity && current.checks.continuity.migrated === true;
-  return candidate.data.schema !== previous.data.schema || candidate.data.schema !== moduleSchema || migrated ? "Data schema changed or migration was recorded; automatic code rollback is unsafe." : null;
+type AutomaticRollbackInput = { tx: Prisma.TransactionClient; workspaceId: string; moduleId: string; hash: string; previousHash: string;
+  moduleSchema: number; current: NonNullable<Awaited<ReturnType<typeof latestModuleEvolution>>> };
+function automaticRollbackDataError(candidate: ReturnType<typeof moduleManifestSchema.parse>,
+  previous: ReturnType<typeof moduleManifestSchema.parse>, moduleSchema: number, current: AutomaticRollbackInput["current"]) {
+  const migrated = current.checks.continuity && typeof current.checks.continuity === "object" && "migrated" in current.checks.continuity &&
+    current.checks.continuity.migrated === true;
+  return candidate.data.schema !== previous.data.schema || candidate.data.schema !== moduleSchema ||
+    migrated ? "Data schema changed or migration was recorded; automatic code rollback is unsafe." : null;
 }
 async function automaticRollbackVersionError(input: AutomaticRollbackInput) {
   const { tx, moduleId, hash, previousHash, moduleSchema, current } = input;
@@ -59,7 +69,8 @@ async function automaticRollbackVersionError(input: AutomaticRollbackInput) {
     tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash } } }),
     tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: previousHash } } }),
   ]);
-  if (!candidateRow || candidateRow.status !== "approved" || !previousRow || previousRow.status !== "approved") return "Candidate or rollback target is not an approved version.";
+  if (!candidateRow || candidateRow.status !== "approved" || !previousRow ||
+    previousRow.status !== "approved") return "Candidate or rollback target is not an approved version.";
   const candidate = moduleManifestSchema.safeParse(candidateRow.manifest).data, previous = moduleManifestSchema.safeParse(previousRow.manifest).data;
   if (!candidate || !previous) return "Candidate or rollback target manifest is invalid.";
   return automaticRollbackDataError(candidate, previous, moduleSchema, current);
@@ -76,10 +87,12 @@ async function automaticRollbackEligibility(input: AutomaticRollbackInput) {
   if (migrationError) return migrationError;
   return null;
 }
-async function automaticRollbackTarget(tx: Prisma.TransactionClient, context: ModuleContext, moduleId: string, hash: string, current: NonNullable<Awaited<ReturnType<typeof latestModuleEvolution>>>) {
+async function automaticRollbackTarget(tx: Prisma.TransactionClient, context: ModuleContext, moduleId: string, hash: string,
+  current: NonNullable<Awaited<ReturnType<typeof latestModuleEvolution>>>) {
   if (current.observedCapabilities.length) return { reason: "A successful capability was already verified." };
   const module = await tx.module.findFirst({ where: { id: moduleId, workspaceId: context.workspaceId } });
-  if (!module || module.status !== "active" || module.activeHash !== hash) return { reason: "Module is paused, migrating, removed, or its active hash changed." };
+  if (!module || module.status !== "active" || module.activeHash !== hash) return {
+    reason: "Module is paused, migrating, removed, or its active hash changed." };
   assertModuleOperation(module, "rollback");
   if (!current.previousHash) return { reason: "No previously approved version exists for a first installation." };
   return { moduleSchema: module.dataSchema, previousHash: current.previousHash };
@@ -91,17 +104,20 @@ export async function rollbackFailedStart(context: ModuleContext, moduleId: stri
   const drained = await ports.db.$transaction(async tx => {
     await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${workspaceId}`;
     const current = await latestModuleEvolution(tx, workspaceId, moduleId, hash);
-    if (!current || current.activationId !== activationId || current.status !== "failed" || current.rollback.attempted || current.rollback.reason?.startsWith("恢复目标不会自动继续回滚")) return;
+    if (!current || current.activationId !== activationId || current.status !== "failed" || current.rollback.attempted ||
+      current.rollback.reason?.startsWith("恢复目标不会自动继续回滚")) return;
     const target = await automaticRollbackTarget(tx, context, moduleId, hash, current);
     if (target.reason) return;
-    if (await automaticRollbackEligibility({ tx, workspaceId, moduleId, hash, previousHash: target.previousHash!, moduleSchema: target.moduleSchema!, current })) return;
+    if (await automaticRollbackEligibility({ tx, workspaceId, moduleId, hash, previousHash: target.previousHash!,
+      moduleSchema: target.moduleSchema!, current })) return;
     return fenceAgentModuleIn(ports, tx, workspaceId, moduleId);
   });
   if (drained) await abortDrainedAgentRuns(ports, workspaceId, drained.runIds);
   return ports.db.$transaction(async tx => {
     const current = await latestModuleEvolution(tx, workspaceId, moduleId, hash);
     const deny = async (reason: string) => {
-      if (current?.activationId === activationId) await updateModuleEvolution(tx, { workspaceId, moduleId, activationId, hash, now, rollback: { attempted: false, result: "blocked", reason } });
+      if (current?.activationId === activationId) await updateModuleEvolution(tx, { workspaceId, moduleId, activationId, hash, now,
+        rollback: { attempted: false, result: "blocked", reason } });
       return { rolledBack: false, reason };
     };
     if (!current || current.activationId !== activationId) return { rolledBack: false, reason: "Activation changed or no current failure record." };
@@ -113,31 +129,37 @@ export async function rollbackFailedStart(context: ModuleContext, moduleId: stri
     const previousHash = target.previousHash!, moduleSchema = target.moduleSchema!;
     const eligibilityError = await automaticRollbackEligibility({ tx, workspaceId, moduleId, hash, previousHash, moduleSchema, current });
     if (eligibilityError) return deny(eligibilityError);
-    const attempted = await updateModuleEvolution(tx, { workspaceId, moduleId, activationId, hash, now, rollback: { attempted: true, result: "blocked", reason: "A single automatic rollback attempt is in progress." } });
+    const attempted = await updateModuleEvolution(tx, { workspaceId, moduleId, activationId, hash, now, rollback: { attempted: true,
+      result: "blocked", reason: "A single automatic rollback attempt is in progress." } });
     if (!attempted) return { rolledBack: false, reason: "Activation changed before rollback." };
     await switchActiveIn(context, tx, moduleId, previousHash);
     await updateModuleEvolution(tx, { workspaceId, moduleId, activationId, hash, status: "rolled-back", expectedCurrentHash: previousHash, now,
-      rollback: { attempted: true, result: "succeeded", reason: `Restored approved code ${previousHash.slice(0, 12)}; data and delivery evidence were preserved.` },
+      rollback: { attempted: true, result: "succeeded", reason: `Restored approved code ${previousHash.slice(0,
+        12)}; data and delivery evidence were preserved.` },
       dataHandling: "仅切换到已批准旧代码；未改动当前数据或投递记录，未重放外部效果。",
       nextAction: `已恢复旧代码 ${previousHash.slice(0, 12)}。已保留当前数据与投递记录；外部已产生效果不会撤销或重放。` });
     const restored = await recordModuleActivation(context, tx, { moduleId, previousHash: hash, hash: previousHash,
       dataHandling: "自动恢复到已批准旧代码；当前数据与投递记录保留，未重放外部效果。",
       rollback: { attempted: false, result: "blocked", reason: "恢复目标不会自动继续回滚，避免版本来回切换。" } });
-    await audit(tx, { workspaceId, actor: "chrona", kind: "module_rollback", subjectId: moduleId, details: { hash: previousHash, failedHash: hash, activationId, restoredActivationId: restored.activationId, automatic: true } });
+    await audit(tx, { workspaceId, actor: "chrona", kind: "module_rollback", subjectId: moduleId, details: { hash: previousHash,
+      failedHash: hash, activationId, restoredActivationId: restored.activationId, automatic: true } });
     return { rolledBack: true, reason: "Automatic code rollback succeeded; current data and delivery evidence were preserved." };
   }).catch(async error => {
     const reason = `Rollback attempt failed without changing data: ${redactSensitiveText(String(error), 300)}`;
     console.error(JSON.stringify({ component: "module-generation", event: "rollback.failed", moduleId, activationId, error: reason }));
     try {
-      await ports.db.$transaction(tx => updateModuleEvolution(tx, { workspaceId, moduleId, activationId, hash, status: "failed", now: ports.now(), rollback: { attempted: true, result: "blocked", reason }, nextAction: "自动代码切换失败；候选版本仍为当前版本，请人工检查诊断并恢复。" }));
+      await ports.db.$transaction(tx => updateModuleEvolution(tx, { workspaceId, moduleId, activationId, hash, status: "failed",
+        now: ports.now(), rollback: { attempted: true, result: "blocked", reason }, nextAction: "自动代码切换失败；候选版本仍为当前版本，请人工检查诊断并恢复。" }));
     } catch (recordError) {
-      console.error(JSON.stringify({ component: "module-generation", event: "rollback.failure_record_failed", moduleId, activationId, error: redactSensitiveText(String(recordError), 300) }));
+      console.error(JSON.stringify({ component: "module-generation", event: "rollback.failure_record_failed", moduleId, activationId,
+        error: redactSensitiveText(String(recordError), 300) }));
     }
     return { rolledBack: false, reason };
   });
 }
 
-export async function startMigration(context: ModuleContext, tx: Prisma.TransactionClient, moduleId: string, hash: string, schema: { from: number | null; to: number }) {
+export async function startMigration(context: ModuleContext, tx: Prisma.TransactionClient, moduleId: string, hash: string, schema: {
+  from: number | null; to: number }) {
   const { from, to } = schema;
   const module = await assertExternalModule(tx, context.workspaceId, moduleId, "activate");
   await assertExecutionModuleIdle(tx, moduleId);
@@ -151,5 +173,6 @@ export async function startMigration(context: ModuleContext, tx: Prisma.Transact
   const createdAt = new Date(Math.max(context.ports.now().getTime(), previous ? previous.createdAt.getTime() + 1 : 0));
   const admission = { hash, fromSchema: from, toSchema: to, previousStatus: module.status, createdAt };
   await tx.moduleMigration.upsert({ where: { moduleId }, create: { moduleId, ...admission }, update: admission });
-  await tx.audit.create({ data: { workspaceId: context.workspaceId, actorKey: "chrona", kind: "module_migration_started", subjectId: moduleId, details: { hash, from, to, previousStatus: module.status }, createdAt } });
+  await tx.audit.create({ data: { workspaceId: context.workspaceId, actorKey: "chrona", kind: "module_migration_started",
+    subjectId: moduleId, details: { hash, from, to, previousStatus: module.status }, createdAt } });
 }

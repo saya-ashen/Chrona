@@ -1,3 +1,4 @@
+import { installTestModuleVersion } from "../__testing__/module-release-test-fixture";
 import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -25,10 +26,10 @@ test("a lost activation response does not replay the handler or pause the applic
   cleanups.push(async () => { await supervisor.stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const manifest = moduleManifestSchema.parse({ name: "activation-entry", entry: "index.ts", tests: ["test.ts"], activated: true, keepAlive: true, effects: [] });
   const app = await db.module.create({ data: { workspaceId: workspace.id, name: manifest.name, activeHash: "activation-v1" } });
-  await db.moduleVersion.create({ data: { moduleId: app.id, hash: app.activeHash!, manifest, source: "user", status: "approved", intent: {}, report: {} } });
+  const hash = await installTestModuleVersion(ports, app, manifest);
   await supervisor.reconcile();
   for (let attempt = 0; attempt < 100 && !await db.moduleRun.count({ where: { moduleId: app.id, triggerId: "activated" } }); attempt++) await Bun.sleep(10);
   for (let attempt = 0; attempt < 3; attempt++) await supervisor.reconcile();
   expect(deliveries).toBe(1);
-  expect(await db.module.findUniqueOrThrow({ where: { id: app.id } })).toMatchObject({ status: "active", activeHash: "activation-v1" });
+  expect(await db.module.findUniqueOrThrow({ where: { id: app.id } })).toMatchObject({ status: "active", activeHash: hash });
 });

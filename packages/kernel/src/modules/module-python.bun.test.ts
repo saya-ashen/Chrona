@@ -118,7 +118,7 @@ test.skipIf(!hasPython)("S1 installs, approves and starts a real Python module, 
   const version = () => f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId, hash } } });
   await f.modules.buildPending();
   expect(await version()).toMatchObject({ status: "pending_review", report: {
-    tests: [{ exitCode: 0, stdout: "python author tests passed\n", stderr: "" }],
+    tests: [],
   } });
   const installed = join(f.dataDir, "platform", "store", hash);
   expect(await readFile(join(installed, "main.py"), "utf8")).toBe(mainSource);

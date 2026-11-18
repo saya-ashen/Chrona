@@ -12,36 +12,46 @@ import { assertExternalModule } from "./module-identity";
 import { ensureVersionMaterial } from "./module-source";
 import { findCandidateSet, setCandidateSetStateIn } from "./module-candidate-records";
 
-async function assertMigrationOwner(context: ModuleContext, db: ModuleContext["db"] | Prisma.TransactionClient, prepared: PreparedMigration, reason: "activate" | "rollback") {
+async function assertMigrationOwner(context: ModuleContext, db: ModuleContext["db"] | Prisma.TransactionClient, prepared: PreparedMigration,
+  reason: "activate" | "rollback") {
   const current = await assertExternalModule(db, context.workspaceId, prepared.module.id, reason);
   const migration = await db.moduleMigration.findUnique({ where: { moduleId: current.id } });
-  if (current.name !== prepared.module.name || current.status !== "migrating" || current.activeHash !== prepared.module.activeHash || migration?.hash !== prepared.version.hash) throw new StewardError("conflict", "Module changed during migration");
+  if (current.name !== prepared.module.name || current.status !== "migrating" || current.activeHash !== prepared.module.activeHash ||
+    migration?.hash !== prepared.version.hash) throw new StewardError("conflict", "Module changed during migration");
   return current;
 }
 
-export type PreparedMigration = { module: Awaited<ReturnType<typeof requireModule>>; version: ModuleVersion; manifest: z.output<typeof moduleManifestSchema>; from: number | null; to: number };
-async function withMigrationOwner<T>(context: ModuleContext, prepared: PreparedMigration, reason: "activate" | "rollback", work: (tx: Prisma.TransactionClient) => Promise<T>) {
+export type PreparedMigration = { module: Awaited<ReturnType<typeof requireModule>>; version: ModuleVersion;
+  manifest: z.output<typeof moduleManifestSchema>; from: number | null; to: number };
+async function withMigrationOwner<T>(context: ModuleContext, prepared: PreparedMigration, reason: "activate" | "rollback",
+  work: (tx: Prisma.TransactionClient) => Promise<T>) {
   return context.db.$transaction(async tx => {
     // Acquire SQLite's writer lock before reading ownership; no author code runs in this transaction.
-    const locked = await tx.module.updateMany({ where: { id: prepared.module.id, workspaceId: context.workspaceId, status: "migrating", activeHash: prepared.module.activeHash }, data: { status: "migrating" } });
+    const locked = await tx.module.updateMany({ where: { id: prepared.module.id, workspaceId: context.workspaceId, status: "migrating",
+      activeHash: prepared.module.activeHash }, data: { status: "migrating" } });
     if (locked.count !== 1) throw new StewardError("conflict", "Module changed during migration");
     await assertMigrationOwner(context, tx, prepared, reason);
     return work(tx);
   });
 }
-async function migrationFailed(context: ModuleContext, prepared: PreparedMigration, reason: "activate" | "rollback", output: TestReport[number], restore?: Restore) {
+async function migrationFailed(context: ModuleContext, prepared: PreparedMigration, reason: "activate" | "rollback",
+  output: TestReport[number], restore?: Restore) {
   const { workspaceId, ports } = context, { module, version } = prepared;
   await withMigrationOwner(context, prepared, reason, async tx => {
     await tx.module.update({ where: { id: module.id }, data: { status: module.status } });
-    if (reason === "activate") await tx.moduleVersion.update({ where: { id: version.id }, data: { status: "rejected", report: json({ ...version.report as BuildReport, migration: { ...output, exitCode: output.exitCode || 1 } }) } });
-    if (reason !== "rollback" || restore) await notifyLifecycle(tx, ports, workspaceId, `${restore ? "module-restore-failed" : "module-migration-failed"}:${version.id}`, { kind: "module-migration-failed", app: module.name, restore: !!restore, module: module.id });
+    if (reason === "activate") await tx.moduleVersion.update({ where: { id: version.id }, data: { status: "rejected", report: json({
+      ...version.report as BuildReport, migration: { ...output, exitCode: output.exitCode || 1 } }) } });
+    if (reason !== "rollback" || restore) await notifyLifecycle(tx, ports, workspaceId,
+      `${restore ? "module-restore-failed" : "module-migration-failed"}:${version.id}`, { kind: "module-migration-failed", app: module.name,
+      restore: !!restore, module: module.id });
   });
   if (reason === "rollback" && !restore) throw new StewardError("conflict", "模块回滚未完成：数据迁移失败，旧版本和数据保持不变");
 }
 async function runMigration(context: ModuleContext, prepared: PreparedMigration, next: string) {
   const { manifest, from, to, version } = prepared;
   if (!manifest.data.migrate) throw new Error("Migration entry missing");
-  return runOffline(context.ports, join(context.store, version.hash), next, manifest.data.migrate, { migrate: { from, to }, now: context.ports.now().toISOString() });
+  return runOffline(context.ports, join(context.store, version.hash), next, manifest.data.migrate, { migrate: { from, to },
+    now: context.ports.now().toISOString() });
 }
 type Swap = { moved: boolean; swapped: boolean; recoveryFailed: boolean };
 async function restoreSwap(live: string, old: string, state: Swap) {
@@ -52,9 +62,11 @@ async function restoreSwap(live: string, old: string, state: Swap) {
     state.moved = false; state.swapped = false;
   } catch (error) { state.recoveryFailed = true; throw error; }
 }
-async function finishMigration(context: ModuleContext, tx: Prisma.TransactionClient, prepared: PreparedMigration, reason: "activate" | "rollback", { output, restore }: { output: TestReport[number]; restore?: Restore }) {
+async function finishMigration(context: ModuleContext, tx: Prisma.TransactionClient, prepared: PreparedMigration, reason: "activate" |
+  "rollback", { output, restore }: { output: TestReport[number]; restore?: Restore }) {
   const { module, version, from, to } = prepared;
-  if (reason === "activate") await tx.moduleVersion.update({ where: { id: version.id }, data: { status: "approved", report: json({ ...version.report as BuildReport, migration: output }) } });
+  if (reason === "activate") await tx.moduleVersion.update({ where: { id: version.id }, data: { status: "approved", report: json({
+    ...version.report as BuildReport, migration: output }) } });
   await tx.module.update({ where: { id: module.id }, data: { dataSchema: to } });
   const dataHandling = restore
     ? `已恢复 schema ${to} 的快照 ${restore.snapshotAt}；切换前当前数据另存为 before-rollback 快照。`
@@ -66,7 +78,8 @@ async function finishMigration(context: ModuleContext, tx: Prisma.TransactionCli
     if (receipt) await setCandidateSetStateIn(context, tx, receipt, "approved", receipt.approvalId);
   }
 }
-export async function migrateData(context: ModuleContext, prepared: PreparedMigration, reason: "activate" | "rollback", restore?: Restore, completedIn?: (tx: Prisma.TransactionClient) => Promise<void>) {
+export async function migrateData(context: ModuleContext, prepared: PreparedMigration, reason: "activate" | "rollback", restore?: Restore,
+  completedIn?: (tx: Prisma.TransactionClient) => Promise<void>) {
   const { db, platform } = context, { module, from, to } = prepared, moduleId = module.id;
   const live = join(platform, "data", moduleId), next = join(platform, "data-next", moduleId), old = join(platform, "data-old", moduleId);
   let output: TestReport[number] = { stdout: "", stderr: "Data migration failed", exitCode: 1 };

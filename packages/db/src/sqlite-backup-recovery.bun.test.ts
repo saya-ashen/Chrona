@@ -100,7 +100,7 @@ test("a committed whole restore finishes cleanup with the restored DB and roots"
   });
 });
 
-test.each(backupDataRoots)("recovery restores an originally absent DB and %s root to absence", root => {
+test.each([...backupDataRoots])("recovery restores an originally absent DB and %s root to absence", root => {
   fixture((db, backup, data) => {
     rmSync(db);
     rmSync(join(data, root), { recursive: true });

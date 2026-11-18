@@ -1,6 +1,6 @@
+import { installTestModuleVersion } from "../__testing__/module-release-test-fixture";
 import { afterEach, expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdtemp, rm } from "node:fs/promises";
 import { createScriptSandbox } from "../../../host/src/runtime/script-sandbox";
 import { createStewardService } from "../runtime/service";
 import { moduleSupervisor } from "./module-supervisor";
@@ -27,9 +27,7 @@ afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) awai
 }, { name: "read", description: "Read event count", parameters: { type: "object", properties: {}, required: [] },
       output: {}
 }] };
-  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "sdk", manifest, source: "user", intent: {}, report: {}, status: "approved" } });
-  const code = join(dataDir, "platform/store/sdk"); await mkdir(code, { recursive: true });
-  await writeFile(join(code, "index.ts"), `
+  await installTestModuleVersion(ports, module, manifest, "sdk", `
 import { on, chrona } from 'chrona';
 let count = 0;
 on('tool', async event => { if (event.id === 'increment') { count++; const key = event.id + ':' + event.firedAt + ':increment'; await chrona.call({moduleId:chrona.dependencies.notify,tool:'send'}, { key, level: 'now', title: 'Incremented', body: String(count) }, { mode: 'async', key }); } return { result: { count } }; });

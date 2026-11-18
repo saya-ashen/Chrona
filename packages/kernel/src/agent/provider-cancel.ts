@@ -11,7 +11,7 @@ export async function cancelProviderRun(ports: StewardPorts, workspaceId: string
   const queued = await db.$transaction(async tx => {
     await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${workspaceId}`;
     const current = await tx.run.findFirst({ where: { id, workspaceId, status: "queued" } });
-    return !!current && createRuns(ports, workspaceId).finishRunIn(tx, id, { outcome: "cancelled", sessionId: null, error: "Cancelled by owner" }, now(), "never_started");
+    return !!current && createRuns(ports, workspaceId).finishRunIn(tx, id, { outcome: "failed", sessionId: null, error: "Cancelled by owner" }, now(), "never_started");
   });
   if (queued) await ports.onRunFinished?.(workspaceId, id);
   else {

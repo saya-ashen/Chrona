@@ -23,7 +23,8 @@ function lineDiff(before: string, after: string): string[] {
 /** Changed lines with `context` unchanged lines around them; longer unchanged runs fold into one line (manifest reviews). */
 export function compactDiff(before: string, after: string, context = 2) {
   const lines = lineDiff(before, after), keep = lines.map(() => false);
-  lines.forEach((line, index) => { if (!line.startsWith("  ")) for (let near = Math.max(0, index - context); near <= Math.min(lines.length - 1, index + context); near++) keep[near] = true; });
+  lines.forEach((line, index) => { if (!line.startsWith("  ")) for (let near = Math.max(0, index - context);
+    near <= Math.min(lines.length - 1, index + context); near++) keep[near] = true; });
   const out: string[] = [];
   for (let index = 0; index < lines.length;) {
     if (keep[index]) { out.push(lines[index++]!); continue; }
@@ -37,7 +38,9 @@ export function compactDiff(before: string, after: string, context = 2) {
 // Compiled caches (e.g. .pyc) are not text; diffing their bytes shows as mojibake in approvals.
 function isText(bytes: Buffer) {
   if (bytes.includes(0)) return false;
-  try { new TextDecoder("utf-8", { fatal: true }).decode(bytes); return true; } catch { return false; }
+  try { new TextDecoder("utf-8", { fatal: true }).decode(bytes); return true; } catch (error) {
+    console.error(JSON.stringify({ component: "module-preview", event: "operation.failed", error: String(error) }));
+ return false; }
 }
 function changeKind(before: Buffer | undefined, after: Buffer | undefined) {
   return !before ? "added" : !after ? "removed" : "changed";
@@ -50,9 +53,9 @@ function renderFileDifference(code: string[], path: string, before: Buffer | und
   }
   code.push(...lineDiff(before?.toString("utf8") ?? "", after?.toString("utf8") ?? ""));
 }
-export function codeDifference(activeFiles: { path: string; bytes: Buffer }[], files: { path: string; bytes: Buffer }[]) {
+export function codeDifference(activeFiles: import("./module-files").ModuleFile[], files: import("./module-files").ModuleFile[]) {
   const previous = new Map<string, Buffer>();
-  activeFiles.forEach(file => previous.set(file.path, file.bytes));
+  activeFiles.forEach(file => previous.set(file.path, Buffer.from(file.bytes)));
   const proposed = new Map(files.map(file => [file.path, Buffer.from(file.bytes)]));
   const code: string[] = ["代码差异："], unchanged: string[] = [];
   for (const path of [...new Set([...previous.keys(), ...proposed.keys()])].sort()) {

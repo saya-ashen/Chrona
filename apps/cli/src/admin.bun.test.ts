@@ -184,8 +184,8 @@ test("admin rollback still rejects unapproved or absent material hashes", async 
 
 test("admin install queues trusted official code offline, preserves the lock and deduplicates request keys", async () => {
   const f = await fixture(), log = spyOn(console, "log").mockImplementation(() => {});
-  const previous = process.env.CHRONA_RESOURCE_DIR;
-  process.env.CHRONA_RESOURCE_DIR = await offlineResources(f.options.dataDir, "author");
+  const previous = process.env.CHRONA_MODULE_RESOURCES;
+  process.env.CHRONA_MODULE_RESOURCES = join(await offlineResources(f.options.dataDir, "author"), "external");
   const lock = acquireSqliteRuntimeLock(f.options.databaseUrl);
   try { await expect(runAdmin("install", ["author", "install", "offline-one"], f.options)).rejects.toThrow("already in use"); }
   finally { lock.release(); }
@@ -201,16 +201,16 @@ test("admin install queues trusted official code offline, preserves the lock and
     await expect(runAdmin("install", ["../private", "install", "invalid"], f.options)).rejects.toThrow("Invalid");
     const released = acquireSqliteRuntimeLock(f.options.databaseUrl); released.release();
   } finally {
-    if (previous === undefined) delete process.env.CHRONA_RESOURCE_DIR; else process.env.CHRONA_RESOURCE_DIR = previous;
+    if (previous === undefined) delete process.env.CHRONA_MODULE_RESOURCES; else process.env.CHRONA_MODULE_RESOURCES = previous;
     log.mockRestore();
   }
 });
 
 test("admin update takes the runtime lock and queues only the selected material", async () => {
   const f = await fixture(), log = spyOn(console, "log").mockImplementation(() => {});
-  const previous = process.env.CHRONA_RESOURCE_DIR;
+  const previous = process.env.CHRONA_MODULE_RESOURCES;
   const root = await offlineResources(f.options.dataDir, "author");
-  process.env.CHRONA_RESOURCE_DIR = root;
+  process.env.CHRONA_MODULE_RESOURCES = join(root, "external");
   try {
     const context = moduleContext({ db: f.db, dataDir: f.options.dataDir, publicUrl: null, now: () => new Date() }, "ws_default");
     const local = await propose(context, { root: join(root, "external"), dir: "author", intent: { changes: ["Owner source submission"] } }, "user");
@@ -228,15 +228,15 @@ test("admin update takes the runtime lock and queues only the selected material"
     expect((await f.db.module.findUniqueOrThrow({ where: { id: local.moduleId! } })).activeHash).toBe(local.hash);
     await expect(runAdmin("install", ["author", "update", "forged", "arbitrary-commit"], f.options)).rejects.toThrow("Invalid install arguments");
   } finally {
-    if (previous === undefined) delete process.env.CHRONA_RESOURCE_DIR; else process.env.CHRONA_RESOURCE_DIR = previous;
+    if (previous === undefined) delete process.env.CHRONA_MODULE_RESOURCES; else process.env.CHRONA_MODULE_RESOURCES = previous;
     log.mockRestore();
   }
 });
 
 test.each(["author", "files", "events", "mcp", "mind"])("stopped-service official %s recovery needs no other entry, Provider or tick", async name => {
   const f = await fixture(), log = spyOn(console, "log").mockImplementation(() => {});
-  const previous = process.env.CHRONA_RESOURCE_DIR;
-  process.env.CHRONA_RESOURCE_DIR = await offlineResources(f.options.dataDir, name);
+  const previous = process.env.CHRONA_MODULE_RESOURCES;
+  process.env.CHRONA_MODULE_RESOURCES = join(await offlineResources(f.options.dataDir, name), "external");
   try {
     expect(await f.db.module.count({ where: { name: { in: ["web", "mcp"] } } })).toBe(0);
     expect(await runAdmin("catalog", [], f.options)).toContainEqual(expect.objectContaining({ name, available: true, moduleId: null }));
@@ -255,7 +255,7 @@ test.each(["author", "files", "events", "mcp", "mind"])("stopped-service officia
     expect(log.mock.calls.some(call => String(call[0]).includes("Restart Chrona"))).toBe(true);
     const released = acquireSqliteRuntimeLock(f.options.databaseUrl); released.release();
   } finally {
-    if (previous === undefined) delete process.env.CHRONA_RESOURCE_DIR; else process.env.CHRONA_RESOURCE_DIR = previous;
+    if (previous === undefined) delete process.env.CHRONA_MODULE_RESOURCES; else process.env.CHRONA_MODULE_RESOURCES = previous;
     log.mockRestore();
   }
 });

@@ -13,5 +13,5 @@ export async function finishRunFromProviderStatus(ports: StewardPorts, workspace
   await createRuns(ports, workspaceId).finish(runId, outcome, { stopEvidence: "provider_exited" });
   const binding = await runProviderBinding(ports, workspaceId, runId);
   // An attached observer owns its own bounded release after the same settlement.
-  if (binding.kind === "completion" && !observedLive) await releaseRegisteredCompletion((name, args, key) => callProviderEndpoint(ports, workspaceId, binding, name, args, key), runId);
+  if (binding.kind === "completion" && !observedLive) await releaseRegisteredCompletion((name, args, key) => callProviderEndpoint(ports, workspaceId, { ...binding, requestKey: key }, name, args), runId);
 }

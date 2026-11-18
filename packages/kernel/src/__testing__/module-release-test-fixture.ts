@@ -42,10 +42,24 @@ export function testReleasePackages(resourcesRoot: string): NonNullable<StewardP
   } };
 }
 
-export async function storeTestModuleMaterial(platform: string, manifest: Record<string, unknown>, label = "fixture") {
+export async function storeTestModuleMaterial(platform: string, manifest: Record<string, unknown>, label = "fixture", source?: string) {
   const paths = new Set(["index.ts", ...((manifest.tests ?? []) as string[]), ...((manifest.data as { migrate?: string } | undefined)?.migrate ? [(manifest.data as { migrate: string }).migrate] : [])]);
   const files = [{ path: "module.json", bytes: Buffer.from(JSON.stringify(manifest)) },
-    ...[...paths].map(path => ({ path, bytes: Buffer.from(`export const fixtureVersion = ${JSON.stringify(label)};\n`) }))];
+    ...[...paths].map(path => ({ path, bytes: Buffer.from(path === "index.ts" && source !== undefined ? source : `export const fixtureVersion = ${JSON.stringify(label)};\n`) }))];
   files.push({ path: "chrona-material.json", bytes: Buffer.from(JSON.stringify({ schema: 1, source: files.map(file => file.path), artifacts: [], build: { commands: [], toolchain: "interpreted fixture", target: "host" } })) });
   return storeVersionMaterial(platform, files);
+}
+
+/** Approved wire peers still retain material so lifecycle checks exercise the real CAS. */
+export async function installTestModuleVersion(
+  ports: Pick<StewardPorts, "db" | "dataDir">,
+  module: { id: string; activeHash: string | null },
+  manifest: Record<string, unknown>,
+  label = "fixture",
+  source?: string,
+) {
+  const hash = await storeTestModuleMaterial(join(ports.dataDir, "platform"), manifest, label, source);
+  await ports.db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest: JSON.parse(JSON.stringify(manifest)), source: "user", status: "approved", intent: {}, report: {} } });
+  await ports.db.module.update({ where: { id: module.id }, data: { activeHash: hash } });
+  return hash;
 }

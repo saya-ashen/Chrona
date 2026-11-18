@@ -42,7 +42,7 @@ async function start() {
   throw new Error("No Provider question");
 }
 const answer = (interaction: string, value: unknown) => service.forWorkspace(workspaceId).provider.answer(interaction, value);
-async function finished(id: string) { for (let i = 0; i < 100; i++) { if ((await db.run.findUniqueOrThrow({ where: { id } })).status !== "running") return; await Bun.sleep(5); } throw new Error("Fixture run did not stop"); }
+async function finished(id: string) { for (let i = 0; i < 100; i++) { if ((await db.run.findUniqueOrThrow({ where: { id } })).stopStatus === "confirmed") return; await Bun.sleep(5); } throw new Error("Fixture run did not stop"); }
 test("the user answers a running Provider's question through the internal channel: no approval or grant, invalid answers refused", async () => {
   const run = await start(), id = run.interactions[0]!.id;
   expect(answers).toEqual([]); expect(run.progress).toEqual({ phase: "reading", tool: "read" });

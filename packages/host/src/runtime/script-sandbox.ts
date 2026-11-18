@@ -10,8 +10,10 @@ import runtimeTable from "../runtimes.json";
 import { moduleEntrySchema, type ModuleEntry } from "@chrona/contracts/steward";
 import { explicitModuleCommand, moduleEntryFile } from "../../../app-sdk/module-entry";
 
-type Runtime = { extensions: string[]; programs: { default: string[]; win32?: string[] }; argv: string[]; sdk?: boolean; preload?: string; venv?: { default: string; win32?: string } };
-export type ScriptSandboxResult = { status: "succeeded" | "failed" | "timed_out" | "unavailable"; output: string; error: string | null; exitCode?: number; stopEvidence?: ProcessStopEvidence };
+type Runtime = { extensions: string[]; programs: { default: string[]; win32?: string[] }; argv: string[]; sdk?: boolean; preload?: string;
+  venv?: { default: string; win32?: string } };
+export type ScriptSandboxResult = { status: "succeeded" | "failed" | "timed_out" | "unavailable"; output: string; error: string | null;
+  exitCode?: number; stopEvidence?: ProcessStopEvidence };
 function confirmedExit(exit: Awaited<ReturnType<typeof spawnSupervised>["exited"]>) {
   const { code, signal } = requireDescendantStop(exit);
   return { code, signal };
@@ -19,7 +21,9 @@ function confirmedExit(exit: Awaited<ReturnType<typeof spawnSupervised>["exited"
 type ModuleTransport = { ipcEndpoint: string; ipcToken: string };
 type ModuleDirs = { codeDir: string; dataDir: string; contentDir?: string; env?: Record<string, string> } & Partial<ModuleTransport>;
 function executable(path: string | null | undefined): string | null {
-  try { if (!path) return null; accessSync(path, constants.X_OK); return resolve(path); } catch { return null; }
+  try { if (!path) return null; accessSync(path, constants.X_OK); return resolve(path); } catch (error) {
+    console.error(JSON.stringify({ component: "script-sandbox", event: "operation.failed", error: String(error) }));
+ return null; }
 }
 function limits(...values: number[]) {
   for (const value of values) if (!Number.isSafeInteger(value) || value <= 0) throw new Error("Invalid sandbox limit");
@@ -61,7 +65,8 @@ function moduleCommand(code: string, entry: ModuleEntry, sdk: string): { program
     argv: [...declared.argv, ...(declared.preload ? ["--preload", join(sdk, declared.preload)] : []), moduleEntryFile(code, entry)] };
 }
 function moduleEnvironment(dirs: ModuleDirs, sdkEnabled: boolean, interpreter: string, sdk: string, helper: string): Record<string, string> {
-  const excluded = new Set(["CHRONA_SOCKET", "CHRONA_HTTP_SOCKET", "CHRONA_IPC_ENDPOINT", "CHRONA_IPC_TOKEN", "CHRONA_HOST_GENERATION", "CHRONA_HOST_STOP_RECEIPT"]);
+  const excluded = new Set(["CHRONA_SOCKET", "CHRONA_HTTP_SOCKET", "CHRONA_IPC_ENDPOINT", "CHRONA_IPC_TOKEN", "CHRONA_HOST_GENERATION",
+    "CHRONA_HOST_STOP_RECEIPT"]);
   const extra = Object.fromEntries(Object.entries(dirs.env ?? {}).filter(([key]) => /^CHRONA_[A-Z_]+$/.test(key) && !excluded.has(key)));
   // Desktop connection paths come only from the host session, never module extras.
   const hostKeys = ["HOME", ...(process.platform === "win32" ? ["SystemRoot", "WINDIR", "TEMP", "TMP", "USERPROFILE", "PATHEXT"]
@@ -85,7 +90,8 @@ function moduleHostReceipt(hostData: string, env: Record<string, string>) {
   return { path, generation };
 }
 /** Trusted local processes retain OS permissions; routed declarations govern only Chrona calls. */
-export function createScriptSandbox({ executionMode = "trusted-local", dataDir, timeoutMs = 60_000, maxOutputBytes = 64 * 1024, moduleSdk = fileURLToPath(new URL("../../../app-sdk", import.meta.url)), processHelper }: {
+export function createScriptSandbox({ executionMode = "trusted-local", dataDir, timeoutMs = 60_000, maxOutputBytes = 64 * 1024,
+  moduleSdk = fileURLToPath(new URL("../../../app-sdk", import.meta.url)), processHelper }: {
   executionMode?: "trusted-local"; dataDir?: string; timeoutMs?: number; maxOutputBytes?: number;
   moduleSdk?: string; processHelper?: string;
 } = {}) {
@@ -103,7 +109,8 @@ export function createScriptSandbox({ executionMode = "trusted-local", dataDir, 
     const env = moduleEnvironment({ ...dirs, codeDir: code, dataDir: data, contentDir: content }, command.sdk === true, interpreter, sdk, helper);
     if (command.sdk) env.CHRONA_SDK_LOADER = join(moduleSdk, "chrona-sdk-loader.ts");
     const supervision = processCapability({ helperPath: processHelper });
-    if (!supervision.available || supervision.scope !== "descendants") throw new Error(supervision.reason ?? "Full descendant supervision is not verified for this platform");
+    if (!supervision.available ||
+      supervision.scope !== "descendants") throw new Error(supervision.reason ?? "Full descendant supervision is not verified for this platform");
     const stopReceipt = dirs.ipcEndpoint ? moduleHostReceipt(dataDir ?? dirname(data), env) : undefined;
     return spawnSupervised(interpreter, command.argv, { cwd: code, env, helperPath: processHelper, stopReceipt });
   }
@@ -111,7 +118,8 @@ export function createScriptSandbox({ executionMode = "trusted-local", dataDir, 
   return {
     health: { available: supervision.available && supervision.scope === "descendants", isolated: false },
     supervision,
-    startModule({ codeDir, dataDir: moduleData, contentDir, env, entry, ipcEndpoint, ipcToken }: { codeDir: string; dataDir: string; contentDir?: string; env?: Record<string, string>; entry: ModuleEntry; network?: boolean } & ModuleTransport) {
+    startModule({ codeDir, dataDir: moduleData, contentDir, env, entry, ipcEndpoint, ipcToken }: { codeDir: string; dataDir: string;
+      contentDir?: string; env?: Record<string, string>; entry: ModuleEntry; network?: boolean } & ModuleTransport) {
       const endpoint = /^tcp:\/\/127\.0\.0\.1:([1-9][0-9]{0,4})$/.exec(ipcEndpoint);
       if (!endpoint || Number(endpoint[1]) > 65535 || !/^[0-9a-f]{64}$/.test(ipcToken)) throw new Error("Invalid module transport credentials");
       const task = spawnModule({ codeDir, dataDir: moduleData, contentDir, ipcEndpoint, ipcToken, env }, entry), child = task.process;
@@ -119,13 +127,15 @@ export function createScriptSandbox({ executionMode = "trusted-local", dataDir, 
       child.stdout!.resume();
       let errors = Buffer.alloc(0), line = "", dropping = false;
       const decoder = new StringDecoder("utf8");
-      const credentials = [ipcToken, ...Object.entries(process.env).filter(([key, value]) => /(KEY|TOKEN|SECRET|PASSWORD)/i.test(key) && value && value.length >= 8).map(([, value]) => value!)];
+      const credentials = [ipcToken, ...Object.entries(process.env).filter(([key, value]) => /(KEY|TOKEN|SECRET|PASSWORD)/i.test(key) &&
+        value && value.length >= 8).map(([, value]) => value!)];
       const scrub = (text: string) => redactSensitiveText(credentials.reduce((safe, value) => safe.replaceAll(value, "[Redacted]"), text), 16 * 1024);
       // Frame before redaction: neither chunk boundaries nor the tail cap may expose a credential fragment.
       const logLine = (text: string) => {
         const safe = scrub(text);
         errors = Buffer.concat([errors, Buffer.from(safe)]).subarray(-16 * 1024);
-        process.stderr.write(JSON.stringify({ component: "module", moduleId: basename(moduleData), hash: basename(codeDir), pid: child.pid, stderr: redactSensitiveText(safe, 4000) }) + "\n");
+        process.stderr.write(JSON.stringify({ component: "module", moduleId: basename(moduleData), hash: basename(codeDir), pid: child.pid,
+          stderr: redactSensitiveText(safe, 4000) }) + "\n");
       };
       child.stderr!.on("data", (chunk: Buffer) => {
         for (const part of decoder.write(chunk).split(/(?<=\n)/)) {
@@ -137,11 +147,14 @@ export function createScriptSandbox({ executionMode = "trusted-local", dataDir, 
       child.stderr!.once("end", () => { line += decoder.end(); if (line && !dropping) logLine(line); line = ""; });
       const exited = task.exited.then(confirmedExit);
       const stopEvidence = task.exited.then(exit => exit.stop);
-      void stopEvidence.catch(() => {});
-      return { pid: child.pid!, ready: task.ready, exited, stopEvidence, stderr: () => errors.toString("utf8") + (dropping ? "[oversized stderr line omitted]" : line ? "[incomplete stderr line omitted]" : ""), kill: task.stop };
+      void stopEvidence.catch(error => { console.error(JSON.stringify({ component: "script-sandbox", event: "operation.failed", error: String(error) }));  });
+      return { pid: child.pid!, ready: task.ready, exited, stopEvidence,
+        stderr: () => errors.toString("utf8") + (dropping ? "[oversized stderr line omitted]" : line ? "[incomplete stderr line omitted]" : ""), kill: task.stop };
     },
     /** One-shot run with JSON on stdin for version tests and data migrations. */
-    async runModule({ codeDir, dataDir: moduleData, contentDir, entry, input, timeoutMs: runTimeout = timeoutMs, maxOutputBytes: outputLimit = maxOutputBytes }: { codeDir: string; dataDir: string; contentDir?: string; entry: string; input: unknown; network?: boolean; timeoutMs?: number; maxOutputBytes?: number }): Promise<ScriptSandboxResult> {
+    async runModule({ codeDir, dataDir: moduleData, contentDir, entry, input, timeoutMs: runTimeout = timeoutMs,
+      maxOutputBytes: outputLimit = maxOutputBytes }: { codeDir: string; dataDir: string; contentDir?: string; entry: string;
+      input: unknown; network?: boolean; timeoutMs?: number; maxOutputBytes?: number }): Promise<ScriptSandboxResult> {
       limits(runTimeout, outputLimit);
       runtime(entry);
       let task: ReturnType<typeof spawnSupervised>;
@@ -158,7 +171,10 @@ export function createScriptSandbox({ executionMode = "trusted-local", dataDir, 
         void task.exited.then(exit => {
           clearTimeout(timer);
           const { code } = confirmedExit(exit);
-          resolve({ exitCode: code ?? 1, status: timedOut ? "timed_out" : code === 0 ? "succeeded" : "failed", output: new TextDecoder().decode(output, { stream: true }), error: timedOut ? "脚本运行超时" : errors.length ? new TextDecoder().decode(errors, { stream: true }) : code === 0 ? null : `脚本退出：${code}`, stopEvidence: exit.stop });
+          resolve({ exitCode: code ?? 1, status: timedOut ? "timed_out" : code === 0 ? "succeeded" : "failed",
+            output: new TextDecoder().decode(output, { stream: true }),
+            error: timedOut ? "脚本运行超时" : errors.length ? new TextDecoder().decode(errors, {
+            stream: true }) : code === 0 ? null : `脚本退出：${code}`, stopEvidence: exit.stop });
         }).catch(error => { clearTimeout(timer); reject(error); });
         child.stdin!.end(JSON.stringify(input));
       });

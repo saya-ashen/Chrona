@@ -53,7 +53,7 @@ describe("check-guardrails", () => {
 	});
 
 	test("lazy db Proxy preserves 'in' reflection and stable bound method references", () => {
-		expect("session" in db).toBe(true);
+		expect("agentContext" in db).toBe(true);
 		expect(db.$connect).toBe(db.$connect);
 		expect(Object.keys(db).length).toBeGreaterThan(0);
 	});

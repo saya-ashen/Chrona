@@ -132,11 +132,7 @@ async function discoverTestFiles(): Promise<string[]> {
 
 }
 
-export async function runTestFiles(files: string[], suite: "Bun" | "API"): Promise<number> {
-	if (files.length === 0) {
-		return 0;
-	}
-
+function testConcurrency(suite: "Bun" | "API") {
 	const concurrency = Math.max(
 		1,
 		Math.floor(Number(process.env.CHRONA_TEST_CONCURRENCY ?? (suite === "Bun" ? "2" : "4"))),
@@ -144,10 +140,20 @@ export async function runTestFiles(files: string[], suite: "Bun" | "API"): Promi
 	if (!Number.isSafeInteger(concurrency)) {
 		throw new Error("CHRONA_TEST_CONCURRENCY must be a finite number");
 	}
+	return concurrency;
+}
+
+export async function runTestFiles(files: string[], suite: "Bun" | "API"): Promise<number> {
+	if (!files.length) {
+		return 0;
+	}
+
+	const concurrency = testConcurrency(suite);
 	const retryFlaky = suite === "Bun" && process.env.CHRONA_TEST_RETRY_FLAKY === "1";
 
 	if (["linux", "darwin", "win32"].includes(process.platform)) {
-		buildProcessHelper(resolve(rootDir, `packages/process/bin/${process.platform}-${process.arch}/chrona-process-guardian${process.platform === "win32" ? ".exe" : ""}`));
+		buildProcessHelper(resolve(rootDir,
+		  `packages/process/bin/${process.platform}-${process.arch}/chrona-process-guardian${process.platform === "win32" ? ".exe" : ""}`));
 	} else {
 		console.log(`Native process supervision unavailable on ${process.platform}; no verified backend`);
 	}
@@ -155,7 +161,8 @@ export async function runTestFiles(files: string[], suite: "Bun" | "API"): Promi
 	let exitCode = 0;
 	const failedFiles: Array<{ file: string; code: number }> = [];
 	const workspace = createTestRunWorkspace(rootDir, files);
-	const helperPath = resolve(rootDir, `packages/process/bin/${process.platform}-${process.arch}/chrona-process-guardian${process.platform === "win32" ? ".exe" : ""}`);
+	const helperPath = resolve(rootDir,
+	  `packages/process/bin/${process.platform}-${process.arch}/chrona-process-guardian${process.platform === "win32" ? ".exe" : ""}`);
 	for (const item of workspace.files) item.env.CHRONA_PROCESS_HELPER = helperPath;
 	console.log(
 		`Running ${files.length} ${suite} test file${files.length === 1 ? "" : "s"} with concurrency ${concurrency}...`,
@@ -173,7 +180,8 @@ export async function runTestFiles(files: string[], suite: "Bun" | "API"): Promi
 						code = await runWithFreshDatabase(item);
 					}
 				} catch (error) {
-					console.error(JSON.stringify({ component: "test-runner", event: "file-failed", file: item.file, error: redactSensitiveText(error instanceof Error ? error.message : String(error)) }));
+					console.error(JSON.stringify({ component: "test-runner", event: "file-failed", file: item.file,
+					  error: redactSensitiveText(error instanceof Error ? error.message : String(error)) }));
 					code = 1;
 				}
 				if (code !== 0) {

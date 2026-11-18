@@ -1,3 +1,4 @@
+import { installTestModuleVersion } from "../__testing__/module-release-test-fixture";
 import { afterEach, expect, test } from "bun:test";
 
 import { mkdtemp, rm} from "node:fs/promises";
@@ -53,7 +54,7 @@ async function fixture({ activated = false, stage = "unknown", fenceApplication 
   const startProperties = Object.fromEntries(["operationId", "runId", "token", "lane", "cwd", "sessionDir", "prompt", "systemPrompt", "resources", "callbacks", "model", "configurationRevision"].map(key => [key, string]));
   Object.assign(startProperties, { sessionId: { type: ["string", "null"] }, deadline: { type: ["string", "null"] }, providerOptions: object, searchTools: { type: "boolean" }, images: { type: "array", items: object }, extraTools: { type: "array", items: string }, hostPaths: { type: "array", items: string }, content: { type: "array", items: object } });
   const manifest = moduleManifestSchema.parse({ name: backend.name, entry: "index.ts", tests: ["test.ts"], activated, uses: ["agent.register"], effects: [], tools: Object.values(declaration.endpoints).map(name => ({ name, description: name, visibility: ["kernel"], parameters: { type: "object", properties: name === "health" ? {} : name === "start" ? startProperties : { operationId: string } }, output: {} })) });
-  await db.moduleVersion.create({ data: { moduleId: backend.id, hash: backend.activeHash!, manifest, source: "user", status: "approved", intent: {}, report: {} } });
+  backend.activeHash = await installTestModuleVersion(ports, backend, manifest);
   const backendCaller = { kind: "module" as const, module: backend.name, moduleId: backend.id, hash: backend.activeHash! };
   await registerAgentProvider(ports, workspaceId, backendCaller, declaration);
   const app = await db.module.create({ data: { workspaceId, name: "entry-app", activeHash: "app-v1" } });
@@ -71,7 +72,7 @@ async function fixture({ activated = false, stage = "unknown", fenceApplication 
   if (stage === "queued") await fenceAgentModule(ports, workspaceId, fenceApplication ? app.id : backend.id);
   else await expect(requestStatus(context, fenceApplication ? app.id : backend.id, "paused", "drain")).rejects.toMatchObject({ code: "conflict" });
   const binding = await runProviderBinding(ports, workspaceId, run.id);
-  const control = (endpoint: "status" | "abort" | "release", key?: string) => callProviderEndpoint(ports, workspaceId, binding, endpoint, { operationId: run.id }, key);
+  const control = (endpoint: "status" | "abort" | "release", key?: string) => callProviderEndpoint(ports, workspaceId, { ...binding, requestKey: key }, endpoint, { operationId: run.id });
   return { db, ports, workspaceId, backend, backendCaller, manifest, context, binding, run, input, requests, control, app, caller, confirmStop: () => { stopped = true; } };
 }
 

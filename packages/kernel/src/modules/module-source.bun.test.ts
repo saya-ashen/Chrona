@@ -33,10 +33,10 @@ test("source remains exact after submitted and runtime copies change or disappea
   await mkdir(runtime, { recursive: true });
   await writeFile(join(runtime, "index.ts"), "runtime pollution");
   await writeFile(join(f.code, "index.ts"), "new release");
-  expect(await readVersionSource(f.context, proposal.moduleId!, proposal.hash)).toEqual(expected);
+  expect(await readVersionSource(f.context, proposal.moduleId!, proposal.hash)).toEqual(expected.map(file => ({ ...file, bytes: Buffer.from(file.bytes) })));
   await rm(runtime, { recursive: true });
   await rm(f.code, { recursive: true });
-  expect(await readVersionSource(f.context, proposal.moduleId!, proposal.hash)).toEqual(expected);
+  expect(await readVersionSource(f.context, proposal.moduleId!, proposal.hash)).toEqual(expected.map(file => ({ ...file, bytes: Buffer.from(file.bytes) })));
   await expect(readVersionSource({ ...f.context, workspaceId: "other" }, proposal.moduleId!, proposal.hash)).rejects.toMatchObject({ code: "not_found" });
 });
 test("a missing retained source is not imported from a mutable store copy", async () => {
@@ -48,7 +48,7 @@ test("a missing retained source is not imported from a mutable store copy", asyn
   await rm(index);
   await expect(readVersionSource(f.context, module.id, hash)).rejects.toMatchObject({ code: "ENOENT" });
   await writeFile(index, saved);
-  expect(await readVersionSource(f.context, module.id, hash)).toEqual(moduleSourceFiles(f.files));
+  expect(await readVersionSource(f.context, module.id, hash)).toEqual(moduleSourceFiles(f.files).map(file => ({ ...file, bytes: Buffer.from(file.bytes) })));
 });
 test("retired Git identities cannot select version material", async () => {
   const f = await fixture(), module = await f.db.module.create({ data: { workspaceId: f.context.workspaceId, name: "fixture" } });

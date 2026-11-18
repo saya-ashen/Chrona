@@ -17,7 +17,8 @@ export type ApprovedOAuth = OAuthBinding & { moduleId: string };
 /** Canonical identity survives unrelated code updates and object-key ordering. */
 export function oauthDefinitionIdentity(name: string, definition: OAuthDefinition) {
   return createHash("sha256").update(JSON.stringify([name, definition.provider, definition.authorizationUrl, definition.tokenUrl,
-    [...new Set(definition.scopes)].sort(), definition.accounts === true, Object.entries(definition.authorizationParams ?? {}).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)])).digest("hex");
+    [...new Set(definition.scopes)].sort(), definition.accounts === true, Object.entries(definition.authorizationParams ?? {}).sort(([a],
+      [b]) => a < b ? -1 : a > b ? 1 : 0)])).digest("hex");
 }
 function definitions(manifest: Pick<ModuleManifest, "secrets">) {
   const result = new Map<string, OAuthBinding>();
@@ -36,9 +37,11 @@ export function addsOAuthDefinitions(next: Pick<ModuleManifest, "secrets">, prev
 }
 
 /** Only the current approved active definition may receive a credential. */
-export async function resolveOAuthDefinition(ports: StewardPorts, workspaceId: string, name: string, provider: string, callerModuleId?: string): Promise<ApprovedOAuth> {
+export async function resolveOAuthDefinition(ports: StewardPorts, workspaceId: string, name: string, provider: string,
+  callerModuleId?: string): Promise<ApprovedOAuth> {
   const found = new Map<string, ApprovedOAuth>();
-  const modules = await ports.db.module.findMany({ where: { workspaceId, status: "active", activeHash: { not: null }, ...(callerModuleId ? { id: callerModuleId } : {}) }, select: { id: true, activeHash: true } });
+  const modules = await ports.db.module.findMany({ where: { workspaceId, status: "active", activeHash: { not: null }, ...(callerModuleId ? {
+    id: callerModuleId } : {}) }, select: { id: true, activeHash: true } });
   for (const module of modules) {
     const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } });
     if (version?.status !== "approved") continue;

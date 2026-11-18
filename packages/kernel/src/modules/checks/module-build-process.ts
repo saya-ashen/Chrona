@@ -19,12 +19,15 @@ export async function checkBuildStartup(context: ModuleContext, staging: string,
   let channel: Awaited<ReturnType<typeof createModuleChannel>> | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    channel = await createModuleChannel({ onCall: async call => ({ id: call.id, error: { code: "unavailable", message: "Calls unavailable during startup check" } }) });
+    channel = await createModuleChannel({ onCall: async call => ({ id: call.id, error: { code: "unavailable",
+      message: "Calls unavailable during startup check" } }) });
     const contentDir = manifest.content ? join(data, ".build-content") : undefined;
     if (contentDir) await mkdir(contentDir, { recursive: true });
-    process = context.ports.sandbox.startModule({ codeDir: staging, dataDir: data, ...(contentDir ? { contentDir } : {}), entry: manifest.entry, ipcEndpoint: channel.endpoint, ipcToken: channel.token, network: false });
+    process = context.ports.sandbox.startModule({ codeDir: staging, dataDir: data, ...(contentDir ? { contentDir } : {}),
+      entry: manifest.entry, ipcEndpoint: channel.endpoint, ipcToken: channel.token, network: false });
     const ready = Promise.all([channel.ping(), ...(manifest.listen ? [moduleHttpReady(channel)] : [])]);
-    await Promise.race([ready, process.exited.then(() => { throw new Error("Module process exited"); }), new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("Module startup timeout")), 10_000); })]);
+    await Promise.race([ready, process.exited.then(() => { throw new Error("Module process exited"); }), new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error("Module startup timeout")), 10_000); })]);
   } finally {
     clearTimeout(timer);
     process?.kill();

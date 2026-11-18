@@ -17,10 +17,13 @@ export function retainedToolOutput(output: unknown, sensitive: boolean) {
 }
 
 /** The target identity was frozen before delivery, not inferred from a same-name current app. */
-export function appendRunToolResultIn(tx: Prisma.TransactionClient, row: { id: string; runId: string | null; target: string; tool: string; targetModuleId: string | null; targetHash: string | null; targetContractHash: string | null; status: string; output: Prisma.JsonValue }, at: Date, sensitive: boolean) {
+export function appendRunToolResultIn(tx: Prisma.TransactionClient, row: { id: string; runId: string | null; target: string; tool: string;
+  targetModuleId: string | null; targetHash: string | null; targetContractHash: string | null; status: string; output: Prisma.JsonValue },
+  at: Date, sensitive: boolean) {
   if (!row.runId || !row.targetModuleId || !row.targetHash) return;
   return appendRunEventIn(tx, row.runId, "tool-result", { type: "tool-result", at: at.toISOString(), value: {
-    runId: row.runId, callId: row.id, target: row.targetModuleId!.startsWith("system:") ? `${row.target}.${row.tool}` : { moduleId: row.targetModuleId!, tool: row.tool }, moduleId: row.targetModuleId!, hash: row.targetHash!,
+    runId: row.runId, callId: row.id, target: row.targetModuleId!.startsWith("system:") ? `${row.target}.${row.tool}` : {
+      moduleId: row.targetModuleId!, tool: row.tool }, moduleId: row.targetModuleId!, hash: row.targetHash!,
     status: row.status, ...retainedToolOutput(row.output, sensitive),
   } }, at);
 }
@@ -29,7 +32,8 @@ export function appendRunToolResultIn(tx: Prisma.TransactionClient, row: { id: s
 export async function interruptRunCallsIn(tx: Prisma.TransactionClient, runId: string, at: Date) {
   const pending = await tx.moduleInvocation.findMany({ where: { runId, mode: "sync", status: "running" } });
   for (const row of pending) {
-    const updated = await tx.moduleInvocation.update({ where: { id: row.id }, data: { status: "unknown", error: "Run interrupted before a tool receipt was committed", finishedAt: at } });
+    const updated = await tx.moduleInvocation.update({ where: { id: row.id }, data: { status: "unknown",
+      error: "Run interrupted before a tool receipt was committed", finishedAt: at } });
     await appendRunToolResultIn(tx, updated, at, true);
   }
 }

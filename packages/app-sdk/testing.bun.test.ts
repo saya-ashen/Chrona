@@ -22,10 +22,12 @@ on("tool", async event => ({ result: event.args.action === "status"
     module = await startModule(join(directory, "index.ts"));
     const send = async (args: Record<string, unknown>) => module!.send({ trigger: { kind: "tool", id: "exercise", firedAt: new Date().toISOString(), args }, now: new Date().toISOString(), params: {} });
     const first = (await send({ key: "original" })).result!.result as CallState;
-    expect(first).toMatchObject({ callId: expect.any(String), status: "queued", duplicate: false });
+    expect({ ...first }).toMatchObject({ callId: expect.any(String), status: "queued", duplicate: false });
     expect((await send({ key: "original" })).result!.result).toEqual({ ...first, duplicate: true });
     for (const selector of [first.callId, { callId: first.callId }, { target: { moduleId: "fixture", tool: "echo" }, key: "original" }]) {
-      expect((await send({ action: "status", selector })).result!.result).toEqual({ callId: first.callId, status: "queued" });
+      const response = await send({ action: "status", selector });
+      expect(response.error).toBeUndefined();
+      expect(response.result!.result).toEqual({ callId: first.callId, status: "queued" });
     }
     const other = (await send({ key: "other" })).result!.result as CallState;
     expect(other.callId).not.toBe(first.callId);

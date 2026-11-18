@@ -119,7 +119,8 @@ function assertPrivateProcessesStopped(dataDir: string, preservedRoots: string[]
       if (code === "ENOENT" || code === "ESRCH" || code === "EACCES" || code === "EPERM") continue;
       throw error;
     }
-    if (roots.some(root => cwd === root || cwd.startsWith(`${root}${sep}`))) throw new Error(`Backup and restore require stopped application processes (pid ${name}).`);
+    if (roots.some(root => cwd === root ||
+      cwd.startsWith(`${root}${sep}`))) throw new Error(`Backup and restore require stopped application processes (pid ${name}).`);
   }
 }
 
@@ -183,10 +184,10 @@ function readRestoreMarker(databasePath: string): RestoreMarker | null {
       marker.version === RESTORE_MARKER_VERSION
       && marker.activePath === databasePath
       && ["staged", "replacing", "replaced", "recovered"].includes(marker.phase ?? "")
-      && (marker.recoveryPath === null || typeof marker.recoveryPath === "string" && dirname(marker.recoveryPath) === dirname(databasePath) && marker.recoveryPath.startsWith(`${databasePath}.pre-restore-`))
-      && (marker.retiredPath === null || typeof marker.retiredPath === "string" && dirname(marker.retiredPath) === dirname(databasePath) && marker.retiredPath.startsWith(`${databasePath}.pre-restore-`))
-      && (marker.stagedPath === null || typeof marker.stagedPath === "string" && dirname(marker.stagedPath) === dirname(databasePath) && marker.stagedPath.startsWith(`${databasePath}.restore-stage-`))
-      && (marker.files === undefined || marker.files !== null && validRestoreFiles(marker.files))
+      && validRestorePath(marker.recoveryPath, databasePath, ".pre-restore-")
+      && validRestorePath(marker.retiredPath, databasePath, ".pre-restore-")
+      && validRestorePath(marker.stagedPath, databasePath, ".restore-stage-")
+      && (marker.files === undefined || validRestoreFiles(marker.files))
     ) {
       return marker as RestoreMarker;
     }
@@ -224,12 +225,7 @@ export function recoverInterruptedSqliteRestore(databaseUrl: string, onRestoreSt
     assertPrivateProcessesStopped(marker.files.dataDir, [marker.files.stage, ...backupDataRoots.map(root => `${marker.files!.stage}-prior-${root}`)]);
   }
   if (marker.phase === "replacing") {
-    if (marker.recoveryPath) {
-      restoreVerifiedRecoverySnapshot(databasePath, marker, onRestoreStep);
-    } else {
-      if (existsSync(databasePath)) renameSync(databasePath, `${databasePath}.restore-interrupted-${randomUUID()}`);
-      removeSqliteSidecars(databasePath);
-    }
+    recoverRestoreDatabase(databasePath, marker, onRestoreStep);
     onRestoreStep?.("database_recovered");
     if (marker.files) recoverDataFiles(marker.files, () => onRestoreStep?.("root_recovered"));
     marker.phase = "recovered";
@@ -300,7 +296,8 @@ function rollbackRetiredDatabase(prepared: PreparedRestore, rename: (from: strin
     rename(prepared.retiredPath, prepared.databasePath);
   } catch (error) {
     const code = (error as NodeJS.ErrnoException | null)?.code;
-    console.error(JSON.stringify({ component: "sqlite-restore", event: "rollback.deferred", error: { code: ["EACCES", "EPERM", "ENOENT", "EEXIST", "ENOTEMPTY", "EXDEV", "EBUSY", "EIO"].includes(code ?? "") ? code : "rename_failed" } }));
+    console.error(JSON.stringify({ component: "sqlite-restore", event: "rollback.deferred", error: { code: ["EACCES", "EPERM", "ENOENT",
+      "EEXIST", "ENOTEMPTY", "EXDEV", "EBUSY", "EIO"].includes(code ?? "") ? code : "rename_failed" } }));
   }
 }
 
@@ -360,7 +357,7 @@ function restoreWithLock(
           rmSync(prepared.marker.files.stage, { recursive: true, force: true });
         }
       } catch (recoveryError) {
-        throw new AggregateError([error, recoveryError], "Chrona restore failed; recovery is pending in the restore marker.");
+        throw new AggregateError([error, recoveryError], "Chrona restore failed; recovery is pending in the restore marker.", { cause: recoveryError });
       }
     } else rollbackRetiredDatabase(prepared, rename);
     throw error;
@@ -395,4 +392,17 @@ export function restoreSqliteDatabase(
   } finally {
     lock.release();
   }
+}
+
+function validRestorePath(value: unknown, databasePath: string, suffix: string) {
+  return value === null || typeof value === "string" && dirname(value) === dirname(databasePath) && value.startsWith(`${databasePath}${suffix}`);
+}
+
+function recoverRestoreDatabase(databasePath: string, marker: RestoreMarker, onRestoreStep?: (step: string) => void) {
+    if (marker.recoveryPath) {
+      restoreVerifiedRecoverySnapshot(databasePath, marker, onRestoreStep);
+    } else {
+      if (existsSync(databasePath)) renameSync(databasePath, `${databasePath}.restore-interrupted-${randomUUID()}`);
+      removeSqliteSidecars(databasePath);
+    }
 }

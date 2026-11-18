@@ -492,7 +492,7 @@
       "additionalProperties": false
     },
     "tests": {
-      "minItems": 1,
+      "default": [],
       "maxItems": 10,
       "type": "array",
       "items": {
@@ -504,8 +504,7 @@
   "required": [
     "name",
     "entry",
-    "effects",
-    "tests"
+    "effects"
   ],
   "additionalProperties": false,
   "$defs": {

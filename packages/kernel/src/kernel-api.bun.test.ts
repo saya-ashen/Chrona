@@ -1,3 +1,4 @@
+import { installTestModuleVersion } from "./__testing__/module-release-test-fixture";
 import { afterEach, expect, test } from "bun:test";
 import { handleModuleCall } from "./modules/module-effects";
 import { createApprovals } from "./approvals";
@@ -25,7 +26,7 @@ async function fixture(handler?: Parameters<typeof testModuleProcess>[0]) {
   async function app(name: string, authority?: "owner") {
     const row = await db.module.create({ data: { workspaceId: workspace.id, name, activeHash: `${name}-v1` } });
     const manifest = moduleManifestSchema.parse({ name, authority, uses: ["*"], keepAlive: true, entry: "index.ts", tests: ["test.ts"], effects: [], tools: [{ name: "observe", description: "Observe", visibility: ["modules", "owner"], parameters: { type: "object", properties: {} }, output: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] } }] });
-    await db.moduleVersion.create({ data: { moduleId: row.id, hash: row.activeHash!, manifest, source: "user", status: "approved", intent: {}, report: {} } });
+    row.activeHash = await installTestModuleVersion(ports, row, manifest);
     const origin = { ...kernelOrigin(workspace.id), caller: { kind: "module" as const, module: name, moduleId: row.id, hash: row.activeHash! } };
     return { row, origin, manifest };
   }
@@ -202,14 +203,15 @@ test("a confirmed null result is replayable without executing the handler twice"
 });
 
 test("public errors retain a bounded recovery reason across keyed replay", async () => {
-  let receiverId = "", attempts = 0;
+  let receiverId = "", receiverHash = "", attempts = 0;
   const replies: unknown[] = [];
   const f = await fixture(async (_event, call, input) => {
-    if (input.codeDir.endsWith("expired-receiver-v1")) { attempts++; throw Object.assign(new Error("Read cursor expired"), { code: "cursor_expired" }); }
+    if (receiverHash && input.codeDir.endsWith(receiverHash)) { attempts++; throw Object.assign(new Error("Read cursor expired"), { code: "cursor_expired" }); }
     for (let i = 0; i < 2; i++) replies.push(await call("call", { target: { moduleId: receiverId, tool: "observe" }, args: {}, key: "original-cursor" }));
     return { result: { ok: true } };
   });
-  receiverId = (await f.app("expired-receiver")).row.id;
+  const receiver = await f.app("expired-receiver");
+  receiverId = receiver.row.id; receiverHash = receiver.row.activeHash!;
   const sender = await f.app("reason-reader");
   await callSync(f.ports, f.owner, { moduleId: sender.row.id, tool: "observe" }, {});
   expect(replies).toEqual([expect.objectContaining({ error: expect.objectContaining({ code: "conflict", reason: "cursor_expired" }) }), expect.objectContaining({ error: expect.objectContaining({ code: "conflict", reason: "cursor_expired" }) })]);

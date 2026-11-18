@@ -4,7 +4,8 @@ import { dataEmpty } from "../module-data";
 import type { ModuleContext, ContinuityReport, requireModule } from "../module-context";
 import { assertBuildOwnership } from "./module-build-ownership";
 
-export async function checkContinuity(context: ModuleContext, staging: string, module: Awaited<ReturnType<typeof requireModule>>, manifest: ModuleManifest, continuity: ContinuityReport) {
+export async function checkContinuity(context: ModuleContext, staging: string, module: Awaited<ReturnType<typeof requireModule>>,
+  manifest: ModuleManifest, continuity: ContinuityReport) {
   assertBuildOwnership(context, staging);
   const from = module.dataSchema, to = manifest.data.schema;
   let empty: boolean;

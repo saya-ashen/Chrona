@@ -18,24 +18,28 @@ import { activateIn } from "./module-generation";
 import { recoverMigrations } from "./module-migration";
 import { readVersionMaterial } from "./module-source";
 import { callModuleTool, moduleToolsets, moduleToolCatalog } from "./module-tools";
-import { moduleIncidents, moduleOutputMismatches, moduleHealthSummarySchema, moduleOutputContractFailureSchema, incidentSchema, kind as moduleIncidentKind, diagnosticText, incidentNextAction, type ModuleIncident } from "./module-diagnostics";
+import { moduleIncidents, moduleOutputMismatches, moduleHealthSummarySchema, moduleOutputContractFailureSchema, incidentSchema,
+  kind as moduleIncidentKind, diagnosticText, incidentNextAction, type ModuleIncident } from "./module-diagnostics";
 import { latestModuleEvolution, moduleEvolutionOutcomes } from "./module-evolution";
 import { moduleFailurePolicy } from "./module-failure-policy";
 
 async function currentIncident(db: StewardPorts["db"], workspaceId: string, moduleId: string, activeHash: string | null, activationId: string) {
   const bound = 200;
-  const rows = await db.audit.findMany({ where: { workspaceId, subjectId: moduleId, kind: moduleIncidentKind }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: bound, select: { details: true } });
+  const rows = await db.audit.findMany({ where: { workspaceId, subjectId: moduleId, kind: moduleIncidentKind }, orderBy: [{
+    createdAt: "desc" }, { id: "desc" }], take: bound, select: { details: true } });
   let incident: ModuleIncident | undefined;
   for (const row of rows) {
     const parsed = incidentSchema.safeParse(row.details);
-    if (parsed.success && parsed.data.hash === activeHash && parsed.data.activationId === activationId && parsed.data.attribution !== "legacy-unattributed") { incident = parsed.data; break; }
+    if (parsed.success && parsed.data.hash === activeHash && parsed.data.activationId === activationId &&
+      parsed.data.attribution !== "legacy-unattributed") { incident = parsed.data; break; }
   }
   return { incident, truncated: !incident && rows.length === bound };
 }
 
 async function currentContractFailures(db: StewardPorts["db"], workspaceId: string, moduleId: string, activationId: string) {
   const bound = 200;
-  const mismatches = await db.audit.findMany({ where: { workspaceId, subjectId: moduleId, kind: "module_output_mismatch" }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: bound, select: { details: true } });
+  const mismatches = await db.audit.findMany({ where: { workspaceId, subjectId: moduleId, kind: "module_output_mismatch" }, orderBy: [{
+    createdAt: "desc" }, { id: "desc" }], take: bound, select: { details: true } });
   let count = 0;
   for (const row of mismatches) {
     const parsed = moduleOutputContractFailureSchema.safeParse(row.details);
@@ -54,7 +58,9 @@ function runtimeOf(ports: StewardPorts, row: { id: string; activeHash: string | 
 function incidentSummary(current: ModuleIncident | undefined) {
   const reason = current ? diagnosticText(current.evidence.reason, 300) : "";
   return {
-    incident: current ? { id: current.id, revision: current.revision ?? 1, status: current.status, failures: current.failures, lastAt: current.lastAt, reason: reason.slice(0, 300), deliveryUnknown: current.deliveryUnknown, pendingTriggers: current.pendingTriggers } : null,
+    incident: current ? { id: current.id, revision: current.revision ?? 1, status: current.status, failures: current.failures,
+      lastAt: current.lastAt, reason: reason.slice(0, 300), deliveryUnknown: current.deliveryUnknown,
+      pendingTriggers: current.pendingTriggers } : null,
     truncated: reason.length > 300,
   };
 }
@@ -82,22 +88,24 @@ export async function moduleHealthSummary(ports: StewardPorts, workspaceId: stri
     contractFailureCount = failures.count;
     truncated = incident.truncated || failures.truncated;
   }
-  const version = activeVersion !== undefined ? activeVersion : activeHash ? await db.moduleVersion.findUnique({
-    where: { moduleId_hash: { moduleId, hash: activeHash } }, select: { manifest: true },
-  }) : null;
+  const version = activeVersion !== undefined ? activeVersion : await activeManifest(db, moduleId, activeHash);
   const summary = incidentSummary(current);
-  return moduleHealthSummarySchema.parse({ module: moduleRow.name, moduleId, activeHash, configuredStatus: moduleRow.status, observedAt: ports.now().toISOString(),
+  return moduleHealthSummarySchema.parse({ module: moduleRow.name, moduleId, activeHash, configuredStatus: moduleRow.status,
+    observedAt: ports.now().toISOString(),
     ...runtimeOf(ports, moduleRow, version),
-    activation: activation ? { activationId: activation.activationId, hash: activation.candidateHash, status: activation.status, activatedAt: activation.activatedAt, observedCapabilities: activation.observedCapabilities } : null,
+    activation: activation ? { activationId: activation.activationId, hash: activation.candidateHash, status: activation.status,
+      activatedAt: activation.activatedAt, observedCapabilities: activation.observedCapabilities } : null,
     consecutiveFailures: policy?.consecutiveFailures ?? 0,
     incident: summary.incident,
-    contractFailureCount, open: hasOpenDiagnostics(current, contractFailureCount), nextAction: incidentNextAction(current), truncated: truncated || summary.truncated });
+    contractFailureCount, open: hasOpenDiagnostics(current, contractFailureCount), nextAction: incidentNextAction(current),
+      truncated: truncated || summary.truncated });
 }
 
 /** Apps as Chrona records them: description from the active manifest, versions with why they were rejected, recent runs. */
 async function list(context: ModuleContext, position?: { after?: string; limit: number }) {
   const { db, workspaceId } = context;
-  const rows = await db.module.findMany({ where: { workspaceId, ...(position?.after ? { id: { gt: position.after } } : {}) }, ...(position ? { take: position.limit + 1 } : {}), orderBy: { id: "asc" }, select: {
+  const rows = await db.module.findMany({ where: { workspaceId, ...(position?.after ? { id: { gt: position.after } } : {}) },
+    ...(position ? { take: position.limit + 1 } : {}), orderBy: { id: "asc" }, select: {
     id: true, name: true, status: true, activeHash: true,
   } });
   // Nested relation take is applied by Prisma after reading all parents' history.
@@ -125,7 +133,8 @@ async function list(context: ModuleContext, position?: { after?: string; limit: 
 async function checkout(context: ModuleContext, moduleId: string, hash: string | undefined, dir: string, root: string) {
   const { db } = context;
   const module = await requireModule(context, db, moduleId), selected = hash ?? module.activeHash;
-  if (!selected || !await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: selected } } })) throw new StewardError("not_found", "Module version not found");
+  if (!selected || !await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId,
+    hash: selected } } })) throw new StewardError("not_found", "Module version not found");
   const files = await readVersionMaterial(context, moduleId, selected);
   await checkoutModule(root, dir, files);
 }
@@ -150,7 +159,8 @@ export function createModules(ports: StewardPorts, workspaceId: string) {
     recoverMigrations: (now = ports.now()) => reconcile(recoverMigrations(context, now)),
     activate: (moduleId: string, hash: string, reason: "activate" | "rollback") => reconcile((async () => {
       await assertExternalModule(ports.db, workspaceId, moduleId, reason);
-      if (!await ports.db.moduleVersion.findFirst({ where: { moduleId, hash, status: "approved" } })) throw new StewardError("conflict", "Module version is not approved");
+      if (!await ports.db.moduleVersion.findFirst({ where: { moduleId, hash, status: "approved" } })) throw new StewardError("conflict",
+        "Module version is not approved");
       await fenceAgentVersionChange(ports, workspaceId, moduleId, hash);
       return ports.db.$transaction(tx => activateIn(context, tx, { moduleId, hash, reason }));
     })()),
@@ -158,17 +168,21 @@ export function createModules(ports: StewardPorts, workspaceId: string) {
     catalog: () => externalPackageCatalog(ports, workspaceId),
     onApproved: (action: ApprovedAction) => reconcile(onApproved(context, action)),
     rollback: (moduleId: string, hash: string) => reconcile(rollback(context, moduleId, hash)),
-    disable: (moduleId: string, source: "cli") => reconcile((async () => { await fenceAgentModule(ports, workspaceId, moduleId); return ports.db.$transaction(tx => setStatusIn(context, tx, moduleId, "paused", source)); })()),
-    /** v2-26 `modules.rollback/disable/enable/remove`: the user pauses or resumes directly; Chrona (the Provider) only asks, and the user decides once; removing always asks (red). */
+    disable: (moduleId: string, source: "cli") => reconcile((async () => { await fenceAgentModule(ports, workspaceId, moduleId);
+      return ports.db.$transaction(tx => setStatusIn(context, tx, moduleId, "paused", source)); })()),
+    /** User lifecycle actions apply directly; Provider removal always requests approval. */
     lifecycle: (name: string, moduleId: string, args: Record<string, unknown>, asUser: boolean) => {
       if (name === "rollback") return reconcile(rollback(context, moduleId, String(args.hash)));
       if (name === "remove") return requestRemove(context, moduleId, String(args.reason ?? ""));
       const status = name === "disable" ? "paused" : "active";
-      return asUser ? reconcile((async () => { if (status === "paused") await fenceAgentModule(ports, workspaceId, moduleId); return ports.db.$transaction(tx => setStatusIn(context, tx, moduleId, status, { source: "owner", reason: String(args.reason ?? "owner") })); })()) : requestStatus(context, moduleId, status, String(args.reason ?? ""));
+      return asUser ? reconcile((async () => { if (status === "paused") await fenceAgentModule(ports, workspaceId, moduleId);
+        return ports.db.$transaction(tx => setStatusIn(context, tx, moduleId, status, { source: "owner",
+        reason: String(args.reason ?? "owner") })); })()) : requestStatus(context, moduleId, status, String(args.reason ?? ""));
     },
     list: (position?: { after?: string; limit: number }) => list(context, position),
     health: async (input: { open?: boolean; cursor?: string } = {}, targets?: string[]) => {
-      const rows = await ports.db.module.findMany({ where: { workspaceId, ...(targets ? { name: { in: targets, ...(input.cursor ? { gt: input.cursor } : {}) } } : input.cursor ? { name: { gt: input.cursor } } : {}) }, orderBy: { name: "asc" } });
+      const rows = await ports.db.module.findMany({ where: { workspaceId, ...(targets ? { name: { in: targets, ...(input.cursor ? {
+        gt: input.cursor } : {}) } } : input.cursor ? { name: { gt: input.cursor } } : {}) }, orderBy: { name: "asc" } });
       // Small personal workspaces (<~200 apps): compute once, then filter before paging.
       const summaries = await Promise.all(rows.map(row => moduleHealthSummary(ports, workspaceId, row)));
       const selected = input.open === true ? summaries.filter(item => item.open) : summaries;
@@ -177,7 +191,8 @@ export function createModules(ports: StewardPorts, workspaceId: string) {
     },
     /** Read-only, also usable offline: never starts modules or invokes a model or health tool. */
     diagnostics: async (name?: string) => {
-      const rows = await context.db.module.findMany({ where: { workspaceId, ...(name ? { OR: [{ id: name }, { name }] } : {}) }, orderBy: { name: "asc" }, take: 100 });
+      const rows = await context.db.module.findMany({ where: { workspaceId, ...(name ? { OR: [{ id: name }, { name }] } : {}) }, orderBy: {
+        name: "asc" }, take: 100 });
       if (name && !rows.length) throw new StewardError("not_found", "Module not found");
       return Promise.all(rows.map(async row => {
         const incidents = await moduleIncidents(context.db, workspaceId, row.id);
@@ -196,4 +211,8 @@ export function createModules(ports: StewardPorts, workspaceId: string) {
     /** `via`: the entry module that relayed the owner's request (recorded, grants nothing). */
     callTool: (name: string, args: unknown, via: string | null = null) => callModuleTool(ports, { workspaceId, runId: null, via }, name, args),
   };
+}
+
+function activeManifest(db: StewardPorts["db"], moduleId: string, hash: string | null) {
+  return hash ? db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash } }, select: { manifest: true } }) : null;
 }

@@ -1,6 +1,6 @@
 import { afterAll, afterEach, expect, spyOn, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readFileSync, statSync, mkdirSync, chmodSync, writeFileSync } from "node:fs";
 import { chmod, link, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -197,27 +197,24 @@ test.each(["none", "bytes", "extra"])("the native checker preserves frozen artif
   const version = await db.moduleVersion.create({ data: { moduleId: module.id, hash: revision, manifest, source: "user", intent: { changes: ["native artifact"], preserves: [] }, status: "building", report: { tests: [] } } });
   await rm(f.dir, { recursive: true });
   let checked = 0;
-  const assertCopy = async (codeDir: string) => {
-    expect(await readFile(join(codeDir, "bin/program"))).toEqual(f.binary);
-    expect((await stat(join(codeDir, "bin/program"))).mode & 0o111).toBe(0o111);
+  const peer = testModuleProcess(async () => ({}));
+  const sandbox = { available: true, isolated: false, startModule(input: Parameters<typeof peer.startModule>[0]) {
+    expect(readFileSync(join(input.codeDir, "bin/program"))).toEqual(f.binary);
+    expect(statSync(join(input.codeDir, "bin/program")).mode & 0o111).toBe(0o111);
     checked++;
-  };
-  const peer = testModuleProcess(async (_event, _call, input) => { await assertCopy(input.codeDir); return {}; });
-  const sandbox = { available: true, isolated: false, startModule: peer.startModule, runModule: async (input: { codeDir: string }) => {
-    await assertCopy(input.codeDir);
     if (mutate === "extra") {
-      await mkdir(join(input.codeDir, "dist"));
-      await writeFile(join(input.codeDir, "dist/helper.js"), "unbound runtime code");
+      mkdirSync(join(input.codeDir, "dist"));
+      writeFileSync(join(input.codeDir, "dist/helper.js"), "unbound runtime code");
     }
     if (mutate === "bytes") {
-      await chmod(join(input.codeDir, "bin/program"), 0o755);
-      await writeFile(join(input.codeDir, "bin/program"), "mutated by offline test");
+      chmodSync(join(input.codeDir, "bin/program"), 0o755);
+      writeFileSync(join(input.codeDir, "bin/program"), "mutated at startup");
     }
-    return { status: "succeeded" as const, output: '{"effects":[]}', error: null, exitCode: 0 };
+    return peer.startModule(input);
   } };
   await buildPending(moduleContext({ ...context.ports, sandbox }, workspace.id));
-  expect(checked).toBeGreaterThan(0);
   const result = await db.moduleVersion.findUniqueOrThrow({ where: { id: version.id } });
+  expect(checked).toBeGreaterThan(0);
   if (mutate !== "none") {
     expect(result.status).toBe("rejected");
     await expect(stat(join(context.store, revision))).rejects.toMatchObject({ code: "ENOENT" });

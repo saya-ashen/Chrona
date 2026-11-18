@@ -1,3 +1,4 @@
+import { installTestModuleVersion } from "../__testing__/module-release-test-fixture";
 import { agent } from "../system/agent";
 import { afterEach, expect, test } from "bun:test";
 import "../modules/module-effects";
@@ -46,7 +47,7 @@ async function fixture(selectedTargets = targets) {
   const other = await db.module.create({ data: { workspaceId, name: "context-peer", status: "active", activeHash: "context-peer-v1" } });
   for (const [module, tools] of [[origin, [tool("observe"), tool("self"), tool("bounce"), tool("unselected"), tool("mutate", ["owner"])]], [other, [tool("back")]]] as const) {
     const manifest = moduleManifestSchema.parse({ name: module.name, entry: "index.ts", tests: ["test.ts"], effects: [], uses: targets, tools });
-    await db.moduleVersion.create({ data: { moduleId: module.id, hash: module.activeHash!, manifest, source: "user", status: "approved", intent: {}, report: {} } });
+    module.activeHash = await installTestModuleVersion(ports, module, manifest);
   }
   const principal = { workspaceId, ownerId: "owner", caller: { kind: "module" as const, moduleId: origin.id, hash: origin.activeHash! } };
   const admitted = await admitContextPrimitive(ports, principal, "context", { requestKey: "context" }) as { contextId: string };

@@ -1,5 +1,6 @@
+import { installTestModuleVersion } from "../../../../../packages/kernel/src/__testing__/module-release-test-fixture";
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { moduleManifestSchema, type ProviderAdapter, type ProviderRunInput } from "@chrona/contracts/steward";
 import { callSync } from "@chrona/kernel";
@@ -77,15 +78,14 @@ beforeEach(async () => {
     uses: methods.map(method => `agent.${method}`), tools: [{ name: "dispatch", description: "Owner Agent fixture", visibility: ["owner"],
       parameters: { type: "object", properties: { tool: { type: "string" }, input: { type: "string" }, key: { type: "string" } }, required: ["tool", "input"] }, output: {} }] });
   const module = await db.module.create({ data: { workspaceId, name: manifest.name, activeHash: "execution-fixture", status: "active" } });
-  entry = { id: module.id, hash: "execution-fixture" };
-  await db.moduleVersion.create({ data: { moduleId: entry.id, hash: entry.hash, manifest, source: "user", status: "approved", intent: {}, report: {} } });
-  const code = join(root, "data/platform/store", entry.hash); await mkdir(code, { recursive: true });
-  await writeFile(join(code, "index.ts"), `import { chrona, on, ModelError } from "chrona";
+  const hash = await installTestModuleVersion({ db, dataDir: join(root, "data") }, module, manifest, "workbench", `import { chrona, on, ModelError } from "chrona";
 const methods = new Set(${JSON.stringify(methods)});
 async function dispatch(tool, input, key) { if (!methods.has(tool)) throw new ModelError("forbidden", "Fixture method denied"); return chrona.call("agent." + tool, input, key ? { key } : {}); }
 on("tool", async event => ({ result: await dispatch(event.args.tool, JSON.parse(event.args.input), event.args.key) }));
-chrona.serve(async request => { try { const { tool, input, key } = await request.json(); return Response.json({ result: await dispatch(tool, input, key) }); }
+chrona.serve(async request => {
+  if (request.headers.get("authorization") !== "Bearer execution-integration-test") return new Response("Unauthorized", { status: 401 }); try { const { tool, input, key } = await request.json(); return Response.json({ result: await dispatch(tool, input, key) }); }
 catch (error) { return Response.json({ error: { code: error.code, message: error.message } }, { status: 409 }); } });`);
+  entry = { id: module.id, hash };
   await boot();
 }, 30_000);
 afterEach(async () => {
@@ -139,7 +139,7 @@ test("HTTP Agent Runs retain auth, actual SDK caller identity, private fences, q
   const run = (await until(async () => fake.started.find(row => row.input.runId === view.runId), Boolean, "queued Provider launch"))!;
   expect(run.input.cwd).toBe(join(root, "data/sessions", view.contextId));
   await writeFile(join(run.input.cwd, "existing.txt"), "existing\n");
-  expect(run.input.execution).toBeUndefined(); expect(run.input.content).toEqual([]); expect(run.input.hostPaths).toEqual([]);
+  expect(run.input).not.toHaveProperty("execution"); expect(run.input.content).toEqual([]); expect(run.input.hostPaths).toEqual([]);
   expect(await db.agentRunAdmission.findUniqueOrThrow({ where: { runId: view.runId } })).toMatchObject({ moduleId: entry.id, hash: entry.hash });
   expect(await db.agentContext.findUniqueOrThrow({ where: { id: view.contextId } })).toMatchObject({ workspaceId, moduleId: entry.id, hash: entry.hash, providerId: fake.provider.name });
   const providerModule = await db.module.findUniqueOrThrow({ where: { workspaceId_name: { workspaceId, name: "test-provider" } } });
@@ -208,10 +208,10 @@ test("HTTP stop acknowledgement retains the live Run and blocks lifecycle change
   await refused("write", { ...target(view), input: { kind: "message", text: "after stop" } }, "conflict", "after-stop");
   await lifecycleRefused();
   // The fence preserves reads needed to drain existing work while rejecting new work.
-  expect((await direct(caller(), "agent.read", target(view))).output).toMatchObject({ run: { runId: view.runId, status: "running", active: true } });
+  expect((await direct(caller(), "agent.read", target(view))).output).toMatchObject({ run: { runId: view.runId, status: "unknown", active: true } });
   await expect(direct(caller(), "agent.run", startInput(), "fenced-new-run")).rejects.toMatchObject({ code: "forbidden" });
   expect(await db.providerLaunch.findUnique({ where: { runId: view.runId } })).not.toBeNull();
-  expect(await db.run.findUniqueOrThrow({ where: { id: view.runId } })).toMatchObject({ status: "running", stopStatus: "pending" });
+  expect(await db.run.findUniqueOrThrow({ where: { id: view.runId } })).toMatchObject({ status: "failed", stopStatus: "unknown" });
   run.finish({ outcome: "failed", sessionId: null, error: "Process exited after cancellation" });
   expect(await until(() => db.run.findUniqueOrThrow({ where: { id: view.runId } }), row => row.stopStatus === "confirmed", "actual exit")).toMatchObject({ status: "cancelled" });
   await requestStatus(moduleContext(runtime.ports, workspaceId), entry.id, "paused", "Stop checked");

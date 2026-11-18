@@ -17,14 +17,17 @@ export async function wakeAllowance(db: Db, workspaceId: string, now: Date, clai
   const workspace = await db.workspace.findUniqueOrThrow({ where: { id: workspaceId } });
   const wake = wakeBudgetSchema.parse((workspace.settings as { wake?: unknown } | null)?.wake ?? {});
   const timezone = budgetTimezone(workspace.settings), day = localDayKey(now, timezone);
-  const recent = await db.moduleInvocation.findMany({ where: { workspaceId, mode: "timer", status: { not: "deferred" }, ...(claimId ? { id: { not: claimId } } : {}), createdAt: { gte: new Date(now.getTime() - 48 * 3600_000), lte: now } }, select: { targetModuleId: true, createdAt: true } });
+  const recent = await db.moduleInvocation.findMany({ where: { workspaceId, mode: "timer", status: { not: "deferred" }, ...(claimId ? {
+    id: { not: claimId } } : {}), createdAt: { gte: new Date(now.getTime() - 48 * 3600_000), lte: now } }, select: { targetModuleId: true,
+    createdAt: true } });
   const today = recent.filter(item => localDayKey(item.createdAt, timezone) === day);
   return (moduleId: string) => today.length < wake.dailyLimit
     && today.filter(item => item.targetModuleId === moduleId).length < wake.moduleDailyLimit
     && !recent.some(item => item.targetModuleId === moduleId && item.createdAt.getTime() > now.getTime() - wake.minIntervalMs);
 }
 /** Runtime serialization covers final validation, durable admission and synchronous transport write. */
-export async function dispatchTimer(ports: StewardPorts, workspaceId: string, input: { timerId: string; revision: string; eventId: string; scheduledAt: Date }, send: () => void) {
+export async function dispatchTimer(ports: StewardPorts, workspaceId: string, input: { timerId: string; revision: string; eventId: string;
+  scheduledAt: Date }, send: () => void) {
   return withTimerLock(ports, workspaceId, async () => {
     try {
       await ports.db.$transaction(async tx => {
@@ -35,7 +38,8 @@ export async function dispatchTimer(ports: StewardPorts, workspaceId: string, in
         const module = await tx.module.findFirst({ where: { id: timer.moduleId!, workspaceId, status: "active", activeHash: rule.hash } });
         if (!module) throw Object.assign(new CallError("unavailable", "Timer application changed"), { timerDeferred: true });
         const now = ports.now();
-        if (!(await wakeAllowance(tx, workspaceId, now, input.eventId))(module.id)) throw Object.assign(new CallError("conflict", "Timer wake budget exhausted"), { timerDeferred: true });
+        if (!(await wakeAllowance(tx, workspaceId, now, input.eventId))(module.id)) throw Object.assign(new CallError("conflict",
+          "Timer wake budget exhausted"), { timerDeferred: true });
         await tx.moduleInvocation.update({ where: { id: input.eventId }, data: { createdAt: now } });
         await tx.timer.update({ where: { id: timer.id }, data: { lastAt: now, nextAt: nextTimerAt(rule.schedule, input.scheduledAt, now) } });
       });
@@ -53,13 +57,16 @@ export async function recoverTimers(ports: StewardPorts, workspaceId: string) {
   for (const invocation of interrupted) await ports.db.$transaction(async tx => {
     await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${workspaceId}`;
     const args = z.object({ timerId: z.string(), revision: z.string() }).parse(invocation.args);
-    const completed = invocation.targetModuleId && invocation.targetHash ? await tx.moduleRun.findMany({ where: { moduleId: invocation.targetModuleId, hash: invocation.targetHash, triggerId: invocation.id }, select: { exitCode: true, output: true } }) : [];
+    const completed = invocation.targetModuleId && invocation.targetHash ? await tx.moduleRun.findMany({ where: {
+      moduleId: invocation.targetModuleId, hash: invocation.targetHash, triggerId: invocation.id }, select: { exitCode: true, output: true } }) : [];
     const delivered = completed.filter(row => !(row.exitCode === 1 && (row.output as { delivery?: string } | null)?.delivery === "not_sent"));
     const succeeded = delivered.length === 1 && delivered[0]!.exitCode === 0;
-    const changed = await tx.moduleInvocation.updateMany({ where: { id: invocation.id, status: "running" }, data: { status: succeeded ? "succeeded" : "unknown", error: succeeded ? null : "Timer delivery interrupted", finishedAt: ports.now() } });
+    const changed = await tx.moduleInvocation.updateMany({ where: { id: invocation.id, status: "running" }, data: {
+      status: succeeded ? "succeeded" : "unknown", error: succeeded ? null : "Timer delivery interrupted", finishedAt: ports.now() } });
     if (!changed.count) return;
     const timer = await tx.timer.findUnique({ where: { id: args.timerId } });
     if (timer?.status !== "running" || storedTimerRule.parse(timer.rule).revision !== args.revision) return;
-    await tx.timer.update({ where: { id: timer.id }, data: succeeded ? { status: timer.nextAt ? "active" : "done", lastResult: "delivered" } : { status: "unknown", nextAt: null, lastResult: "Timer delivery interrupted; outcome unknown" } });
+    await tx.timer.update({ where: { id: timer.id }, data: succeeded ? { status: timer.nextAt ? "active" : "done",
+      lastResult: "delivered" } : { status: "unknown", nextAt: null, lastResult: "Timer delivery interrupted; outcome unknown" } });
   });
 }

@@ -110,12 +110,11 @@ test("database failure before publication does not become refusal proof", async 
   expect(error.reason).toBeUndefined();
 });
 
-test("Git failure remains unmarked", async () => {
+test("fixed publication does not depend on a Git repository directory", async () => {
   const f = await fixture();
-  await writeFile(join(f.ports.dataDir, "platform", "repos"), "blocks Git repository directory");
-  const error = await refusal(f.routed());
-  expect(error.reason).toBeUndefined();
-  await expect(checkCandidates(f.ports, f.workspace.id, owner, { admissionId: f.submission.admissionId, requestKey: "submit" })).rejects.toMatchObject({ code: "not_found" });
+  await writeFile(join(f.ports.dataDir, "platform", "repos"), "unused legacy directory");
+  await expect(f.routed()).resolves.toBeDefined();
+  await expect(checkCandidates(f.ports, f.workspace.id, owner, { admissionId: f.submission.admissionId, requestKey: "submit" })).resolves.toBeDefined();
 });
 
 test("parallel direct material refusal carries no proof while the original call can still publish", async () => {

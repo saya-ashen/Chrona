@@ -1,9 +1,11 @@
+import { installTestModuleVersion } from "../__testing__/module-release-test-fixture";
+import { installNotifyTarget } from "../__testing__/test-notify-target";
 import { afterEach, expect, test } from "bun:test";
 import "./module-effects";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { moduleManifestSchema, RUN_LIMITS, type ModuleManifest } from "@chrona/contracts/steward";
+import { RUN_LIMITS, type ModuleManifest } from "@chrona/contracts/steward";
 import { createModules } from "./modules";
 import { registerSystemModules } from "../system/system-modules";
 import { callModuleTool, moduleToolCatalog } from "./module-tools";
@@ -25,7 +27,6 @@ async function fixture() {
   let error: string | null = null;
   const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null,
     sandbox: testModuleSandbox(async input => {
-      if (input.codeDir.endsWith("notify-fixture")) return { status: "succeeded", exitCode: 0, error: null, output: JSON.stringify({ result: { id: "fixture-notice", status: "pending", duplicate: false } }) };
       calls.push(input);
       return { status: error ? "failed" : "succeeded", exitCode: error ? 1 : 0, error,
         output: JSON.stringify({ result: { found: 3 }, effects: [{ type: "notify_user", key: "found", level: "now", title: "Found", body: "Three" }] }) };
@@ -34,18 +35,17 @@ async function fixture() {
   cleanups.push(async () => { await callsSettled(ports); await moduleSupervisor(ports).stop(); });
   const workspaceId = (await db.workspace.create({ data: { name: "tools" } })).id;
   registerSystemModules();
-  const notifyManifest = moduleManifestSchema.parse({ name: "notify", entry: "index.ts", tests: ["test.ts"], effects: [], tools: [{ name: "send", description: "Synthetic send", visibility: ["modules"], parameters: { type: "object", properties: {}, additionalProperties: true }, output: {} }] });
-  const notify = await db.module.create({ data: { workspaceId, name: "notify", activeHash: "notify-fixture" } });
-  await db.moduleVersion.create({ data: { moduleId: notify.id, hash: "notify-fixture", manifest: notifyManifest, intent: {}, source: "user", report: {}, status: "approved" } });
+  await installNotifyTarget(ports, workspaceId, true);
   const api = createModules(ports, workspaceId);
   const module = await db.module.create({ data: { workspaceId, name: "mail-sort", activeHash: "hash" } });
   const tool: ModuleManifest["tools"][number] = { name: "find-mail", description: "Find matching mail", visibility: ["provider", "owner"], idempotent: false, parameters: { type: "object", properties: { query: { type: "string" }, count: { type: "number" }, unread: { type: "boolean" }, folder: { type: "string", enum: ["inbox", "sent"] } }, required: ["query"] },
       output: {}
 };
   const manifest = { name: module.name, entry: "index.ts", tests: ["test.ts"], effects: ["network"], uses: ["notify.send"], params: { limit: { type: "number", value: 3 } }, tools: [tool] };
-  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "hash", manifest, intent: {}, source: "user", report: {}, status: "approved" } });
-  await db.$transaction(tx => recordModuleActivation(moduleContext(ports, workspaceId), tx, { moduleId: module.id, previousHash: null, hash: "hash" }));
-  const session = await db.agentContext.create({ data: { workspaceId, ownerId: "owner", moduleId: module.id, hash: "hash" } });
+  const hash = await installTestModuleVersion(ports, module, manifest);
+  module.activeHash = hash;
+  await db.$transaction(tx => recordModuleActivation(moduleContext(ports, workspaceId), tx, { moduleId: module.id, previousHash: null, hash }));
+  const session = await db.agentContext.create({ data: { workspaceId, ownerId: "owner", moduleId: module.id, hash } });
   const run = await db.run.create({ data: { workspaceId, sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Find mail", provider: "fake", tokenHash: "fixture-provider-token", cwd: dataDir } });
   return { db, ports, api, module, manifest, tool, session, run, calls, workspaceId,
     catalog: () => moduleToolCatalog(ports, { workspaceId }),
@@ -117,7 +117,7 @@ test("success returns result, runs sandbox with scoped input and deduplicates sh
   expect(await f.call(args)).toEqual({ result: { found: 3 } });
   expect(await f.call(args)).toEqual({ result: { found: 3 } });
   expect(await f.db.moduleCall.count({ where: { moduleId: f.module.id, method: "call", status: { not: "rejected" } } })).toBe(0);
-  expect(f.calls[0]).toMatchObject({ codeDir: join(f.ports.dataDir, "platform/store/hash"), dataDir: join(f.ports.dataDir, "platform/data", f.module.id), entry: "index.ts", network: true, timeoutMs: RUN_LIMITS.jobTimeoutMs, maxOutputBytes: RUN_LIMITS.jobOutputBytes,
+  expect(f.calls[0]).toMatchObject({ codeDir: join(f.ports.dataDir, "platform/store", f.module.activeHash!), dataDir: join(f.ports.dataDir, "platform/data", f.module.id), entry: "index.ts", network: true, timeoutMs: RUN_LIMITS.jobTimeoutMs, maxOutputBytes: RUN_LIMITS.jobOutputBytes,
     input: { trigger: { id: "find-mail", kind: "tool", firedAt: f.ports.now().toISOString(), args, caller: { kind: "provider", runId: expect.any(String) }, call: { id: expect.any(String), key: null, attempt: 1, chain: [] } }, now: f.ports.now().toISOString(), params: { limit: 3 } } });
   expect((await notices(f.db)).length).toBe(1);
   expect(await f.db.run.count({ where: { lane: "background" } })).toBe(0);

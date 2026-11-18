@@ -11,23 +11,29 @@ export const approvalStatusOutput = z.object({ approval: z.string(), status: z.e
 export const modulesListOutput = z.array(appSchema.extend({
   health: moduleHealthSummarySchema,
   versions: z.array(z.object({ hash: z.string(), status: z.string(), createdAt: z.string(), errors: z.array(z.string().max(300)).max(5).nullable() })).max(5),
-  runs: z.array(z.object({ id: z.string(), hash: z.string(), triggerId: z.string(), firedAt: z.string(), exitCode: z.number(), error: z.string().max(1000).nullable(), createdAt: z.string() })).max(5),
+  runs: z.array(z.object({ id: z.string(), hash: z.string(), triggerId: z.string(), firedAt: z.string(), exitCode: z.number(),
+    error: z.string().max(1000).nullable(), createdAt: z.string() })).max(5),
 }));
 const toolExampleOutput = z.object({ description: z.string().optional(), args: z.record(z.string(), z.json()), result: z.json().optional() });
 const toolErrorOutput = z.object({ code: z.string(), description: z.string(), recovery: z.string() });
-export const modulesToolsOutput = z.array(z.object({ moduleId: z.string().optional(), hash: z.string().optional(), target: routedTargetSchema, label: z.string(), description: z.string(), inputSchema: z.record(z.string(), z.json()), outputSchema: z.json().nullable(), examples: z.array(toolExampleOutput).nullable(), sideEffects: z.array(z.string()).nullable(), errors: z.array(toolErrorOutput).nullable(), retry: z.string(), idempotent: z.boolean() }));
+export const modulesToolsOutput = z.array(z.object({ moduleId: z.string().optional(), hash: z.string().optional(),
+  target: routedTargetSchema, label: z.string(), description: z.string(), inputSchema: z.record(z.string(), z.json()),
+  outputSchema: z.json().nullable(), examples: z.array(toolExampleOutput).nullable(), sideEffects: z.array(z.string()).nullable(),
+  errors: z.array(toolErrorOutput).nullable(), retry: z.string(), idempotent: z.boolean() }));
 export const secretGetOutput = z.object({ value: z.record(z.string(), z.string()) });
 export const secretSetOutput = z.object({ name: z.string(), configured: z.literal(true) });
 export const secretRemoveOutput = z.object({ name: z.string(), configured: z.boolean() });
 export const secretAuthorizeOutput = z.object({ url: z.string(), redirectUri: z.string(), expiresAt: z.string() });
 export const secretTokenOutput = z.object({ accessToken: z.string(), expiresAt: z.string() });
-export const secretsListOutput = z.array(z.object({ name: z.string(), configured: z.boolean(), updatedAt: z.string().nullable(), modules: z.array(z.string()) }));
+export const secretsListOutput = z.array(z.object({ name: z.string(), configured: z.boolean(), updatedAt: z.string().nullable(),
+  modules: z.array(z.string()) }));
 
 const referenceSource = z.object({ kind: z.enum(["system", "module"]), hash: z.string().nullable() });
 const referenceIndex = z.object({ target: routedTargetSchema, label: z.string(), source: referenceSource, description: z.string() });
 export const modulesReferenceOutput = z.union([z.array(referenceIndex), referenceIndex.extend({
   inputSchema: z.record(z.string(), z.json()), outputSchema: z.json().nullable(),
   documentation: z.string().nullable(), examples: z.json().nullable(), sideEffects: z.array(z.string()).nullable(), errors: z.json().nullable(),
-  retry: z.string(), admission: z.object({ visibility: z.array(z.enum(["kernel", "provider", "owner", "modules"])), uses: z.string(), idempotent: z.boolean() }),
+  retry: z.string(), admission: z.object({ visibility: z.array(z.enum(["kernel", "provider", "owner", "modules"])), uses: z.string(),
+    idempotent: z.boolean() }),
   routingErrors: z.array(z.string()),
 })]);

@@ -1,5 +1,5 @@
 import { compileModuleOutput } from "@chrona/contracts/steward";
-import type { DeliveryStage } from "./module-supervisor";
+import type { DeliveryStage } from "./module-supervisor-state";
 import type { RoutedTool, Tool } from "./module-call-types";
 import type { SystemTool } from "./module-system-types";
 import { parseInput, StewardError } from "../errors";

@@ -1,7 +1,7 @@
+import { installTestModuleVersion } from "../__testing__/module-release-test-fixture";
 import "../modules/module-effects";
 import { expect, test } from "bun:test";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdtemp, rm } from "node:fs/promises";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { createScriptSandbox } from "../../../host/src/runtime/script-sandbox";
 import { testDb } from "../__testing__/test-db";
@@ -19,10 +19,7 @@ test("real SDK handler typed error crosses supervisor and routed call without me
         output: {}
     }] });
     const module = await db.module.create({ data: { workspaceId: workspace.id, name: manifest.name, activeHash: "fixture" } });
-    await db.moduleVersion.create({ data: { moduleId: module.id, hash: "fixture", manifest, source: "user", intent: {}, report: {}, status: "approved" } });
-    const code = join(dataDir, "platform/store/fixture"); await mkdir(code, { recursive: true });
-    await writeFile(join(code, "module.json"), JSON.stringify(manifest));
-    await writeFile(join(code, "index.ts"), 'import {on,ModelError} from "chrona"; on("tool",()=>{throw new ModelError("conflict","Exact conflict");});');
+    await installTestModuleVersion(ports, module, manifest, "typed-error", 'import {on,ModelError} from "chrona"; on("tool",()=>{throw new ModelError("conflict","Exact conflict");});');
     await expect(callSync(ports, { workspaceId: workspace.id, caller: { kind: "owner", via: null }, chain: [], path: [] }, "typed-error.fail", {})).rejects.toMatchObject({ code: "conflict", message: "typed-error.fail: Exact conflict" });
   } finally { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); }
 });

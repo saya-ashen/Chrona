@@ -19,7 +19,8 @@ import { completeApprovedOperations, completeApprovedOperationsIn } from "./modu
 
 function parseRestore(value: Prisma.JsonValue | undefined): Restore | undefined {
   if (value === undefined) return;
-  if (!value || typeof value !== "object" || Array.isArray(value) || typeof value.schema !== "number" || !Number.isInteger(value.schema) || value.schema < 1 || typeof value.snapshotAt !== "string") throw new StewardError("invalid", "Invalid module restore approval");
+  if (!value || typeof value !== "object" || Array.isArray(value) || typeof value.schema !== "number" || !Number.isInteger(value.schema) ||
+    value.schema < 1 || typeof value.snapshotAt !== "string") throw new StewardError("invalid", "Invalid module restore approval");
   return { schema: value.schema, snapshotAt: value.snapshotAt };
 }
 async function checkApproval(context: ModuleContext, tx: Prisma.TransactionClient, action: ApprovedAction, moduleId: string) {
@@ -29,22 +30,23 @@ async function checkApproval(context: ModuleContext, tx: Prisma.TransactionClien
 }
 async function approvedVersion(tx: Prisma.TransactionClient, moduleId: string, hash: string, restore?: Restore) {
   const version = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash } } });
-  if (!version || version.status !== (restore ? "approved" : "pending_review")) throw new StewardError("conflict", restore ? "Module version is not approved" : "Module version is not pending review");
+  if (!version || version.status !== (restore ? "approved" : "pending_review")) throw new StewardError("conflict",
+    restore ? "Module version is not approved" : "Module version is not pending review");
   return version;
 }
-async function prepareApproved(context: ModuleContext, tx: Prisma.TransactionClient, action: ApprovedAction, target: { moduleId: string; hash: string; restore?: Restore }) {
+async function prepareApproved(context: ModuleContext, tx: Prisma.TransactionClient, action: ApprovedAction, target: { moduleId: string;
+  hash: string; restore?: Restore }) {
   const { moduleId, hash, restore } = target;
   const module = await requireModule(context, tx, moduleId);
   if (module.status === "migrating") throw new StewardError("conflict", "Module is migrating");
   await checkApproval(context, tx, action, module.id);
   if (module.activeHash === hash) return null;
   const version = await approvedVersion(tx, moduleId, hash, restore);
-  const receipt = restore ? null : await assertCandidateVersionIn(context, tx, version);
-  if (receipt && (receipt.state !== "pending_approval" || receipt.approvalId !== action.approvalId)) throw new StewardError("conflict", "Approval does not bind this fixed receipt");
-  if (!restore) await assertExactReleaseUpdateIn(context, tx, moduleId, version.report as BuildReport, module);
+  const receipt = await approvedCandidate(context, tx, action, { module, version, restore });
   await assertDynamicModuleActivation(tx, context.workspaceId, moduleId);
   const manifest = moduleManifestSchema.parse(version.manifest), from = module.dataSchema, to = manifest.data.schema;
-  if (restore && (restore.schema !== to || await snapshotAt(context, moduleId, to) !== restore.snapshotAt)) throw new StewardError("conflict", "Module restore snapshot is missing or changed");
+  if (restore && (restore.schema !== to || await snapshotAt(context, moduleId,
+    to) !== restore.snapshotAt)) throw new StewardError("conflict", "Module restore snapshot is missing or changed");
   if (restore || (from !== null && to > from && !await dataEmpty(join(context.platform, "data", moduleId)))) {
     await startMigration(context, tx, moduleId, hash, { from, to });
     return { module, version, manifest, from, to };
@@ -58,7 +60,8 @@ async function prepareApproved(context: ModuleContext, tx: Prisma.TransactionCli
 export async function activateApprovedIn(context: ModuleContext, tx: Prisma.TransactionClient, action: ApprovedAction) {
   const payload = action.payload;
   if (!payload || typeof payload !== "object" || Array.isArray(payload) || payload.kind !== "activate_module") return;
-  if (action.workspaceId !== context.workspaceId || typeof payload.moduleId !== "string" || typeof payload.hash !== "string") throw new StewardError("invalid", "Invalid module approval");
+  if (action.workspaceId !== context.workspaceId || typeof payload.moduleId !== "string" ||
+    typeof payload.hash !== "string") throw new StewardError("invalid", "Invalid module approval");
   const { moduleId, hash } = payload, restore = parseRestore(payload.restore);
   return prepareApproved(context, tx, action, { moduleId, hash, restore });
 }
@@ -72,7 +75,8 @@ export async function onApproved(context: ModuleContext, action: ApprovedAction)
 }
 async function applyApproved(context: ModuleContext, action: ApprovedAction) {
   const approval = await context.db.approval.findFirst({ where: { id: action.approvalId, workspaceId: context.workspaceId, status: "approved" } });
-  if (!approval || action.workspaceId !== context.workspaceId || JSON.stringify(approval.payload) !== JSON.stringify(action.payload)) throw new StewardError("conflict", "Module approval does not match");
+  if (!approval || action.workspaceId !== context.workspaceId ||
+    JSON.stringify(approval.payload) !== JSON.stringify(action.payload)) throw new StewardError("conflict", "Module approval does not match");
   const versions = approvalVersions(action.payload);
   for (const target of versions) {
     const version = await context.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: target.moduleId, hash: target.hash } } });
@@ -89,7 +93,8 @@ async function applyApproved(context: ModuleContext, action: ApprovedAction) {
   const prepared = await context.db.$transaction(tx => activateApprovedIn(context, tx, action));
   if (!prepared) return;
   const payload = action.payload as Prisma.JsonObject, restore = parseRestore(payload.restore);
-  await migrateData(context, prepared, restore ? "rollback" : "activate", restore, tx => completeApprovedOperationsIn(tx, context.workspaceId, action.approvalId));
+  await migrateData(context, prepared, restore ? "rollback" : "activate", restore, tx => completeApprovedOperationsIn(tx,
+    context.workspaceId, action.approvalId));
 }
 async function prepareRollback(context: ModuleContext, tx: Prisma.TransactionClient, moduleId: string, hash: string) {
   const module = await assertExternalModule(tx, context.workspaceId, moduleId, "rollback");
@@ -117,9 +122,21 @@ export async function rollback(context: ModuleContext, moduleId: string, hash: s
   const prepared = await context.db.$transaction(tx => prepareRollback(context, tx, moduleId, hash));
   if (prepared.restore) {
     await expireModuleApprovals(context, moduleId);
-    const approval = await createApprovals(context).create({ moduleId: prepared.module.id, action: "activate_module", title: `回滚模块 ${prepared.module.name}`, detail: "恢复旧版本的数据快照", payload: { kind: "activate_module", moduleId, hash, restore: prepared.restore }, preview: `将恢复 ${prepared.restore.snapshotAt} 的数据，此后写入的数据会丢失；当前数据会另存为 before-rollback-<iso>。\nhash: ${hash}` });
+    const approval = await createApprovals(context).create({ moduleId: prepared.module.id, action: "activate_module",
+      title: `回滚模块 ${prepared.module.name}`, detail: "恢复旧版本的数据快照", payload: { kind: "activate_module", moduleId, hash,
+      restore: prepared.restore }, preview: `将恢复 ${prepared.restore.snapshotAt} 的数据，此后写入的数据会丢失；当前数据会另存为 before-rollback-<iso>。\nhash: ${hash}` });
     return { status: "pending_approval" as const, approvalId: approval.id };
   }
   if (prepared.migration) await migrateData(context, prepared.migration, "rollback");
   return { status: "active" as const, moduleId, activeHash: hash };
+}
+
+async function approvedCandidate(context: ModuleContext, tx: Prisma.TransactionClient, action: ApprovedAction,
+  { module, version, restore }: { module: Awaited<ReturnType<typeof requireModule>>; version: Awaited<ReturnType<typeof approvedVersion>>;
+    restore?: Restore }) {
+  const receipt = restore ? null : await assertCandidateVersionIn(context, tx, version);
+  if (receipt && (receipt.state !== "pending_approval" || receipt.approvalId !== action.approvalId)) throw new StewardError("conflict",
+    "Approval does not bind this fixed receipt");
+  if (!restore) await assertExactReleaseUpdateIn(context, tx, module.id, version.report as BuildReport, module);
+  return receipt;
 }

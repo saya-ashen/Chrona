@@ -1,5 +1,6 @@
+import { installTestModuleVersion } from "../../../packages/kernel/src/__testing__/module-release-test-fixture";
 import { expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { createScriptSandbox } from "../../../packages/host/src/runtime/script-sandbox";
@@ -21,6 +22,7 @@ on("tool", async event => {
   return { result: { value: event.args.value, count } };
 });
 chrona.serve(async request => {
+  if (request.headers.get("authorization") !== "Bearer consumer-fixture-key") return new Response("Unauthorized", { status: 401 });
   try {
     const body = await request.json();
     const value = body.status ? await chrona.callStatus(body.status) : await chrona.call(body.target, body.args, body.options);
@@ -42,11 +44,10 @@ test("independent consumer crosses HTTP and real SDK, then resumes persisted rec
     const { id: workspaceId } = await db.workspace.create({ data: { name: "Independent consumer" } });
     const installed = [];
     for (const name of ["consumer-owner", "consumer-ordinary"]) {
-      const hash = name + "-v1", code = join(dataDir, "platform/store", hash);
+
       const manifest = moduleManifestSchema.parse({ name, ...(name === "consumer-owner" ? { authority: "owner" } : {}), entry: "index.ts", tests: ["test.ts"], keepAlive: true, listen: "/api/" + name, effects: [], uses: ["*"], tools: [{ name: "echo", description: "Receipt counter fixture", idempotent: false, visibility: ["modules", "owner"], parameters: { type: "object", properties: { value: { type: "string" } }, required: ["value"] }, output: { type: "object", properties: { value: { type: "string" }, count: { type: "integer" } }, required: ["value", "count"] } }] });
-      const module = await db.module.create({ data: { workspaceId, name, activeHash: hash } });
-      await db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest, source: "user", status: "approved", intent: {}, report: {} } });
-      await mkdir(code, { recursive: true }); await writeFile(join(code, "index.ts"), bridge);
+      const module = await db.module.create({ data: { workspaceId, name, activeHash: null } });
+      module.activeHash = await installTestModuleVersion({ db, dataDir }, module, manifest, name, bridge);
       installed.push(module);
     }
     async function restart() {

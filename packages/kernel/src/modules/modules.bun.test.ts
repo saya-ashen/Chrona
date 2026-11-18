@@ -1,3 +1,4 @@
+import { seedTestModuleRelease } from "../__testing__/module-release-test-fixture";
 import { afterEach, expect, spyOn, test } from "bun:test";
 import { BunSqliteAdapter } from "prisma-adapter-bun-sqlite";
 import { mkdir, mkdtemp, readFile, readdir, rename, rm, stat, symlink, truncate, writeFile } from "node:fs/promises";
@@ -702,6 +703,7 @@ test("queued failures sharing a timestamp retain two failure audits and one life
 
 test("user proposals emit no provider failure audit and rejected hashes can be resubmitted by the provider", async () => {
   const f = await fixture(); f.fail();
+  await seedTestModuleRelease(f.root, "price-watch");
   const first = await f.service.modules.propose({ root: f.root, dir: "price-watch", intent }, "user");
   await f.service.modules.buildPending();
   expect(await f.db.run.count()).toBe(0);
@@ -1074,10 +1076,10 @@ test("trusted pinned proposals preserve the selected material and reject differe
   expect(await f.db.moduleVersion.count()).toBe(2);
 });
 
-test("invalid manifests have no source commit, module identity, or repository", async () => {
+test("invalid manifests retain their material hash without a module identity or repository", async () => {
   const f = await fixture();
   await writeFile(join(f.dir, "module.json"), "{");
-  expect(await f.submit()).toMatchObject({ moduleId: null, hash: "", status: "rejected" });
+  expect(await f.submit()).toMatchObject({ moduleId: null, hash: expect.stringMatching(/^[a-f0-9]{64}$/), status: "rejected" });
   expect(await f.db.module.count()).toBe(0);
   await expect(stat(join(f.dataDir, "platform", "repos"))).rejects.toMatchObject({ code: "ENOENT" });
 });

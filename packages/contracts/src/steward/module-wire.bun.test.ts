@@ -7,6 +7,7 @@ import { moduleWireMessageSchema, moduleWireTransport } from "./module-wire";
 const committed = z.fromJSONSchema(wire as unknown as Parameters<typeof z.fromJSONSchema>[0]);
 const token = "a".repeat(64), now = "2026-11-09T12:00:00.000Z";
 const accepted = [
+  { id: "call-1", method: "call", params: { target: "modules.list" } },
   { type: "auth", version: 1, token },
   { type: "ready", version: 1 },
   { type: "http-ready", endpoint: "http://127.0.0.1:1" },
@@ -36,7 +37,6 @@ const rejected = [
   { id: "", ping: true },
   { id: "schedule-event", event: { trigger: { kind: "schedule", id: "daily", firedAt: now }, now, params: {} } },
   { id: "event-1", result: { handled: true } },
-  { id: "call-1", method: "call", params: { target: "modules.list" } },
   { id: "call-1", method: "call", params: { target: "modules.list", owner: "injected" } },
   { id: "call-1", error: { code: "arbitrary", message: "Invalid error" } },
   { id: "call-proof", error: { code: "unavailable", message: "Refused", reason: "arbitrary" } },

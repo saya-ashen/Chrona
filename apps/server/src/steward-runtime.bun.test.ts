@@ -90,24 +90,23 @@ test("runtime forwards thrown and stage failures to onError", async () => {
 
 test("runtime logs tick failures without onError and keeps health diagnostics private", async () => {
   const db = testDb({ injectedAgent: false }), dataDir = mkdtempSync(join(tmpdir(), "chrona-runtime-diagnostics-"));
-  const runtime = createStewardRuntime(db, { dataDir });
   const error = new Error("runtime storage failed token=private-runtime-fixture");
+  const faultyDb = db.$extends({ query: { workspace: { findMany() { throw error; } } } });
+  const runtime = createStewardRuntime(faultyDb as typeof db, { dataDir });
   const log = spyOn(console, "error").mockImplementation(() => {});
   const tick = spyOn(runtime.service, "tick");
-  const workspaces = spyOn(db.workspace, "findMany");
   try {
     tick.mockRejectedValueOnce(error);
     await runtime.tickOnce();
     tick.mockResolvedValueOnce({ failures: [{ workspaceId: "w", stage: "modules", error }] });
     await runtime.tickOnce();
-    workspaces.mockRejectedValueOnce(error);
     expect((await runtime.health()).provider).toEqual({ name: "registered", available: false, sandboxed: false });
     const messages = log.mock.calls.map(([value]) => String(value));
     expect(messages.filter(value => value.includes('"event":"tick_failed"'))).toHaveLength(2);
     expect(messages.some(value => value.includes('"event":"provider_health_failed"') && value.includes("runtime storage failed"))).toBe(true);
     expect(messages.join("\n")).not.toContain("private-runtime-fixture");
   } finally {
-    tick.mockRestore(); workspaces.mockRestore(); log.mockRestore();
+    tick.mockRestore(); log.mockRestore();
     await runtime.stop(); await db.$disconnect(); rmSync(dataDir, { recursive: true, force: true });
   }
 });

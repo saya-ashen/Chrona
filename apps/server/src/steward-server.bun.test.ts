@@ -24,7 +24,7 @@ test("health and database readiness do not require an execution engine", async (
   const app = await createServerApp();
   const health = await app.request("/health");
   expect(health.status).toBe(200);
-  expect((await health.json()).provider).toEqual({ available: false, name: "unconfigured", sandboxed: false });
+  expect((await health.json()).provider).toEqual({ available: false, name: "registered", sandboxed: false });
   expect(await (await app.request("/ready")).json()).toEqual({ status: "ready" });
 });
 

@@ -98,7 +98,7 @@ export const agent: SystemModule = {
       if (admission.perform) {
         const binding = await runProviderBinding(ports, workspaceId, args.runId), handle = liveRuns.get(args.runId);
         if (handle) await handle.abort();
-        else if (await ports.db.providerLaunch.findUnique({ where: { runId: args.runId } })) await callProviderEndpoint(ports, workspaceId, binding, "abort", { operationId: args.runId }, `provider-stop:${args.runId}:${call.key}`);
+        else if (await ports.db.providerLaunch.findUnique({ where: { runId: args.runId } })) await callProviderEndpoint(ports, workspaceId, { ...binding, requestKey: `provider-stop:${args.runId}:${call.key}` }, "abort", { operationId: args.runId });
         await admitContextPrimitive(ports, principal, "interrupt", command, true);
         const status = await callProviderEndpoint(ports, workspaceId, binding, "status", { operationId: args.runId }).catch(error => {
           console.error(JSON.stringify({ component: "agent", event: "stop_status.failed", runId: args.runId, error: String(error) }));
@@ -118,7 +118,7 @@ export const agent: SystemModule = {
       const admission = await admitContextPrimitive(ports, principal, "native", command) as { perform: boolean; result: unknown };
       if (!admission.perform) return json(admission.result);
       if (!await ports.db.providerLaunch.findUnique({ where: { runId: args.runId } })) throw new CallError("conflict", "Provider operation has not started");
-      const output = providerNativeOutput.parse(await callProviderEndpoint(ports, workspaceId, binding, "native", { operationId: args.runId, request: args.request }, `provider-native:${args.runId}:${call.key}`));
+      const output = providerNativeOutput.parse(await callProviderEndpoint(ports, workspaceId, { ...binding, requestKey: `provider-native:${args.runId}:${call.key}` }, "native", { operationId: args.runId, request: args.request }));
       const result = providerNativeOutput.parse(maskProviderPayload(output));
       await admitContextPrimitive(ports, principal, "native", command, true, { perform: false, operationId: args.runId, result } as Prisma.InputJsonValue);
       return json(result);

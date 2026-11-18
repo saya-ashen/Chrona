@@ -10,7 +10,8 @@ export async function ensureDefaultWorkspace(db: PrismaClient) {
 }
 
 /** Initialize storage before importing the Prisma-backed runtime graph. */
-export async function prepareChronaRuntime(options: { databaseUrl: string; port?: number; onError?: (error: unknown) => void; log?: (message: string) => void }) {
+export async function prepareChronaRuntime(options: { databaseUrl: string; port?: number; onError?: (error: unknown) => void;
+  log?: (message: string) => void }) {
   const databaseLock = acquireSqliteRuntimeLock(options.databaseUrl);
   const release = () => databaseLock.release();
   process.once("exit", release);

@@ -169,7 +169,7 @@ test.each([false, true])("rollback failure remains diagnosable when failure reco
   try {
     const context = moduleContext({ ...f.context.ports, db }, f.workspace.id);
     const result = await rollbackFailedStart(context, f.module.id, "candidate", f.activation.activationId);
-    expect(result).toMatchObject({ rolledBack: false, reason: expect.stringContaining("switch failed") });
+    expect({ ...result }).toMatchObject({ rolledBack: false, reason: expect.stringContaining("switch failed") });
     expect(result.reason).not.toContain("synthetic-private-value");
     const records = logged.map(line => JSON.parse(line));
     expect(records).toContainEqual(expect.objectContaining({ component: "module-generation", event: "rollback.failed", moduleId: f.module.id, activationId: f.activation.activationId, error: expect.stringContaining("switch failed") }));

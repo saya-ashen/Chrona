@@ -5,8 +5,10 @@ export function withTimerLock<T>(ports: StewardPorts, workspaceId: string, work:
   let workspaceLocks = locks.get(ports.db);
   if (!workspaceLocks) { workspaceLocks = new Map(); locks.set(ports.db, workspaceLocks); }
   const previous = workspaceLocks.get(workspaceId) ?? Promise.resolve();
-  const next = previous.catch(() => {}).then(work);
+  const next = previous.catch(error => { console.error(JSON.stringify({ component: "timer-lock", event: "operation.failed",
+    error: String(error) }));  }).then(work);
   workspaceLocks.set(workspaceId, next);
-  void next.finally(() => { if (workspaceLocks.get(workspaceId) === next) workspaceLocks.delete(workspaceId); }).catch(() => {});
+  void next.finally(() => { if (workspaceLocks.get(workspaceId) === next) workspaceLocks.delete(workspaceId); }).catch(error => {
+    console.error(JSON.stringify({ component: "timer-lock", event: "operation.failed", error: String(error) }));  });
   return next;
 }

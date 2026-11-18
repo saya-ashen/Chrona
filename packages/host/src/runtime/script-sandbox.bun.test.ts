@@ -115,7 +115,7 @@ on("tool", async () => {
     delete process.env.API_KEY;
     await Promise.race([channel.ready, handle.exited.then(exit => { throw new Error(JSON.stringify(exit) + ": " + handle!.stderr()); })]);
     const now = "2026-10-23T09:00:00.000Z";
-    expect(await channel.send({ trigger: { kind: "schedule", id: "daily", firedAt: now }, now, params: {} }, 5000)).toMatchObject({ error: "No handler for schedule" });
+    expect(await channel.send({ trigger: { kind: "timer", id: "daily", eventId: "event", timerId: "timer", timerRevision: "v1", scheduledAt: now, firedAt: now, payload: null }, now, params: {} }, 5000)).toMatchObject({ error: "No handler for timer" });
     expect(await channel.send({ trigger: { kind: "tool", id: "daily", args: {}, firedAt: now }, now, params: {} }, 5000)).toMatchObject({ result: { result: "queued" } });
     expect(await readFile(join(dataDir, "result"), "utf8")).toBe(`${codeDir}|${codeDir}|none`);
     const child = Number(await readFile(join(dataDir, "child"), "utf8"));

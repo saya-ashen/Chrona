@@ -10,8 +10,10 @@ const decision = (consecutiveFailures: number) => ({ consecutiveFailures, should
  * Unattributed executions cannot be assigned to a historical activation.
  */
 export async function moduleFailurePolicy(db: Db, input: Activation) {
-  if (!input.activationId || (await currentModuleEvolution(db, input.workspaceId, input.moduleId, input.hash))?.activationId !== input.activationId) return null;
-  const row = await db.moduleExecutionResult.findFirst({ where: { moduleId: input.moduleId, activationId: input.activationId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] });
+  if (!input.activationId || (await currentModuleEvolution(db, input.workspaceId, input.moduleId,
+    input.hash))?.activationId !== input.activationId) return null;
+  const row = await db.moduleExecutionResult.findFirst({ where: { moduleId: input.moduleId, activationId: input.activationId }, orderBy: [{
+    createdAt: "desc" }, { id: "desc" }] });
   return { ...decision(row?.consecutiveFailures ?? 0), createdAt: row?.createdAt };
 }
 

@@ -1,4 +1,4 @@
-import { seedTestModuleRelease } from "../__testing__/module-release-test-fixture";
+import { installTestModuleVersion, seedTestModuleRelease } from "../__testing__/module-release-test-fixture";
 import { afterEach, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -147,8 +147,9 @@ test("a module caller with a replaced hash loses its declared secret access afte
   f.ports.secrets = async () => ({ token: "private-token" });
   const origin = { workspaceId: f.workspace.id, caller: { kind: "module" as const, moduleId: f.moduleId, module: "price-watch", hash: f.hash }, chain: [], path: [] };
   expect(await callSync(f.ports, origin, "secrets.get", { name: "demo_key" })).toMatchObject({ output: { value: { token: "private-token" } } });
-  await f.db.moduleVersion.create({ data: { moduleId: f.moduleId, hash: "replacement", status: "approved", source: "user", manifest, intent: {}, report: {} } });
-  await f.service.modules.rollback(f.moduleId, "replacement");
+  const replacement = await installTestModuleVersion(f.ports, { id: f.moduleId, activeHash: f.hash }, manifest, "replacement");
+  await f.db.module.update({ where: { id: f.moduleId }, data: { activeHash: f.hash } });
+  await f.service.modules.rollback(f.moduleId, replacement);
   await expect(callSync(f.ports, origin, "secrets.get", { name: "demo_key" })).rejects.toMatchObject({ code: "forbidden" });
   expect(f.calls).toHaveLength(0);
   expect(await f.db.moduleRun.count()).toBe(0);

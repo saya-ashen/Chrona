@@ -1,3 +1,4 @@
+import { installTestModuleVersion } from "../__testing__/module-release-test-fixture";
 import { expect } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -39,10 +40,10 @@ export async function approvedCompletionFixture(cleanups: (() => Promise<void>)[
   cleanups.push(async () => { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); await rm(dirname(databases.find(row => row.name === "main")!.file), { recursive: true, force: true }); });
   const backend = await db.module.create({ data: { workspaceId, name: "approved-completion-provider", status: "active", activeHash: "provider-v1" } });
   const tools = Object.values(declaration.endpoints).map(name => ({ name, description: name, visibility: ["kernel"], parameters: { type: "object", properties: name === "health" ? {} : name === "complete" ? { commandKey: string, prompt: string, maxOutputTokens: { type: "number" }, timeoutMs: { type: "number" } } : { operationId: string } }, output: {} }));
-  await db.moduleVersion.create({ data: { moduleId: backend.id, hash: backend.activeHash!, status: "approved", source: "user", manifest: moduleManifestSchema.parse({ name: backend.name, entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], tools }), intent: {}, report: {} } });
+  backend.activeHash = await installTestModuleVersion(ports, backend, moduleManifestSchema.parse({ name: backend.name, entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], tools }));
   await registerAgentProvider(ports, workspaceId, { kind: "module", module: backend.name, moduleId: backend.id, hash: backend.activeHash! }, declaration);
   const callerModule = await db.module.create({ data: { workspaceId, name: "completion-caller", status: "active", activeHash: "caller-v1" } });
-  await db.moduleVersion.create({ data: { moduleId: callerModule.id, hash: callerModule.activeHash!, status: "approved", source: "user", manifest: moduleManifestSchema.parse({ name: callerModule.name, entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], uses: ["agent.run", "agent.read", "agent.stop"], model: { tier: "any", maxCalls: 4, maxOutputTokens: 20 } }), intent: {}, report: {} } });
+  callerModule.activeHash = await installTestModuleVersion(ports, callerModule, moduleManifestSchema.parse({ name: callerModule.name, entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], uses: ["agent.run", "agent.read", "agent.stop"], model: { tier: "any", maxCalls: 4, maxOutputTokens: 20 } }));
   const caller = { kind: "module" as const, module: callerModule.name, moduleId: callerModule.id, hash: callerModule.activeHash! };
   const invoke = (name: string, args: Record<string, unknown>, key = name) => agent.handle({ ports, workspaceId, caller, call: { id: key, key }, run: { eventKey: "execution:late-completion" } }, name, args);
   const admitted = await invoke("run", { kind: "completion", prompt: "private prompt", providerOptions: { maxOutputTokens: 10 } }, "admit") as { runId: string };

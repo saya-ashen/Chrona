@@ -1,6 +1,6 @@
+import { installTestModuleVersion } from "../../../packages/kernel/src/__testing__/module-release-test-fixture";
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdtemp, rm } from "node:fs/promises";
 import { isEntryModule, moduleManifestSchema } from "@chrona/contracts/steward";
 import { createServerApp } from "./app";
 import { createStewardRuntime } from "./steward-runtime";
@@ -42,10 +42,7 @@ test("generic listener preserves application authentication and replaces the tra
   const { workspaceId } = await seedWorkspace("Listen");
   const manifest = moduleManifestSchema.parse({ name: "echo", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["modules.list"], keepAlive: true, listen: "/api/echo" });
   const module = await db.module.create({ data: { workspaceId, name: "echo", activeHash: "v1", status: "active" } });
-  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest, intent: {}, source: "user", report: {}, status: "approved" } });
-  const code = join(dataDir, "platform/store/v1");
-  await mkdir(code, { recursive: true });
-  await writeFile(join(code, "index.ts"), `import { chrona } from "chrona";
+  await installTestModuleVersion({ db, dataDir }, module, manifest, "listener", `import { chrona } from "chrona";
 chrona.serve(async request => {
   const apps = await chrona.call("modules.list");
   return Response.json({ path: new URL(request.url).pathname, query: new URL(request.url).search, auth: request.headers.get("authorization"), cookie: request.headers.get("cookie"), transportToken: request.headers.get("x-chrona-module-token"), body: await request.text(), apps: Array.isArray(apps.items) }, { headers: { "set-cookie": "module=session" } });

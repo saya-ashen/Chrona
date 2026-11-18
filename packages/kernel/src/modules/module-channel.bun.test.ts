@@ -4,7 +4,7 @@ import { createModuleChannel } from "./module-channel";
 import type { CallScope } from "./module-supervisor-state";
 
 const now = "2026-10-22T09:00:00.000Z";
-const event = { trigger: { kind: "schedule" as const, id: "daily", firedAt: now }, now, params: {} };
+const event = { trigger: { kind: "timer" as const, id: "daily", eventId: "event", timerId: "timer", timerRevision: "v1", scheduledAt: now, firedAt: now, payload: null }, now, params: {} };
 function lines(socket: Socket) {
   let buffer = "";
   const values: unknown[] = [], waiters: ((value: unknown) => void)[] = [];
@@ -67,8 +67,8 @@ test("channel validates calls and event replies, then recovers", async () => {
     f.socket.write(JSON.stringify({ id: message.id, result: { unexpected: true } }) + "\n");
     f.socket.write(JSON.stringify({ id: "call", method: "call", params: { target: "modules.describe", args: { prompt: "hello" }, mode: "async", key: "key" } }) + "\n");
     expect(await f.next()).toEqual({ id: "call", result: { callId: "c1", status: "queued" } });
-    f.socket.write(JSON.stringify({ id: message.id, result: { handled: true, result: 42 } }) + "\n");
-    expect(await result).toEqual({ id: message.id, result: { handled: true, result: 42 } });
+    f.socket.write(JSON.stringify({ id: message.id, result: { result: 42 } }) + "\n");
+    expect(await result).toEqual({ id: message.id, result: { result: 42 } });
     expect(f.calls).toHaveLength(1);
     expect(f.channel.diagnostics()).toEqual(["Invalid module call", "Invalid module call", "Invalid event reply"]);
   } finally { await f.close(); }
@@ -205,7 +205,7 @@ test("an early SDK reply cannot conceal a dispatch persistence failure", async (
     const response = f.channel.send(event, 1000, async send => { send(); await committed; });
     const failure = response.catch(error => error as Error & { written: boolean });
     const message = await f.next() as { id: string };
-    f.socket.write(JSON.stringify({ id: message.id, result: { handled: true } }) + "\n");
+    f.socket.write(JSON.stringify({ id: message.id, result: {} }) + "\n");
     rejectDispatch(new Error("dispatch commit failed"));
     expect(await failure).toMatchObject({ message: "dispatch commit failed", written: true });
   } finally { await f.close(); }

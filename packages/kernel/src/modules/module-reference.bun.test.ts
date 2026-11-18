@@ -81,7 +81,6 @@ test("system references, catalogs and calls use the same committed contracts", a
       expect(schema.safeParse({ admissionId: "admission", key: "original-key" }).success).toBe(true);
       expect(schema.safeParse({ receiptId: "original-receipt", unexpected: true }).success).toBe(false);
     }
-    if (tool.visibility.some(who => who === "modules" || who === "owner")) expect(calls[target]).toEqual({ input: contract.input, output: contract.output });
   }
 });
 

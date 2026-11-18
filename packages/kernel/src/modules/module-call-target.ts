@@ -16,7 +16,8 @@ export function assertExpectedTarget(resolved: Target | CallError, expected?: Ex
   const parsed = expectedModuleTargetSchema.safeParse(expected);
   if (!parsed.success) throw new CallError("invalid", "Invalid expected target identity");
   if (resolved instanceof CallError || resolved.module.id !== parsed.data.moduleId ||
-    parsed.data.hash !== undefined && resolved.module.activeHash !== parsed.data.hash) throw new CallError("conflict", "Registered target identity or version changed; register again");
+    parsed.data.hash !== undefined && resolved.module.activeHash !== parsed.data.hash) throw new CallError("conflict",
+      "Registered target identity or version changed; register again");
 }
 /** Kernel-only closure used at the supervisor's final never-sent boundary. */
 export function targetFence(ports: StewardPorts, workspaceId: string, resolved: Target, caller: Caller) {
@@ -41,9 +42,11 @@ const differentBinding = (binding: { moduleId: string | null }, current: { modul
   binding.moduleId !== null && binding.moduleId !== current.moduleId;
 const differentActivation = (active: Target | CallError, resolved: Target) =>
   active instanceof CallError || active.module.id !== resolved.module.id || active.module.activeHash !== resolved.module.activeHash;
-export async function checkInvocationTarget(ports: StewardPorts, row: { id: string; workspaceId: string; leaseToken: string | null; target: string; tool: string }, resolved: Target) {
+export async function checkInvocationTarget(ports: StewardPorts, row: { id: string; workspaceId: string; leaseToken: string | null;
+  target: string; tool: string }, resolved: Target) {
   return ports.db.$transaction(async tx => {
-    const previous = await tx.moduleInvocation.findFirst({ where: { id: row.id, workspaceId: row.workspaceId, status: "running", leaseToken: row.leaseToken } });
+    const previous = await tx.moduleInvocation.findFirst({ where: { id: row.id, workspaceId: row.workspaceId, status: "running",
+      leaseToken: row.leaseToken } });
     if (!previous?.targetBound) return false;
     const current = { moduleId: resolved.module.id };
     const binding = { moduleId: previous.targetModuleId };
@@ -53,7 +56,8 @@ export async function checkInvocationTarget(ports: StewardPorts, row: { id: stri
     const active = await resolveTarget(tx, row.workspaceId, `${row.target}.${row.tool}`);
     if (differentActivation(active, resolved)) return false;
 
-    await tx.moduleInvocation.update({ where: { id: row.id }, data: { idempotent: resolved.tool.idempotent, targetModuleId: current.moduleId, targetContractHash: null } });
+    await tx.moduleInvocation.update({ where: { id: row.id }, data: { idempotent: resolved.tool.idempotent,
+      targetModuleId: current.moduleId, targetContractHash: null } });
     return true;
   });
 }
@@ -84,7 +88,8 @@ async function resolveReleaseTarget(db: Db, workspaceId: string, target: string,
     if (conflict) return new CallError("conflict", `Local capability ${name.module} conflicts with an installed application`);
   }
   const tool = system.tools.find(candidate => candidate.name === name.tool);
-  return tool ? { module: { id: `${local ? "local" : "system"}:${system.name}`, name: system.name, activeHash: "system", workspaceId }, tool, system } : new CallError("not_found", `Tool ${target} not found`);
+  return tool ? { module: { id: `${local ? "local" : "system"}:${system.name}`, name: system.name, activeHash: "system", workspaceId },
+    tool, system } : new CallError("not_found", `Tool ${target} not found`);
 }
 export async function resolveTarget(db: Db, workspaceId: string, target: string): Promise<Target | CallError> {
   const name = splitTarget(target);
@@ -103,5 +108,6 @@ export async function resolveTarget(db: Db, workspaceId: string, target: string)
 
 /** An id-based route must still resolve to that exact application. */
 export function assertRoutedIdentity(requested: RoutedTarget, resolved: Target | CallError) {
-  if (typeof requested !== "string" && (resolved instanceof CallError || requested.moduleId !== resolved.module.id)) throw new CallError("conflict", "Resolved target identity changed");
+  if (typeof requested !== "string" && (resolved instanceof CallError ||
+    requested.moduleId !== resolved.module.id)) throw new CallError("conflict", "Resolved target identity changed");
 }

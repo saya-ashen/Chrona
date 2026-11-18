@@ -1,5 +1,6 @@
 import type { PrismaClient, Prisma } from "@chrona/db";
-import { providerInteractionSchema, providerProgressSchema, providerResourcesSchema, providerRunViewSchema, providerUsageSchema, type ProviderInteraction, type ProviderRunView, type ProviderQuestion } from "@chrona/contracts/steward";
+import { providerInteractionSchema, providerProgressSchema, providerResourcesSchema, providerRunViewSchema, providerUsageSchema,
+  type ProviderInteraction, type ProviderRunView, type ProviderQuestion } from "@chrona/contracts/steward";
 import { providerRequestStatus, providerRunActive } from "@chrona/domain/steward/provider";
 import { appendRunEventIn } from "../execution/run-events";
 import type { StewardPorts } from "../ports";
@@ -25,7 +26,9 @@ function eventValue(row: { payload: unknown }) {
   const details = row.payload as { type?: unknown; value?: unknown; at?: string } | null;
   return details ?? {};
 }
-export async function providerRuns(ctx: RecordContext, { sessionId, ids }: { sessionId?: string; ids?: string[] }, connected: (id: string) => boolean, waiting: (id: string) => boolean, liveQuestion: (id: string) => ProviderQuestion | null = () => null): Promise<ProviderRunView[]>  {
+export async function providerRuns(ctx: RecordContext, { sessionId, ids }: { sessionId?: string; ids?: string[] },
+  connected: (id: string) => boolean, waiting: (id: string) => boolean, liveQuestion: (id: string) => ProviderQuestion |
+  null = () => null): Promise<ProviderRunView[]>  {
   const { db, workspaceId, now } = ctx;
   const scope = { workspaceId, ...(sessionId ? { sessionId } : {}) };
   const [active, recent] = ids ? [[], await db.run.findMany({ where: { ...scope, id: { in: ids } } })] : await Promise.all([
@@ -39,15 +42,18 @@ export async function providerRuns(ctx: RecordContext, { sessionId, ids }: { ses
       db.runInteraction.findMany({ where: { runId: run.id }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: 12 }),
     ]);
     const records = latest.filter(row => row !== null);
-    const questions = requested.flatMap(row => { const parsed = providerInteractionSchema.safeParse(row.request); return parsed.success ? [parsed.data] : []; });
+    const questions = requested.flatMap(row => { const parsed = providerInteractionSchema.safeParse(row.request);
+      return parsed.success ? [parsed.data] : []; });
     const alive = providerRunActive(run, connected(run.id) && !run.cancelRequestedAt, now());
     const interactions = questions.map(question => {
       const receipt = requested.find(row => row.id === question.id);
-      const status = providerRequestStatus(question, receipt?.status === "pending" ? undefined : receipt?.status as ProviderInteraction["status"], alive, waiting(question.id), now());
+      const status = providerRequestStatus(question,
+        receipt?.status === "pending" ? undefined : receipt?.status as ProviderInteraction["status"], alive, waiting(question.id), now());
       return { ...question, status, question: status === "pending" ? liveQuestion(question.id) ?? question.question : question.question };
     });
     const last = (type: string) => records.map(eventValue).findLast(value => value.type === type)?.value;
-    const progress = providerProgressSchema.safeParse(last("progress")), usage = providerUsageSchema.safeParse(last("usage")), resources = providerResourcesSchema.safeParse(last("resources"));
+    const progress = providerProgressSchema.safeParse(last("progress")), usage = providerUsageSchema.safeParse(last("usage")),
+      resources = providerResourcesSchema.safeParse(last("resources"));
     return providerRunViewSchema.parse({ id: run.id, sessionId: run.sessionId, sessionTitle: null, active: alive, status: run.status,
       progress: progress.success ? progress.data : null, usage: usage.success ? usage.data : null, resources: resources.success ? resources.data : null,
       interactions, updatedAt: (run.endedAt ?? run.startedAt ?? run.createdAt).toISOString() });

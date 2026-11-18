@@ -19,7 +19,7 @@ export function providerStartGate() {
   };
   // Tick observes the real Provider promise for exit evidence; this cancellation facade
   // can outlive its consumers. Keep its rejection observable without an unhandled promise.
-  void handle.done.catch(() => {});
+  void handle.done.catch(error => { console.error(JSON.stringify({ component: "provider-start", event: "operation.failed", error: String(error) }));  });
   return { handle, stopped: () => stopped, fail: () => resolve(null), attach(value: Handle) {
     active = value;
     if (!stopped) resolve(value);

@@ -1,3 +1,4 @@
+import { installTestModuleVersion } from "../__testing__/module-release-test-fixture";
 import { afterEach, expect, test } from "bun:test";
 import "../modules/module-effects";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -25,7 +26,7 @@ async function fixture(handler?: Parameters<typeof testModuleProcess>[0]) {
   async function app(name: string, authority?: "owner") {
     const row = await db.module.create({ data: { workspaceId: workspace.id, name, activeHash: `${name}-v1` } });
     const manifest = moduleManifestSchema.parse({ name, authority, uses: ["*"], keepAlive: true, entry: "index.ts", tests: ["test.ts"], effects: [], tools: [{ name: "observe", description: "Observe", visibility: ["modules", "owner"], parameters: { type: "object", properties: {} }, output: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] } }] });
-    await db.moduleVersion.create({ data: { moduleId: row.id, hash: row.activeHash!, manifest, source: "user", status: "approved", intent: {}, report: {} } });
+    row.activeHash = await installTestModuleVersion(ports, row, manifest);
     const origin = { ...kernelOrigin(workspace.id), caller: { kind: "module" as const, module: name, moduleId: row.id, hash: row.activeHash! } };
     return { row, origin, manifest };
   }
@@ -57,7 +58,7 @@ test("cancel confirmed before process connects prevents the unsent timer", async
 test("slow handlers cannot backdate another application wake admission", async () => {
   const actualTimes: string[] = [];
   const f = await fixture(async (_event, _call, input) => {
-    if (input.codeDir.endsWith("first-clock-v1")) f.advance(60_000);
+    if (input.codeDir.endsWith(first.row.activeHash!)) f.advance(60_000);
     else actualTimes.push(f.ports.now().toISOString());
     return { result: { ok: true } };
   }), first = await f.app("first-clock"), second = await f.app("second-clock");

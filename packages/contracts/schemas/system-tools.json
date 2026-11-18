@@ -495,15 +495,15 @@
           "minLength": 1,
           "maxLength": 128
         },
-        "cwd": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 8192
-        },
         "prompt": {
           "type": "string",
           "minLength": 1,
           "maxLength": 200000
+        },
+        "cwd": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8192
         },
         "content": {
           "default": [],
@@ -6327,7 +6327,7 @@
         },
         "hash": {
           "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
+          "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
         }
       },
       "required": [

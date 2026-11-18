@@ -6,7 +6,8 @@ export async function startChrona() {
   await assertSafeBind(env);
   const runtime = await prepareChronaRuntime({ databaseUrl: env.DATABASE_URL, port: resolvePort(env),
     log: message => log.info("database migration", { message }),
-    onError: error => log.error("steward tick failed", { code: "STEWARD_TICK_FAILED", message: redactSensitiveText(error instanceof Error ? error.message : String(error)) }),
+    onError: error => log.error("steward tick failed", { code: "STEWARD_TICK_FAILED",
+      message: redactSensitiveText(error instanceof Error ? error.message : String(error)) }),
   });
   let http: { stop(): void };
   try {
@@ -24,7 +25,8 @@ export async function startChrona() {
     if (stopping) return;
     stopping = true;
     log.info("shutdown started", { signal });
-    const deadline = setTimeout(() => { log.error("shutdown timed out; interrupted work will require recovery", { code: "SHUTDOWN_TIMEOUT" }); process.exit(1); }, 30_000);
+    const deadline = setTimeout(() => { log.error("shutdown timed out; interrupted work will require recovery", {
+      code: "SHUTDOWN_TIMEOUT" }); process.exit(1); }, 30_000);
     http.stop();
     try { await runtime.stop(); }
     catch (error) { log.error("runtime shutdown failed", { error: String(error) }); clearTimeout(deadline); process.exit(1); }

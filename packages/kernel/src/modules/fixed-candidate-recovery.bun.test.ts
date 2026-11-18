@@ -116,7 +116,7 @@ test("fixed migration runs only after approval and retains original data until t
 
 test("automatic fixed activation waits for unknown Agent stop and resumes the same receipt after actual stop", async () => {
   const f = await fixture(false, false);
-  const session = await f.db.agentContext.create({ data: { workspaceId: f.workspace.id, ownerId: "owner", moduleId: f.module.id, hash: f.module.activeHash! } });
+  const session = await f.db.agentContext.create({ data: { workspaceId: f.workspace.id, ownerId: "owner", moduleId: f.module.id, hash: f.baselineHash } });
 
   const run = await f.db.run.create({ data: { workspaceId: f.workspace.id, sessionId: session.id, lane: "background", trigger: "module", provider: "fixture", tokenHash: crypto.randomUUID(), prompt: "offline", cwd: f.ports.dataDir, status: "running", startedAt: f.ports.now() } });
   const runs = createRuns(f.ports, f.workspace.id);

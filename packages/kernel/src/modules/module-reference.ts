@@ -8,21 +8,25 @@ import { StewardError } from "../errors";
 type Reference = { target: string; source: { kind: "system" | "module"; hash: string | null }; tool: SystemTool | Tool };
 /** Batch only current approved versions, without loading historical manifests or runtime evidence. */
 export async function activeModuleReferences(ports: StewardPorts, workspaceId: string) {
-  const modules = (await ports.db.module.findMany({ where: { workspaceId, status: "active", activeHash: { not: null } }, orderBy: { name: "asc" }, select: { id: true, name: true, activeHash: true } }));
+  const modules = (await ports.db.module.findMany({ where: { workspaceId, status: "active", activeHash: { not: null } }, orderBy: {
+    name: "asc" }, select: { id: true, name: true, activeHash: true } }));
   if (!modules.length) return [];
   const versions = [];
   for (let offset = 0; offset < modules.length; offset += 200) {
-    versions.push(...await ports.db.moduleVersion.findMany({ where: { status: "approved", OR: modules.slice(offset, offset + 200).map(module => ({ moduleId: module.id, hash: module.activeHash! })) }, select: { moduleId: true, hash: true, manifest: true } }));
+    versions.push(...await ports.db.moduleVersion.findMany({ where: { status: "approved", OR: modules.slice(offset,
+      offset + 200).map(module => ({ moduleId: module.id, hash: module.activeHash! })) }, select: { moduleId: true, hash: true, manifest: true } }));
   }
   const byModule = new Map(versions.map(version => [version.moduleId, version]));
   return modules.flatMap(module => {
     const version = byModule.get(module.id), manifest = moduleManifestSchema.safeParse(version?.manifest).data;
     if (!manifest || version?.hash !== module.activeHash) return [];
-    return manifest.tools.map(tool => ({ target: `${module.name}.${tool.name}`, source: { kind: "module" as const, hash: module.activeHash! }, moduleId: module.id, tool }));
+    return manifest.tools.map(tool => ({ target: `${module.name}.${tool.name}`, source: { kind: "module" as const,
+      hash: module.activeHash! }, moduleId: module.id, tool }));
   });
 }
 export async function references(ports: StewardPorts, workspaceId: string): Promise<Reference[]> {
-  return [...listSystemModules().flatMap(module => module.tools.map(tool => ({ target: `${module.name}.${tool.name}`, source: { kind: "system" as const, hash: null }, tool }))), ...await activeModuleReferences(ports, workspaceId)];
+  return [...listSystemModules().flatMap(module => module.tools.map(tool => ({ target: `${module.name}.${tool.name}`, source: {
+    kind: "system" as const, hash: null }, tool }))), ...await activeModuleReferences(ports, workspaceId)];
 }
 
 async function exactReference(ports: StewardPorts, workspaceId: string, target: string): Promise<Reference | undefined> {
@@ -34,9 +38,11 @@ async function exactReference(ports: StewardPorts, workspaceId: string, target: 
     return tool ? { target, source: { kind: "system", hash: null }, tool } : undefined;
   }
 
-  const module = await ports.db.module.findFirst({ where: { workspaceId, name, status: "active", activeHash: { not: null } }, select: { id: true, activeHash: true } });
+  const module = await ports.db.module.findFirst({ where: { workspaceId, name, status: "active", activeHash: { not: null } }, select: {
+    id: true, activeHash: true } });
   if (!module?.activeHash) return;
-  const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } }, select: { status: true, manifest: true } });
+  const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } },
+    select: { status: true, manifest: true } });
   if (version?.status !== "approved") return;
   const tool = moduleManifestSchema.safeParse(version.manifest).data?.tools.find(tool => tool.name === toolName);
   return tool ? { target, source: { kind: "module", hash: module.activeHash }, tool } : undefined;
@@ -61,5 +67,6 @@ export async function interfaceReference(ports: StewardPorts, workspaceId: strin
     return referenceContract(target, entry);
   }
   // The index names interfaces; contracts come one target at a time (all of them overflowed the Provider's tool result).
-  return (await references(ports, workspaceId)).filter(entry => canRead(entry.tool)).map(({ target, source, tool }) => ({ target, source, description: tool.description }));
+  return (await references(ports, workspaceId)).filter(entry => canRead(entry.tool)).map(({ target, source, tool }) => ({ target, source,
+    description: tool.description }));
 }

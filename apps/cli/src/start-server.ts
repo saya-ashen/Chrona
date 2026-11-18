@@ -106,8 +106,8 @@ function openBrowser(host: string, port: number) {
     } else {
       Bun.spawn(["xdg-open", url], { stdio: ["ignore", "ignore", "ignore"] });
     }
-  } catch {
-    // best-effort
+  } catch (error) {
+    console.error(JSON.stringify({ component: "cli", event: "browser.open_failed", error: String(error) }));
   }
 }
 

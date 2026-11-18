@@ -147,7 +147,7 @@ test("preflight CLI observes the source entry's implicit package fallback withou
   await mkdir(join(resources, "packages/db/prisma/migrations"), { recursive: true });
   const startup = await readFile(join(import.meta.dir, "../apps/cli/src/start-server.ts"), "utf8");
   // Keep the real launcher's default resolution in the fixture; only relocate its dependency import.
-  await writeFile(join(sourceDir, "start-server.ts"), startup.replace('"@chrona/db/sqlite-url"', JSON.stringify(join(import.meta.dir, "../packages/db/src/sqlite-url.ts"))));
+  await writeFile(join(sourceDir, "start-server.ts"), startup.replace('"@chrona/db/sqlite-url"', JSON.stringify(join(import.meta.dir, "../packages/db/src/sqlite-url.ts"))).replace('"@chrona/runtime-config"', JSON.stringify(join(import.meta.dir, "../packages/runtime-config/src/runtime-config.ts"))));
   await writeFile(join(sourceDir, "bun-entry.ts"), `import { findResourceDir } from './start-server';
     import { acquireSqliteRuntimeLock } from ${JSON.stringify(join(import.meta.dir, "../packages/db/src/sqlite-runtime-lock.ts"))};
     const lock = acquireSqliteRuntimeLock(process.env.DATABASE_URL);

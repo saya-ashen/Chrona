@@ -1,3 +1,4 @@
+import { installTestModuleVersion } from "../__testing__/module-release-test-fixture";
 import { afterEach, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 
@@ -71,7 +72,7 @@ test("trusted release binds manifest and exact code hash; missing, drift, mismat
   await writeFile(join(release.codeDir, "index.ts"), "changed\n");
   await expect(resolveExternalRelease(f.ports, "pi", release.hash)).rejects.toMatchObject({ reason: "release_drift" });
   await symlink(join(release.codeDir, "index.ts"), join(release.codeDir, "leak.ts"));
-  await expect(resolveExternalRelease(f.ports, "pi")).rejects.toMatchObject({ code: "forbidden" });
+  await expect(resolveExternalRelease(f.ports, "pi")).rejects.toMatchObject({ reason: "release_drift" });
   await writeFile(join(f.ports.moduleExternalResources!, "qq/module.json"), JSON.stringify(fixtures.external.manifest));
   await expect(resolveExternalRelease(f.ports, "qq")).rejects.toMatchObject({ reason: "invalid_release" });
 });
@@ -110,7 +111,7 @@ test("queued callbacks reject same-name reinstalls and invalid arguments but sur
         output: {}
     }] });
     const row = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "alpha", activeHash: "a".repeat(64) } });
-    await f.db.moduleVersion.create({ data: { moduleId: row.id, hash: row.activeHash!, status: "approved", source: "user", manifest, intent: {}, report: {} } });
+    row.activeHash = await installTestModuleVersion(f.ports, row, manifest);
     const call = await enqueueCall({ tx: f.db, ports: f.ports, origin: kernelOrigin(f.workspaceId), target: "alpha.receive", raw: {} }, { key: "callback-one" });
     expect(await f.db.moduleInvocation.findUnique({ where: { id: call.callId } })).toMatchObject({ targetModuleId: row.id, targetContractHash: null });
     if (change === "reinstall") {

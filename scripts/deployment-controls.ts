@@ -87,7 +87,7 @@ function processObservation(pid: number): DeploymentReport["process"] {
   const envValue = (key: string) => environment.find(value => value.startsWith(`${key}=`))?.slice(key.length + 1);
   const command = readFileSync(`${processRoot}/cmdline`).toString().split("\0").filter(Boolean);
   const sourceEntry = command.map(value => resolve(cwd, value)).find(value => value.endsWith("/apps/cli/src/bun-entry.ts"));
-  const packageDir = envValue("CHRONA_PACKAGE_DIR") ?? (sourceEntry ? resolve(dirname(sourceEntry), "../..") : undefined);
+  const packageDir = envValue("CHRONA_PACKAGE_DIR") ?? (sourceEntry ? resolve(dirname(sourceEntry), "../../..") : undefined);
   const resourceRoot = resolve(cwd, findResourceDir({
     cwd, executable, argv0: command[0] ?? executable, resourceDir: envValue("CHRONA_RESOURCE_DIR"), packageDir,
   }));

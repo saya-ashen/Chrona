@@ -1,3 +1,4 @@
+import { installTestModuleVersion } from "../__testing__/module-release-test-fixture";
 import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -25,10 +26,11 @@ async function fixture() {
   async function moduleNamed(name: string, part: Record<string, unknown>) {
     const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], ...part });
     const module = await db.module.create({ data: { workspaceId: w, name, activeHash: `${name}-1` } });
-    await db.moduleVersion.create({ data: { moduleId: module.id, hash: `${name}-1`, manifest, source: "provider", intent: {}, report: {}, status: "approved" } });
+    const hash = await installTestModuleVersion(ports, module, manifest);
+    module.activeHash = hash;
     let id = 0;
     const call = async (target: string, args: Record<string, unknown>, async?: { key: string }) => {
-      const reply = await handleModuleCall(ports, { workspaceId: w, moduleId: module.id, hash: `${name}-1`, manifest }, moduleCallSchema.parse({ id: String(++id), method: "call", params: { target, args, ...(async ? { mode: "async", key: async.key, reply: true } : { mode: "sync", reply: false }) } }));
+      const reply = await handleModuleCall(ports, { workspaceId: w, moduleId: module.id, hash, manifest }, moduleCallSchema.parse({ id: String(++id), method: "call", params: { target, args, ...(async ? { mode: "async", key: async.key, reply: true } : { mode: "sync", reply: false }) } }));
       if ("error" in reply) throw reply.error;
       return (reply as { result: unknown }).result as Record<string, unknown> & { output?: unknown };
     };
@@ -83,7 +85,7 @@ test("approvals.request waits for the user's decision and sends it back; approve
   const call = () => f.db.moduleInvocation.findUniqueOrThrow({ where: { id: String(queued.callId) } });
   expect(await call()).toMatchObject({ status: "waiting", leaseUntil: null });
   const card = await f.db.approval.findFirstOrThrow({ where: { status: "open" } });
-  expect(card).toMatchObject({ action: "modify_external", moduleId: trader.module.id, title: "trader：开始实验", preview: "本金 2000 USDT", payload: { kind: "module_request", hash: "trader-1", call: queued.callId } });
+  expect(card).toMatchObject({ action: "modify_external", moduleId: trader.module.id, title: "trader：开始实验", preview: "本金 2000 USDT", payload: { kind: "module_request", hash: trader.module.activeHash!, call: queued.callId } });
 
   // A repeat of the same request and a recovered delivery find the same card.
   expect((await trader.call("approvals.request", { title: "开始实验", detail: "24 小时", preview: "本金 2000 USDT" }, { key: "exp-1" })).callId).toBe(queued.callId);
@@ -96,7 +98,7 @@ test("approvals.request waits for the user's decision and sends it back; approve
   await f.api.approvals.resolve(card.id, { decision: "approve", scope: "once" }, "web");
   expect(await call()).toMatchObject({ status: "succeeded", output: { approval: card.id, decision: "approved" } });
 
-  expect((await trader.call("approvals.status", { approval: card.id })).output).toMatchObject({ approval: card.id, status: "approved", hash: "trader-1" });
+  expect((await trader.call("approvals.status", { approval: card.id })).output).toMatchObject({ approval: card.id, status: "approved", hash: trader.module.activeHash! });
   await expect(other.call("approvals.status", { approval: card.id })).rejects.toMatchObject({ code: "not_found" });
 
   const second = await trader.call("approvals.request", { title: "再开一次" }, { key: "exp-2" });
@@ -118,10 +120,10 @@ test("installed identities and contracts are readable; credentials and approvals
   await web.call("secrets.set", { name: "okx_demo", value: { apiKey: "k-secret" } });
   const approval = await f.api.approvals.create({ action: "modify_external", moduleId: trader.module.id, title: "trader：开始", detail: "", preview: "", payload: {} });
   const view = ((await web.call("modules.list", {})).output as { items: unknown[] }).items;
-  expect(view).toContainEqual(expect.objectContaining({ id: trader.module.id, name: "trader", activeHash: "trader-1", origin: "external", capabilities: expect.objectContaining({ remove: true }), versions: [expect.objectContaining({ hash: "trader-1", status: "approved" })] }));
+  expect(view).toContainEqual(expect.objectContaining({ id: trader.module.id, name: "trader", activeHash: trader.module.activeHash!, origin: "external", capabilities: expect.objectContaining({ remove: true }), versions: [expect.objectContaining({ hash: trader.module.activeHash!, status: "approved" })] }));
   expect((await other.call("modules.list", {})).output).toEqual({ items: view, nextCursor: null });
-  expect((await other.call("modules.describe", { query: "trader.start" } )).output).toMatchObject({ items: [{ target: { moduleId: trader.module.id, tool: "start" }, moduleId: trader.module.id, hash: "trader-1" }] });
-  expect((await other.call("modules.describe", { target: { moduleId: trader.module.id, tool: "start" } })).output).toMatchObject({ target: { moduleId: trader.module.id, tool: "start" }, source: { kind: "module", hash: "trader-1" }, admission: { visibility: ["modules", "owner"], uses: "trader.start" } });
+  expect((await other.call("modules.describe", { query: "trader.start" } )).output).toMatchObject({ items: [{ target: { moduleId: trader.module.id, tool: "start" }, moduleId: trader.module.id, hash: trader.module.activeHash! }] });
+  expect((await other.call("modules.describe", { target: { moduleId: trader.module.id, tool: "start" } })).output).toMatchObject({ target: { moduleId: trader.module.id, tool: "start" }, source: { kind: "module", hash: trader.module.activeHash! }, admission: { visibility: ["modules", "owner"], uses: "trader.start" } });
   const credentials = ((await web.call("secrets.list", {})).output as { items: unknown[] }).items;
   const approvals = ((await web.call("approvals.list", {})).output as { items: unknown[] }).items;
   expect(credentials).toEqual([{ name: "okx_demo", configured: true, updatedAt: expect.any(String), modules: ["trader"] }]);
@@ -139,7 +141,7 @@ test.each([
 ] as const)("approval $decision converges before or after waiting (lease reentry=$reenter)", async ({ decision, reenter }) => {
   const f = await fixture();
   const app = await f.moduleNamed("requester", { uses: ["approvals.request"] });
-  const origin = { ...kernelOrigin(f.w), caller: { kind: "module" as const, module: app.module.name, moduleId: app.module.id, hash: "requester-1" } };
+  const origin = { ...kernelOrigin(f.w), caller: { kind: "module" as const, module: app.module.name, moduleId: app.module.id, hash: app.module.activeHash! } };
   type Handle = { key: string; callId: string; approvalId: string; release(): void; delivery: Promise<number> };
   const handles: Handle[] = [];
   try {
@@ -203,9 +205,9 @@ test.each(["mode", "target", "caller", "hash", "workspace"] as const)("an approv
   const f = await fixture();
   const app = await f.moduleNamed("requester", { uses: ["approvals.request"] });
   const other = await f.moduleNamed("other", { uses: ["approvals.request"] });
-  const origin = { ...kernelOrigin(f.w), caller: { kind: "module" as const, module: app.module.name, moduleId: app.module.id, hash: "requester-1" } };
+  const origin = { ...kernelOrigin(f.w), caller: { kind: "module" as const, module: app.module.name, moduleId: app.module.id, hash: app.module.activeHash! } };
   const queued = await enqueueCall({ tx: f.db, ports: f.ports, origin, target: "approvals.request", raw: { title: "bound request" } }, { key: "bound-request" });
-  const approval = await f.api.approvals.create({ action: "modify_external", moduleId: app.module.id, title: "bound approval", detail: "", preview: "", payload: { kind: "module_request", hash: "requester-1", call: queued.callId } });
+  const approval = await f.api.approvals.create({ action: "modify_external", moduleId: app.module.id, title: "bound approval", detail: "", preview: "", payload: { kind: "module_request", hash: app.module.activeHash!, call: queued.callId } });
   const changes = mismatch === "mode" ? { mode: "sync" } : mismatch === "target" ? { target: "settings", targetIdentity: "system:settings", tool: "update" }
     : mismatch === "caller" ? { callerModuleId: other.module.id, caller: `module:${other.module.id}` } : mismatch === "hash" ? { callerHash: "other-hash" }
     : { workspaceId: (await f.db.workspace.create({ data: { name: "other" } })).id };

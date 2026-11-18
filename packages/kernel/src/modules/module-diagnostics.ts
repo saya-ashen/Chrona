@@ -18,10 +18,12 @@ export const incidentSchema = z.object({
   attribution: z.enum(["activation", "unattributed", "legacy-unattributed"]).default("legacy-unattributed"),
   firstAt: z.string(), lastAt: z.string(), failures: z.number(),
   status: z.enum(["retrying", "unresolved", "verifying", "recovered"]),
-  deliveryUnknown: z.boolean(), pendingTriggers: z.array(z.string()).max(50), firstEvidence: evidenceSchema, evidence: evidenceSchema, attempts: z.array(attemptSchema),
+  deliveryUnknown: z.boolean(), pendingTriggers: z.array(z.string()).max(50), firstEvidence: evidenceSchema, evidence: evidenceSchema,
+    attempts: z.array(attemptSchema),
 });
 // activationId absent: written before step 3 (hash-only); never counted toward the current activation.
-export const moduleOutputContractFailureSchema = z.object({ hash: z.string(), activationId: z.string().nullable().optional(), tool: z.string(), callId: z.string(), at: z.string(), issues: z.array(z.string()).max(5) }).strict();
+export const moduleOutputContractFailureSchema = z.object({ hash: z.string(), activationId: z.string().nullable().optional(),
+  tool: z.string(), callId: z.string(), at: z.string(), issues: z.array(z.string()).max(5) }).strict();
 /** One light, stderr-free projection of a module's health: modules.list (`health`), modules.health summaries and details use it. */
 export const moduleHealthSummarySchema = z.object({
   module: z.string(), moduleId: z.string(), activeHash: z.string().nullable(), configuredStatus: z.string(),
@@ -33,7 +35,8 @@ export const moduleHealthSummarySchema = z.object({
     z.object({ state: z.enum(["unobserved", "backoff", "unavailable", "idle", "paused"]), pid: z.null() }),
   ]),
   /** Latest evolution record of the active hash; null when none is recorded (legacy or never activated). */
-  activation: z.object({ activationId: z.string(), hash: z.string(), status: moduleEvolutionOutcomeSchema.shape.status, activatedAt: z.string(), observedCapabilities: z.array(z.string()).max(100) }).nullable(),
+  activation: z.object({ activationId: z.string(), hash: z.string(), status: moduleEvolutionOutcomeSchema.shape.status,
+    activatedAt: z.string(), observedCapabilities: z.array(z.string()).max(100) }).nullable(),
   /** The pause policy's streak for the current activation (0 without one); not the incident total. */
   consecutiveFailures: z.number().int().nonnegative(),
   /** Latest snapshot of the current activation's incident, recovered or not; legacy hash-only incidents never appear here. */
@@ -71,7 +74,8 @@ export function diagnosticText(text: string, max = 4000, tail = false) {
 
 /** Immutable, bounded snapshots in the existing audit store; not writable through module tools. */
 export async function moduleIncidents(db: Db, workspaceId: string, moduleId: string) {
-  const rows = await db.audit.findMany({ where: { workspaceId, subjectId: moduleId, kind }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 30, select: { details: true } });
+  const rows = await db.audit.findMany({ where: { workspaceId, subjectId: moduleId, kind }, orderBy: [{ createdAt: "desc" }, {
+    id: "desc" }], take: 30, select: { details: true } });
   const found = new Map<string, ModuleIncident>();
   for (const row of rows) {
     const parsed = incidentSchema.safeParse(row.details);
@@ -85,28 +89,39 @@ async function save(db: Db, workspaceId: string, moduleId: string, incident: Mod
   const createdAt = new Date(Math.max(now.getTime(), (previous?.createdAt.getTime() ?? -Infinity) + 1));
   await db.audit.create({ data: { workspaceId, actorKey: "chrona", subjectId: moduleId, kind, createdAt, details: incident } });
 }
-export async function recordModuleOutputMismatch(db: StewardPorts["db"], input: { workspaceId: string; moduleId: string; activationId?: string | null; hash: string; tool: string; callId: string; issues: string[]; now: Date }) {
-  const item = moduleOutputContractFailureSchema.parse({ hash: input.hash, activationId: input.activationId, tool: diagnosticText(input.tool, 100), callId: input.callId.slice(0, 100), at: input.now.toISOString(), issues: input.issues.slice(0, 5).map(issue => diagnosticText(issue, 160)) });
+export async function recordModuleOutputMismatch(db: StewardPorts["db"], input: { workspaceId: string; moduleId: string;
+  activationId?: string | null; hash: string; tool: string; callId: string; issues: string[]; now: Date }) {
+  const item = moduleOutputContractFailureSchema.parse({ hash: input.hash, activationId: input.activationId,
+    tool: diagnosticText(input.tool, 100), callId: input.callId.slice(0, 100), at: input.now.toISOString(), issues: input.issues.slice(0,
+    5).map(issue => diagnosticText(issue, 160)) });
   try {
     await db.$transaction(async tx => {
-      await tx.audit.create({ data: { workspaceId: input.workspaceId, actorKey: "chrona", subjectId: input.moduleId, kind: "module_output_mismatch", createdAt: input.now, details: item } });
-      if (input.activationId) await updateModuleEvolution(tx, { workspaceId: input.workspaceId, moduleId: input.moduleId, activationId: input.activationId, hash: input.hash, status: "failed", nextAction: `输出契约校验失败（${item.tool}）；查看模块诊断并按审批流程修复。`, now: input.now });
+      await tx.audit.create({ data: { workspaceId: input.workspaceId, actorKey: "chrona", subjectId: input.moduleId,
+        kind: "module_output_mismatch", createdAt: input.now, details: item } });
+      if (input.activationId) await updateModuleEvolution(tx, { workspaceId: input.workspaceId, moduleId: input.moduleId,
+        activationId: input.activationId, hash: input.hash, status: "failed", nextAction: `输出契约校验失败（${item.tool}）；查看模块诊断并按审批流程修复。`, now: input.now });
     });
-  } catch { console.error(JSON.stringify({ component: "module-diagnostics", event: "module_output_mismatch.persist_failed", moduleId: input.moduleId, hash: input.hash, tool: item.tool, callId: item.callId, issues: item.issues })); }
+  } catch { console.error(JSON.stringify({ component: "module-diagnostics", event: "module_output_mismatch.persist_failed",
+    moduleId: input.moduleId, hash: input.hash, tool: item.tool, callId: item.callId, issues: item.issues })); }
 }
 export async function moduleOutputMismatches(db: Db, workspaceId: string, moduleId: string) {
-  const rows = await db.audit.findMany({ where: { workspaceId, subjectId: moduleId, kind: "module_output_mismatch" }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 5, select: { details: true } });
+  const rows = await db.audit.findMany({ where: { workspaceId, subjectId: moduleId, kind: "module_output_mismatch" }, orderBy: [{
+    createdAt: "desc" }, { id: "desc" }], take: 5, select: { details: true } });
   return rows.flatMap(row => { const result = moduleOutputContractFailureSchema.safeParse(row.details); return result.success ? [result.data] : []; });
 }
-type FailureInput = { workspaceId: string; moduleId: string; activationId?: string | null; hash: string; now: Date; retry: boolean; evidence: ModuleFailureEvidence };
+type FailureInput = { workspaceId: string; moduleId: string; activationId?: string | null; hash: string; now: Date; retry: boolean;
+  evidence: ModuleFailureEvidence };
 async function beginFailure(db: Db, input: FailureInput) {
   const { workspaceId, moduleId, hash, now, evidence } = input;
   if (input.activationId && (await currentModuleEvolution(db, workspaceId, moduleId, hash))?.activationId !== input.activationId) return null;
   const activationId = input.activationId ?? null;
-  const previous = (await moduleIncidents(db, workspaceId, moduleId)).find(item => item.hash === hash && item.activationId === activationId && item.attribution !== "legacy-unattributed");
-  const execution = evidence.runId ? await recordModuleExecution(db, { workspaceId, moduleId, hash, activationId, resultId: evidence.runId, outcome: "failure", now }) : null;
+  const previous = (await moduleIncidents(db, workspaceId, moduleId)).find(item => item.hash === hash &&
+    item.activationId === activationId && item.attribution !== "legacy-unattributed");
+  const execution = evidence.runId ? await recordModuleExecution(db, { workspaceId, moduleId, hash, activationId, resultId: evidence.runId,
+    outcome: "failure", now }) : null;
   if (execution?.duplicate) return null;
-  return { previous, activationId, attribution: activationId ? "activation" as const : "unattributed" as const, status: input.retry && !execution?.shouldPause ? "retrying" as const : "unresolved" as const };
+  return { previous, activationId, attribution: activationId ? "activation" as const : "unattributed" as const, status: input.retry &&
+    !execution?.shouldPause ? "retrying" as const : "unresolved" as const };
 }
 export async function recordModuleFailure(db: Db, input: FailureInput) {
   const state = await beginFailure(db, input);
@@ -121,13 +136,16 @@ export async function recordModuleFailure(db: Db, input: FailureInput) {
   const incident: ModuleIncident = {
     id: old.id, hash, activationId, revision: (old.revision ?? 0) + 1, attribution, firstAt: old.firstAt, lastAt: at, failures: old.failures + 1,
     status, deliveryUnknown: old.deliveryUnknown || evidence.delivery === "lost",
-    pendingTriggers: [...new Set([...old.pendingTriggers, evidence.triggerId])].slice(0, 49).concat(old.pendingTriggers.length >= 49 ? ["manual-verification-required"] : []),
+    pendingTriggers: [...new Set([...old.pendingTriggers, evidence.triggerId])].slice(0,
+      49).concat(old.pendingTriggers.length >= 49 ? ["manual-verification-required"] : []),
     firstEvidence: old.firstEvidence, evidence: safeEvidence,
     attempts: [...old.attempts, { at, action: "failure" as const, detail: reason }].slice(-10),
   };
   await save(db, workspaceId, moduleId, incident, now);
-  if (input.activationId) try { await updateModuleEvolution(db, { workspaceId, moduleId, activationId: input.activationId, hash, status: "failed", nextAction: "新版本运行失败；请检查故障记录，外部结果未知时先核对效果，不要直接重放。", now }); }
-  catch (error) { console.error(JSON.stringify({ component: "module-diagnostics", event: "evolution_failure.persist_failed", moduleId, hash, error: diagnosticText(String(error), 300) })); }
+  if (input.activationId) try { await updateModuleEvolution(db, { workspaceId, moduleId, activationId: input.activationId, hash,
+    status: "failed", nextAction: "新版本运行失败；请检查故障记录，外部结果未知时先核对效果，不要直接重放。", now }); }
+  catch (error) { console.error(JSON.stringify({ component: "module-diagnostics", event: "evolution_failure.persist_failed", moduleId, hash,
+    error: diagnosticText(String(error), 300) })); }
   return incident;
 }
 
@@ -137,16 +155,19 @@ async function verifyEvolution(tx: Db, input: RecoveryInput, now: Date) {
   const { workspaceId, moduleId, hash, activationId, triggerId } = input;
   if (!activationId || !triggerId) return;
   try { await updateModuleEvolution(tx, { workspaceId, moduleId, activationId, hash, capability: triggerId, now }); }
-  catch (error) { console.error(JSON.stringify({ component: "module-diagnostics", event: "evolution_verification.persist_failed", moduleId, hash, error: diagnosticText(String(error), 300) })); }
+  catch (error) { console.error(JSON.stringify({ component: "module-diagnostics", event: "evolution_verification.persist_failed", moduleId,
+    hash, error: diagnosticText(String(error), 300) })); }
 }
 async function updateIncidentRecovery(tx: Db, input: RecoveryInput, previous: ModuleIncident, now: Date) {
   const { workspaceId, moduleId, triggerId } = input;
   if (previous.status === "recovered") return;
-  const pendingTriggers = triggerId === undefined ? previous.pendingTriggers : previous.pendingTriggers.filter(item => item !== "process" && item !== triggerId);
+  const pendingTriggers = triggerId === undefined ? previous.pendingTriggers : previous.pendingTriggers.filter(item => item !== "process" &&
+    item !== triggerId);
   const verified = triggerId !== undefined && pendingTriggers.length === 0;
   if (!verified && (triggerId === undefined ? previous.status === "verifying" : pendingTriggers.length === previous.pendingTriggers.length)) return;
   const at = now.toISOString();
-  await save(tx, workspaceId, moduleId, { ...previous, revision: (previous.revision ?? 0) + 1, pendingTriggers, lastAt: at, status: verified ? "recovered" : "verifying",
+  await save(tx, workspaceId, moduleId, { ...previous, revision: (previous.revision ?? 0) + 1, pendingTriggers, lastAt: at,
+    status: verified ? "recovered" : "verifying",
     attempts: [...previous.attempts, { at, action: triggerId !== undefined ? "verified" as const : "connected" as const,
       detail: triggerId !== undefined ? `实际调用成功：${triggerId}；${verified ? "对应能力已验证" : "其他故障能力仍待验证"}；未重放失败调用` : "模块连接已建立，尚未验证原有功能" }].slice(-10),
   }, now);
@@ -161,7 +182,8 @@ export async function recordModuleRecovery(ports: Pick<StewardPorts, "db" | "now
       await recordModuleExecution(tx, { workspaceId, moduleId, hash, activationId, resultId: input.runId, outcome: "success", now });
     }
     await verifyEvolution(tx, input, now);
-    const previous = (await moduleIncidents(tx, workspaceId, moduleId)).find(item => item.hash === hash && item.activationId === activationId && item.attribution !== "legacy-unattributed");
+    const previous = (await moduleIncidents(tx, workspaceId, moduleId)).find(item => item.hash === hash &&
+      item.activationId === activationId && item.attribution !== "legacy-unattributed");
     if (previous) await updateIncidentRecovery(tx, input, previous, now);
   });
 }

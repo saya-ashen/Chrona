@@ -1,3 +1,4 @@
+import { installTestModuleVersion } from "../__testing__/module-release-test-fixture";
 import { afterEach, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -65,12 +66,12 @@ async function fixture(onControl?: (name: string) => Promise<void>) {
   Object.assign(startProperties, { sessionId: { type: ["string", "null"] }, deadline: { type: ["string", "null"] }, providerOptions: object, searchTools: { type: "boolean" }, images: { type: "array", items: object }, extraTools: { type: "array", items: string }, hostPaths: { type: "array", items: string }, content: { type: "array", items: object } });
   const backend = await db.module.create({ data: { workspaceId, name: "test-backend", status: "active", activeHash: "backend-v1" } });
   const manifest = moduleManifestSchema.parse({ name: backend.name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: ["runtime-callback.event"], tools: Object.values(declaration.endpoints).map(name => ({ name, description: name, visibility: ["kernel"], parameters: { type: "object", properties: name === "health" ? {} : name === "start" ? startProperties : name === "native" ? { operationId: string, request: object } : name === "transcript" ? { sessionDir: string, limit: { type: "number" } } : name === "complete" ? { commandKey: string, prompt: string, system: string, model: string, thinking: string, configurationRevision: string, maxOutputTokens: { type: "number" }, timeoutMs: { type: "number" } } : { operationId: string, message: string } }, output: {} })).concat([{ name: "configure", description: "Provider configuration", visibility: ["owner"], parameters: { type: "object", properties: {} }, output: {} }]) });
-  await db.moduleVersion.create({ data: { moduleId: backend.id, hash: backend.activeHash!, manifest, source: "user", status: "approved", intent: {}, report: {} } });
+  backend.activeHash = await installTestModuleVersion(ports, backend, manifest);
   const backendCaller = { kind: "module" as const, module: backend.name, moduleId: backend.id, hash: backend.activeHash! };
   async function installCaller(name: string) {
     const row = await db.module.create({ data: { workspaceId, name, status: "active", activeHash: "caller-v1" } });
     const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: ["agent.run", "agent.native", "agent.read", "agent.write", "agent.stop"], model: { tier: "any", maxCalls: 2, maxOutputTokens: 20 } });
-    await db.moduleVersion.create({ data: { moduleId: row.id, hash: row.activeHash!, manifest, source: "user", status: "approved", intent: {}, report: {} } });
+    row.activeHash = await installTestModuleVersion(ports, row, manifest);
     return { kind: "module" as const, module: name, moduleId: row.id, hash: row.activeHash! };
   }
   const caller = await installCaller("entry-app");

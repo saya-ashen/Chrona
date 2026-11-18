@@ -9,6 +9,8 @@ export type Json = z.output<ReturnType<typeof z.json>>;
  * `run`: the module event being handled, for system modules that budget per event (provider.complete).
  * `deadline` is ms since epoch: when the caller stops waiting; system tools that wait finish by then.
  */
-export type CallOrigin = { workspaceId: string; caller: Caller; chain: string[]; path: string[]; run?: { moduleRunId?: string; eventKey?: string; executionRunId?: string }; deadline?: number };
+export type CallOrigin = { workspaceId: string; caller: Caller; chain: string[]; path: string[]; run?: { moduleRunId?: string;
+  eventKey?: string; executionRunId?: string }; deadline?: number };
 export type Tool = ModuleManifest["tools"][number];
-export type RoutedTool = Pick<Tool, "name" | "description" | "parameters" | "visibility" | "idempotent"> & { readOnly?: true; output?: unknown; examples?: unknown; sideEffects?: unknown; errors?: unknown };
+export type RoutedTool = Pick<Tool, "name" | "description" | "parameters" | "visibility" | "idempotent"> & { readOnly?: true;
+  output?: unknown; examples?: unknown; sideEffects?: unknown; errors?: unknown };

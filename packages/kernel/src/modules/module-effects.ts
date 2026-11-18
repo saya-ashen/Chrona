@@ -1,3 +1,4 @@
+import { rollbackFailedStart } from "./module-generation";
 import { currentCallerManifest } from "./module-owner";
 import { publicCallError, publicCallReason } from "./module-call-error";
 import type { Prisma } from "@chrona/db";
@@ -82,4 +83,4 @@ export async function pauseFailedModule(ports: StewardPorts, execution: ModuleEx
   });
 }
 
-registerModuleEffects({ handleModuleCall, pauseFailedModule });
+registerModuleEffects({ handleModuleCall, pauseFailedModule, rollbackFailedStart });

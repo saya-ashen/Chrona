@@ -1,3 +1,4 @@
+import { installTestModuleVersion } from "../__testing__/module-release-test-fixture";
 import { afterEach, expect, test } from "bun:test";
 import "./module-effects";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
@@ -36,12 +37,12 @@ async function fixture(handler: Parameters<typeof testModuleProcess>[0] = async 
   await supervisor.start();
   const workspace = await db.workspace.create({ data: { name: "supervisor boundary", settings: { moduleModel: modelCaps, limit: 888 } } });
   async function app(name = "ordinary", extra: Record<string, unknown> = {}) {
-    const hash = `${name}-v1`;
     const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], effects: [], tools: [{ name: "go", description: "Go", parameters: { type: "object", properties: {}, required: [] },
         output: {}
     }], ...extra });
-    const row = await db.module.create({ data: { workspaceId: workspace.id, name, activeHash: hash } });
-    await db.moduleVersion.create({ data: { moduleId: row.id, hash, manifest, source: "user", status: "approved", intent: {}, report: {} } });
+    const row = await db.module.create({ data: { workspaceId: workspace.id, name, activeHash: null } });
+    const hash = await installTestModuleVersion({ db, dataDir }, row, manifest);
+    row.activeHash = hash;
     return { row, hash, manifest, deliver: (input = event, options = {}) => supervisor.deliver(row.id, hash, input, options) };
   }
   return { db, dataDir, workspace, supervisor, peer, app, ...fakeClock };

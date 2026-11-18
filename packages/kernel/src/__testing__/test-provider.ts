@@ -1,6 +1,8 @@
+import { storeTestModuleMaterial } from "./module-release-test-fixture";
+import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { basename } from "node:path";
-import type { AgentProviderRegistration, ProviderAdapter } from "@chrona/contracts/steward";
+import type { AgentProviderRegistration } from "@chrona/contracts/steward";
 import type { StewardPorts } from "../ports";
 import { callSync, kernelOrigin } from "../modules/module-calls";
 import { testProviderManifest, testProviderProcess } from "./test-provider-process";
@@ -8,12 +10,13 @@ import { registerLocalRuntime } from "../execution/local-runtime";
 import { registerSystemModules } from "../system/system-modules";
 import "../modules/module-effects";
 
-export type TestProviderPorts = StewardPorts & { provider?: ProviderAdapter };
+import type { TestProviderPorts } from "./test-provider-process";
+export type { TestProviderPorts } from "./test-provider-process";
 
 type Fixture = { ports?: TestProviderPorts; install(workspaceId: string): Promise<void> };
 const fixtures = new WeakMap<StewardPorts["db"], Fixture>();
 const moduleName = "test-provider";
-const versionHash = "test-provider-wire-v1";
+
 
 /** Prepare fixture state without installing a module or taking over the kernel's agent namespace. */
 export function registerTestProvider(db: StewardPorts["db"]): StewardPorts["db"] {
@@ -44,6 +47,7 @@ export async function testProviderPorts<T extends TestProviderPorts>(ports: T): 
   }
   registerSystemModules();
   registerLocalRuntime();
+  const versionHash = await storeTestModuleMaterial(join(ports.dataDir, "platform"), testProviderManifest);
   const modules = new Map<string, string>();
   const peer = testProviderProcess(ports, modules);
   const sandbox = ports.sandbox;
