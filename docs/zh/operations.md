@@ -61,13 +61,17 @@ chrona restore /absolute/private/path/before.db
 
 ## chino：2026-11-18 内核减重发行
 
-运行源码版本为 `bf63e7511145997669ade271e1fd2f732315d56a`。按用户选择，新实例使用 `/var/lib/chrona/kernel/{data,config,work,runtime-resources}`；没有转换或清空 `/var/lib/chrona/data` 的旧库，也没有自动迁入旧应用。新实例为空内核，Provider、Web 和 Chat 尚未安装。
+运行源码版本为 `bf63e7511145997669ade271e1fd2f732315d56a`。按用户选择，新实例使用 `/var/lib/chrona/kernel/{data,config,work,runtime-resources}`；没有转换或清空 `/var/lib/chrona/data` 的旧库，也没有自动迁入旧应用。新实例从空内核启动，随后按用户授权从独立应用仓安装并激活了 Pi Provider、Web 和 Chat。
 
 本次只构建并激活 Nix 配置生成的 `chrona.service` 及其包，没有切换整个 NixOS generation。服务使用 `/nix/store/yg5v4pwnrg9x29ibnv0axh0n3cp5n245-chrona-0.3.1-kernel-bf63e751/bin/chrona`；系统默认 PATH 中的 `chrona` 仍可能是旧包，管理本实例须使用此路径并显式指定新数据目录。旧 `90-state-directory.conf` 已退出当前服务，避免覆盖新路径。
 
 恢复材料位于 `/var/lib/chrona/deployments/kernel-bf63e751/`：`before.db` 与 `before.db.tar` 保存停服后的旧数据库和 platform/sessions/secrets，`extra-state.tar` 保存旧 config/pi-profile/work；原 unit、drop-in 及新旧包的 GC roots 同目录保留。数据库 quick_check 和两份 tar 目录读取通过。原目录仍保留，回退前先停止新实例并核对其新增数据，不自动覆盖。
 
-Linux 发行空实例运行冒烟、现场 `/health`、`/ready`、内网直连 TLS 及无 capability 的工具请求拒绝均通过；这不等于应用业务验收。主仓全量 verify、Bun/API 和独立 Author/Pi 测试已通过，macOS/Windows 原生行为未验收。
+Linux 发行空实例运行冒烟、现场 `/health`、`/ready`、内网直连 TLS 及无 capability 的工具请求拒绝均通过。应用安装后，通过保留证书校验的本机 TLS 连接验证了 Web 密码登录、未登录私有 API 返回 401、Chat 页面与 Pi 设置页登记、Chat 读取 Pi 可用状态及模型列表；没有调用真实模型，尚未验证真实聊天回复或公网访问路径。主仓全量 verify、Bun/API 和独立 Author/Pi 测试已通过；本次 Pi 启动配置修复后 314 项测试通过，Web 定向测试 35 项、Chat 测试 6 项通过。macOS/Windows 原生行为未验收。
+
+当前应用材料 SHA256：Web `78fc5fa416ad3b77d41ca514a7f9b91d883b5faf0c9476964410d952b8392b95`；Pi `33188bbd4d52953382ce521a6f7d385d195397046fcf0f03535cd7dadcae2094`；Chat `1f6565ae1d303ec61163651fff0c13349f470fe19d83b60c37f3fbc2603e79cb`。精确输入保留于新实例 `releases/web-pi-chat-78fc5fa4/external` 与 `releases/pi-host-url-fix/external`，内核不携带应用名单。Pi 通过应用私有 `pi-host.json` 引用原 `/var/lib/chrona/pi-profile`，不迁移旧会话；Web 使用应用私有 `web-host.json` 和新登录密码，凭据值不记录于文档或日志。
+
+本次安装前的新实例备份为上述恢复目录下 `apps/before-apps.db` 及同名 `.tar`。Pi 原安装因空目录启动检查缺少内核 URL 被拒绝，失败回执保留；修复后以 `install-pi-host-url-fix-20261118` 记录当前已安装版本。Web 可用后已显式完成 Pi 设置页登记。
 
 ## 历史恢复材料
 
