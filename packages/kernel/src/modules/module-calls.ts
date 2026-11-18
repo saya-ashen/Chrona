@@ -248,12 +248,14 @@ export async function callSync(ports: StewardPorts, origin: CallOrigin, requeste
   assertRoutedIdentity(requestedTarget, resolved);
   assertProviderHash(resolved.module.activeHash, expectedHash);
   const args = validArgs(resolved.tool, raw), now = ports.now(), quiet = privateTransport || unrecorded(resolved);
-  if (quietUnkeyedRead(key, resolved)) {
-    return invokeSystemSync({ ports, origin, resolved, target, args, chain, path, now, rowId: randomUUID(), quiet });
-  }
-  if (!key && resolved.tool.readOnly) {
-    return executeSyncInvocation({ ports, origin, resolved, target, args, chain, path, now,
-      rowId: randomUUID(), quiet, timeoutMs, privateTransport, observation: true });
+  if (!key) {
+    if (unrecorded(resolved)) {
+      return invokeSystemSync({ ports, origin, resolved, target, args, chain, path, now, rowId: randomUUID(), quiet });
+    }
+    if (resolved.tool.readOnly) {
+      return executeSyncInvocation({ ports, origin, resolved, target, args, chain, path, now,
+        rowId: randomUUID(), quiet, timeoutMs, privateTransport, observation: true });
+    }
   }
   const row = await createSyncInvocation({ ports, origin, resolved, target, args, chain, path, now, key }, { requestedTarget, digest, quiet });
   if ("existing" in row) {
@@ -523,8 +525,6 @@ async function settleModuleOutput({ ports, row, resolved, activationId, reply, s
   }
   return settle({ status: "succeeded", output: output as Prisma.InputJsonValue, error: null, finishedAt: ports.now() });
 }
-
-function quietUnkeyedRead(key: string | undefined, resolved: Target) { return !key && unrecorded(resolved); }
 
 async function queuedTargetChanged(ports: StewardPorts, row: Row, candidate: Target | CallError) {
   if (!(candidate instanceof CallError) || row.targetHash === null) return false;
