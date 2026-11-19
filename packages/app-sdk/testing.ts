@@ -108,15 +108,18 @@ export async function startModule(entry: string | ExplicitModuleEntry, { stubs =
     }); },
     onDisconnect: fail,
   });
-  // The release ships this static loader with the SDK. A trusted launcher may
-  // supply its own preload path; a child never inherits Bun's preload flags.
-  const loader = process.env.CHRONA_SDK_LOADER ?? join(import.meta.dirname, "chrona-sdk-loader.ts");
+  const bundledLoader = join(import.meta.dirname, "chrona-sdk-loader.ts");
+  const loader = process.env.CHRONA_SDK_LOADER || (existsSync(bundledLoader) ? bundledLoader : undefined);
   let task: ReturnType<typeof spawnSupervised>;
   try {
-    const env: NodeJS.ProcessEnv = { ...process.env, CHRONA_SDK: process.env.CHRONA_SDK ?? import.meta.dirname, CHRONA_IPC_ENDPOINT: channel.endpoint, CHRONA_IPC_TOKEN: channel.token, CHRONA_MODULE_BINDINGS: JSON.stringify(bindings) };
+    const env: NodeJS.ProcessEnv = {
+      ...process.env, CHRONA_IPC_ENDPOINT: channel.endpoint, CHRONA_IPC_TOKEN: channel.token,
+      CHRONA_MODULE_BINDINGS: JSON.stringify(bindings),
+    };
+    if (loader) env.CHRONA_SDK ??= import.meta.dirname;
     delete env.CHRONA_SOCKET; delete env.CHRONA_HTTP_SOCKET;
     const command = typeof entry === "string"
-      ? { program: process.execPath, argv: ["--no-install", ...(process.env.CHRONA_SDK_LOADER || existsSync(loader) ? ["--preload", loader] : []), entry] }
+      ? { program: process.execPath, argv: ["--no-install", ...(loader ? ["--preload", loader] : []), entry] }
       : explicitModuleCommand(env.CHRONA_MODULE ?? process.cwd(), entry);
     task = spawnSupervised(command.program, command.argv, { env, cwd: env.CHRONA_MODULE ?? process.cwd() });
     task.process.stdin.end();
