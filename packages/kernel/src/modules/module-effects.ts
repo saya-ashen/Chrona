@@ -1,4 +1,5 @@
 import { rollbackFailedStart } from "./module-generation";
+import { callWithToolDelegations } from "./tool-delegation";
 import { currentCallerManifest } from "./module-owner";
 import { publicCallError, publicCallReason } from "./module-call-error";
 import type { Prisma } from "@chrona/db";
@@ -39,7 +40,10 @@ async function routedCall(ports: StewardPorts, scope: CallScope, call: Extract<M
   const { args, mode, key, reply, timeoutMs, expectedTarget } = call.params, target = call.params.target;
   try {
     if (mode === "sync") {
-      const result = await callSync(ports, originOf(scope), target, args, { timeoutMs, expectedTarget, key });
+      const origin = originOf(scope), { delegations } = call.params;
+      const result = delegations && Object.keys(delegations).length
+        ? await callWithToolDelegations(ports, origin, { target, delegations, args, timeoutMs, expectedTarget, key })
+        : await callSync(ports, origin, target, args, { timeoutMs, expectedTarget, key });
       return { id: call.id, result: { output: result.output } };
     }
     // The caller owns its keys (derive them from what is being done): a repeat after a crash returns the same call.

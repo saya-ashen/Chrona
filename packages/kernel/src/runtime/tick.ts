@@ -90,7 +90,7 @@ export function createTick(ports: StewardPorts) {
       function providerInput(run: ClaimedRun, lane: "foreground" | "background", sessionDir: string, ordinary: Awaited<ReturnType<typeof runInput>>) {
         return { runId: run.id, token: run.token, lane, cwd: run.cwd, sessionDir, sessionId: ordinary.sessionId,
           prompt: ordinary.prompt, systemPrompt: ordinary.systemPrompt, resources: ordinary.resources, images: ordinary.images, deadline: run.deadlineAt,
-          extraTools: ordinary.extraTools, searchTools: ordinary.searchTools, hostPaths: ordinary.hostPaths, content: ordinary.content };
+          hostPaths: ordinary.hostPaths, content: ordinary.content };
       }
       async function launchLocal(run: ClaimedRun, lane: "foreground" | "background") {
           const gate = providerStartGate();
@@ -166,6 +166,6 @@ export function createTick(ports: StewardPorts) {
 async function genericInput(ports: StewardPorts, run: ClaimedRun, sessionId: string | null) {
   const tools = await contextRunTools(ports, run);
   if (!tools) return null;
-  return { images: await contextRunImages(ports, run), prompt: run.prompt, inbound: null, extraTools: tools.catalog.map(tool => tool.name),
-    searchTools: false, sessionId, hostPaths: [], content: [], systemPrompt: "", resources: "configured" as const };
+  return { images: await contextRunImages(ports, run), prompt: run.prompt, inbound: null,
+    sessionId, hostPaths: [], content: [], systemPrompt: "", resources: "configured" as const };
 }

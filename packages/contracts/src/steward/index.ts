@@ -186,7 +186,7 @@ export const moduleEventSchema = z.object({
      */
     z.object({ kind: z.literal("tool"), id: slug, firedAt: iso, args: z.record(z.string(), z.unknown()),
       caller: callerSchema.optional(),
-      call: z.object({ id: z.string().max(128), key: z.string().max(500).nullable(), attempt: z.number().int().min(1), chain: z.array(slug).max(16), executionRunId: z.string().min(1).max(128).optional() }).strict().optional() }).strict(),
+      call: z.object({ id: z.string().max(128), key: z.string().max(500).nullable(), attempt: z.number().int().min(1), chain: z.array(slug).max(16), delegate: callerSchema.optional(), executionRunId: z.string().min(1).max(128).optional() }).strict().optional() }).strict(),
     /** The result of an async call this module made with `reply: true` (`id` is always "call"). */
     z.object({ kind: z.literal("call_result"), id: z.literal("call"), firedAt: iso, callId: z.string().max(128), target: routedTargetSchema, key: z.string().max(500),
       status: z.enum(["succeeded", "failed", "unknown"]), output: z.json().optional(), error: z.string().max(2000).optional() }).strict(),
@@ -232,7 +232,8 @@ export const moduleCallSchema = z.discriminatedUnion("method", [
   z.object({ id: channelId, eventId: channelId.optional(), method: z.literal("call"), params: z.object({
     target: routedTargetSchema, args: z.record(z.string(), z.json()).default({}), mode: z.enum(["sync", "async"]).default("sync"),
     key: z.string().min(1).max(200).optional(), reply: z.boolean().default(false), timeoutMs: z.number().int().min(1000).max(600_000).optional(), expectedTarget: expectedModuleTargetSchema.optional(),
-  }).strict().refine(params => params.mode === "sync" || params.key !== undefined, "async calls need a key") }).strict(),
+    delegations: z.record(z.string().min(1).max(120), routedTargetSchema).refine(value => Object.keys(value).length <= 100).optional(),
+  }).strict().refine(params => params.mode === "sync" || params.delegations === undefined, "tool delegation requires a synchronous call").refine(params => params.mode === "sync" || params.key !== undefined, "async calls need a key") }).strict(),
   /** State of an async call this module made. */
   z.object({ id: channelId, eventId: channelId.optional(), method: z.literal("callStatus"), params: z.union([z.object({ callId: z.string().min(1).max(128) }).strict(), z.object({ target: routedTargetSchema, key: z.string().min(1).max(200) }).strict()]) }).strict(),
 ]);
@@ -318,6 +319,8 @@ export type ProviderRunInput = {
   model?: string;
   /** Module tool names (m_*) declared up front; Providers with tool allowlists must admit them. */
   extraTools?: string[];
+  tools?: import("./local-runtime").RuntimeStart["tools"];
+  callTool?: (request: import("zod").infer<typeof import("./local-runtime").runtimeToolCallSchema>) => Promise<unknown>;
   /** The catalog also has deferred module tools (m_*); Providers should admit them behind their tool search. */
   searchTools?: boolean;
   /** Absolute host paths the user approved for this run (read-write). */

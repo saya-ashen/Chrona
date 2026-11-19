@@ -1,6 +1,6 @@
 import { currentCallerManifest } from "./module-owner";
 import { assertExpectedTarget, targetFence, bindInvocationTarget, checkInvocationTarget, routedTargetName, splitTarget, resolveTarget,
-  assertRoutedIdentity, type Target } from "./module-call-target";
+  assertRoutedIdentity, assertExpectedRequest, type Target } from "./module-call-target";
 export { routedTargetName } from "./module-call-target";
 import { systemError, systemFailureData, deliveryErrorCode, checkSystemOutput, checkModuleOutput, moduleOutputError, validArgs, stageOf,
   message } from "./module-call-output";
@@ -51,7 +51,7 @@ export function callerKey(caller: Caller) {
 const callerName = (caller: Caller) => caller.kind === "module" || caller.kind === "system" ? caller.module : null;
 export const kernelOrigin = (workspaceId: string): CallOrigin => ({ workspaceId, caller: { kind: "kernel" }, chain: [], path: [] });
 
-async function previousCall(db: Db, origin: CallOrigin, target: RoutedTarget, key: string) {
+export async function previousCall(db: Db, origin: CallOrigin, target: RoutedTarget, key: string) {
   const identity = typeof target === "string" ? await resolveTarget(db, origin.workspaceId, target) : null;
   return db.moduleInvocation.findFirst({ where: { workspaceId: origin.workspaceId, caller: callerKey(origin.caller), key,
     ...(typeof target === "string" ? { targetIdentity: identity &&
@@ -72,7 +72,7 @@ function checkDuplicateCall(row: Row, origin: CallOrigin, digest: string, expect
   if (row.requestDigest !== digest) throw new CallError("conflict", "Call key was already used with different arguments");
   checkDuplicateTarget(row, expected);
 }
-function duplicateReply(row: Row, origin: CallOrigin, digest: string, expected?: ExpectedModuleTarget, privateTransport = false) {
+export function duplicateReply(row: Row, origin: CallOrigin, digest: string, expected?: ExpectedModuleTarget, privateTransport = false) {
   checkDuplicateCall(row, origin, digest, expected);
   if (privateTransport) throw new CallError("unknown", "Private Provider call was already offered; reconcile the original operation");
   if (row.status === "succeeded" && hasStoredOutput(row)) return { callId: row.id, output: row.output as Json };
@@ -80,11 +80,11 @@ function duplicateReply(row: Row, origin: CallOrigin, digest: string, expected?:
     row.error ?? "Original call has not produced a confirmed result", publicCallReason(row.errorReason ?? ""));
 }
 function nextPath(origin: CallOrigin) {
-  const name = callerName(origin.caller);
+  const name = callerName(origin.delegate ?? origin.caller);
   return { chain: name ? [...origin.chain, name] : origin.chain, path: name ? [...origin.path, name] : origin.path };
 }
 function toolEvent(target: Target, args: Record<string, unknown>, now: Date, caller: Caller, call: { id: string; key: string | null;
-  attempt: number; chain: string[]; executionRunId?: string }): ModuleEvent {
+  attempt: number; chain: string[]; delegate?: Caller; executionRunId?: string }): ModuleEvent {
   return { trigger: { id: target.tool.name, kind: "tool", firedAt: now.toISOString(), args, caller, call }, now: now.toISOString(), params: {} };
 }
 /** Synchronous routed calls wait for their exact reply; unknown outcomes are never retried. */
@@ -92,8 +92,8 @@ type SyncInvocation = { ports: StewardPorts; origin: CallOrigin; resolved: Targe
   chain: string[]; path: string[]; now: Date; key?: string; activationId?: string | null; privateTransport?: boolean };
 async function invokeSystemSync({ ports, origin, resolved, args, rowId, rowKey, finish, quiet }: SyncInvocation & { rowId: string;
   rowKey?: string; finish?: (data: Prisma.ModuleInvocationUpdateInput) => Promise<unknown>; quiet: boolean }) {
-  // In-process: no event queue to wait on, so no deadlock to guard against.
   try {
+    await origin.beforeDelivery?.();
     const output = await resolved.system!.handle({ ports, workspaceId: origin.workspaceId, caller: origin.caller, run: origin.run,
       deadline: origin.deadline, call: { id: rowId, key: rowKey, mode: "sync" } }, resolved.tool.name, args);
     const schema = (resolved.tool as SystemTool).output;
@@ -113,13 +113,15 @@ type SyncModuleDelivery = SyncInvocation & { timeoutMs?: number; rowId: string;
   finish: (data: Prisma.ModuleInvocationUpdateInput) => Promise<unknown>; transient: boolean };
 async function dispatchSyncModule({ ports, origin, resolved, target, args, chain, path, now, key, timeoutMs, activationId, rowId,
   privateTransport, transient }: SyncModuleDelivery) {
-  return await moduleSupervisor(ports).deliver(resolved.module.id, resolved.module.activeHash, toolEvent(resolved, args, now,
-      origin.caller, { id: rowId, key: key ?? null, attempt: 1, chain: path, ...(isAgentContextEntry(ports, origin) ? {
-      executionRunId:origin.run!.executionRunId} : {}) }), { chain, path, callerRunId: origin.run?.moduleRunId, ...(privateTransport ? {
-      private: true } : {}), ...(transient ? { retainOutput: false } : {}), ...(resolved.tool.readOnly ? { retainHistory: false } : {}),
-      beforeDelivery: targetFence(ports, origin.workspaceId, resolved, origin.caller), ...(activationId !== undefined ? { activationId } : {
-      }), validateResult: output => moduleOutputError(target, resolved.tool, output), ...(timeoutMs ? { timeoutMs } : {}) });
-
+  const executionRunId = isAgentContextEntry(ports, origin) ? origin.run!.executionRunId : undefined;
+  const event = toolEvent(resolved, args, now, origin.caller, {
+    id: rowId, key: key ?? null, attempt: 1, chain: path, delegate: origin.delegate, executionRunId });
+  return moduleSupervisor(ports).deliver(resolved.module.id, resolved.module.activeHash, event, {
+    chain, path, callerRunId: origin.waitingModuleRunId ?? origin.run?.moduleRunId, private: privateTransport, retainOutput: !transient,
+    retainHistory: !resolved.tool.readOnly, activationId, timeoutMs, deadline: origin.deadline,
+    beforeDelivery: targetFence(ports, origin.workspaceId, resolved, origin.caller, origin.beforeDelivery),
+    validateResult: output => moduleOutputError(target, resolved.tool, output),
+  });
 }
 async function deliverSyncModule(input: SyncModuleDelivery) {
   const { ports, origin, resolved, target, finish, privateTransport } = input;
@@ -166,7 +168,7 @@ async function validateSyncRoute(ports: StewardPorts, origin: CallOrigin, target
   const resolved = await resolveTarget(ports.db, origin.workspaceId, target);
   if (expectedTarget?.hash !== undefined) assertExpectedTarget(resolved, expectedTarget);
   if (resolved instanceof CallError) throw resolved;
-  if (!await admitted(ports.db, origin.caller, resolved.tool, origin.workspaceId)) throw new CallError("forbidden",
+  if (!await admitted(ports.db, origin.caller, resolved.tool, origin.workspaceId, resolved.module)) throw new CallError("forbidden",
     `${target} does not accept calls from this caller`);
   assertExpectedTarget(resolved, expectedTarget);
   const route = isAgentContextEntry(ports, origin) ? { chain: [], path: [] } : nextPath(origin);
@@ -223,16 +225,12 @@ function assertPrivateTransport(origin: CallOrigin, privateTransport: boolean, e
 function assertProviderHash(actual: string | null, expectedHash?: string) {
   if (expectedHash !== undefined && actual !== expectedHash) throw new CallError("conflict", "Provider source version changed before delivery");
 }
-function assertExpectedRequest(requested: RoutedTarget, expected?: ExpectedModuleTarget) {
-  if (typeof requested !== "string" && expected && requested.moduleId !== expected.moduleId) throw new CallError("conflict",
-    "Target and expected identity differ");
-}
 /** Private Provider transport/expectedHash remain kernel-only; routed expectedTarget is public. */
 export async function callSync(ports: StewardPorts, origin: CallOrigin, requestedTarget: RoutedTarget, raw: unknown, { timeoutMs,
-  expectedTarget, key, private: privateTransport = false, expectedHash }: { timeoutMs?: number; expectedTarget?: ExpectedModuleTarget;
-  key?: string; private?: boolean; expectedHash?: string } = {}) {
+  expectedTarget, key, private: privateTransport = false, expectedHash, delegationRequest }: { timeoutMs?: number; expectedTarget?: ExpectedModuleTarget;
+  key?: string; private?: boolean; expectedHash?: string; delegationRequest?: { args: unknown; targets: Record<string, RoutedTarget> } } = {}) {
   assertPrivateTransport(origin, privateTransport, expectedHash);
-  const digest = requestDigest({ args: raw, mode: "sync" });
+  const digest = requestDigest({ args: raw, mode: "sync", ...delegationRequest });
   if (key) {
     const previous = await previousCall(ports.db, origin, requestedTarget, key);
     if (previous) {
@@ -276,7 +274,7 @@ async function resolveEnqueueTarget(tx: Db, origin: CallOrigin, target: string) 
   const resolved = await resolveTarget(tx, origin.workspaceId, target);
   if (resolved instanceof CallError) {
     if (origin.caller.kind !== "kernel" && origin.caller.kind !== "system") throw resolved;
-  } else if (!await admitted(tx, origin.caller, resolved.tool, origin.workspaceId)) throw new CallError("forbidden",
+  } else if (!await admitted(tx, origin.caller, resolved.tool, origin.workspaceId, resolved.module)) throw new CallError("forbidden",
     `${target} does not accept calls from this caller`);
   else if (resolved.system?.unrecorded?.includes(resolved.tool.name)) throw new CallError("invalid",
     `${target} is called synchronously (its arguments are never stored)`);
@@ -408,7 +406,7 @@ async function deliverRow(ports: StewardPorts, row: Row, token: string) {
     const callerModule = row.callerModuleId ? await db.module.findUnique({ where: { id: row.callerModuleId } }) : null;
     if (missingCaller(row, callerModule)) return settle({ status: "failed", error: "forbidden: original caller no longer exists", finishedAt: now });
     caller = originOf(row, callerModule);
-    if (!await admitted(db, caller, resolved.tool, row.workspaceId)) return settle({ status: "failed",
+    if (!await admitted(db, caller, resolved.tool, row.workspaceId, resolved.module)) return settle({ status: "failed",
       error: "forbidden: the target no longer accepts this caller", finishedAt: now });
     try { args = validArgs(resolved.tool, row.args); }
     catch (error) { return settle({ status: "failed", error: message(error), finishedAt: now }); }

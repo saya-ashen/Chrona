@@ -15,11 +15,14 @@ export async function selectContextTools(ports: StewardPorts, principal: ModuleP
   const entries = [...await moduleTools(ports, { workspaceId: principal.workspaceId, audience: "modules" }), ...await moduleTools(ports, {
     workspaceId: principal.workspaceId, audience: "owner" })];
   const selected = [] as typeof entries;
+  const names = new Set<string>();
   for (const target of targets) {
     const entry = entries.find(entry => typeof target === "string" ? `${entry.module.name}.${entry.tool.name}` === target : entry.module.id === target.moduleId && entry.tool.name === target.tool);
     if (!entry) throw new CallError("not_found", `Agent tool ${target} not found`);
-    if (!await admitted(ports.db, caller, entry.tool, principal.workspaceId)) throw new CallError("forbidden", `Agent caller cannot use ${target}`);
+    if (entry.module.name === "secrets" || !await admitted(ports.db, caller, entry.tool, principal.workspaceId, entry.module)) throw new CallError("forbidden", `Agent caller cannot use ${target}`);
     // Explicit Run selections must be callable without workspace focus or tool search.
+    if (names.has(entry.name)) continue;
+    names.add(entry.name);
     selected.push({ ...entry, direct: true });
   }
   return { caller, entries: selected, catalog: selected.map(catalogEntry), runId: undefined as string | undefined, workspaceId: principal.workspaceId };
@@ -43,21 +46,38 @@ export async function contextRunTools(ports: StewardPorts, run: { id: string; se
   }
   return { ...selected, runId: run.id };
 }
+export type RunToolDelegate = { caller: Extract<Caller, { kind: "module" }>; hash: string; active(): boolean };
+
 export async function callContextTool(ports: StewardPorts, context: NonNullable<Awaited<ReturnType<typeof contextRunTools>>>, name: string,
-  raw: unknown, { deadline, key }: { deadline: number; key?: string }) {
+  raw: unknown, { deadline, key, delegate }: { deadline: number; key?: string; delegate?: RunToolDelegate }) {
   const now = ports.now();
-  const run = context.runId && context.workspaceId ? await ports.db.run.findFirst({ where: { id: context.runId,
-    workspaceId: context.workspaceId, status: "running" } }) : null;
-  if (!run || runExpired(run, now) || run.cancelRequestedAt) throw new CallError("forbidden", "Agent run is no longer active");
+  async function liveRun() {
+    const run = context.runId && context.workspaceId ? await ports.db.run.findFirst({ where: { id: context.runId,
+      workspaceId: context.workspaceId, status: "running" } }) : null;
+    if (!run || runExpired(run, ports.now()) || run.cancelRequestedAt || delegate && !delegate.active()) {
+      throw new CallError("forbidden", "Agent run is no longer active");
+    }
+    return run;
+  }
+  const run = await liveRun();
   const current = await contextRunTools(ports, run);
   if (!current || current.caller.moduleId !== context.caller.moduleId || current.caller.hash !== context.caller.hash ||
     current.caller.module !== context.caller.module) throw new CallError("forbidden", "Agent context caller changed");
   const entry = current.entries.find(entry => entry.name === name);
   if (!entry) throw new CallError("forbidden", "Tool is outside the module's Agent run selection");
+  if (delegate && entry.module.activeHash !== delegate.hash) throw new CallError("conflict", "Admitted Run tool version changed");
   const origin: CallOrigin = { workspaceId: current.workspaceId, caller: current.caller, chain: [], path: [],
-    deadline: run.deadlineAt ? Math.min(deadline, run.deadlineAt.getTime()) : deadline, run: { executionRunId: run.id } };
+    deadline: run.deadlineAt ? Math.min(deadline, run.deadlineAt.getTime()) : deadline, run: { executionRunId: run.id },
+    beforeDelivery: async () => {
+      await liveRun();
+      if (deadline <= ports.now().getTime()) throw new CallError("unavailable", "Tool call deadline ended");
+      if (delegate) await assertApprovedAgentPrincipal(ports.db, { workspaceId: current.workspaceId, ownerId: "owner", caller: delegate.caller }, false);
+    } };
+  if (delegate) origin.delegate = delegate.caller;
   return withAgentContextEntry(ports, origin, async () => {
-    const result = await callSync(ports, origin, `${entry.module.name}.${entry.tool.name}`, raw, { key, expectedTarget: { moduleId: entry.module.id } });
+    const result = await callSync(ports, origin, `${entry.module.name}.${entry.tool.name}`, raw, { key,
+      timeoutMs: Math.max(1, (origin.deadline ?? deadline) - now.getTime()),
+      expectedTarget: { moduleId: entry.module.id, ...(delegate ? { hash: delegate.hash } : {}) } });
     return { result: result.output };
   });
 }

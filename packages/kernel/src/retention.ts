@@ -21,7 +21,7 @@ const LOG_KINDS = [
   "workspace_stray_quarantined", "workspace_stray_quarantine_failed", "build_settings_updated",
   "module_build_failed", "module_model_call", "module_tool_call", "module_status_changed", "module_removed",
   "module_group_activation", "module_candidate_rejected", "build_targets", "build_request",
-  "run_claimed", "run_finished", "run_reply", "tool_limit_rejected", "tool_started", "tool_finished",
+  "run_claimed", "run_finished", "run_reply", "tool_limit_rejected", "tool_started", "tool_finished", "tool_delegation_attempted",
   "run_finalize_failed", "execution_capture_failed",
 ];
 

@@ -13,15 +13,15 @@ export type Caller = { kind: "module"; module: string; moduleId: string; hash: s
 /** Private wire shape used to settle retained timer receipts. */
 type WireTrigger = { kind: "timer"; id: string; eventId: string; timerId: string; timerRevision: string; scheduledAt: string; firedAt: string; payload: unknown }
   | { kind: "schedule"; id: string; firedAt: string; scheduleId?: string; payload?: Record<string, unknown> }
-  | { kind: "tool"; id: string; firedAt: string; args: Record<string, unknown>; caller?: Caller; call?: { id: string; key: string | null; attempt: number; chain: string[]; /** Kernel-bound original Agent run, absent for ordinary module calls. */ executionRunId?: string } }
+  | { kind: "tool"; id: string; firedAt: string; args: Record<string, unknown>; caller?: Caller; call?: { id: string; key: string | null; attempt: number; chain: string[]; delegate?: Caller; /** Kernel-bound original Agent run, absent for ordinary module calls. */ executionRunId?: string } }
   | { kind: "call_result"; id: "call"; firedAt: string; callId: string; target: CallTarget; key: string; status: "succeeded" | "failed" | "unknown"; output?: unknown; error?: string }
   /** Once per active version, and again when a declared dependency changes version: renew its registrations here. */
   | { kind: "activated"; id: "activated"; firedAt: string };
 export type Trigger = Exclude<WireTrigger, { kind: "schedule" }>;
 type EventResult = { result?: unknown };
 export type CallState = { callId: string; status: "queued" | "running" | "waiting" | "succeeded" | "failed" | "unknown"; duplicate?: boolean; output?: unknown; error?: string };
-export type CallOptions = { mode?: "sync" | "async"; key?: string; reply?: boolean; timeoutMs?: number; expectedTarget?: { moduleId: string; hash?: string } };
-export type KernelTarget = `${"modules" | "approvals" | "settings" | "secrets" | "activity" | "timers" | "agent" | "runtime-callback" | "workspace-local"}.${string}`;
+export type CallOptions = { mode?: "sync" | "async"; key?: string; reply?: boolean; timeoutMs?: number; expectedTarget?: { moduleId: string; hash?: string }; delegations?: Record<string, CallTarget> };
+export type KernelTarget = `${"modules" | "approvals" | "settings" | "secrets" | "activity" | "timers" | "agent" | "runtime-callback" | "tool-delegation" | "workspace-local"}.${string}`;
 export type CallTarget = KernelTarget | { moduleId: string; tool: string };
 const initialBindings: unknown = JSON.parse(process.env.CHRONA_MODULE_BINDINGS ?? "{}");
 if (!initialBindings || typeof initialBindings !== "object" || Array.isArray(initialBindings) || Object.values(initialBindings).some(id => typeof id !== "string" || !id.length || id.length > 128)) throw new Error("Invalid module bindings");
@@ -131,6 +131,8 @@ export const chrona = {
     if (mode === "async" && syncOnlyAgentTargets.some(name => name === target)) return Promise.reject(new ModelError("invalid", `${target} is called synchronously (its arguments are never stored)`));
     return call<{ output?: unknown } & CallState>("call", { target, args, mode, ...options }).then(result => (mode === "sync" ? result.output : result));
   }) as Call,
+  invokeDelegated: <T = unknown>(reference: string, args: Record<string, unknown>, key: string = randomUUID()) =>
+    chrona.call<T>("tool-delegation.invoke", { reference, args, key }),
   /** Routed call receipt, including keyed sync calls. Agent run/write/stop retain outputs; Run progress uses agent.read. */
   callStatus: (selector: string | { callId: string } | { target: CallTarget; key: string }) => call<CallState>("callStatus", typeof selector === "string" ? { callId: selector } : selector),
   /**

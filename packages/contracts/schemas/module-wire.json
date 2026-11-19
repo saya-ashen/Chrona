@@ -302,6 +302,112 @@
                             "pattern": "^[a-z][a-z0-9-]{1,40}$"
                           }
                         },
+                        "delegate": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "const": "module"
+                                },
+                                "module": {
+                                  "type": "string",
+                                  "pattern": "^[a-z][a-z0-9-]{1,40}$"
+                                },
+                                "moduleId": {
+                                  "type": "string",
+                                  "maxLength": 128
+                                },
+                                "hash": {
+                                  "type": "string",
+                                  "maxLength": 64
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "module",
+                                "moduleId",
+                                "hash"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "const": "provider"
+                                },
+                                "runId": {
+                                  "type": "string",
+                                  "maxLength": 128
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "runId"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "const": "owner"
+                                },
+                                "via": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "pattern": "^[a-z][a-z0-9-]{1,40}$"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "via"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "const": "kernel"
+                                }
+                              },
+                              "required": [
+                                "kind"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "const": "system"
+                                },
+                                "module": {
+                                  "type": "string",
+                                  "pattern": "^[a-z][a-z0-9-]{1,40}$"
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "module"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
                         "executionRunId": {
                           "type": "string",
                           "minLength": 1,
@@ -666,6 +772,41 @@
                     "moduleId"
                   ],
                   "additionalProperties": false
+                },
+                "delegations": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]*\\.[a-z][a-z0-9-]*$"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "moduleId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "tool": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9-]{1,40}$"
+                          }
+                        },
+                        "required": [
+                          "moduleId",
+                          "tool"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
                 }
               },
               "required": [

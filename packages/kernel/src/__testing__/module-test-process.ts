@@ -39,7 +39,7 @@ export function testModuleSandbox(runModule: NonNullable<NonNullable<StewardPort
 type Start = NonNullable<NonNullable<StewardPorts["sandbox"]>["startModule"]>;
 /** In-process wire peer for engine tests. Production SDK/bwrap coverage lives in supervisor tests. */
 export function testModuleProcess(handler: (event: ModuleEvent, call: (method: ModuleCall["method"],
-  params: ModuleCall["params"]) => Promise<unknown>, input: Parameters<Start>[0]) => Promise<unknown>) {
+  params: ModuleCall["params"]) => Promise<unknown>, input: Parameters<Start>[0]) => Promise<unknown>, beforeReady?: () => Promise<void>) {
   const processes: { socket: Socket; httpReady(endpoint: string): void; kill(): void; rejectExit(error: Error): void; input: Parameters<Start>[0] }[] = [];
   const startModule: Start = input => {
     const socket = createConnection({ host: "127.0.0.1", port: Number(new URL(input.ipcEndpoint).port) });
@@ -56,7 +56,11 @@ export function testModuleProcess(handler: (event: ModuleEvent, call: (method: M
       const id = randomUUID(); pending.set(id, resolve); socket.write(JSON.stringify({ id, ...(activeEvents.has(eventId) ? { eventId } : {
         }), method, params }) + "\n");
     });
-    socket.on("connect", () => socket.write(JSON.stringify({ type: "auth", version: 1, token: input.ipcToken }) + "\n"));
+    socket.on("connect", () => {
+      const authenticate = () => { socket.write(JSON.stringify({ type: "auth", version: 1, token: input.ipcToken }) + "\n"); };
+      if (beforeReady) void beforeReady().then(authenticate, error => socket.destroy(error));
+      else authenticate();
+    });
     let buffer = "";
     socket.on("error", () => {});
     socket.on("close", () => { finish({ code: 1, signal: null }); });

@@ -12,7 +12,7 @@ import { moduleFailurePolicy } from "./module-failure-policy";
 import { moduleContext } from "./module-context";
 import { ensureVersionMaterial } from "./module-source";
 import { assertModuleOperation } from "./module-identity";
-import { recordEventResult, validateTrigger, trackDelivery, eventLimits, activationChanged, availableInstance, evidence,
+import { recordEventResult, validateTrigger, trackDelivery, eventLimits, sendModuleEvent, activationChanged, availableInstance, evidence,
   failureDetail, deliveryFailure, handlerFailureData, isClosing,
   instanceStatus, isHandlerRejection, keyOf, moduleEffects, restartDelay, staged, triggerKey, type CallScope, type Delivery,
   type DeliveryOptions, type DeliveryStage, type Instance, type Options, type Process, type Reply, type Timers } from "./module-supervisor-state";
@@ -344,17 +344,13 @@ class ModuleSupervisor {
       error: diagnosticText(String(error), 1000) })));
   }
   private async sendEvent(instance: Instance, event: ModuleEvent, workspaceId: string,
-    { requested, dispatch, scope }: { requested?: number; dispatch?: DeliveryOptions["dispatch"]; scope?: CallScope }) {
+    { requested, ...options }: Pick<DeliveryOptions, "dispatch" | "deadline" | "beforeDelivery"> & { requested?: number; scope?: CallScope }) {
     const { manifest } = instance;
     try { await (instance.start ??= this.startInstance(instance)); }
     catch (error) { throw staged(error, "unavailable"); }
     const { timeoutMs, params } = await eventLimits(this.ports, manifest, workspaceId, requested);
     const bindings = await this.bindings(workspaceId);
-    let reply: Reply;
-    try { reply = await instance.channel!.send({ ...event, params, bindings }, timeoutMs, dispatch, scope); }
-    catch (error) { throw staged(error, (error as { written?: boolean }).written === false ? "unavailable" : "lost"); }
-    if ("error" in reply) throw staged(Object.assign(new Error(reply.error), { code: reply.errorCode, reason: reply.errorReason }), "handler");
-    return reply;
+    return sendModuleEvent(this.ports, instance, { ...event, params, bindings }, timeoutMs, options);
   }
   private async failedDelivery(instance: Instance, event: ModuleEvent, runId: string | undefined, error: unknown) {
     if (error instanceof Error) await this.collectExit(instance, error.message);
@@ -390,7 +386,7 @@ class ModuleSupervisor {
     }
     return module;
   }
-  private async deliverEvent(instance: Instance, event: ModuleEvent, { chain = [], path = [], timeoutMs, validateResult, beforeDelivery,
+  private async deliverEvent(instance: Instance, event: ModuleEvent, { chain = [], path = [], timeoutMs, deadline, validateResult, beforeDelivery,
     dispatch, private: privateTransport, retainOutput, retainHistory }: DeliveryOptions, delivery: Delivery): Promise<Reply> {
     if (instance.idle) this.timers.clearTimeout(instance.idle);
     const { moduleId, hash } = instance, module = await this.assertCurrentActivation(instance);
@@ -408,7 +404,7 @@ class ModuleSupervisor {
     const scope: CallScope = { ...instance.scope, moduleRunId: run.id,
       eventKey: `${event.trigger.id}:${event.trigger.firedAt}`, chain, path };
     try {
-      const reply = await this.sendEvent(instance, event, module.workspaceId, { requested: timeoutMs, dispatch, scope });
+      const reply = await this.sendEvent(instance, event, module.workspaceId, { requested: timeoutMs, dispatch, scope, deadline, beforeDelivery });
       const succeeded = await recordEventResult(this.ports, { instance, event, workspaceId: module.workspaceId, runId: run.id, reply, validateResult,
         private: privateTransport, retainOutput, retainHistory });
       if (succeeded) this.backoffFailures.set(keyOf(instance.moduleId, instance.hash, instance.activationId), 0);

@@ -43,14 +43,10 @@ test("origin policy and body limit apply to /api routes", async () => {
   expect((await app.request("/api/fixture/input", { method: "POST", headers: owner, body: "x".repeat(21 * 1024 * 1024 + 1) })).status).toBe(413);
 });
 
-test("only exact capability endpoints bypass owner auth, retaining their own proxy guard", async () => {
+test("Provider tools use the SDK channel and have no HTTP endpoints", async () => {
   const app = await createServerApp();
-  const headers = { authorization: "Bearer invalid-capability", "x-forwarded-for": "203.0.113.1" };
-  for (const [path, method] of [["catalog", "GET"], ["tools/chrona_reply", "POST"]]) {
-    expect((await app.request(`/api/steward-agent/${path}`, { method, headers })).status).toBe(403);
-  }
-  expect((await app.request("/api/steward-agent/catalog/extra", { headers })).status).toBe(401);
-  expect((await app.request("/api/steward-agent/catalog", undefined, { server: { requestIP: () => ({ address: "127.0.0.1" }) } })).status).toBe(401);
+  expect((await app.request("/api/steward-agent/catalog", { headers: owner })).status).toBe(404);
+  expect((await app.request("/api/steward-agent/tools/m_modules_list", { method: "POST", headers: owner, body: "{}" })).status).toBe(404);
 });
 
 test("legacy routes and the disabled test seam are absent", async () => {

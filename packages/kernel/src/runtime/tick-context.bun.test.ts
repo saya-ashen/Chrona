@@ -42,7 +42,7 @@ test("application Agent context supplies its own prompt without kernel module-na
   expect(await f.db.agentRunProvider.findUniqueOrThrow({ where: { runId: admitted.runId } })).toMatchObject({ providerId: "fake" });
   await f.tick(); await f.tick.settled({ includeRuns: true });
   expect(f.starts).toHaveLength(1);
-  expect(f.starts[0]).toMatchObject({ prompt, systemPrompt: "", resources: "configured", extraTools: [], searchTools: false, hostPaths: [], content: [] });
+  expect(f.starts[0]).toMatchObject({ prompt, systemPrompt: "", resources: "configured", hostPaths: [], content: [] });
   expect(f.starts[0]!.prompt).not.toContain("Chrona modules");
 });
 test("an Agent context without a Run admission cannot launch Provider work", async () => {

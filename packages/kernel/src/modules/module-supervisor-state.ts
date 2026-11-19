@@ -26,9 +26,25 @@ export type Process = ReturnType<NonNullable<NonNullable<StewardPorts["sandbox"]
 export type Timers = Pick<typeof globalThis, "setTimeout" | "clearTimeout">;
 export type Options = { timers?: Timers; idleMs?: number; backoffMs?: number };
 export type DeliveryOptions = { private?: boolean; /** Observations keep only in-memory delivery identity. */ retainHistory?: boolean;
-  /** false: record the run, not its result. */ retainOutput?: boolean; chain?: string[]; path?: string[]; timeoutMs?: number;
+  /** false: record the run, not its result. */ retainOutput?: boolean; chain?: string[]; path?: string[]; timeoutMs?: number; deadline?: number;
   activationId?: string | null; beforeDelivery?: () => Promise<void>; dispatch?: (send: () => void) => Promise<void>;
   validateResult?: (result: unknown) => string | null; callerRunId?: string };
+export async function sendModuleEvent(ports: StewardPorts, instance: Instance, event: ModuleEvent, timeoutMs: number,
+  { deadline, beforeDelivery, dispatch, scope }: Pick<DeliveryOptions, "deadline" | "beforeDelivery" | "dispatch"> & { scope?: CallScope }) {
+  const remaining = deadline === undefined ? timeoutMs : Math.min(timeoutMs, deadline - ports.now().getTime());
+  if (remaining <= 0) throw staged(new Error("Tool delivery deadline ended"), "unavailable");
+  const fenced = deadline === undefined ? dispatch : async (send: () => void) => {
+    await beforeDelivery?.();
+    if (deadline <= ports.now().getTime()) throw new Error("Tool delivery deadline ended");
+    if (dispatch) await dispatch(send);
+    else send();
+  };
+  let reply: Reply;
+  try { reply = await instance.channel!.send(event, remaining, fenced, scope); }
+  catch (error) { throw staged(error, (error as { written?: boolean }).written === false ? "unavailable" : "lost"); }
+  if ("error" in reply) throw staged(Object.assign(new Error(reply.error), { code: reply.errorCode, reason: reply.errorReason }), "handler");
+  return reply;
+}
 export type Delivery = { promise: Promise<Reply>; waits: Set<Delivery>; runId?: string };
 export type Instance = {
   moduleId: string; hash: string; activationId: string | null; manifest: ModuleManifest; scope: CallScope;

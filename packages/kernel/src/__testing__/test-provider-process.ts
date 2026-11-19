@@ -56,7 +56,7 @@ async function event(call: Call, callbackId: string, value: RuntimeEvent) {
 }
 function providerInput(call: Call, raw: unknown): ProviderRunInput {
   const { callbacks, operationId: _id, configurationRevision: _revision, deadline, ...input } = runtimeStartSchema.parse(raw);
-  return { ...input, deadline: deadline === null ? null : new Date(deadline), ...(callbacks ? {
+  return { ...input, token: input.token ?? "", deadline: deadline === null ? null : new Date(deadline), ...(callbacks ? {
     events: {
       raw: async value => { await event(call, callbacks, { kind: "raw", value: z.record(z.string(), z.json()).parse(value) }); },
       progress: async value => { await event(call, callbacks, { kind: "progress", value }); },

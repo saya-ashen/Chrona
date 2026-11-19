@@ -11,6 +11,11 @@ type Db = StewardPorts["db"] | Prisma.TransactionClient;
 
 /** Target identity and delivery fences share one resolution policy. */
 export type Target = { module: { id: string; name: string; activeHash: string; workspaceId: string }; tool: RoutedTool; system?: SystemModule };
+export function assertExpectedRequest(requested: RoutedTarget, expected?: ExpectedModuleTarget) {
+  if (typeof requested !== "string" && expected && requested.moduleId !== expected.moduleId) {
+    throw new CallError("conflict", "Target and expected identity differ");
+  }
+}
 export function assertExpectedTarget(resolved: Target | CallError, expected?: ExpectedModuleTarget) {
   if (!expected) return;
   const parsed = expectedModuleTargetSchema.safeParse(expected);
@@ -20,13 +25,14 @@ export function assertExpectedTarget(resolved: Target | CallError, expected?: Ex
       "Registered target identity or version changed; register again");
 }
 /** Kernel-only closure used at the supervisor's final never-sent boundary. */
-export function targetFence(ports: StewardPorts, workspaceId: string, resolved: Target, caller: Caller) {
+export function targetFence(ports: StewardPorts, workspaceId: string, resolved: Target, caller: Caller, beforeDelivery?: () => Promise<void>) {
   return async () => {
     const current = await resolveTarget(ports.db, workspaceId, `${resolved.module.name}.${resolved.tool.name}`);
     try {
       assertExpectedTarget(current, { moduleId: resolved.module.id, hash: resolved.module.activeHash });
       if (current instanceof CallError) throw current;
-      if (!await admitted(ports.db, caller, current.tool, workspaceId)) throw new CallError("forbidden", "Target no longer accepts this caller");
+      if (!await admitted(ports.db, caller, current.tool, workspaceId, current.module)) throw new CallError("forbidden", "Target no longer accepts this caller");
+      await beforeDelivery?.();
     } catch (error) { throw Object.assign(error instanceof Error ? error : new Error(String(error)), { stage: "unavailable" }); }
   };
 }

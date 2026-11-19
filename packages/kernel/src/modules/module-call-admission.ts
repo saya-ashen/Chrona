@@ -13,6 +13,10 @@ export async function discoveryAdmission(db: StewardPorts["db"] | Prisma.Transac
 }
 
 /** Visibility defines the audience; `uses` declares dependencies; approved explicit authority may reach owner tools. */
-export async function admitted(db: StewardPorts["db"] | Prisma.TransactionClient, caller: Caller, tool: RoutedTool, workspaceId: string) {
-  return (await discoveryAdmission(db, caller, workspaceId))(tool);
+export async function admitted(db: StewardPorts["db"] | Prisma.TransactionClient, caller: Caller, tool: RoutedTool, workspaceId: string, target?: { id: string; name: string }) {
+  if (!(await discoveryAdmission(db, caller, workspaceId))(tool)) return false;
+  if (caller.kind !== "module" || !target || target.id === caller.moduleId || target.id.startsWith("system:") || target.id.startsWith("local:")) return true;
+  const provider = await db.agentProvider.findFirst({ where: { workspaceId, moduleId: caller.moduleId }, select: { id: true } });
+  if (!provider) return true;
+  return target.name === "web" && tool.name === "page-set" && !!(await currentCallerManifest(db, workspaceId, caller))?.uses.includes("web.page-set");
 }

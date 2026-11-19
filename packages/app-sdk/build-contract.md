@@ -1,3 +1,11 @@
+## Standalone SDK package
+
+From the Chrona checkout, run `bun run pack:sdk` to create `dist/chrona-org-sdk-<version>.tgz`. In an application checkout, try the artifact with `bun add chrona@file:./vendor/chrona-org-sdk-<version>.tgz` after copying it into `vendor/`. Keep the tarball in application source materials when the lockfile refers to it so installation can reproduce the dependency. After publication, use `bun add chrona@npm:@chrona-org/sdk@<version>` to keep existing `from "chrona"` imports.
+
+Use an explicit manifest entry such as `"entry": { "path": "index.ts", "runtime": "bun", "args": ["--no-install"] }` to load the installed package through normal Bun resolution. The host supplies `CHRONA_PROCESS_HELPER` for supervised subprocesses. For standalone `chrona/testing` or preview runs outside the host, set it to the absolute path to a built `chrona-process-guardian`.
+
+## Application process
+
 Chrona modules are long-running SDK processes. Import { on, chrona } from "chrona" and register on("tool", ...) handlers. The SDK connects to CHRONA_IPC_ENDPOINT using CHRONA_IPC_TOKEN and waits for the authenticated ready ACK. chrona.serve binds an ephemeral authenticated loopback HTTP listener and reports readiness over that connection; browsers reach it through the kernel proxy. Register handlers before asynchronous initialization. Keep durable application state under chrona.paths.data and application files under chrona.paths.content when content is declared. These files are private; expose bounded tools for cross-application access. Never accept caller identity, host paths, Run tokens or privileged authority from arguments.
 
 Authoring is an ordinary application's material workflow. The owner grants an exact candidate admission to the current submitter identity and one target baseline through modules.admit. The author application prepares files under its own content directory, obtains immutable admitted source with modules.source, submits one fixed application material through modules.submit, and reads its durable receipt with modules.receipt. The kernel freezes source bytes and validates the fixed material before checks and activation. A replay returns the same receipt; changed arguments conflict. A passing author test does not itself establish activation or approval. This material admission does not authorize automatic model execution or an unlimited repair loop. Agent is a kernel namespace; concrete Providers, including Pi, follow the ordinary application lifecycle.
@@ -14,4 +22,20 @@ Chrona checks the manifest, immutable material digest, executable modes, depende
 
 Dependencies use package.json with bun.lock or pyproject.toml with uv.lock. Chrona installs from lockfiles without accepting node_modules or .venv from candidate materials. Host programs belong in module.json packages for the current backend: ${BACKEND}. Derive application idempotency keys from the actual triggering operation and persist receipts before acknowledging work.
 
-Application calls use `{ moduleId, tool }`; only kernel namespace targets use strings. Resolve dependencies through `chrona.dependencies` or discover exact IDs with `modules.list`. Pass idempotency keys only as `chrona.call` options; every tool declares its output schema. Timers use `timers.set/cancel/list` and `on("timer")`, not the removed schedule contract.
+Application calls use `{ moduleId, tool }`; kernel and SDK capability targets use strings. Resolve dependencies through `chrona.dependencies` or discover exact IDs with `modules.list`. Pass ordinary call keys in `chrona.call` options. Every tool declares its output schema. Timers use `timers.set/cancel/list` and `on("timer")`.
+
+## Delegating tools
+
+For a conversation Run, pass the task's exact `RoutedTarget[]` in `agent.run.tools`. For example, use `tools: [{ moduleId: bookmarksId, tool: "list" }]` if your app can call that tool. The kernel authorizes the selection as the initiating app and binds the references to the Run and Provider. To restrict inputs or reshape results, declare an ordinary tool in your app's `module.json`, implement it in `on("tool")`, and select that wrapper in `agent.run.tools`. Keep fixed filters and argument mapping in the wrapper's code.
+
+To delegate a tool to another app for one synchronous call, the receiver declares a string parameter such as `lookupRef` in its tool contract. The sender leaves that field out of `args` and supplies the target in `delegations`.
+
+```ts
+await chrona.call({ moduleId: receiverId, tool: "verify" }, {}, {
+  delegations: { lookupRef: { moduleId: bookmarksId, tool: "list" } },
+});
+```
+
+Inside the receiving tool handler, use `await chrona.invokeDelegated(String(event.args.lookupRef), args, key)`. The kernel binds the reference to the receiving app and the target version. The sender supplies the authority, and the calling app is recorded as `event.call?.delegate` on the target event. Reuse the same reference, arguments and key when recovering a reply within the active call. The reference expires when the outer call ends or times out.
+
+A Provider receives the selected definitions and references in its start request and invokes them through SDK target `tool-delegation.invoke` with `{ reference, args, key, timeoutSeconds? }`. Keep references in the Provider's adapter. Give the model tool schemas and names. Use this same delegation for business tools; Provider registration and Run events use their respective platform contracts.

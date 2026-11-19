@@ -2,10 +2,8 @@ import { Hono } from "hono";
 import { createStewardRuntime, type StewardRuntime } from "./steward-runtime";
 import { bodyLimit } from "hono/body-limit";
 
-import { createApiRouter } from "./routes/api";
 import { completeOAuth, OAUTH_CALLBACK_PATH } from "@chrona/kernel";
 import { createLogger } from "./logger";
-import { apiKeyAuth } from "./middleware/auth";
 import { loopbackHostGuard } from "./middleware/host";
 import { isLoopbackBindHost, isTrustedRequestOrigin, readEnv, resolveAllowedOrigins } from "./config/env";
 
@@ -13,12 +11,6 @@ import type { ServerBindings } from "./request-peer";
 
 const log = createLogger("apps.server");
 const MAX_HTTP_BODY_BYTES = 21 * 1024 * 1024;
-
-function isStewardAgentPath(path: string, method: string) {
-  // These exact endpoints validate their own narrower credentials. Prefixes stay API-key protected.
-  return (method === "GET" && path === "/api/steward-agent/catalog")
-    || (method === "POST" && /^\/api\/steward-agent\/tools\/[^/]+$/.test(path));
-}
 
 function getAllowedOrigins() {
   return resolveAllowedOrigins(readEnv());
@@ -66,7 +58,6 @@ export async function createServerApp(options: { steward?: StewardRuntime } = {}
     app.use("*", loopbackHostGuard(extra));
   }
   const steward = options.steward ?? createStewardRuntime((await import("@chrona/db")).db);
-  const api = createApiRouter({ steward });
   const allowedOrigins = getAllowedOrigins();
 
   app.use("/api/*", async (c, next) => {
@@ -86,7 +77,6 @@ export async function createServerApp(options: { steward?: StewardRuntime } = {}
     if (c.req.method === "OPTIONS") return c.body(null, 204);
     await next();
   });
-  app.use("/api/steward-agent/*", apiKeyAuth({ isExempt: isStewardAgentPath }));
   app.use(
     "/api/*",
     bodyLimit({
@@ -111,7 +101,6 @@ export async function createServerApp(options: { steward?: StewardRuntime } = {}
     return c.html(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Chrona</title><p style="font:16px system-ui;margin:3em auto;max-width:30em">${escaped}</p>`, ok ? 200 : 400);
   });
 
-  app.route("/api", api);
   // Paths no kernel route claimed go to the module declaring `listen` for them (v2-4).
   app.all("/api/:name/*", async (c) => {
     const socket = await steward.listener(`/api/${c.req.param("name")}`);

@@ -30,7 +30,7 @@ Chrona 源码仓只维护通用内核及其运行所需的宿主、CLI、数据�
 
 内核事务仅保存后续机制实际读取的有限事实。唯一选定接收应用负责持久接收、ack 与业务通知；没有接收应用不取消审批本体。详见[有限事实](kernel-notification-facts.md)。
 
-HTTP 转发保持应用的 Authorization、Cookie 和 Set-Cookie，替换内部传输 token；接收应用验证其客户端身份和来源。内核不代替应用建立浏览器密码、会话或 MCP 凭据策略。`CHRONA_KERNEL_URL` 仅传递内核 origin，不授予权限；Run 工具桥接仍验证真实 Run token。
+HTTP 转发保持应用的 Authorization、Cookie 和 Set-Cookie，替换内部传输 token；接收应用验证其客户端身份和来源。内核不代替应用建立浏览器密码、会话或 MCP 凭据策略。Provider 的 Run 工具使用 SDK 委托，内核绑定接收者、授权者和目标版本。
 
 ## 存储和代码地图
 

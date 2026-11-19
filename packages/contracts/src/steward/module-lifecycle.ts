@@ -4,7 +4,7 @@ import { slug } from "./module-tool";
 /** Public kernel namespaces, reserved independently of database initialization. */
 export const KERNEL_MODULE_NAMES = ["modules", "approvals", "settings", "secrets", "activity", "timers", "agent"] as const;
 /** Private kernel host identities routed internally; never installable applications. */
-export const LOCAL_CAPABILITY_NAMES = ["runtime-callback", "workspace-local"] as const;
+export const LOCAL_CAPABILITY_NAMES = ["runtime-callback", "tool-delegation", "workspace-local"] as const;
 const releaseNameSchema = slug;
 export const moduleVersionHashSchema = z.string().regex(/^[a-f0-9]{64}$/);
 export const moduleOriginSchema = z.enum(["kernel", "external"]);
