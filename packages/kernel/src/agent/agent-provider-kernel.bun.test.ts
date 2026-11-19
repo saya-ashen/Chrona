@@ -36,7 +36,7 @@ function latch() {
   const promise = new Promise<void>(done => { resolve = done; });
   return { promise, resolve };
 }
-async function fixture(onControl?: (name: string) => Promise<void>) {
+async function fixture(onControl?: (name: string) => Promise<void>, registration = declaration) {
   registerSystemModules();
   const db = testDb({ injectedAgent: false }), dataDir = await mkdtemp(join(tmpdir(), "chrona-provider-kernel-"));
   const databases = await db.$queryRawUnsafe<{ name: string; file: string }[]>("PRAGMA database_list");
@@ -56,6 +56,7 @@ async function fixture(onControl?: (name: string) => Promise<void>) {
     }
     if (name === "abort" && confirmStop) stopped = true;
     if (name === "status") return { result: { operationId: args.operationId, outcome: stopped ? { outcome: "finished", sessionId: null, error: null } : null, failure: false } };
+    if (name === "inspect") return { result: { query: args.query, version: args.version, data: { operationId: args.operationId ?? null, apiKey: "private" } } };
     if (name === "transcript") return { result: transcript };
     if (name === "complete") return { result: { text: "bounded completion", inputTokens: 2, outputTokens: 3 } };
     return { result: {} };
@@ -65,12 +66,12 @@ async function fixture(onControl?: (name: string) => Promise<void>) {
   const startProperties = Object.fromEntries(["operationId", "runId", "token", "lane", "cwd", "sessionDir", "prompt", "systemPrompt", "resources", "callbacks", "model", "configurationRevision"].map(key => [key, string]));
   Object.assign(startProperties, { sessionId: { type: ["string", "null"] }, deadline: { type: ["string", "null"] }, providerOptions: object, searchTools: { type: "boolean" }, images: { type: "array", items: object }, tools: { type: "array", items: object }, hostPaths: { type: "array", items: string }, content: { type: "array", items: object } });
   const backend = await db.module.create({ data: { workspaceId, name: "test-backend", status: "active", activeHash: "backend-v1" } });
-  const manifest = moduleManifestSchema.parse({ name: backend.name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: ["runtime-callback.event"], tools: Object.values(declaration.endpoints).map(name => ({ name, description: name, visibility: ["kernel"], parameters: { type: "object", properties: name === "health" ? {} : name === "start" ? startProperties : name === "native" ? { operationId: string, request: object } : name === "transcript" ? { sessionDir: string, limit: { type: "number" } } : name === "complete" ? { commandKey: string, prompt: string, system: string, model: string, thinking: string, configurationRevision: string, maxOutputTokens: { type: "number" }, timeoutMs: { type: "number" } } : { operationId: string, message: string } }, output: {} })).concat([{ name: "configure", description: "Provider configuration", visibility: ["owner"], parameters: { type: "object", properties: {} }, output: {} }]) });
+  const manifest = moduleManifestSchema.parse({ name: backend.name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: ["runtime-callback.event"], tools: Object.values(registration.endpoints).map(name => ({ name, description: name, visibility: ["kernel"], parameters: { type: "object", properties: name === "health" ? {} : name === "start" ? startProperties : name === "native" ? { operationId: string, request: object } : name === "inspect" ? { operationId: string, configurationRevision: string, query: string, version: { type: "number" }, args: object } : name === "transcript" ? { sessionDir: string, runId: string, limit: { type: "number" } } : name === "complete" ? { commandKey: string, prompt: string, system: string, model: string, thinking: string, configurationRevision: string, maxOutputTokens: { type: "number" }, timeoutMs: { type: "number" } } : { operationId: string, message: string } }, output: {} })).concat([{ name: "configure", description: "Provider configuration", visibility: ["owner"], parameters: { type: "object", properties: {} }, output: {} }]) });
   backend.activeHash = await installTestModuleVersion(ports, backend, manifest);
   const backendCaller = { kind: "module" as const, module: backend.name, moduleId: backend.id, hash: backend.activeHash! };
   async function installCaller(name: string) {
     const row = await db.module.create({ data: { workspaceId, name, status: "active", activeHash: "caller-v1" } });
-    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: ["agent.run", "agent.native", "agent.read", "agent.write", "agent.stop"], model: { tier: "any", maxCalls: 2, maxOutputTokens: 20 } });
+    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: ["agent.run", "agent.inspect", "agent.native", "agent.read", "agent.write", "agent.stop"], model: { tier: "any", maxCalls: 2, maxOutputTokens: 20 } });
     row.activeHash = await installTestModuleVersion(ports, row, manifest);
     return { kind: "module" as const, module: name, moduleId: row.id, hash: row.activeHash! };
   }
@@ -101,6 +102,31 @@ test("kernel boots without a provider and reports explicit unavailability", asyn
   expect(await f.db.run.count()).toBe(0);
 });
 
+test("inspection negotiates the declared scope and version and uses the owned Run binding", async () => {
+  const registration: AgentProviderRegistration = { ...declaration, endpoints: { ...declaration.endpoints, inspect: "inspect" },
+    inspections: [{ query: "models", scope: "provider", version: 1 }, { query: "context", scope: "run", version: 1 }] };
+  const f = await fixture(undefined, registration);
+  await registerAgentProvider(f.ports, f.workspaceId, f.backendCaller, declaration);
+  const models = { providerId: declaration.id, query: "models", version: 1 };
+  const origin = { ...kernelOrigin(f.workspaceId), caller: f.caller };
+  await expect(callSync(f.ports, origin, "agent.inspect", models)).rejects.toMatchObject({ code: "unavailable" });
+  await registerAgentProvider(f.ports, f.workspaceId, f.backendCaller, registration);
+  expect(await f.invoke("providers", {})).toMatchObject({ items: [{ inspections: registration.inspections }] });
+  expect((await callSync(f.ports, origin, "agent.inspect", models)).output).toEqual({ query: "models", version: 1, data: { operationId: null, apiKey: "[redacted]" } });
+  await expect(callSync(f.ports, origin, "agent.inspect", { ...models, version: 2 })).rejects.toMatchObject({ code: "unavailable" });
+  await expect(callSync(f.ports, origin, "agent.inspect", { ...models, query: "context" })).rejects.toMatchObject({ code: "unavailable" });
+  const { runId } = await f.run("inspect-run");
+  const context = { runId, query: "context", version: 1 };
+  await expect(callSync(f.ports, origin, "agent.inspect", context)).rejects.toMatchObject({ code: "unavailable" });
+  const input = await f.claim(runId);
+  await startLocalProvider(f.ports, f.workspaceId, input);
+  const intruder = await f.installCaller("other-app");
+  await expect(callSync(f.ports, { ...origin, caller: intruder }, "agent.inspect", context)).rejects.toMatchObject({ code: "not_found" });
+  expect((await callSync(f.ports, origin, "agent.inspect", context)).output).toEqual({ query: "context", version: 1, data: { operationId: runId, apiKey: "[redacted]" } });
+  expect(f.requests.filter(row => row.name === "inspect")).toHaveLength(2);
+  await f.invoke("stop", { runId }, "stop-inspection");
+}, 10000);
+
 test("normalized reads retain development transcripts larger than a native reply bound", async () => {
   const f = await fixture();
   await registerAgentProvider(f.ports, f.workspaceId, f.backendCaller, declaration);
@@ -113,6 +139,20 @@ test("normalized reads retain development transcripts larger than a native reply
   expect(output.transcript[0]).toMatchObject({ kind: "result", text });
   expect(output.run).toMatchObject({ runId: admitted.runId, status: "queued" });
   await f.invoke("stop", { runId: admitted.runId }, "stop-large-transcript");
+});
+
+test("normalized live text is visible only to the active Run it belongs to", async () => {
+  const f = await fixture();
+  await registerAgentProvider(f.ports, f.workspaceId, f.backendCaller, { ...declaration, capabilities: { ...declaration.capabilities, liveTranscript: true } });
+  const { runId } = await f.run("live-transcript");
+  const live = { id: runId, at: new Date().toISOString(), kind: "text" as const, text: "in progress", partial: true as const };
+  const call = { at: live.at, kind: "tool" as const, tool: "read", args: "{}", callId: "call-a" };
+  f.setTranscript([call, { ...live, id: "another-run" }, live]);
+  expect(await f.invoke("read", { runId, live: true })).toMatchObject({ ended: false, transcript: [call, live] });
+  expect(f.requests.find(row => row.name === "transcript")?.args).toMatchObject({ runId });
+  expect(await f.invoke("read", { runId })).toMatchObject({ ended: false, transcript: [call] });
+  await f.invoke("stop", { runId }, "stop-live-transcript");
+  expect(await f.invoke("read", { runId, live: true })).toMatchObject({ ended: true, transcript: [call] });
 });
 
 test("a terminal Run keeps transcript delivery pending until its Provider becomes available", async () => {

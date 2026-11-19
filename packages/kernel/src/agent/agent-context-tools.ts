@@ -3,6 +3,7 @@ import type { RoutedTarget } from "@chrona/contracts/steward";
 import type { StewardPorts } from "../ports";
 import { admitted, callSync, CallError, type Caller, type CallOrigin } from "../modules/module-calls";
 import { moduleTools, catalogEntry } from "../modules/module-tools";
+import { canDelegateTool } from "../modules/module-call-admission";
 import { assertApprovedAgentPrincipal, type ModulePrincipal } from "./agent-context-state";
 import { runExpired } from "../execution/run-finish";
 
@@ -19,7 +20,9 @@ export async function selectContextTools(ports: StewardPorts, principal: ModuleP
   for (const target of targets) {
     const entry = entries.find(entry => typeof target === "string" ? `${entry.module.name}.${entry.tool.name}` === target : entry.module.id === target.moduleId && entry.tool.name === target.tool);
     if (!entry) throw new CallError("not_found", `Agent tool ${target} not found`);
-    if (entry.module.name === "secrets" || !await admitted(ports.db, caller, entry.tool, principal.workspaceId, entry.module)) throw new CallError("forbidden", `Agent caller cannot use ${target}`);
+    if (!canDelegateTool(entry.module.name, entry.tool.name) || !await admitted(ports.db, caller, entry.tool, principal.workspaceId, entry.module)) {
+      throw new CallError("forbidden", `Agent caller cannot use ${target}`);
+    }
     // Explicit Run selections must be callable without workspace focus or tool search.
     if (names.has(entry.name)) continue;
     names.add(entry.name);

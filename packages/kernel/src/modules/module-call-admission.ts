@@ -3,6 +3,10 @@ import type { StewardPorts } from "../ports";
 import type { Caller, Tool, RoutedTool } from "./module-call-types";
 import { currentCallerManifest } from "./module-owner";
 
+export function canDelegateTool(moduleName: string, toolName: string) {
+  return moduleName !== "secrets" || ["list", "set", "remove"].includes(toolName);
+}
+
 /** One discovery operation may reuse its caller read; never retain this check across requests or use it to invoke tools. */
 export async function discoveryAdmission(db: StewardPorts["db"] | Prisma.TransactionClient, caller: Caller, workspaceId: string) {
   if (caller.kind === "system") return (tool: RoutedTool) => tool.visibility.includes("modules");

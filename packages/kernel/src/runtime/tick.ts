@@ -69,6 +69,7 @@ export function createTick(ports: StewardPorts) {
   const installChecks = new Map<string, Promise<void>>(), checkFailures = new Map<string, unknown>();
   const finalizers = new Set<Promise<unknown>>();
   const pendingFinalizations = new Map<string, PendingFinalization>();
+  let collectingStore: Promise<unknown> | undefined;
   async function tick(now = ports.now()) {
     const failures: { workspaceId: string; stage: string; error: unknown }[] = [...checkFailures].map(([workspaceId, error]) => ({
       workspaceId, stage: "modules", error }));
@@ -76,9 +77,9 @@ export function createTick(ports: StewardPorts) {
     // A backlog pass can take ~100 s on a large DB (measured); never hold up runs and timers for it.
     void pruneHistory(ports.db, now).catch(error => console.error(JSON.stringify({ component: "retention", event: "prune_failed",
       error: String(error).slice(0, 300) })));
-    void collectStore(ports, now).catch(function (error) {
+    collectingStore ??= collectStore(ports, now).catch(error => {
       console.error(JSON.stringify({ component: "store-gc", event: "collect_failed", error: String(error).slice(0, 300) }));
-    });
+    }).finally(() => { collectingStore = undefined; });
     for (const workspace of await ports.db.workspace.findMany()) {
       const workspaceId = workspace.id, runs = createRuns(ports, workspaceId);
       async function runInput(run: NonNullable<Awaited<ReturnType<typeof runs.claimNext>>>) {
@@ -158,7 +159,7 @@ export function createTick(ports: StewardPorts) {
     return { failures };
   }
   return Object.assign(tick, { settled: async ({ includeRuns = false } = {}) => {
-    await Promise.all([...installChecks.values(), ...(includeRuns ? finalizers : []), timersSettled(ports)]);
+    await Promise.all([...installChecks.values(), ...(includeRuns ? finalizers : []), collectingStore, timersSettled(ports)]);
     await callsSettled(ports);
   } });
 }

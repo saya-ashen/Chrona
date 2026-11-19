@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { lstat, mkdir, realpath } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
+import { Prisma } from "@chrona/db";
 import { candidateAdmissionInputSchema, candidateCheckInputSchema, candidateReceiptSchema, candidateSourceInputSchema,
   candidateSubmitInputSchema, type CandidateReceipt, type CandidateSubmitInput, type CandidateAdmissionOutput,
   type CandidateSourceOutput } from "../../../contracts/src/steward/module-candidates";
@@ -13,7 +14,7 @@ import { parseInput, StewardError } from "../errors";
 import { json, moduleContext, type ModuleContext } from "./module-context";
 import { checkoutModule } from "./module-files";
 import { moduleMaterialDigest, snapshotModuleMaterial } from "./module-artifacts";
-import { storeVersionMaterial, readStoredVersionMaterial } from "./module-artifacts";
+import { storeVersionMaterial, readStoredVersionMaterial, withMaterialPublication } from "./module-artifacts";
 import { assertCandidateAdmissionIn, assertCandidateOwner, assertCandidateSubmitter, candidateDigest, candidateRequestId,
   readCandidateAdmissionIn, readCandidateSetIn, type CandidateAdmissionRecord, type CandidateDb,
   type CandidateSet } from "./module-candidate-records";
@@ -65,18 +66,13 @@ async function authorizedAdmission(context: ModuleContext, db: CandidateDb, call
   await assertCandidateOwner(db, context.workspaceId, admission.issuer);
   return admission;
 }
-/** Project one fixed member, retaining the terminal result after a recorded module removal. */
+/** The terminal receipt can outlive its version. */
 async function receiptMemberView(context: ModuleContext, db: CandidateDb, state: CandidateSet["state"],
   member: CandidateSet["member"]): Promise<CandidateReceipt["member"]> {
   const version = await db.moduleVersion.findUnique({ where: { id: member.versionId } });
   const module = await db.module.findFirst({ where: { id: member.moduleId, workspaceId: context.workspaceId } });
-  if (!version || !module) {
-    if ((state === "approved" || state === "rejected") && await db.moduleRemoval.findFirst({ where: { workspaceId: context.workspaceId,
-      moduleId: member.moduleId } })) {
-      return { ...member, status: state, selected: false };
-    }
-    throw new StewardError("conflict", "Fixed candidate member is missing");
-  }
+  if ((!version || !module) && (state === "approved" || state === "rejected")) return { ...member, status: state, selected: false };
+  if (!version || !module) throw new StewardError("conflict", "Fixed candidate member is missing");
   if (version.moduleId !== member.moduleId || version.hash !== member.hash) throw new StewardError("conflict", "Fixed candidate member changed");
   return { ...member, status: candidateReceiptSchema.shape.member.shape.status.parse(version.status), selected: module.activeHash === member.hash };
 }
@@ -173,7 +169,24 @@ export async function submitCandidates(
     return null;
   });
   if (completed) return completed;
-  await storeVersionMaterial(context.platform, frozen.files);
+  return withMaterialPublication(context.platform, async () => {
+    await storeVersionMaterial(context.platform, frozen.files);
+    return publishCandidate(context, caller, input, frozen, invocationId);
+  });
+}
+
+async function assertNewCandidate(db: CandidateDb, workspaceId: string, moduleId: string, hash: string) {
+  const version = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash } }, select: { id: true } });
+  const archived = version ? [] : await db.$queryRaw<[{ id: string }] | []>(Prisma.sql`
+    SELECT r."id" FROM "CandidateReceipt" r JOIN "CandidateAdmission" a ON a."id" = r."admissionId"
+    WHERE a."workspaceId" = ${workspaceId} AND json_extract(r."members", '$[0].moduleId') = ${moduleId}
+      AND json_extract(r."members", '$[0].hash') = ${hash} LIMIT 1`);
+  if (version || archived.length) throw new StewardError("conflict", "Candidate version already exists; terminal versions cannot be resubmitted");
+}
+
+function publishCandidate(context: ModuleContext, caller: Caller, input: CandidateSubmitInput,
+  frozen: Awaited<ReturnType<typeof freezeItem>>, invocationId?: string) {
+  const { ports, workspaceId } = context;
   return ports.db.$transaction(async tx => {
     const previous = await replay(context, tx, caller, input);
     if (previous) return previous;
@@ -196,9 +209,7 @@ export async function submitCandidates(
     };
     {
       const item = frozen;
-      if (await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: item.moduleId,
-        hash: frozen.materialDigest } } })) throw new StewardError("conflict",
-        "Candidate version already exists; terminal versions cannot be resubmitted");
+      if (item.target.moduleId) await assertNewCandidate(tx, workspaceId, item.moduleId, item.materialDigest);
       if (item.target.moduleId === null) await tx.module.create({ data: { id: item.moduleId, workspaceId, name: item.item.name } });
       await tx.moduleVersion.create({ data: { id: item.versionId, moduleId: item.moduleId, hash: frozen.materialDigest,
         manifest: json(item.manifest), intent: json(item.item.intent), report: json({ tests: [] }), status: "building", source: "candidate",

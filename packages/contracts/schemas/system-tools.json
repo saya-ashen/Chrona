@@ -37,6 +37,10 @@
             },
             "resume": {
               "type": "boolean"
+            },
+            "liveTranscript": {
+              "type": "boolean",
+              "const": true
             }
           },
           "required": [
@@ -87,6 +91,10 @@
             "complete": {
               "type": "string",
               "pattern": "^[a-z][a-z0-9-]{1,40}$"
+            },
+            "inspect": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{1,40}$"
             }
           },
           "required": [
@@ -98,6 +106,38 @@
             "release"
           ],
           "additionalProperties": false
+        },
+        "inspections": {
+          "maxItems": 40,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string",
+                "maxLength": 100,
+                "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$"
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "provider",
+                  "run"
+                ]
+              }
+            },
+            "required": [
+              "query",
+              "version",
+              "scope"
+            ],
+            "additionalProperties": false
+          }
         },
         "configuration": {
           "type": "object",
@@ -177,6 +217,10 @@
             },
             "resume": {
               "type": "boolean"
+            },
+            "liveTranscript": {
+              "type": "boolean",
+              "const": true
             }
           },
           "required": [
@@ -227,6 +271,10 @@
             "complete": {
               "type": "string",
               "pattern": "^[a-z][a-z0-9-]{1,40}$"
+            },
+            "inspect": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{1,40}$"
             }
           },
           "required": [
@@ -238,6 +286,38 @@
             "release"
           ],
           "additionalProperties": false
+        },
+        "inspections": {
+          "maxItems": 40,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string",
+                "maxLength": 100,
+                "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$"
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "provider",
+                  "run"
+                ]
+              }
+            },
+            "required": [
+              "query",
+              "version",
+              "scope"
+            ],
+            "additionalProperties": false
+          }
         },
         "configuration": {
           "type": "object",
@@ -356,6 +436,10 @@
                   },
                   "resume": {
                     "type": "boolean"
+                  },
+                  "liveTranscript": {
+                    "type": "boolean",
+                    "const": true
                   }
                 },
                 "required": [
@@ -406,6 +490,10 @@
                   "complete": {
                     "type": "string",
                     "pattern": "^[a-z][a-z0-9-]{1,40}$"
+                  },
+                  "inspect": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]{1,40}$"
                   }
                 },
                 "required": [
@@ -417,6 +505,38 @@
                   "release"
                 ],
                 "additionalProperties": false
+              },
+              "inspections": {
+                "maxItems": 40,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "query": {
+                      "type": "string",
+                      "maxLength": 100,
+                      "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 65535
+                    },
+                    "scope": {
+                      "type": "string",
+                      "enum": [
+                        "provider",
+                        "run"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "query",
+                    "version",
+                    "scope"
+                  ],
+                  "additionalProperties": false
+                }
               },
               "configuration": {
                 "type": "object",
@@ -477,6 +597,189 @@
     "visibility": [
       "modules",
       "owner"
+    ],
+    "idempotent": true
+  },
+  "agent.inspect": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "providerId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "query": {
+              "type": "string",
+              "maxLength": 100,
+              "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$"
+            },
+            "version": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "args": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/__schema0"
+              }
+            }
+          },
+          "required": [
+            "providerId",
+            "query",
+            "version"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "runId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "query": {
+              "type": "string",
+              "maxLength": 100,
+              "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$"
+            },
+            "version": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "args": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/__schema0"
+              }
+            }
+          },
+          "required": [
+            "runId",
+            "query",
+            "version"
+          ],
+          "additionalProperties": false
+        }
+      ],
+      "$defs": {
+        "__schema0": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema0"
+              }
+            },
+            {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/__schema0"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "maxLength": 100,
+          "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "data": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema0"
+          }
+        }
+      },
+      "required": [
+        "query",
+        "version",
+        "data"
+      ],
+      "additionalProperties": false,
+      "$defs": {
+        "__schema0": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema0"
+              }
+            },
+            {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/__schema0"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "visibility": [
+      "modules"
     ],
     "idempotent": true
   },
@@ -680,6 +983,10 @@
             "normalized",
             "native"
           ]
+        },
+        "live": {
+          "type": "boolean",
+          "const": true
         }
       },
       "required": [
@@ -891,6 +1198,10 @@
                   },
                   "text": {
                     "type": "string"
+                  },
+                  "partial": {
+                    "type": "boolean",
+                    "const": true
                   }
                 },
                 "required": [
@@ -912,6 +1223,9 @@
                   "kind": {
                     "type": "string",
                     "const": "tool"
+                  },
+                  "callId": {
+                    "type": "string"
                   },
                   "tool": {
                     "type": "string"
@@ -940,6 +1254,9 @@
                   "kind": {
                     "type": "string",
                     "const": "result"
+                  },
+                  "callId": {
+                    "type": "string"
                   },
                   "tool": {
                     "type": "string"

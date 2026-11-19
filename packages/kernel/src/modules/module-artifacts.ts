@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { mkdir } from "node:fs/promises";
+import { resolve } from "node:path";
 import { MODULE_MATERIAL_FILE, MODULE_SOURCE_MAX_BYTES, MODULE_SOURCE_MAX_FILES, MODULE_ARTIFACT_MAX_BYTES, MODULE_ARTIFACT_MAX_FILE_BYTES, isModuleMaterialPath, moduleMaterialSchema, type ModuleMaterial } from "../../../contracts/src/steward/module-material";
-import { ModuleSnapshot, openModuleDirectory, type ModuleFile } from "./module-files";
+import { ModuleSnapshot, openModuleDirectory, openOptionalModuleDirectory, sweepModuleDirectories, type ModuleDirectory, type ModuleFile } from "./module-files";
 import { StewardError } from "../errors";
 
 const sorted = (files: ModuleFile[]) => [...files].sort((a, b) => a.path.localeCompare(b.path));
@@ -148,15 +149,16 @@ export async function storeVersionMaterial(platform: string, files: ModuleFile[]
   return hash;
 }
 
+async function readMaterialIndex(materials: ModuleDirectory) {
+  const entries = await materials.entries(), file = await materials.read("bytes", MODULE_SOURCE_MAX_BYTES);
+  if (entries.length !== 1 || entries[0]?.name !== "bytes" || file.executable) throw new StewardError("conflict", "Stored material index layout mismatch; object preserved");
+  return storedSourceSchema.parse(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(file.bytes)));
+}
+
 export async function readStoredVersionMaterial(platform: string, hash: string): Promise<ModuleFile[]> {
   if (!/^[a-f0-9]{64}$/.test(hash)) throw new StewardError("invalid", "Invalid material SHA256 identity");
   const materials = await openModuleDirectory(platform, `materials/sha256/${hash}`);
-  let index: z.infer<typeof storedSourceSchema>;
-  try {
-    const entries = await materials.entries(), file = await materials.read("bytes", MODULE_SOURCE_MAX_BYTES);
-    if (entries.length !== 1 || entries[0]?.name !== "bytes" || file.executable) throw new StewardError("conflict", "Stored material index layout mismatch; object preserved");
-    index = storedSourceSchema.parse(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(file.bytes)));
-  } finally { await materials.close(); }
+  const index = await readMaterialIndex(materials).finally(() => materials.close());
   const objects = await openModuleDirectory(platform, "artifacts/sha256"), source: ModuleFile[] = [];
   let total = 0;
   try {
@@ -169,4 +171,32 @@ export async function readStoredVersionMaterial(platform: string, hash: string):
   const files = await restoreModuleArtifacts(platform, source);
   if (moduleMaterialDigest(files) !== hash) throw new StewardError("conflict", "Stored material differs from its SHA256 identity; objects preserved");
   return files;
+}
+
+const materialOperations = new Map<string, Promise<unknown>>();
+
+export async function withMaterialPublication<T>(platform: string, operation: () => Promise<T>): Promise<T> {
+  const key = resolve(platform);
+  const pending = materialOperations.get(key);
+  const result = pending ? pending.then(operation, operation) : Promise.resolve().then(operation);
+  materialOperations.set(key, result);
+  try { return await result; }
+  finally { if (materialOperations.get(key) === result) materialOperations.delete(key); }
+}
+
+export async function collectMaterialObjects(platform: string, versions: Set<string>) {
+  const indexesRemoved = await sweepModuleDirectories(platform, "materials/sha256", versions);
+  const objects = await openOptionalModuleDirectory(platform, "artifacts/sha256");
+  if (!objects) return { indexesRemoved, objectsRemoved: 0 };
+  try {
+    const keep = new Set<string>();
+    for (const hash of versions) {
+      if (!/^[a-f0-9]{64}$/.test(hash)) continue;
+      const files = await readStoredVersionMaterial(platform, hash).catch(error => {
+        throw new Error(`Cannot verify retained material ${hash}: ${String(error)}`, { cause: error });
+      });
+      for (const file of files) keep.add(sha256(file.bytes));
+    }
+    return { indexesRemoved, objectsRemoved: await objects.sweepDigests(keep) };
+  } finally { await objects.close(); }
 }

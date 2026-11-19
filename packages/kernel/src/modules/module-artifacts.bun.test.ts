@@ -9,7 +9,7 @@ import { MODULE_MATERIAL_FILE, MODULE_SOURCE_MAX_BYTES, MODULE_SOURCE_MAX_FILES,
 // Engine imports must never inherit a developer/live database URL.
 const databaseRoot = mkdtempSync(join(tmpdir(), "chrona-material-test-db-"));
 process.env.DATABASE_URL = `file:${join(databaseRoot, "test.db")}`;
-const [{ snapshotModuleMaterial, moduleMaterialDigest, moduleSourceFiles, storeModuleArtifacts, storeVersionMaterial, readStoredVersionMaterial }, { snapshotModule, ModuleDirectory, checkoutModule }, { admitCandidates, submitCandidates, candidateSource }, { testDb }, { moduleContext }, { buildPending }, { ensureVersionMaterial }, { rollback }, { testModuleProcess }, { createExternalModuleInstaller, installExternal }] = await Promise.all([
+const [{ snapshotModuleMaterial, moduleMaterialDigest, moduleSourceFiles, storeModuleArtifacts, storeVersionMaterial, readStoredVersionMaterial }, { snapshotModule, ModuleDirectory, checkoutModule }, { admitCandidates, submitCandidates, candidateSource, checkCandidates }, { testDb }, { moduleContext }, { buildPending }, { ensureVersionMaterial }, { rollback }, { testModuleProcess }, { createExternalModuleInstaller, installExternal }] = await Promise.all([
   import("./module-artifacts"), import("./module-files"), import("./module-candidates"), import("../__testing__/test-db"), import("./module-context"), import("./module-build"), import("./module-source"), import("./module-activation"), import("../__testing__/module-test-process"), import("./module-install"),
 ]);
 const roots: string[] = [];
@@ -154,7 +154,10 @@ test.each([true, false])("candidate receipts freeze materials, replay and export
     await writeFile(join(f.dir, MODULE_MATERIAL_FILE), JSON.stringify(f.record));
   }
   const workspace = await db.workspace.create({ data: { name: "material test" } });
-  const authorHash = "a".repeat(64), author = await db.module.create({ data: { workspaceId: workspace.id, name: "author", activeHash: authorHash } });
+  const authorMaterial = (await snapshotModuleMaterial(f.root, "submitted")).map(file =>
+    file.path === "index.ts" ? { ...file, bytes: Buffer.from("// Author entry") } : file);
+  const authorHash = await storeVersionMaterial(f.repository.platform, authorMaterial);
+  const author = await db.module.create({ data: { workspaceId: workspace.id, name: "author", activeHash: authorHash } });
   await db.moduleVersion.create({ data: { moduleId: author.id, hash: authorHash, manifest: { ...f.manifest, name: "author", uses: ["*"],
       authority: "owner"
 }, intent: {}, report: {}, source: "user", status: "approved" } });
@@ -183,6 +186,20 @@ test.each([true, false])("candidate receipts freeze materials, replay and export
     expect(await readFile(join(checkout, "index.ts"), "utf8")).toBe("export {};");
     expect(moduleMaterialDigest(await snapshotModuleMaterial(context.platform, `store/${member.hash}`, { verifyTree: true }))).toBe(member.materialDigest);
   }
+  const check = () => checkCandidates(ports, workspace.id, caller, { receiptId: receipt.receiptId });
+  expect(await check()).toMatchObject({ state: "approved", member: { selected: true } });
+  await db.module.update({ where: { id: member.moduleId }, data: { activeHash: null } });
+  const { collectStore } = await import("../store-gc");
+  const later = new Date(version.createdAt.getTime() + 31 * 24 * 3600_000);
+  expect(await collectStore(ports, later)).toMatchObject({ versionsRemoved: 1, indexesRemoved: 1 });
+  const archived = await check();
+  expect(archived).toMatchObject({ state: "approved", member: { versionId: member.versionId, status: "approved", selected: false } });
+  expect(await submitCandidates(ports, workspace.id, caller, input)).toEqual(archived);
+  const duplicate = await admitCandidates(ports, workspace.id, owner, { requestKey: "duplicate", submitter: { moduleId: author.id, hash: authorHash },
+    target: { name: "fixture", moduleId: member.moduleId, expectedActiveHash: null } });
+  await checkoutModule(content, "duplicate", files);
+  await expect(submitCandidates(ports, workspace.id, caller, { ...input, admissionId: duplicate.admissionId, requestKey: "duplicate",
+    item: { ...input.item, dir: "duplicate" } })).rejects.toThrow("terminal versions cannot be resubmitted");
 });
 
 test.each(["none", "bytes", "extra"])("the native checker preserves frozen artifacts and rollback bytes (mutation=%s)", async mutate => {

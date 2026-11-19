@@ -7,7 +7,7 @@ import { tool } from "../system/shared";
 import { CallError, callSync, duplicateReply, previousCall, registerLocalModule, type Caller, type CallOrigin, type Json } from "./module-calls";
 import { moduleRequestDigest } from "./module-request-digest";
 import { assertExpectedTarget, resolveTarget, routedTargetName } from "./module-call-target";
-import { admitted } from "./module-call-admission";
+import { admitted, canDelegateTool } from "./module-call-admission";
 import { currentCallerManifest } from "./module-owner";
 
 type Principal = Extract<Caller, { kind: "module" }>;
@@ -32,7 +32,7 @@ async function retainOrdinaryTool(ports: StewardPorts, origin: CallOrigin, targe
   const name = await routedTargetName(ports.db, workspaceId, target);
   const resolved = await resolveTarget(ports.db, workspaceId, name);
   if (resolved instanceof CallError) throw resolved;
-  if (resolved.module.name === "secrets" || !await admitted(ports.db, authorizer, resolved.tool, workspaceId, resolved.module)) {
+  if (!canDelegateTool(resolved.module.name, resolved.tool.name) || !await admitted(ports.db, authorizer, resolved.tool, workspaceId, resolved.module)) {
     throw new CallError("forbidden", "Tool delegation exceeds caller authority");
   }
   const expectedTarget = { moduleId: resolved.module.id, hash: resolved.module.activeHash };

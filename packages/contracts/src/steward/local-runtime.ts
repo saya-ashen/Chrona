@@ -7,9 +7,9 @@ export const runtimeOutcomeSchema = z.object({ outcome: z.enum(["finished", "fai
 export const runtimeHealthSchema = z.object({ name: z.string().min(1), supportsRunModel: z.boolean(), complete: z.boolean(), available: z.boolean(), sandboxed: z.boolean(), error: z.string().nullable() }).strict();
 export const runtimeCompletionSchema = z.object({ text: z.string(), inputTokens: z.number().int().nonnegative().nullable(), outputTokens: z.number().int().nonnegative().nullable() }).strict();
 export const runtimeTranscriptSchema = z.array(z.discriminatedUnion("kind", [
-  z.object({ id: z.string().optional(), at: z.string(), kind: z.literal("text"), text: z.string() }).strict(),
-  z.object({ id: z.string().optional(), at: z.string(), kind: z.literal("tool"), tool: z.string(), args: z.string() }).strict(),
-  z.object({ id: z.string().optional(), at: z.string(), kind: z.literal("result"), tool: z.string(), text: z.string(), error: z.boolean() }).strict(),
+  z.object({ id: z.string().optional(), at: z.string(), kind: z.literal("text"), text: z.string(), partial: z.literal(true).optional() }).strict(),
+  z.object({ id: z.string().optional(), at: z.string(), kind: z.literal("tool"), callId: z.string().optional(), tool: z.string(), args: z.string() }).strict(),
+  z.object({ id: z.string().optional(), at: z.string(), kind: z.literal("result"), callId: z.string().optional(), tool: z.string(), text: z.string(), error: z.boolean() }).strict(),
 ])).max(300);
 export const runtimeImageSchema = z.object({ mime: z.string().max(200), base64: z.string().max(8 * 1024 * 1024) }).strict();
 export const runtimeToolSchema = z.object({

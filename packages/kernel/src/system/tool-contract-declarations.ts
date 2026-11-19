@@ -15,6 +15,7 @@ const readers = ["modules", "owner", "provider"] as const;
 const agentGuidance: Record<keyof typeof kernelAgentInputs, string> = {
   register: "Register this caller's Provider declaration.",
   providers: "Discover available Providers and their capabilities before selecting one.",
+  inspect: "Inspect a declared versioned Provider or owned Run query without starting a Run.",
   run: "Accept a caller-owned Run and return its identity without waiting for model completion. Persist the call key and exact arguments before sending; recover a lost response with the same key and arguments. Read progress with agent.read.",
   read: "Read one owned Run. Drain nextCursor even when ended is true; ended describes execution, not pagination. Normalized transcript is a bounded snapshot, not an append-only delta.",
   write: "Submit input to an owned Run with a stable call key. A repeated key cannot repeat the effect; an unresolved control outcome remains unknown. Preserve the original request and reconcile the Run rather than inventing another key.",
@@ -28,7 +29,7 @@ export const publicSystemTools = {
     const key = name as keyof typeof kernelAgentInputs;
     return tool(key, `Kernel Agent ${key}. ${agentGuidance[key]} Call synchronously (mode: sync); mode: async is unsupported. callStatus can observe a keyed synchronous invocation receipt, not live Run progress or new stop evidence. Provider identity and Run ownership are checked by the kernel.`, {}, [], {
       visibility: key === "providers" ? ["modules", "owner"] : ["modules"],
-      idempotent: ["register", "providers", "read"].includes(key), input: kernelAgentInputs[key], output: kernelAgentOutputs[key],
+      idempotent: ["register", "providers", "inspect", "read"].includes(key), input: kernelAgentInputs[key], output: kernelAgentOutputs[key],
     });
   })),
   activity: declaredSystemTools("activity", [

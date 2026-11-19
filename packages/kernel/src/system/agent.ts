@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { kernelAgentInputs, providerNativeOutput, runtimeTranscriptSchema } from "@chrona/contracts/steward";
+import { agentInspectOutput, kernelAgentInputs, providerNativeOutput, runtimeTranscriptSchema } from "@chrona/contracts/steward";
 import type { Prisma } from "@chrona/db";
 import { publicSystemTools } from "./tool-contract-declarations";
 import type { SystemModule } from "../modules/module-system-types";
@@ -24,6 +24,7 @@ function cursorSequence(cursor: string | undefined, runId: string, kind: string)
   } catch { throw new CallError("invalid", "Read cursor belongs to another Run or view"); }
 }
 async function read(ports: StewardPorts, principal: ModulePrincipal, args: ReturnType<typeof kernelAgentInputs.read.parse>) {
+  await assertApprovedAgentPrincipal(ports.db, principal);
   const after = cursorSequence(args.cursor, args.runId, args.view), until = Date.now() + args.waitMs;
   let run = await ownedRun(ports.db, principal, args.runId);
   let rows;
@@ -41,10 +42,12 @@ async function read(ports: StewardPorts, principal: ModulePrincipal, args: Retur
     try {
       const binding = await runProviderBinding(ports, principal.workspaceId, run.id), declaration = providerSnapshot(binding.declaration);
       if (declaration.endpoints.transcript) {
-        const raw = await callProviderEndpoint(ports, principal.workspaceId, binding, "transcript", { sessionDir: join(ports.dataDir, "sessions", run.sessionId!, ".chrona", "sessions"), limit: args.limit });
+        const live = args.live && declaration.capabilities.liveTranscript && view(run).active;
+        const raw = await callProviderEndpoint(ports, principal.workspaceId, binding, "transcript", { sessionDir: join(ports.dataDir, "sessions", run.sessionId!, ".chrona", "sessions"), limit: args.limit, ...(live ? { runId: run.id } : {}) });
         // A normalized conversation is a collection of messages, not a native RPC reply.
         // Keep its complete bounded transcript below the 32 MiB module transport envelope.
-        transcript = runtimeTranscriptSchema.parse(maskProviderPayload(runtimeTranscriptSchema.parse(raw), [], 16 * 1024 * 1024));
+        const records = runtimeTranscriptSchema.parse(raw).filter(item => item.kind !== "text" || !item.partial || (live && item.id === run.id));
+        transcript = runtimeTranscriptSchema.parse(maskProviderPayload(records, [], 16 * 1024 * 1024));
         transcriptState = { status: "available" };
       }
     } catch (error) {
@@ -59,15 +62,51 @@ async function read(ports: StewardPorts, principal: ModulePrincipal, args: Retur
   return { run: view(run), items, nextCursor: view(run).active || items.length === args.limit ? Buffer.from(JSON.stringify({ runId: run.id, kind: args.view, sequence })).toString("base64url") : null, ended: !view(run).active, interactions: await contextInteractions(ports, run), ...(args.view === "normalized" ? { transcriptState } : {}), ...(transcript ? { transcript } : {}) };
 }
 
+function matchesInspection(result: { query: string; version: number }, request: { query: string; version: number }) {
+  return result.query === request.query && result.version === request.version;
+}
+
+async function inspect(ports: StewardPorts, principal: ModulePrincipal, args: ReturnType<typeof kernelAgentInputs.inspect.parse>) {
+  const { workspaceId } = principal;
+  await assertApprovedAgentPrincipal(ports.db, principal);
+  let binding, operationId, scope: "run" | "provider";
+  if ("runId" in args) {
+    const run = await ownedRun(ports.db, principal, args.runId);
+    operationId = run.id;
+    binding = await runProviderBinding(ports, workspaceId, run.id);
+    if (!await ports.db.providerLaunch.findUnique({ where: { runId: run.id } })) {
+      throw new CallError("unavailable", "Provider operation has not started");
+    }
+    scope = "run";
+  } else {
+    const provider = await ports.db.agentProvider.findUnique({ where: { workspaceId_id: { workspaceId, id: args.providerId } } });
+    if (!provider) throw new CallError("not_found", "Provider is not registered");
+    binding = { ...provider, providerId: provider.id };
+    scope = "provider";
+  }
+  const declaration = providerSnapshot(binding.declaration), { query, version } = args;
+  if (!declaration.inspections?.some(item => item.query === query && item.version === version && item.scope === scope)) {
+    throw new CallError("unavailable", "Provider does not support this inspection query, version or scope");
+  }
+  const raw = await callProviderEndpoint(ports, workspaceId, binding, "inspect", {
+    query, version, args: args.args, operationId, configurationRevision: declaration.configuration?.revision,
+  });
+  const result = agentInspectOutput.safeParse(raw);
+  if (!result.success || !matchesInspection(result.data, { query, version })) {
+    throw new CallError("unavailable", "Provider returned an invalid inspection response");
+  }
+  return { query, version, data: maskProviderPayload(result.data.data) };
+}
+
 export const agent: SystemModule = {
   name: "agent", description: "Registered providers and caller-owned durable Agent Runs.", tools: publicSystemTools.agent,
-  unrecorded: ["register", "providers", "run", "read", "write", "stop", "native"],
+  unrecorded: ["register", "providers", "inspect", "run", "read", "write", "stop", "native"],
   async handle({ ports, workspaceId, caller, call, run: scope }, name, raw) {
     if (name === "register") return json(await registerAgentProvider(ports, workspaceId, caller, kernelAgentInputs.register.parse(raw)));
     if (name === "providers") return json(await listAgentProviders(ports, workspaceId, kernelAgentInputs.providers.parse(raw)));
     if (caller.kind !== "module") throw new CallError("forbidden", "Agent Runs require their actual module caller");
     const principal = { workspaceId, ownerId: "owner", caller } satisfies ModulePrincipal;
-    if (name === "read") await assertApprovedAgentPrincipal(ports.db, principal);
+    if (name === "inspect") return json(await inspect(ports, principal, kernelAgentInputs.inspect.parse(raw)));
     if (name === "read") return json(await read(ports, principal, kernelAgentInputs.read.parse(raw)));
     if (!call?.key) throw new CallError("invalid", "Agent commands require a call key");
     if (name === "run") {

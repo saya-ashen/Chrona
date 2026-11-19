@@ -36,11 +36,6 @@ export async function publishRestoredMaterial(store: string, staging: string, ha
     } finally { await source.close(); }
   } finally { await parent.close(); }
 }
-/** GC may remove a checkout only after all retained material bytes verify. */
-export async function versionMaterialRestorable(context: ModuleContext, version: ModuleVersion) {
-  await versionMaterial(context, version);
-  return true;
-}
 export async function ensureVersionMaterial(context: ModuleContext, version: ModuleVersion) {
   const source = await versionMaterial(context, version);
   const path = relative(context.platform, join(context.store, version.hash));

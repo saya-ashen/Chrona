@@ -109,6 +109,29 @@ test("changed pinned release can be explicitly retried after startup rejection",
   expect(await installExternal(f.ports, f.workspaceId, request)).toMatchObject({ status: "failed" });
 });
 
+test("a rejected first install can retry fixed material with the same identity and a new receipt", async () => {
+  const f = await fixture(), context = moduleContext(f.ports, f.workspaceId), sandbox = f.ports.sandbox!;
+  const first = { package: "files", mode: "install" as const, requestKey: "initial-startup-failed" };
+  const candidate = await installExternal(f.ports, f.workspaceId, first);
+  f.ports.sandbox = { ...sandbox, startModule: () => { throw new Error("synthetic startup rejection"); } };
+  await buildPending(context); await refreshInstallationReceipts(f.ports, f.workspaceId);
+  const failed = await installExternal(f.ports, f.workspaceId, first);
+  expect(failed).toMatchObject({ status: "failed", moduleId: candidate.moduleId, hash: candidate.hash });
+  f.ports.sandbox = sandbox;
+  const duplicate = { ...first, requestKey: "initial-same-material" };
+  expect(await installExternal(f.ports, f.workspaceId, duplicate)).toMatchObject({ status: "failed", moduleId: candidate.moduleId });
+  await f.resource("files", { description: "Corrected initial release" });
+  const retry = { ...first, requestKey: "initial-startup-retry" };
+  const next = await installExternal(f.ports, f.workspaceId, retry);
+  expect(next).toMatchObject({ status: "building", moduleId: candidate.moduleId });
+  expect(next.hash).not.toBe(candidate.hash);
+  await expect(installExternal(f.ports, f.workspaceId, { ...first, requestKey: "parallel-retry" })).rejects.toMatchObject({ code: "conflict" });
+  await buildPending(context); await refreshInstallationReceipts(f.ports, f.workspaceId);
+  expect(await installExternal(f.ports, f.workspaceId, retry)).toMatchObject({ status: "installed", hash: next.hash, moduleId: candidate.moduleId });
+  await recordInstallationResult(f.ports, f.workspaceId, { ...failed, status: "installed", error: null }, "building");
+  expect(await installExternal(f.ports, f.workspaceId, first)).toEqual(failed);
+});
+
 test("real adapter copies read-only official resources and only queues once", async () => {
   const f = await fixture(), release = await resolveExternalRelease(f.ports, "files");
   await chmod(join(release.codeDir, "index.ts"), 0o444);

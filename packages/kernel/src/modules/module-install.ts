@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { redactSensitiveText } from "@chrona/logging/redaction";
 import { moduleContext } from "./module-context";
-import { propose } from "./module-proposal";
+import { assertInitialInstallRetry, InitialInstallRetryConflict, propose } from "./module-proposal";
 import { moduleMaterialDigest } from "./module-artifacts";
 import { checkoutModule } from "./module-files";
 import { moduleInstallRequestSchema, moduleInstallResultSchema, type ModuleInstallRequest, type ModuleInstallResult } from "@chrona/contracts/steward";
@@ -61,14 +61,14 @@ export function createExternalModuleInstaller(ports: StewardPorts): ExternalModu
       await copyRelease(trusted, root, request.package);
       const prepared = async (hash: string) => {
         submission.hash = hash;
-        submission.existingVersionId = submission.moduleId ? (await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: {
+        submission.existingVersionId = request.mode === "update" && submission.moduleId ? (await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: {
           moduleId: submission.moduleId, hash } } }))?.id ?? null : null;
         submission.phase = "proposing";
         await ports.db.moduleInstallationSubmission.update({ where: { id }, data: submission });
       };
       let proposal;
-      if (submission.moduleId) {
-        if (!exactReleaseUpdate) throw new StewardError("conflict", "Release update requires an exact active baseline");
+      if (request.mode === "update") {
+        if (!submission.moduleId || !exactReleaseUpdate) throw new StewardError("conflict", "Release update requires an exact active baseline");
         const { baseline } = await prepareExactReleaseUpdate(context, submission.moduleId, trusted, exactReleaseUpdate);
         await prepared(trusted.hash);
         proposal = await propose(context, { root, dir: request.package, intent, allowed: [request.package], expectedHash: trusted.hash,
@@ -76,7 +76,7 @@ export function createExternalModuleInstaller(ports: StewardPorts): ExternalModu
       } else {
         await prepared(trusted.hash);
         proposal = await propose(context, { root, dir: request.package, intent, allowed: [request.package], expectedHash: trusted.hash,
-          expectedModuleId: null }, "user");
+          expectedModuleId: submission.moduleId, retryInitialInstall: submission.moduleId !== null }, "user");
       }
       if (proposal.hash !== trusted.hash) throw new StewardError("conflict", "Installation material differs from the selected release");
       submission.moduleId = proposal.moduleId ?? submission.moduleId;
@@ -107,7 +107,8 @@ async function prepareSubmission(ports: StewardPorts, workspaceId: string, reque
   const previous = await ports.db.moduleInstallationSubmission.findUnique({ where: { id } });
   if (previous) throw new StewardError("conflict", "Installation submission already exists; reconcile the original request");
   const module = await assertExternalName(ports.db, workspaceId, request.package, "install");
-  if ((request.mode === "install") === Boolean(module)) throw new StewardError("conflict",
+  const receipt = await ports.db.moduleInstallation.findUniqueOrThrow({ where: { id: installationId(workspaceId, request.requestKey) } });
+  if (receipt.moduleId !== (module?.id ?? null)) throw new StewardError("conflict",
     "Module identity changed before installation; reconcile the original request");
   const existing = module ? await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash } } }) : null;
   const marker = `Official installation ${installationId(workspaceId, request.requestKey)}`;
@@ -163,7 +164,7 @@ async function refreshReceipts(ports: StewardPorts, workspaceId: string, ids: st
       if (!recovered) continue;
       result.moduleId = recovered.moduleId; result.hash = recovered.hash;
     }
-    await recordInstallationResult(ports, workspaceId, await installationFacts(ports, workspaceId, result));
+    await recordInstallationResult(ports, workspaceId, await installationFacts(ports, workspaceId, result), row.status);
   }
 }
 async function removedSubmission(ports: StewardPorts, workspaceId: string, createdAt: Date, name: string, hash: string) {
@@ -179,14 +180,14 @@ async function recoverSubmission(ports: StewardPorts, workspaceId: string, row: 
   const submission = submissionSchema.parse(stored);
   if (submission.phase === "prepared") {
     await recordInstallationResult(ports, workspaceId, failure(result, "submission_not_started",
-      submission.error ?? "Resource preparation was interrupted before proposal; explicitly retry with a new request key"));
+      submission.error ?? "Resource preparation was interrupted before proposal; explicitly retry with a new request key"), "pending");
     return null;
   }
   if (!submission.moduleId) {
     const removed = await removedSubmission(ports, workspaceId, row.createdAt, result.package, submission.hash);
     if (removed?.moduleId) {
       await recordInstallationResult(ports, workspaceId, failure({ ...result, moduleId: removed.moduleId, hash: submission.hash },
-        "module_removed", "The submitted module was removed; a same-name installation cannot take over its receipt", "not_found"));
+        "module_removed", "The submitted module was removed; a same-name installation cannot take over its receipt", "not_found"), "pending");
       return null;
     }
   }
@@ -199,13 +200,13 @@ async function recoverSubmission(ports: StewardPorts, workspaceId: string, row: 
       ? failure({ ...result, moduleId: removedId, hash: submission.hash }, "module_removed",
         "The submitted module was removed; explicitly install it again", "not_found")
       : { ...result, error: { code: "conflict", reason: "submission_unconfirmed",
-        message: "Proposal was started but no attributable module remains; inspect diagnostics before explicitly retrying" } });
+        message: "Proposal was started but no attributable module remains; inspect diagnostics before explicitly retrying" } }, "pending");
     return null;
   }
   const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: submission.hash } } });
   if (!attributedVersion(version, submission)) {
     await recordInstallationResult(ports, workspaceId, { ...result, error: { code: "conflict", reason: "submission_unconfirmed",
-      message: "Proposal outcome cannot be attributed to this request; inspect the recorded candidate and diagnostics before explicitly retrying" } });
+      message: "Proposal outcome cannot be attributed to this request; inspect the recorded candidate and diagnostics before explicitly retrying" } }, "pending");
     return null;
   }
   return { moduleId: module.id, hash: version.hash };
@@ -219,13 +220,28 @@ function resumeInstallation(request: InstallationRequest, previous: Prisma.Modul
 export async function installExternal(ports: StewardPorts, workspaceId: string, raw: ModuleInstallRequest): Promise<ModuleInstallResult> {
   return installRequest(ports, workspaceId, parseInput(moduleInstallRequestSchema, raw));
 }
+async function assertInitialInstallClaim(tx: Prisma.TransactionClient, workspaceId: string, name: string,
+  module: Awaited<ReturnType<typeof assertExternalName>>) {
+  const head = await tx.moduleInstallationHead.findUnique({ where: { workspaceId_package: { workspaceId, package: name } },
+    include: { installation: true } });
+  const last = head?.installation;
+  if (last && ["pending", "building", "pending_approval"].includes(last.status)) {
+    throw new StewardError("conflict", "Installation has not settled; reconcile the original request");
+  }
+  if (!module) return;
+  if (module.activeHash || module.dataSchema !== null) throw new StewardError("conflict", "Module already installed; explicitly select update");
+  if (last?.mode !== "install" || last.status !== "failed" || last.moduleId !== module.id) {
+    throw new StewardError("conflict", "No failed initial installation to retry");
+  }
+  await assertInitialInstallRetry(tx, module);
+}
 async function installRequest(ports: StewardPorts, workspaceId: string, request: InstallationRequest): Promise<ModuleInstallResult> {
   const id = installationId(workspaceId, request.requestKey);
   const claim = await ports.db.$transaction(async tx => {
     const previous = await tx.moduleInstallation.findUnique({ where: { id } });
     if (previous) return resumeInstallation(request, previous);
     const module = await assertExternalName(tx, workspaceId, request.package, "install");
-    if (module && request.mode === "install") throw new StewardError("conflict", "Module already installed; explicitly select update");
+    if (request.mode === "install") await assertInitialInstallClaim(tx, workspaceId, request.package, module);
     if (!module && request.mode !== "install") throw new StewardError("not_found", "Module not installed; explicitly select install");
     const exactReleaseUpdate = request.mode === "update" ? await readExactReleaseBaselineIn(tx, module!) : undefined;
     const moduleId = module?.id ?? null;
@@ -263,7 +279,8 @@ async function installRequest(ports: StewardPorts, workspaceId: string, request:
     console.error(JSON.stringify({ component: "module-install", event: "submission.failed", package: request.package,
       requestKey: request.requestKey, error: redactSensitiveText(String(error)) }));
     const submission = await ports.db.moduleInstallationSubmission.findUnique({ where: { id: submissionId(workspaceId, request.requestKey) } });
-    result = submission ? { ...claim.result, status: "pending", error: null } : installationFailure(claim.result, error);
+    result = submission && !(error instanceof InitialInstallRetryConflict)
+      ? { ...claim.result, status: "pending", error: null } : installationFailure(claim.result, error);
   }
   try {
     await recordInstallationResult(ports, workspaceId, result);
@@ -276,12 +293,13 @@ async function installRequest(ports: StewardPorts, workspaceId: string, request:
   return result;
 }
 /** B updates this same receipt after the existing build/approval completes, then initialization can converge. */
-export async function recordInstallationResult(ports: StewardPorts, workspaceId: string, raw: ModuleInstallResult) {
+export async function recordInstallationResult(ports: StewardPorts, workspaceId: string, raw: ModuleInstallResult, expectedStatus?: string) {
   const result = moduleInstallResultSchema.parse(raw), id = installationId(workspaceId, result.requestKey);
   await ports.db.$transaction(async tx => {
     const row = await tx.moduleInstallation.findUniqueOrThrow({ where: { id } });
     if (row.package !== result.package) throw new StewardError("conflict", "Installation receipt identity mismatch");
-    await tx.moduleInstallation.update({ where: { id }, data: resultData(result) });
+    const written = await tx.moduleInstallation.updateMany({ where: { id, status: expectedStatus }, data: resultData(result) });
+    if (!written.count) return;
     if (row.mode !== "install" && result.error?.reason === "installation_rejected" && result.moduleId && result.hash) {
       const module = await tx.module.findFirst({ where: { id: result.moduleId, workspaceId, name: result.package } });
       if (module) await rejectedUpdateNotice({ ports, workspaceId, tx, module, hash: result.hash, error: result.error.message });

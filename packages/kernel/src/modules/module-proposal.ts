@@ -2,10 +2,11 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { z } from "zod";
+import type { Prisma } from "@chrona/db";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { parseInput, StewardError } from "../errors";
 import { intentSchema, json, type ModuleContext, type BuildReport, type Proposal, type ModuleSource } from "./module-context";
-import { storeVersionMaterial, moduleMaterialDigest, snapshotModuleMaterial } from "./module-artifacts";
+import { storeVersionMaterial, moduleMaterialDigest, snapshotModuleMaterial, withMaterialPublication } from "./module-artifacts";
 import { moduleMaterialEntryPath } from "../../../contracts/src/steward/module-material";
 import type { ModuleFile } from "./module-files";
 import { assertExactReleaseUpdateIn, assertExactReleaseCandidate } from "./module-exact-release";
@@ -15,14 +16,29 @@ import { assertExternalModule, assertExternalName } from "./module-identity";
 type Manifest = z.output<typeof moduleManifestSchema>;
 type ProposalInput = { dir: string; intent: z.input<typeof intentSchema>; root: string; allowed?: string[];
   /** Internal official installation/update path; never part of routed tool input. */
-  exactReleaseUpdate?: ExactReleaseBaseline; expectedHash?: string; expectedModuleId?: string | null };
+  exactReleaseUpdate?: ExactReleaseBaseline; expectedHash?: string; expectedModuleId?: string | null; retryInitialInstall?: boolean };
 type Submission = { moduleId: string; hash: string; versionId: string; manifest: Manifest; intent: z.output<typeof intentSchema>;
   source: ModuleSource; report: BuildReport };
-async function queueVersion(context: ModuleContext, submission: Submission) {
+export class InitialInstallRetryConflict extends StewardError {
+  constructor(message: string) { super("conflict", message); }
+}
+export async function assertInitialInstallRetry(tx: Prisma.TransactionClient,
+  module: { id: string; activeHash: string | null; dataSchema: number | null; status: string }) {
+  if (module.activeHash || module.dataSchema !== null || module.status !== "active" ||
+    await tx.moduleVersion.findFirst({ where: { moduleId: module.id, status: { not: "rejected" } }, select: { id: true } })) {
+    throw new InitialInstallRetryConflict("Initial installation cannot be retried while a version is selected or awaiting a decision");
+  }
+}
+async function queueVersion(context: ModuleContext, submission: Submission, retryInitialInstall?: boolean) {
   const { db, ports } = context, { moduleId, hash, versionId, manifest, intent, source, report } = submission;
   return db.$transaction(async tx => {
     const module = await assertExternalModule(tx, context.workspaceId, moduleId, "propose");
     await assertExactReleaseUpdateIn(context, tx, moduleId, report, module);
+    if (retryInitialInstall) {
+      await assertInitialInstallRetry(tx, module);
+      const previous = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash } }, select: { id: true } });
+      if (previous) throw new InitialInstallRetryConflict("Retry initial installation with material that has not already been submitted");
+    }
     // Preserve submission order for failure streaks even within one millisecond.
     const latest = await tx.moduleVersion.findFirst({ where: { moduleId }, orderBy: { createdAt: "desc" } });
     const createdAt = new Date(Math.max(ports.now().getTime(), (latest?.createdAt.getTime() ?? 0) + 1));
@@ -102,6 +118,9 @@ async function submitStaging(context: ModuleContext, submission: Omit<Submission
   await storeVersionMaterial(context.platform, files);
   const existing = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash } } });
   assertExactReleaseCandidate(existing, input.exactReleaseUpdate);
+  if (input.retryInitialInstall && existing) {
+    throw new InitialInstallRetryConflict("Retry initial installation with material that has not already been submitted");
+  }
   const hasEntry = files.some(file => file.path === moduleMaterialEntryPath(manifest.entry));
   const hasMigrate = hasMigration(manifest, files);
   if (existing?.status === "approved") return { moduleId: module.id, hash, status: "approved", report: existing.report as BuildReport };
@@ -109,7 +128,7 @@ async function submitStaging(context: ModuleContext, submission: Omit<Submission
     errors: submissionErrors(manifest, hasEntry, hasMigrate) } };
   if (existing && ["building", "testing", "pending_review"].includes(existing.status)) return { moduleId: module.id, hash,
     status: existing.status as Proposal["status"], report: existing.report as BuildReport };
-  const queued = await queueVersion(context, { ...submission, hash, moduleId: module.id, manifest });
+  const queued = await queueVersion(context, { ...submission, hash, moduleId: module.id, manifest }, input.retryInitialInstall);
   if (queued.id !== versionId) return { moduleId: module.id, hash, status: queued.status as Proposal["status"], report: queued.report as BuildReport };
   return { moduleId: module.id, hash, status: "building", report, retained: true };
 }
@@ -131,7 +150,7 @@ async function submitProposal(context: ModuleContext, input: ProposalInput, sour
   let retained = false;
   await mkdir(staging, { recursive: true });
   try {
-    const result = await submitStaging(context, { hash, report, versionId, intent, source }, staging, files, input);
+    const result = await withMaterialPublication(platform, () => submitStaging(context, { hash, report, versionId, intent, source }, staging, files, input));
     retained = result.retained ?? false;
     const { retained: _retained, ...proposal } = result;
     return proposal;

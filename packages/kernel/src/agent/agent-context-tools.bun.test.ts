@@ -26,7 +26,7 @@ const tool = (name: string, visibility = ["modules"]) => ({ name, description: n
 const targets = ["context-origin.observe", "context-origin.self", "context-origin.bounce", "context-peer.back"];
 
 /** Real admission, Run claim, router and supervisor; the wire peer only replaces application handlers. */
-async function fixture(selectedTargets = targets, beforeStart?: () => Promise<void>) {
+async function fixture(selectedTargets = targets, beforeStart?: () => Promise<void>, authority?: "owner") {
   registerSystemModules();
   const db = testDb({ injectedAgent: false }), dataDir = await mkdtemp(join(tmpdir(), "chrona-context-entry-"));
   const databases = await db.$queryRawUnsafe<{ name: string; file: string }[]>("PRAGMA database_list");
@@ -56,7 +56,8 @@ async function fixture(selectedTargets = targets, beforeStart?: () => Promise<vo
   const origin = await db.module.create({ data: { workspaceId, name: "context-origin", status: "active", activeHash: "context-origin-v1" } });
   const other = await db.module.create({ data: { workspaceId, name: "context-peer", status: "active", activeHash: "context-peer-v1" } });
   for (const [module, tools] of [[origin, [tool("observe"), tool("self"), tool("bounce"), tool("unselected"), tool("mutate", ["owner"]), tool("capture"), { ...tool("delegate", ["kernel"]), parameters: { type: "object", properties: { moduleId: { type: "string" }, recipientId: { type: "string" } }, required: ["moduleId", "recipientId"] } }]], [other, [tool("back"), { ...tool("relay", ["kernel", "modules"]), parameters: { type: "object", properties: { reference: { type: "string" } }, required: ["reference"] } }]]] as const) {
-    const manifest = moduleManifestSchema.parse({ name: module.name, entry: "index.ts", tests: ["test.ts"], effects: [], uses: [...targets, "context-peer.relay", "tool-delegation.invoke"], tools });
+    const manifest = moduleManifestSchema.parse({ name: module.name, entry: "index.ts", tests: ["test.ts"], effects: [],
+      ...(module.id === origin.id && authority ? { authority } : {}), uses: [...targets, "context-peer.relay", "tool-delegation.invoke"], tools });
     module.activeHash = await installTestModuleVersion(ports, module, manifest);
   }
   const principal = { workspaceId, ownerId: "owner", caller: { kind: "module" as const, moduleId: origin.id, hash: origin.activeHash! } };
@@ -67,6 +68,18 @@ async function fixture(selectedTargets = targets, beforeStart?: () => Promise<vo
   const invoke = (name: string, candidate = context) => callContextTool(ports, candidate, name, {}, { deadline: Date.now() + 5000 });
   return { db, ports, workspaceId, origin, other, run, context, principal, invoke };
 }
+
+test("an owner application can select credential management tools for its Run", async () => {
+  const management = ["secrets.list", "secrets.set", "secrets.remove"];
+  const f = await fixture(management, undefined, "owner");
+  expect(f.context.entries.map(entry => entry.tool.name)).toEqual(["list", "set", "remove"]);
+  expect(await f.invoke("m_secrets_list")).toEqual({ result: { items: [], nextCursor: null } });
+  for (const name of ["get", "token", "authorize"]) {
+    await expect(selectContextTools(f.ports, f.principal, [`secrets.${name}`])).rejects.toMatchObject({ code: "forbidden" });
+  }
+  const ordinary = await fixture();
+  await expect(selectContextTools(ordinary.ports, ordinary.principal, ["secrets.list"])).rejects.toMatchObject({ code: "forbidden" });
+});
 
 test("an ordinary module can delegate its own tool for one synchronous call", async () => {
   registerToolDelegations();

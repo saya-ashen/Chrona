@@ -1,7 +1,7 @@
 import { dlopen, FFIType, ptr, read } from "bun:ffi";
 import { randomUUID } from "node:crypto";
 import { constants, type BigIntStats } from "node:fs";
-import { lstat, mkdir, open, readdir, realpath, rm, type FileHandle } from "node:fs/promises";
+import { lstat, mkdir, open, readdir, realpath, rename, rm, type FileHandle } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { MODULE_SOURCE_MAX_BYTES, MODULE_SOURCE_MAX_FILES } from "../../../contracts/src/steward/module-material";
 import { StewardError } from "../errors";
@@ -130,6 +130,22 @@ export class ModuleDirectory {
     if (this.snapshot) this.snapshot.remember(target, await this.handle.stat({ bigint: true }));
     return readdir(target, { withFileTypes: true });
   }
+  async sweepDigests(keep: Set<string>) {
+    const parent = descriptor(this.handle);
+    const entries = (await this.entries()).filter(entry => entry.isDirectory());
+    for (const entry of entries) {
+      if (/^\.gc-[a-f0-9]{64}$/.test(entry.name)) await rm(join(parent, entry.name), { recursive: true, force: true });
+    }
+    let removed = 0;
+    for (const entry of entries) {
+      if (!/^[a-f0-9]{64}$/.test(entry.name) || keep.has(entry.name)) continue;
+      const trash = join(parent, `.gc-${entry.name}`);
+      await rename(join(parent, entry.name), trash);
+      await rm(trash, { recursive: true, force: true });
+      removed++;
+    }
+    return removed;
+  }
   async verifyTree(paths: Set<string>, prefix = "") {
     for (const entry of await this.entries()) {
       if (!prefix && INSTALLED_DIRS.has(entry.name) && entry.isDirectory()) continue;
@@ -185,6 +201,21 @@ export class ModuleDirectory {
     } finally { if (directory !== this) await directory.close(); }
   }
 }
+export async function openOptionalModuleDirectory(root: string, path: string) {
+  try { return await openModuleDirectory(root, path); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+export async function sweepModuleDirectories(root: string, path: string, keep: Set<string>) {
+  const directory = await openOptionalModuleDirectory(root, path);
+  if (!directory) return 0;
+  try { return await directory.sweepDigests(keep); }
+  finally { await directory.close(); }
+}
+
 export async function openModuleDirectory(root: string, path?: string, create = false, snapshot?: ModuleSnapshot) {
   if (snapshot) {
     const base = resolve(root);

@@ -8,6 +8,7 @@ import { StewardError } from "../errors";
 import { assertDynamicModuleActivation, expireModuleApprovals, requireModule, type ModuleContext } from "./module-context";
 import { dataEmpty, snapshotAt, type Restore } from "./module-data";
 import { activateIn, startMigration } from "./module-generation";
+import { withMaterialPublication } from "./module-artifacts";
 import { migrateData } from "./module-migration";
 import { assertCandidateVersionIn, setCandidateSetStateIn } from "./module-candidate-records";
 import { removeApproved } from "./module-remove";
@@ -114,7 +115,7 @@ async function prepareRollback(context: ModuleContext, tx: Prisma.TransactionCli
   await startMigration(context, tx, moduleId, hash, { from, to });
   return { migration: { module, version, manifest, from, to } };
 }
-export async function rollback(context: ModuleContext, moduleId: string, hash: string) {
+async function prepareRollbackRequest(context: ModuleContext, moduleId: string, hash: string) {
   await assertExternalModule(context.db, context.workspaceId, moduleId, "rollback");
   const version = await context.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash } } });
   if (!version || version.status !== "approved") throw new StewardError("conflict", "Module version is not approved");
@@ -127,6 +128,12 @@ export async function rollback(context: ModuleContext, moduleId: string, hash: s
       restore: prepared.restore }, preview: `将恢复 ${prepared.restore.snapshotAt} 的数据，此后写入的数据会丢失；当前数据会另存为 before-rollback-<iso>。\nhash: ${hash}` });
     return { status: "pending_approval" as const, approvalId: approval.id };
   }
+  return prepared;
+}
+
+export async function rollback(context: ModuleContext, moduleId: string, hash: string) {
+  const prepared = await withMaterialPublication(context.platform, () => prepareRollbackRequest(context, moduleId, hash));
+  if ("status" in prepared) return prepared;
   if (prepared.migration) await migrateData(context, prepared.migration, "rollback");
   return { status: "active" as const, moduleId, activeHash: hash };
 }

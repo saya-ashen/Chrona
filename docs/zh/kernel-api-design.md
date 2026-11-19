@@ -8,7 +8,7 @@
 
 ## 1. 设计边界
 
-内核目标提供一个调用原语及七个命名空间：`modules / approvals / secrets / settings / activity / timers / agent`。原六个命名空间共 35 个工具，新增 `agent` 的 7 个工具后目标共 42 个。通用 Agent API 归内核，内核不包含具体 Provider；具体 Provider 由独立应用注册，内核不预装或携带具体 Provider，也允许没有 Provider 时启动。此目标替代“Agent 是唯一不可替换内置应用、Pi 是唯一内置 Provider”的旧设计；当前源码已按此合同实现并完成记录中的定向检查，已部署实例仍使用先前版本，离线检查与线上可用性须分别记录。
+内核目标提供一个调用原语及七个命名空间：`modules / approvals / secrets / settings / activity / timers / agent`。原六个命名空间共 35 个工具，新增 `agent` 的 8 个工具后目标共 43 个。通用 Agent API 归内核，内核不包含具体 Provider；具体 Provider 由独立应用注册，内核不预装或携带具体 Provider，也允许没有 Provider 时启动。此目标替代“Agent 是唯一不可替换内置应用、Pi 是唯一内置 Provider”的旧设计；当前源码已按此合同实现并完成记录中的定向检查，已部署实例仍使用先前版本，离线检查与线上可用性须分别记录。
 
 内核保留真实身份、路由、精确授权、硬预算、单 Run 队列、租约、取消、实际停止证据、敏感交付、受控生命周期与持久唤醒。通知、会话、记忆、文件业务、页面、应用设置、业务调度策略和多消费者分发由普通应用承担。应用名称不授予权力；本地执行仍是 trusted-local，不承诺隔离同一 OS 用户下的恶意代码。
 
@@ -138,9 +138,9 @@
 
 内核负责持久化、最小间隔、唤醒硬预算及重启后错过多次合并一次。同版本暂停期间不投递，恢复后合并过期唤醒；timer 绑定注册时的活动代码 hash，hash 改变后标为 stale，须由应用重新 set。尚未检查到旧 timer 前若回到相同 hash，可继续原 timer；一旦标为 stale 则须重新 set。取消或替换不撤销已送出的事件，但旧处理器的迟到返回不能覆盖新 revision 或取消结果。运行中断且没有完成证据时标为 unknown、停止后续唤醒，须由应用核对效果后显式 set。取消不撤销已执行效果，未知效果不自动重放，不承诺业务恰好执行一次。唤醒成功不证明业务完成或通知送达。timer 不直接启动模型，模型工作仍走 Agent 准入及预算。
 
-## 9. agent：Provider 注册与通用执行（7 个，待实现）
+## 9. agent：Provider 注册与通用执行（8 个）
 
-本节是 2026-11-11 用户确认的后续设计，不是当前接口使用手册。只保留以下七个公开工具；不以通用 `command` 隐藏另一套操作全集，也不新增独立公开 `provider` 命名空间。
+本节是 2026-11-11 用户确认的后续设计，不是当前接口使用手册。当前列出八个公开工具；不以通用 `command` 隐藏另一套操作全集，也不新增独立公开 `provider` 命名空间。
 
 | API | 功能与概念输入 | 合并或替代关系 |
 | --- | --- | --- |
@@ -151,6 +151,7 @@
 | `write` | 向指定运行发送输入，使用判别联合区分 `message` 与绑定问题 ID 的 `answer` | 合并原 `write + respond`，保留分别校验 |
 | `stop` | 请求停止指定运行，返回停止请求及实际停止确认状态 | 替代原 `interrupt`；已受理不等于已停止 |
 | `native` | 将指定 Run 的 Provider 原生请求透传给其已绑定的后端实例，返回关联的原生响应 | 新增后端能力入口；内核不解释 Pi 命令 |
+| `inspect` | 查询 Provider 已声明的版本化只读数据，支持 Provider 和 Run 两种作用域 | Run 查询使用原绑定和所有权校验 |
 
 上表字段为概念合同，完整 wire schema、大小上限和默认值须在冻结前确定。所有写调用的幂等 key 使用第 2 节调用选项，不在参数中恢复 `requestKey`。所有读取均检查实际调用者，不因持有 ID 或 cursor 而获权。
 
@@ -179,6 +180,11 @@ Chrona 接入工具桥、会话关联和运行控制，明确显示必要覆盖�
 这属于配置与能力加载选择，不构成 OS 沙箱。trusted-local 仍按服务用户的系统权限执行，不能以环境变量过滤、工具目录或 Manifest 宣称文件与网络隔离。
 
 ### 9.4 原生能力与 raw 输出
+
+`providers` 的 `inspections` 列出每条 `{query, version, scope}`。调用 `inspect` 时使用 `{providerId, query, version, args}` 或 `{runId, query, version, args}`，返回 `{query, version, data}`。`args` 和 `data` 各限 64 KiB。Provider 定义各查询的参数和结果，新增查询无需改变内核调用形式。
+
+- `models@1` 使用 Provider 作用域。参数可带上一页返回的不透明 `cursor`。配置修订变化后须从第一页重新查询。结果包含 `defaultModel`、`nextCursor` 和 `models`。每个模型提供 `id`、`label` 和 `effort`，其中 `effort` 为 `{options, default}` 或 `null`，表示 Provider 未提供可验证的选项。调用方通过 `run.providerOptions.model` 和 `run.providerOptions.thinking` 传入选中的值。
+- `context@1` 使用 Run 作用域，参数为空对象，结果包含 `windowTokens` 和 `usedTokens`。未知值为 `null`。已退出或尚未启动的 Provider 操作可能不可查询。Pi 在运行中的会话上提取 `get_session_stats.contextUsage`，用量是当前上下文窗口的估计。
 
 启动前的后端特有选项和命令行参数放入 `run.providerOptions`，由 Provider 校验与解释。运行中的原生命令使用 `native`，概念请求为 `{runId, request: {type: "get_state"}}`，幂等 key 放在调用选项。原生协议和版本由 Provider 描述，内核不维护 Pi 命令白名单；不支持的能力返回明确的 `unsupported` reason。
 

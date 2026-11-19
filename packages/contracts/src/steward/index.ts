@@ -331,9 +331,9 @@ export type ProviderRunInput = {
   events?: ProviderEvents;
 };
 export type ProviderTranscriptItem =
-  | { id?: string; at: string; kind: "text"; text: string }
-  | { id?: string; at: string; kind: "tool"; tool: string; args: string }
-  | { id?: string; at: string; kind: "result"; tool: string; text: string; error: boolean };
+  | { id?: string; at: string; kind: "text"; text: string; partial?: true }
+  | { id?: string; at: string; kind: "tool"; tool: string; args: string; callId?: string }
+  | { id?: string; at: string; kind: "result"; tool: string; text: string; error: boolean; callId?: string };
 export type ProviderAdapter = {
   name: string;
   supportsRunModel?: boolean;
@@ -341,9 +341,9 @@ export type ProviderAdapter = {
   /** Internal adapter completion: no tools, session or fallback model. Public callers use agent.run with kind: completion. */
   complete?(input: { model: string; thinking?: (typeof THINKING_LEVELS)[number]; system?: string; prompt: string; maxOutputTokens: number; timeoutMs: number }): Promise<{ text: string; inputTokens: number | null; outputTokens: number | null }>;
   /** Read normalized session history without exposing backend file formats to the kernel. */
-  transcript?(input: { sessionDir: string; limit: number }): Promise<ProviderTranscriptItem[]>;
+  transcript?(input: { sessionDir: string; limit: number; runId?: string }): Promise<ProviderTranscriptItem[]>;
   /** Starts a run; returns a handle that can receive messages while running. */
-  start(input: ProviderRunInput): { native?(request: Record<string, unknown>): Promise<Record<string, unknown>>; inject(message: string, images?: { mime: string; base64: string }[]): Promise<void>; abort(): Promise<void>; done: Promise<{ outcome: "finished" | "failed" | "timed_out" | "unavailable"; sessionId: string | null; error: string | null }> };
+  start(input: ProviderRunInput): { contextUsage?(): Promise<{ windowTokens: number | null; usedTokens: number | null }>; native?(request: Record<string, unknown>): Promise<Record<string, unknown>>; inject(message: string, images?: { mime: string; base64: string }[]): Promise<void>; abort(): Promise<void>; done: Promise<{ outcome: "finished" | "failed" | "timed_out" | "unavailable"; sessionId: string | null; error: string | null }> };
 };
 
 // ---------------------------------------------------------------- types ----
