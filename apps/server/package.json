@@ -16,6 +16,6 @@
     "@chrona/logging": "workspace:*",
     "@chrona/kernel": "workspace:*",
     "@chrona/runtime-config": "workspace:*",
-    "pino": "^10.3.1"
+    "pino": "^10.4.0"
   }
 }

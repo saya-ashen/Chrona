@@ -48,8 +48,8 @@
     "audit:security": "bun run scripts/audit-security.ts"
   },
   "dependencies": {
-    "@prisma/client": "7.9.1",
-    "hono": "^4.13.18",
+    "@prisma/client": "7.10.1",
+    "hono": "^4.13.19",
     "prisma-adapter-bun-sqlite": "^0.8.0",
     "zod": "^4.6.6"
   },
