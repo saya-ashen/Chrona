@@ -268,7 +268,11 @@ test("tick does not wait for or fail on pruning; a failed pass is logged and can
   const db = testDb(); closes.push(() => db.$disconnect());
   const execute = db.$executeRaw.bind(db);
   let attempts = 0;
-  db.$executeRaw = (() => { attempts++; return Promise.reject(new Error("retention write failure")); }) as typeof db.$executeRaw;
+  db.$executeRaw = ((query: Prisma.Sql) => {
+    if (query.sql.includes('DELETE FROM "ModuleVersion"')) return execute(query);
+    attempts++;
+    return Promise.reject(new Error("retention write failure"));
+  }) as typeof db.$executeRaw;
   const logged: string[] = [], error = console.error;
   console.error = (line: string) => { logged.push(line); };
   try {

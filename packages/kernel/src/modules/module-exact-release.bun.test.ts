@@ -201,7 +201,7 @@ test.each([false, true])("exact drain preserves unknown stop; changed lifecycle 
 }, 30_000);
 
 test("baseline changed after async material retention is rejected inside the queue write transaction", async () => {
-  const f = await fixture(), { alternate, api } = await alternateApproved(f);
+  const f = await fixture(), { alternate } = await alternateApproved(f);
   const module = await f.db.module.findUniqueOrThrow({ where: { id: f.local.moduleId! } });
   const { baseline } = await prepareExactReleaseUpdate(f.context, f.local.moduleId!, f.release, await readExactReleaseBaselineIn(f.db, module));
   let transactions = 0;
@@ -209,7 +209,7 @@ test("baseline changed after async material retention is rejected inside the que
     if (property !== "$transaction") return Reflect.get(target, property, receiver);
     return async (...args: Parameters<typeof target.$transaction>) => {
       if (++transactions === 2) {
-        await api.modules.rollback(f.local.moduleId!, alternate.hash);
+        await target.module.update({ where: { id: module.id }, data: { activeHash: alternate.hash } });
       }
       return target.$transaction(...args);
     };

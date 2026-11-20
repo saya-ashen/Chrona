@@ -8,6 +8,30 @@ kernel 负责应用生命周期、工具路由、真实调用方、审批、凭�
 
 具体应用源码、页面、Provider 适配器、依赖包和发行制品由各自仓库维护，应用自行构建、发布并说明安装方式。本仓库与发行包不含默认应用；全新 kernel 启动时创建数据库和默认 workspace，不安装应用，也不调用模型。
 
+## 运行发行版
+
+从 [GitHub Releases](https://github.com/saya-ashen/Chrona/releases) 下载对应平台的归档，用 `SHA256SUMS` 核对下载文件，然后解压并保留同目录下的发行资源。
+
+新版 kernel 使用全新的数据目录。在 Linux 或 macOS 上进入解压目录并运行：
+
+```bash
+export CHRONA_DATA_DIR="$PWD/chrona-data"
+export DATABASE_URL="file:$CHRONA_DATA_DIR/chrona.db"
+./chrona start --no-open
+```
+
+Windows 使用 PowerShell：
+
+```powershell
+$env:CHRONA_DATA_DIR = Join-Path $PWD chrona-data
+$env:DATABASE_URL = "file:$env:CHRONA_DATA_DIR/chrona.db"
+.\chrona.exe start --no-open
+```
+
+如果正在使用 Chrona 0.3.x，请保留原数据目录和完整备份。重构后的 kernel 需要单独的数据库，会拒绝旧 schema。
+
+按各应用仓库的说明构建，把每个应用的完整发行材料放入同名子目录，例如 `external/pi`。将 `CHRONA_MODULE_RESOURCES` 设为 `external` 的绝对路径。kernel 初始化数据库后，先停服务，再执行 `chrona admin install pi --request-key install-pi`，然后重启以处理构建。用 `chrona admin catalog` 查看回执。若需要审批，停服务后运行 `chrona admin approvals`，确认目标并执行 `chrona admin approve <id>`，再重启。恢复流程见[运维说明](docs/zh/operations.md)。
+
 ## 从源码运行
 
 需要 **Bun ≥ 1.4.2**、**git** 及用于构建进程监管器的本机 C 编译器。完整备份还需要 GNU 兼容的 `tar`。
