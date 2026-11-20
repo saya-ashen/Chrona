@@ -125,6 +125,10 @@ export function spawnSupervised(command: string, args: readonly string[] = [], o
     console.error(JSON.stringify({ component: "process-guardian", event: "control.failed", pid: child.pid, error: String(error) }));
   });
   status?.on("error", () => { invalid = true; stop(); });
+  const statusFinished = status ? new Promise<void>(resolve => {
+    status.once("end", resolve);
+    status.once("close", resolve);
+  }) : undefined;
   const abort = () => stop();
   options.signal?.addEventListener("abort", abort, { once: true });
   const timer = options.timeoutMs === undefined ? undefined : setTimeout(stop, options.timeoutMs);
@@ -141,9 +145,8 @@ export function spawnSupervised(command: string, args: readonly string[] = [], o
       }, 250);
     });
     child.once("close", async (code, signal) => {
-      // Windows status arrives on a separate pipe, outside ChildProcess stdio.
-      // Retain the drain deadline until its last record/EOF has been delivered.
-      if (windows) await windows.statusFinished;
+      // Keep the drain deadline until the last status record and EOF are delivered.
+      await (windows?.statusFinished ?? statusFinished);
       windows?.dispose();
       clearTimeout(timer);
       clearTimeout(drainTimer);
