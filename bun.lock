@@ -8,7 +8,7 @@
         "@prisma/client": "7.9.1",
         "hono": "^4.13.18",
         "prisma-adapter-bun-sqlite": "^0.8.0",
-        "zod": "^4.4.3",
+        "zod": "^4.6.6",
       },
       "devDependencies": {
         "@eslint/js": "^10.0.1",
@@ -27,7 +27,7 @@
     },
     "apps/cli": {
       "name": "@chrona/cli",
-      "version": "0.3.1",
+      "version": "0.4.0-rc.1",
       "bin": {
         "chrona": "./src/index.ts",
       },
@@ -58,7 +58,7 @@
       "name": "@chrona/contracts",
       "version": "0.1.0",
       "dependencies": {
-        "zod": "^4.3.6",
+        "zod": "^4.6.6",
       },
     },
     "packages/db": {
@@ -110,7 +110,7 @@
       "name": "@chrona/runtime-config",
       "version": "0.1.0",
       "dependencies": {
-        "zod": "^4.4.3",
+        "zod": "^4.6.6",
       },
     },
   },
@@ -121,6 +121,7 @@
   "overrides": {
     "brace-expansion": "5.0.12",
     "deepmerge-ts": "8.0.0",
+    "effect": "3.22.1",
     "fast-uri": "3.1.7",
     "mysql2": "3.22.0",
   },
@@ -133,17 +134,13 @@
 
     "@chrona/domain": ["@chrona/domain@workspace:packages/domain"],
 
-
     "@chrona/host": ["@chrona/host@workspace:packages/host"],
 
     "@chrona/kernel": ["@chrona/kernel@workspace:packages/kernel"],
 
     "@chrona/logging": ["@chrona/logging@workspace:packages/logging"],
 
-
     "@chrona/process": ["@chrona/process@workspace:packages/process"],
-
-
 
     "@chrona/runtime-config": ["@chrona/runtime-config@workspace:packages/runtime-config"],
 
@@ -481,7 +478,7 @@
 
     "dotenv": ["dotenv@17.4.2", "", {}, "sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw=="],
 
-    "effect": ["effect@3.20.0", "", { "dependencies": { "@standard-schema/spec": "^1.0.0", "fast-check": "^3.23.1" } }, "sha512-qMLfDJscrNG8p/aw+IkT9W7fgj50Z4wG5bLBy0Txsxz8iUHjDIkOgO3SV0WZfnQbNG2VJYb0b+rDLMrhM4+Krw=="],
+    "effect": ["effect@3.22.1", "", { "dependencies": { "@standard-schema/spec": "^1.0.0", "fast-check": "^3.23.1" } }, "sha512-TNoXushmPOBAjJlthF5d2QwnX2xBPEtcNJr5XKNKbRLbDvBcOYkXlYDfvGfSA0zriwLFuCll5MDtNMAdZL17PQ=="],
 
     "elkjs": ["elkjs@0.11.1", "", {}, "sha512-zxxR9k+rx5ktMwT/FwyLdPCrq7xN6e4VGGHH8hA01vVYKjTFik7nHOxBnAYtrgYUB1RpAiLvA1/U2YraWxyKKg=="],
 
@@ -823,7 +820,7 @@
 
     "zeptomatch": ["zeptomatch@2.1.0", "", { "dependencies": { "grammex": "^3.1.11", "graphmatch": "^1.1.0" } }, "sha512-KiGErG2J0G82LSpniV0CtIzjlJ10E04j02VOudJsPyPwNZgGnRKQy7I1R7GMyg/QswnE4l7ohSGrQbQbjXPPDA=="],
 
-    "zod": ["zod@4.4.3", "", {}, "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="],
+    "zod": ["zod@4.6.7", "", {}, "sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg=="],
 
     "@eslint-community/eslint-utils/eslint-visitor-keys": ["eslint-visitor-keys@3.4.3", "", {}, "sha512-wpc+LXeiyiisxPlEkUzU6svyS1frIO3Mgxj1fdy7Pm8Ygzguax2N3Fa/D/ag1WqbOprdI+uY6wMUl8/a2G+iag=="],
 

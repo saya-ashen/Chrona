@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, platform-v2]
+    branches: [platform-v2]
   pull_request:
-    branches: [main]
+    branches: [platform-v2]
 
 permissions:
   contents: read
@@ -41,6 +41,7 @@ jobs:
         run: bun run ci:local
         env:
           LINT_RATCHET_BASE: ${{ github.event_name == 'push' && github.event.before || '' }}
+          CHRONA_TEST_CONCURRENCY: "1"
 
 
   container:

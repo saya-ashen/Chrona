@@ -192,7 +192,11 @@ test("HTTP Agent Runs retain auth, actual SDK caller identity, private fences, q
   expect(replay.ended).toBe(true); expect(replay.items.every((item: { sequence: number }) => item.sequence > before.items[0].sequence)).toBe(true);
   expect(replay.items).toContainEqual(expect.objectContaining({ kind: "progress", payload: expect.objectContaining({ value: { phase: "writing", tool: "write" } }) }));
   const invocations = await db.moduleInvocation.findMany();
-  expect(invocations.length).toBeGreaterThan(0); expect(JSON.stringify(invocations)).not.toContain(startInput().prompt); expect(JSON.stringify(invocations)).not.toContain(run.input.token);
+  expect(invocations.length).toBeGreaterThan(0);
+  expect(run.input.token).toBe("");
+  const persistedInvocations = JSON.stringify(invocations);
+  expect(persistedInvocations).not.toContain(startInput().prompt);
+  expect(persistedInvocations).not.toContain('"token":');
   expect(await readFile(join(run.input.cwd, "existing.txt"), "utf8")).toBe("existing\n");
   expect(await db.module.count({ where: { name: { in: ["agent", "coding", "mcp", "mind", "remind"] } } })).toBe(0);
   expect(errors).toEqual([]);

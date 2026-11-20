@@ -1,15 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.4.0-rc.1 — Standalone application kernel
 
-### Added
-- Local personal-steward loop: affairs, source events/baselines, deterministic assessments and permissions, delegations, attention, follow-ups, audited declarative tools, restrained suggestions and leased notification delivery.
-- Today / Affairs / Delegations / Connections UI, steward Schedule projection, owner/workspace-scoped HTTP API, in-app delivery and env-gated test seams with local test coverage. Reddit remains an unwired read-only adapter boundary; no real external notification channel or external-Agent assessor is connected.
-- Added experimental official Pi CLI provider alongside OMP, with local Pi resource reuse for execution, isolated planning/review/result tools, scoped execution control, yes/no approvals and Chrona-owned session-history resume. Requires separately installed Pi ≥ 0.85.0; Codex remains the recommended stable default. See [setup and compatibility limits](docs/en/pi-provider.md).
+### Highlights
+- Chrona now ships the kernel, host runtime, CLI, and application SDK. Web pages, chat, and model providers are installed separately from their application repositories.
+- The kernel governs application lifecycle, approvals, credentials, durable timers, and Agent Runs with a shared queue, budgets, and stop tracking.
+- Providers can advertise versioned read-only queries through `agent.providers` and serve them through `agent.inspect`. The separate Pi application uses this interface for model-specific effort options and live context usage.
+- The runtime periodically reclaims unreferenced files from old terminal application versions while retaining active versions, direct rollback versions, and versions still needed by lifecycle operations.
 
-### Changed
-- Product centre is now the [personal steward](docs/en/personal-steward.md), following the 2026-10-13 direction. Earlier work/results architecture remains a result-layer reference; legacy Plan/Run/managed execution remains reachable through secondary navigation.
-- This steward rebuild is unreleased and not deployed; no real user data was migrated.
+### Upgrading from 0.3.x
+- Start this version with a new data directory and database. Retain a complete backup of the previous instance, including configuration, sessions, and secrets. The rebuilt kernel rejects databases from the previous architecture and does not migrate them.
+- Install the applications you need after the kernel starts. The previous bundled UI and providers are not included. See the [binary startup instructions](README.md#run-a-release-binary) and [operations guide](docs/zh/operations.md).
 
 ## 0.3.1 — Provider parity and product demo polish
 

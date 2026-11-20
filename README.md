@@ -8,6 +8,30 @@ The kernel owns application lifecycle, tool routing, caller identity, approvals,
 
 Application source, pages, Provider adapters, dependency bundles and release artifacts belong to their own repositories. Applications manage their own builds, releases and installation instructions. This repository and its distributions contain no default applications; starting a fresh kernel creates its database and default workspace without installing an application or calling a model.
 
+## Run a release binary
+
+Download and extract the archive for your platform from [GitHub Releases](https://github.com/saya-ashen/Chrona/releases). Verify it against `SHA256SUMS` and keep the extracted files together.
+
+For the rebuilt kernel, choose a fresh data directory. From the extracted directory on Linux or macOS:
+
+```bash
+export CHRONA_DATA_DIR="$PWD/chrona-data"
+export DATABASE_URL="file:$CHRONA_DATA_DIR/chrona.db"
+./chrona start --no-open
+```
+
+On Windows, run the equivalent commands in PowerShell:
+
+```powershell
+$env:CHRONA_DATA_DIR = Join-Path $PWD chrona-data
+$env:DATABASE_URL = "file:$env:CHRONA_DATA_DIR/chrona.db"
+.\chrona.exe start --no-open
+```
+
+If you already use Chrona 0.3.x, keep its data directory and a complete backup. The rebuilt kernel requires a separate database and rejects the old schema.
+
+Build the applications you want using their repository instructions. Place each application's complete release material in a subdirectory named after the application, such as `external/pi`. Set `CHRONA_MODULE_RESOURCES` to the absolute path of `external`. After the kernel has initialized its database, stop it and run `chrona admin install pi --request-key install-pi`. Restart Chrona to process the build. Use `chrona admin catalog` to check the receipt. If an approval is required, stop Chrona, review `chrona admin approvals`, approve the intended ID with `chrona admin approve <id>`, and restart. See [operations](docs/zh/operations.md) for recovery.
+
 ## Run from source
 
 Requires **Bun ≥ 1.4.2**, **git**, and a native C compiler for the process guardian. Full backups also require GNU-compatible `tar`.

@@ -8,5 +8,5 @@ test("service bootstraps kernel Agent and private event delivery before any Prov
   const callback = listLocalModules().find(module => module.name === "runtime-callback");
   expect(callback?.tools.map(tool => tool.name)).toEqual(["event"]);
   const agent = listSystemModules().find(module => module.name === "agent");
-  expect(agent?.tools.map(tool => tool.name).sort()).toEqual(["native", "providers", "read", "register", "run", "stop", "write"]);
+  expect(agent?.tools.map(tool => tool.name).sort()).toEqual(["inspect", "native", "providers", "read", "register", "run", "stop", "write"]);
 });

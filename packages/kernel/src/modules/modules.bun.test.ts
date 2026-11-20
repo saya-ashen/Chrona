@@ -913,7 +913,7 @@ test("invalid manifests reject without inventing a module identity or leaking pa
   expect(await f.propose()).toMatchObject({ status: "rejected", moduleId: null, report: { errors: [expect.stringMatching(/^name: /)] } });
   // Every removed field fails strictly, even when its legacy value is empty.
   for (const [field, value] of Object.entries({ triggers: [], settings: {}, contributes: {}, healthCheck: "health.ts" })) {
-    await writeFile(join(f.dir, "module.json"), JSON.stringify({ name: "water", entry: "index.ts", effects: [], tests: ["test.ts"], [field]: value }));
+    await writeFile(join(f.dir, "module.json"), JSON.stringify({ name: "water", entry: "index.ts", keepAlive: true, effects: [], tests: ["test.ts"], [field]: value }));
     expect(await f.propose()).toMatchObject({ status: "rejected", moduleId: null, report: { errors: [`module.json: Unrecognized key: "${field}"`] } });
   }
   expect(await f.db.module.count()).toBe(0);

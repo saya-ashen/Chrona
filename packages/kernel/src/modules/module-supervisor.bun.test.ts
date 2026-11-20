@@ -293,7 +293,7 @@ test("keepAlive starts at runtime start, restarts with backoff and pauses after 
     await Bun.sleep(20);
     f.advance(2 ** i * 1000 - 1); await Bun.sleep(10); expect(f.processes).toHaveLength(i + 1);
     f.advance(1);
-    if (i < 2) await until(() => f.processes.length === i + 2);
+    if (i < 2) await until(() => f.processes.length === i + 2 && f.supervisor.status(f.module.id, f.hash, true).state === "running");
   }
   await until(async () => (await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).status === "paused");
   expect((await notices(f.db, { kind: "module-paused" })).length).toBe(1);
