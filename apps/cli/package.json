@@ -11,6 +11,6 @@
     "@chrona/host": "workspace:*",
     "@chrona/logging": "workspace:*",
     "@chrona/runtime-config": "workspace:*",
-    "commander": "^15.0.0"
+    "commander": "^15.1.0"
   }
 }
