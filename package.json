@@ -70,6 +70,7 @@
   "overrides": {
     "brace-expansion": "5.0.12",
     "deepmerge-ts": "8.0.0",
+    "effect": "3.22.1",
     "fast-uri": "3.1.7",
     "mysql2": "3.22.0"
   },
